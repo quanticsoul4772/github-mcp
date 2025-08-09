@@ -6,6 +6,9 @@ import {
   validateRef,
   validateCommitSha,
   sanitizeText,
+  validateGitHubToken,
+  validateGitHubTokenFormat,
+  ValidationLevel,
   ValidationError,
 } from './validation.js';
 
@@ -150,6 +153,122 @@ describe('Validation Module', () => {
       expect(sanitizeText('')).toBe('');
       expect(sanitizeText(null as any)).toBe('');
       expect(sanitizeText(undefined as any)).toBe('');
+    });
+  });
+
+  describe('validateGitHubToken (legacy)', () => {
+    it('should accept valid GitHub tokens (classic PAT)', () => {
+      expect(validateGitHubToken('ghp_1234567890123456789012345678901234567890')).toBe(true);
+    });
+
+    it('should accept valid GitHub tokens (fine-grained PAT)', () => {
+      expect(validateGitHubToken('github_pat_11ABCDEFG0123456789012_abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOP')).toBe(true);
+    });
+
+    it('should accept valid OAuth tokens', () => {
+      expect(validateGitHubToken('gho_1234567890123456789012345678901234567890')).toBe(true);
+    });
+
+    it('should accept valid installation tokens', () => {
+      expect(validateGitHubToken('ghi_1234567890123456789012345678901234567890')).toBe(true);
+    });
+
+    it('should accept legacy 40-character hex tokens', () => {
+      expect(validateGitHubToken('1234567890abcdef1234567890abcdef12345678')).toBe(true);
+    });
+
+    it('should reject invalid tokens', () => {
+      expect(validateGitHubToken('')).toBe(false);
+      expect(validateGitHubToken('invalid-token')).toBe(false);
+      expect(validateGitHubToken('ghp_123')).toBe(false); // too short
+      expect(validateGitHubToken('unknown_prefix_token')).toBe(false);
+    });
+  });
+
+  describe('validateGitHubTokenFormat', () => {
+    describe('MODERATE validation (default)', () => {
+      it('should accept valid classic PAT tokens', () => {
+        const result = validateGitHubTokenFormat('ghp_' + 'a'.repeat(36));
+        expect(result.isValid).toBe(true);
+        expect(result.format?.description).toBe('GitHub Personal Access Token (classic)');
+      });
+
+      it('should accept valid fine-grained PAT tokens', () => {
+        // Fine-grained tokens have github_pat_ prefix and are minimum 82 characters total
+        const token = 'github_pat_' + 'A'.repeat(71); // 12 + 71 = 83 characters
+        const result = validateGitHubTokenFormat(token);
+        expect(result.isValid).toBe(true);
+        expect(result.format?.description).toBe('GitHub Fine-grained Personal Access Token');
+      });
+
+      it('should accept tokens with length variations', () => {
+        // Test minimum length
+        const shortResult = validateGitHubTokenFormat('ghp_' + 'a'.repeat(36));
+        expect(shortResult.isValid).toBe(true);
+
+        // Test longer than minimum
+        const longResult = validateGitHubTokenFormat('ghp_' + 'a'.repeat(100));
+        expect(longResult.isValid).toBe(true);
+      });
+
+      it('should reject tokens that are too short', () => {
+        const result = validateGitHubTokenFormat('ghp_123');
+        expect(result.isValid).toBe(false);
+        expect(result.error).toContain('must be between');
+      });
+
+      it('should reject tokens that are too long', () => {
+        const result = validateGitHubTokenFormat('ghp_' + 'a'.repeat(300));
+        expect(result.isValid).toBe(false);
+        expect(result.error).toContain('must be between');
+      });
+
+      it('should reject unrecognized token formats', () => {
+        // Use a token that won't match legacy format (non-hex characters)
+        const result = validateGitHubTokenFormat('unknown_prefix_with_invalid_chars!@#');
+        expect(result.isValid).toBe(false);
+        expect(result.error).toContain('Unrecognized token format');
+      });
+    });
+
+    describe('STRICT validation', () => {
+      it('should enforce exact pattern matching', () => {
+        // Valid pattern
+        const validResult = validateGitHubTokenFormat('ghp_' + 'A'.repeat(36), ValidationLevel.STRICT);
+        expect(validResult.isValid).toBe(true);
+
+        // Invalid characters
+        const invalidResult = validateGitHubTokenFormat('ghp_' + 'A'.repeat(35) + '!', ValidationLevel.STRICT);
+        expect(invalidResult.isValid).toBe(false);
+        expect(invalidResult.error).toContain('invalid character pattern');
+      });
+
+      it('should validate legacy tokens strictly', () => {
+        const validLegacy = validateGitHubTokenFormat('1234567890abcdef1234567890abcdef12345678', ValidationLevel.STRICT);
+        expect(validLegacy.isValid).toBe(true);
+
+        const invalidLegacy = validateGitHubTokenFormat('1234567890abcdef1234567890abcdef1234567g', ValidationLevel.STRICT);
+        expect(invalidLegacy.isValid).toBe(false);
+      });
+    });
+
+    describe('LENIENT validation', () => {
+      it('should accept any non-empty token', () => {
+        expect(validateGitHubTokenFormat('any_token_format', ValidationLevel.LENIENT).isValid).toBe(true);
+        expect(validateGitHubTokenFormat('123', ValidationLevel.LENIENT).isValid).toBe(true);
+        expect(validateGitHubTokenFormat('!@#$%^&*()', ValidationLevel.LENIENT).isValid).toBe(true);
+      });
+
+      it('should reject empty tokens', () => {
+        expect(validateGitHubTokenFormat('', ValidationLevel.LENIENT).isValid).toBe(false);
+        expect(validateGitHubTokenFormat('   ', ValidationLevel.LENIENT).isValid).toBe(false);
+      });
+    });
+
+    it('should handle edge cases', () => {
+      expect(validateGitHubTokenFormat(null as any).isValid).toBe(false);
+      expect(validateGitHubTokenFormat(undefined as any).isValid).toBe(false);
+      expect(validateGitHubTokenFormat(123 as any).isValid).toBe(false);
     });
   });
 
