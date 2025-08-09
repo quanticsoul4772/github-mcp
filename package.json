@@ -12,7 +12,13 @@
     "prepare": "npm run build",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "test:watch": "vitest --watch",
+    "test:run": "vitest run",
+    "test:integration": "vitest run --testNamePattern=\"Integration\"",
+    "test:unit": "vitest run --testNamePattern=\"^(?!.*Integration).*$\"",
+    "lint": "echo 'Linting not configured yet'",
+    "typecheck": "npx tsc --noEmit"
   },
   "keywords": [
     "mcp",
@@ -32,6 +38,7 @@
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.4",
     "@types/node": "^24.2.1",
+    "@vitest/coverage-v8": "^3.2.4",
     "@vitest/ui": "^3.2.4",
     "tsx": "^4.20.3",
     "typescript": "^5.9.2",
