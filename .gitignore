@@ -59,3 +59,7 @@ pnpm-lock.yaml
 *.pid
 *.seed
 *.pid.lock
+
+# Test/debug scripts with potential secrets
+debug-api.js
+test-api.js
