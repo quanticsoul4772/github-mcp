@@ -181,6 +181,205 @@ export function sanitizeText(text: string, maxLength: number = 1000): string {
 }
 
 /**
+ * Validates a GitHub Personal Access Token format
+ * - Must start with appropriate prefix (ghp_, gho_, ghu_, ghs_, ghr_)
+ * - Must be the correct length for the token type
+ * - Must contain only valid characters
+ */
+export function validateGitHubToken(token: string): boolean {
+  if (!token || typeof token !== 'string') {
+    return false;
+  }
+
+  // GitHub Personal Access Token (classic) - starts with ghp_
+  if (token.startsWith('ghp_')) {
+    return token.length === 40 && /^ghp_[A-Za-z0-9]{36}$/.test(token);
+  }
+  
+  // GitHub OAuth token - starts with gho_
+  if (token.startsWith('gho_')) {
+    return token.length === 40 && /^gho_[A-Za-z0-9]{36}$/.test(token);
+  }
+  
+  // GitHub user access token - starts with ghu_
+  if (token.startsWith('ghu_')) {
+    return token.length === 40 && /^ghu_[A-Za-z0-9]{36}$/.test(token);
+  }
+  
+  // GitHub server-to-server token - starts with ghs_
+  if (token.startsWith('ghs_')) {
+    return token.length === 40 && /^ghs_[A-Za-z0-9]{36}$/.test(token);
+  }
+  
+  // GitHub refresh token - starts with ghr_
+  if (token.startsWith('ghr_')) {
+    return token.length === 40 && /^ghr_[A-Za-z0-9]{36}$/.test(token);
+  }
+
+  // Legacy format (40 characters, hex) - deprecated but still supported
+  if (token.length === 40 && /^[a-f0-9]{40}$/i.test(token)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Validates and sanitizes environment variables for security
+ * - Checks for common security issues
+ * - Validates format and content
+ * - Returns sanitized value or null if invalid
+ */
+export function validateEnvironmentVariable(name: string, value: string): string | null {
+  if (!name || !value || typeof name !== 'string' || typeof value !== 'string') {
+    return null;
+  }
+
+  // Remove any null bytes or control characters
+  const sanitized = value.replace(/[\x00-\x1f\x7f]/g, '');
+  
+  // Specific validation based on environment variable name
+  switch (name.toUpperCase()) {
+    case 'GITHUB_PERSONAL_ACCESS_TOKEN':
+    case 'GITHUB_TOKEN':
+      return validateGitHubToken(sanitized) ? sanitized : null;
+      
+    case 'GITHUB_HOST':
+    case 'GITHUB_API_URL':
+      return validateApiUrl(sanitized) ? sanitized : null;
+      
+    case 'GITHUB_READ_ONLY':
+      return ['1', 'true', 'false', '0'].includes(sanitized.toLowerCase()) ? sanitized : null;
+      
+    case 'GITHUB_TOOLSETS':
+      return validateToolsets(sanitized) ? sanitized : null;
+      
+    case 'NODE_OPTIONS':
+      return validateNodeOptions(sanitized) ? sanitized : null;
+      
+    default:
+      // Generic validation for other environment variables
+      // Prevent common injection patterns
+      if (sanitized.includes('$(') || sanitized.includes('`') || sanitized.includes('&&') || sanitized.includes('||')) {
+        return null;
+      }
+      return sanitized.length <= 1000 ? sanitized : null;
+  }
+}
+
+/**
+ * Validates GitHub API URL format
+ */
+function validateApiUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' && 
+           parsed.hostname.length > 0 &&
+           !parsed.hostname.includes('localhost') &&
+           !parsed.hostname.includes('127.0.0.1');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validates toolsets configuration
+ */
+function validateToolsets(toolsets: string): boolean {
+  if (toolsets === 'all') {
+    return true;
+  }
+  
+  const validToolsets = [
+    'context', 'repos', 'issues', 'pull_requests', 'actions', 
+    'code_security', 'users', 'orgs', 'notifications', 
+    'discussions', 'dependabot', 'secret_protection'
+  ];
+  
+  const specified = toolsets.split(',').map(t => t.trim());
+  return specified.every(t => validToolsets.includes(t));
+}
+
+/**
+ * Validates Node.js options for security
+ */
+function validateNodeOptions(options: string): boolean {
+  const allowedOptions = [
+    '--max-old-space-size',
+    '--expose-gc',
+    '--max-semi-space-size',
+    '--max-new-space-size'
+  ];
+  
+  const parts = options.split(' ').filter(p => p.length > 0);
+  
+  for (const part of parts) {
+    if (part.startsWith('--')) {
+      const option = part.split('=')[0];
+      if (!allowedOptions.includes(option)) {
+        return false;
+      }
+    }
+  }
+  
+  return true;
+}
+
+/**
+ * Securely loads and validates environment variables
+ * - Validates all security-relevant environment variables
+ * - Returns validation results and sanitized values
+ */
+export function validateEnvironmentConfiguration(): {
+  isValid: boolean;
+  errors: string[];
+  sanitizedValues: Record<string, string>;
+} {
+  const errors: string[] = [];
+  const sanitizedValues: Record<string, string> = {};
+  
+  // Required variables
+  const token = process.env.GITHUB_PERSONAL_ACCESS_TOKEN || process.env.GITHUB_TOKEN;
+  if (!token) {
+    errors.push('GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN is required');
+  } else {
+    const sanitizedToken = validateEnvironmentVariable('GITHUB_PERSONAL_ACCESS_TOKEN', token);
+    if (!sanitizedToken) {
+      errors.push('Invalid GitHub token format');
+    } else {
+      sanitizedValues.GITHUB_TOKEN = sanitizedToken;
+    }
+  }
+  
+  // Optional variables
+  const optionalVars = [
+    'GITHUB_HOST',
+    'GITHUB_API_URL', 
+    'GITHUB_READ_ONLY',
+    'GITHUB_TOOLSETS',
+    'NODE_OPTIONS'
+  ];
+  
+  for (const varName of optionalVars) {
+    const value = process.env[varName];
+    if (value) {
+      const sanitized = validateEnvironmentVariable(varName, value);
+      if (sanitized === null) {
+        errors.push(`Invalid format for ${varName}`);
+      } else {
+        sanitizedValues[varName] = sanitized;
+      }
+    }
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+    sanitizedValues
+  };
+}
+
+/**
  * Creates a validation error with consistent format
  */
 export class ValidationError extends Error {
