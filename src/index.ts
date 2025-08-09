@@ -39,14 +39,32 @@ const DEFAULT_TOOLSETS = [
   'secret_protection',
 ];
 
+/**
+ * GitHub MCP Server - Provides GitHub API integration for the Model Context Protocol
+ * 
+ * This server enables AI assistants to interact with GitHub repositories, issues,
+ * pull requests, actions, and more through a comprehensive set of tools.
+ */
 class GitHubMCPServer {
+  /** The MCP server instance */
   private server: McpServer;
+  /** GitHub API client (Octokit) */
   private octokit: Octokit;
+  /** Set of enabled toolsets */
   private enabledToolsets: Set<string>;
+  /** Whether the server is running in read-only mode */
   private readOnly: boolean;
+  /** Set of registered tool names to prevent duplicates */
   private registeredTools = new Set<string>();
+  /** Total count of registered tools */
   private toolCount = 0;
 
+  /**
+   * Initialize the GitHub MCP Server
+   * 
+   * Sets up the MCP server, configures GitHub authentication,
+   * parses environment variables, and registers tools.
+   */
   constructor() {
     // Initialize MCP server
     this.server = new McpServer({
@@ -83,6 +101,12 @@ class GitHubMCPServer {
     this.registerTools();
   }
 
+  /**
+   * Convert a JSON Schema to a Zod schema for validation
+   * 
+   * @param schema - The JSON schema to convert
+   * @returns A Zod schema object for input validation
+   */
   private convertSchemaToZod(schema: any): any {
     if (!schema || !schema.properties) {
       return {};
@@ -122,6 +146,11 @@ class GitHubMCPServer {
     return zodSchema;
   }
 
+  /**
+   * Register a tool configuration with the MCP server
+   * 
+   * @param config - Tool configuration object containing tool definition and handler
+   */
   private registerToolConfig(config: any) {
     // Skip if already registered
     if (this.registeredTools.has(config.tool.name)) {
@@ -167,6 +196,12 @@ class GitHubMCPServer {
     );
   }
 
+  /**
+   * Register all enabled tools with the MCP server
+   * 
+   * Tools are organized into toolsets that can be selectively enabled
+   * via the GITHUB_TOOLSETS environment variable.
+   */
   private registerTools() {
     // Context tools (always enabled)
     if (this.enabledToolsets.has('context')) {
