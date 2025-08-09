@@ -1,0 +1,113 @@
+repos:
+  # Security and secret scanning
+  - repo: https://github.com/trufflesecurity/trufflehog
+    rev: v3.84.0
+    hooks:
+      - id: trufflehog
+        name: TruffleHog
+        description: Detect secrets in your data
+        entry: bash -c 'trufflehog git file://. --since-commit HEAD --only-verified --fail'
+        language: system
+        stages: [commit]
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: package-lock.json
+
+  # Code quality and linting
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        exclude: \.github/workflows/.*\.ya?ml$
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: detect-private-key
+        exclude: tests/fixtures/
+
+  # TypeScript and Node.js specific
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v9.0.0
+    hooks:
+      - id: eslint
+        files: \.[jt]sx?$
+        types: [file]
+        additional_dependencies:
+          - '@typescript-eslint/eslint-plugin@^7.0.0'
+          - '@typescript-eslint/parser@^7.0.0'
+          - 'eslint@^8.0.0'
+
+  # Security linting
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        files: \.py$
+
+  # Docker security (if applicable)
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        files: Dockerfile.*
+
+  # Dependency scanning
+  - repo: local
+    hooks:
+      - id: npm-audit
+        name: npm audit
+        description: Run npm audit to check for vulnerabilities
+        entry: bash -c 'npm audit --audit-level high'
+        language: system
+        files: package\.json$
+        pass_filenames: false
+
+      # TypeScript compilation check
+      - id: typescript-check
+        name: TypeScript Check
+        description: Check TypeScript compilation
+        entry: bash -c 'npx tsc --noEmit'
+        language: system
+        files: \.(ts|tsx)$
+        pass_filenames: false
+
+      # Custom security validation
+      - id: security-check
+        name: Security Check
+        description: Run custom security validation
+        entry: bash -c 'node -e "
+          const { validateEnvironmentConfiguration } = require(\"./build/validation.js\");
+          const result = validateEnvironmentConfiguration();
+          if (!result.isValid) {
+            console.error(\"Environment validation failed:\", result.errors);
+            process.exit(1);
+          }
+          console.log(\"Environment validation passed\");
+        "'
+        language: system
+        files: \.(ts|js|json|ya?ml)$
+        pass_filenames: false
+
+# Global settings
+default_language_version:
+  node: system
+
+# CI settings
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: []
+  submodules: false

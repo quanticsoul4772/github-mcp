@@ -18,6 +18,7 @@ import { createNotificationTools } from './tools/notifications.js';
 import { createDiscussionTools } from './tools/discussions.js';
 import { createDependabotTools } from './tools/dependabot.js';
 import { createSecretScanningTools } from './tools/secret-scanning.js';
+import { validateEnvironmentConfiguration } from './validation.js';
 
 // Server configuration
 const SERVER_NAME = 'github-mcp';
@@ -73,15 +74,19 @@ class GitHubMCPServer {
       description: 'GitHub API integration for MCP'
     });
 
-    // Initialize Octokit with auth token
-    const token = process.env.GITHUB_PERSONAL_ACCESS_TOKEN || process.env.GITHUB_TOKEN;
-    if (!token) {
-      console.error('ERROR: GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN environment variable is required');
-      console.error('Please create a GitHub Personal Access Token at: https://github.com/settings/tokens');
+    // Validate environment configuration for security
+    const envValidation = validateEnvironmentConfiguration();
+    if (!envValidation.isValid) {
+      console.error('ERROR: Environment configuration validation failed:');
+      envValidation.errors.forEach(error => console.error(`  - ${error}`));
+      console.error('Please check your environment variables and try again.');
+      console.error('Create a GitHub Personal Access Token at: https://github.com/settings/tokens');
       console.error('Required scopes: repo, workflow, user, notifications');
       process.exit(1);
     }
 
+    // Initialize Octokit with validated token
+    const token = envValidation.sanitizedValues.GITHUB_TOKEN;
     this.octokit = new Octokit({
       auth: token,
     });
