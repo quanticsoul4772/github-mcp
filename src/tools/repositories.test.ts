@@ -220,7 +220,7 @@ describe('Repository Tools', () => {
         repo: 'test-repo',
         path: 'new-file.txt',
         message: 'Add new file',
-        content: btoa('Hello World'),
+        content: Buffer.from('Hello World', 'utf8').toString('base64'),
         branch: undefined,
       });
 
