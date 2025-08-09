@@ -1,5 +1,31 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import {
+  ListIssuesParams,
+  CreateIssueParams,
+  UpdateIssueParams,
+  CreateIssueCommentParams,
+  SearchIssuesParams
+} from '../tool-types.js';
+
+interface GetIssueParams {
+  owner: string;
+  repo: string;
+  issue_number: number;
+}
+
+interface GetIssueCommentsParams {
+  owner: string;
+  repo: string;
+  issue_number: number;
+  page?: number;
+  perPage?: number;
+}
+
+interface SearchIssuesWithRepoParams extends SearchIssuesParams {
+  owner?: string;
+  repo?: string;
+}
 
 export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
@@ -28,7 +54,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
         required: ['owner', 'repo', 'issue_number'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetIssueParams) => {
       const { data } = await octokit.issues.get({
         owner: args.owner,
         repo: args.repo,
@@ -44,10 +70,10 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           login: data.user?.login,
           type: data.user?.type,
         },
-        labels: data.labels.map((label: any) => 
+        labels: data.labels.map((label) => 
           typeof label === 'string' ? label : label.name
         ),
-        assignees: data.assignees?.map((user: any) => ({
+        assignees: data.assignees?.map((user) => ({
           login: user.login,
           type: user.type,
         })),
@@ -120,7 +146,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: ListIssuesParams) => {
       const { data } = await octokit.issues.listForRepo({
         owner: args.owner,
         repo: args.repo,
@@ -133,7 +159,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
         per_page: args.perPage,
       });
 
-      return data.map((issue: any) => ({
+      return data.map((issue) => ({
         number: issue.number,
         title: issue.title,
         state: issue.state,
@@ -141,10 +167,10 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           login: issue.user?.login,
           type: issue.user?.type,
         },
-        labels: issue.labels.map((label: any) => 
+        labels: issue.labels.map((label) => 
           typeof label === 'string' ? label : label.name
         ),
-        assignees: issue.assignees?.map((user: any) => ({
+        assignees: issue.assignees?.map((user) => ({
           login: user.login,
         })),
         comments: issue.comments,
@@ -191,7 +217,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
         required: ['owner', 'repo', 'issue_number'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetIssueCommentsParams) => {
       const { data } = await octokit.issues.listComments({
         owner: args.owner,
         repo: args.repo,
@@ -200,7 +226,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
         per_page: args.perPage,
       });
 
-      return data.map((comment: any) => ({
+      return data.map((comment) => ({
         id: comment.id,
         body: comment.body,
         user: {
@@ -259,7 +285,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
         required: ['query'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: SearchIssuesWithRepoParams) => {
       let query = args.query;
       
       // Add repo filter if provided
@@ -278,15 +304,15 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
       return {
         total_count: data.total_count,
         incomplete_results: data.incomplete_results,
-        items: data.items.map((item: any) => ({
+        items: data.items.map((item) => ({
           number: item.number,
           title: item.title,
           state: item.state,
           user: {
             login: item.user?.login,
           },
-          labels: item.labels.map((label: any) => label.name),
-          assignees: item.assignees?.map((user: any) => ({
+          labels: item.labels.map((label) => label.name),
+          assignees: item.assignees?.map((user) => ({
             login: user.login,
           })),
           comments: item.comments,
@@ -344,7 +370,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           required: ['owner', 'repo', 'title'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: CreateIssueParams) => {
         const { data } = await octokit.issues.create({
           owner: args.owner,
           repo: args.repo,
@@ -420,7 +446,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           required: ['owner', 'repo', 'issue_number'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: UpdateIssueParams) => {
         const { data } = await octokit.issues.update({
           owner: args.owner,
           repo: args.repo,
@@ -472,7 +498,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           required: ['owner', 'repo', 'issue_number', 'body'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: CreateIssueCommentParams) => {
         const { data } = await octokit.issues.createComment({
           owner: args.owner,
           repo: args.repo,

@@ -1,5 +1,11 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import {
+  SearchCodeParams,
+  SearchReposParams,
+  SearchIssuesParams,
+  SearchUsersParams
+} from '../tool-types.js';
 
 export function createSearchTools(octokit: Octokit): ToolConfig[] {
   const tools: ToolConfig[] = [];
@@ -41,7 +47,7 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
         required: ['q'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: SearchCodeParams) => {
       const { data } = await octokit.search.code({
         q: args.q,
         sort: args.sort,
@@ -53,7 +59,7 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
       return {
         total_count: data.total_count,
         incomplete_results: data.incomplete_results,
-        items: data.items.map((item: any) => ({
+        items: data.items.map((item) => ({
           name: item.name,
           path: item.path,
           sha: item.sha,
@@ -113,7 +119,7 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
         required: ['q'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: SearchCodeParams) => {
       const { data } = await octokit.search.commits({
         q: args.q,
         sort: args.sort,
@@ -125,7 +131,7 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
       return {
         total_count: data.total_count,
         incomplete_results: data.incomplete_results,
-        items: data.items.map((item: any) => ({
+        items: data.items.map((item) => ({
           sha: item.sha,
           commit: {
             message: item.commit.message,
@@ -192,7 +198,7 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
         required: ['q'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: SearchCodeParams) => {
       const { data } = await octokit.search.topics({
         q: args.q,
         page: args.page,
@@ -202,7 +208,7 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
       return {
         total_count: data.total_count,
         incomplete_results: data.incomplete_results,
-        items: data.items.map((item: any) => ({
+        items: data.items.map((item) => ({
           name: item.name,
           display_name: item.display_name,
           short_description: item.short_description,
@@ -260,7 +266,7 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
         required: ['repository_id', 'q'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: SearchCodeParams) => {
       const { data } = await octokit.search.labels({
         repository_id: args.repository_id,
         q: args.q,
@@ -273,7 +279,7 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
       return {
         total_count: data.total_count,
         incomplete_results: data.incomplete_results,
-        items: data.items.map((item: any) => ({
+        items: data.items.map((item) => ({
           id: item.id,
           node_id: item.node_id,
           url: item.url,

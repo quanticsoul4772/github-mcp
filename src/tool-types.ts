@@ -348,8 +348,8 @@ export function isGetFileContentsParams(params: unknown): params is GetFileConte
     params !== null &&
     'owner' in params &&
     'repo' in params &&
-    typeof (params as any).owner === 'string' &&
-    typeof (params as any).repo === 'string'
+    typeof (params as GetFileContentsParams).owner === 'string' &&
+    typeof (params as GetFileContentsParams).repo === 'string'
   );
 }
 
@@ -360,9 +360,9 @@ export function isCreateIssueParams(params: unknown): params is CreateIssueParam
     'owner' in params &&
     'repo' in params &&
     'title' in params &&
-    typeof (params as any).owner === 'string' &&
-    typeof (params as any).repo === 'string' &&
-    typeof (params as any).title === 'string'
+    typeof (params as CreateIssueParams).owner === 'string' &&
+    typeof (params as CreateIssueParams).repo === 'string' &&
+    typeof (params as CreateIssueParams).title === 'string'
   );
 }
 
@@ -375,11 +375,11 @@ export function isCreatePullRequestParams(params: unknown): params is CreatePull
     'title' in params &&
     'head' in params &&
     'base' in params &&
-    typeof (params as any).owner === 'string' &&
-    typeof (params as any).repo === 'string' &&
-    typeof (params as any).title === 'string' &&
-    typeof (params as any).head === 'string' &&
-    typeof (params as any).base === 'string'
+    typeof (params as CreatePullRequestParams).owner === 'string' &&
+    typeof (params as CreatePullRequestParams).repo === 'string' &&
+    typeof (params as CreatePullRequestParams).title === 'string' &&
+    typeof (params as CreatePullRequestParams).head === 'string' &&
+    typeof (params as CreatePullRequestParams).base === 'string'
   );
 }
 

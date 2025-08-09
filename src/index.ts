@@ -4,6 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { Octokit } from '@octokit/rest';
 import { z } from 'zod';
+import { JSONSchema, JSONSchemaProperty, ToolConfig } from './types.js';
 
 // Tool modules
 import { createRepositoryTools } from './tools/repositories.js';
@@ -107,15 +108,15 @@ class GitHubMCPServer {
    * @param schema - The JSON schema to convert
    * @returns A Zod schema object for input validation
    */
-  private convertSchemaToZod(schema: any): any {
-    if (!schema || !schema.properties) {
+  private convertSchemaToZod(schema: JSONSchema): Record<string, z.ZodType> {
+    if (!schema?.properties) {
       return {};
     }
 
-    const zodSchema: any = {};
+    const zodSchema: Record<string, z.ZodType> = {};
     for (const [key, value] of Object.entries(schema.properties)) {
-      const prop = value as any;
-      let zodType: any;
+      const prop = value as JSONSchemaProperty;
+      let zodType: z.ZodType;
       
       if (prop.type === 'string') {
         zodType = z.string();
@@ -124,11 +125,26 @@ class GitHubMCPServer {
       } else if (prop.type === 'boolean') {
         zodType = z.boolean();
       } else if (prop.type === 'array') {
-        zodType = z.array(z.any());
+        // Try to infer array element type from items property
+        if (prop.items) {
+          if (prop.items.type === 'string') {
+            zodType = z.array(z.string());
+          } else if (prop.items.type === 'number') {
+            zodType = z.array(z.number());
+          } else if (prop.items.type === 'boolean') {
+            zodType = z.array(z.boolean());
+          } else if (prop.items.type === 'object') {
+            zodType = z.array(z.object({}));
+          } else {
+            zodType = z.array(z.unknown());
+          }
+        } else {
+          zodType = z.array(z.unknown());
+        }
       } else if (prop.type === 'object') {
         zodType = z.object({});
       } else {
-        zodType = z.any();
+        zodType = z.unknown();
       }
 
       if (prop.description) {
@@ -151,7 +167,7 @@ class GitHubMCPServer {
    * 
    * @param config - Tool configuration object containing tool definition and handler
    */
-  private registerToolConfig(config: any) {
+  private registerToolConfig(config: ToolConfig<unknown, unknown>): void {
     // Skip if already registered
     if (this.registeredTools.has(config.tool.name)) {
       return;
@@ -161,14 +177,14 @@ class GitHubMCPServer {
     this.toolCount++;
 
     // Convert the JSON schema to Zod schema
-    const zodSchema = this.convertSchemaToZod(config.tool.inputSchema);
+    const zodSchema = this.convertSchemaToZod(config.tool.inputSchema as JSONSchema);
 
     // Register the tool with the correct signature
     this.server.tool(
       config.tool.name,
       config.tool.description || 'GitHub API operation',
       zodSchema,
-      async (args: any) => {
+      async (args: Record<string, unknown>) => {
         try {
           const result = await config.handler(args);
           return {
@@ -310,7 +326,7 @@ class GitHubMCPServer {
     }
   }
 
-  public async start() {
+  public async start(): Promise<void> {
     try {
       const transport = new StdioServerTransport();
       await this.server.connect(transport);

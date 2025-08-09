@@ -33,12 +33,30 @@ export type GitHubToolset =
   | 'experiments';
 
 /**
+ * JSON Schema property definition
+ */
+export interface JSONSchemaProperty {
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
+  description?: string;
+  items?: JSONSchemaProperty;
+}
+
+/**
+ * JSON Schema definition
+ */
+export interface JSONSchema {
+  type: 'object';
+  properties?: Record<string, JSONSchemaProperty>;
+  required?: string[];
+}
+
+/**
  * Configuration object for MCP tools
  * 
  * @template TParams - Type for tool input parameters
  * @template TResult - Type for tool result
  */
-export interface ToolConfig<TParams = any, TResult = any> {
+export interface ToolConfig<TParams = unknown, TResult = unknown> {
   /** MCP tool definition with name, description, and input schema */
   tool: Tool;
   /** Handler function that processes tool requests */
