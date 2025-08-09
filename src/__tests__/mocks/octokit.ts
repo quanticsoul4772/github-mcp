@@ -167,7 +167,7 @@ export const mockResponses = {
     },
   },
   fileContent: {
-    content: btoa('Test file content'),
+    content: Buffer.from('Test file content').toString('base64'),
     encoding: 'base64',
     sha: 'file123',
     path: 'test.txt',
