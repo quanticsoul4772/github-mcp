@@ -1,0 +1,324 @@
+/**
+ * Standardized error handling for GitHub MCP Server
+ * Provides consistent error types and handling patterns
+ */
+
+/**
+ * Base error class for all GitHub MCP errors
+ */
+export class GitHubMCPError extends Error {
+  public readonly code: string;
+  public readonly statusCode?: number;
+  public readonly context?: Record<string, any>;
+  public readonly isRetryable: boolean;
+  public readonly originalError?: Error;
+
+  constructor(
+    message: string,
+    code: string,
+    statusCode?: number,
+    context?: Record<string, any>,
+    originalError?: Error
+  ) {
+    super(message);
+    this.name = 'GitHubMCPError';
+    this.code = code;
+    this.statusCode = statusCode;
+    this.context = context;
+    this.originalError = originalError;
+    this.isRetryable = this.determineRetryability();
+    
+    // Maintain proper stack trace
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, GitHubMCPError);
+    }
+  }
+
+  private determineRetryability(): boolean {
+    // Network and rate limit errors are retryable
+    if (this.statusCode && [429, 502, 503, 504].includes(this.statusCode)) {
+      return true;
+    }
+    // Specific error codes that are retryable
+    if (['RATE_LIMIT', 'NETWORK_ERROR', 'TIMEOUT'].includes(this.code)) {
+      return true;
+    }
+    return false;
+  }
+
+  toJSON() {
+    return {
+      name: this.name,
+      message: this.message,
+      code: this.code,
+      statusCode: this.statusCode,
+      context: this.context,
+      isRetryable: this.isRetryable,
+    };
+  }
+}
+
+/**
+ * Authentication error
+ */
+export class AuthenticationError extends GitHubMCPError {
+  constructor(message: string, context?: Record<string, any>) {
+    super(message, 'AUTHENTICATION_ERROR', 401, context);
+    this.name = 'AuthenticationError';
+  }
+}
+
+/**
+ * Authorization error
+ */
+export class AuthorizationError extends GitHubMCPError {
+  constructor(message: string, context?: Record<string, any>) {
+    super(message, 'AUTHORIZATION_ERROR', 403, context);
+    this.name = 'AuthorizationError';
+  }
+}
+
+/**
+ * Resource not found error
+ */
+export class NotFoundError extends GitHubMCPError {
+  constructor(resource: string, context?: Record<string, any>) {
+    super(`Resource not found: ${resource}`, 'NOT_FOUND', 404, context);
+    this.name = 'NotFoundError';
+  }
+}
+
+/**
+ * Rate limit error
+ */
+export class RateLimitError extends GitHubMCPError {
+  public readonly resetTime?: Date;
+  public readonly limit?: number;
+  public readonly remaining?: number;
+
+  constructor(
+    message: string,
+    resetTime?: number,
+    limit?: number,
+    remaining?: number
+  ) {
+    const context = { resetTime, limit, remaining };
+    super(message, 'RATE_LIMIT', 429, context);
+    this.name = 'RateLimitError';
+    this.resetTime = resetTime ? new Date(resetTime * 1000) : undefined;
+    this.limit = limit;
+    this.remaining = remaining;
+  }
+}
+
+/**
+ * Network error
+ */
+export class NetworkError extends GitHubMCPError {
+  constructor(message: string, originalError?: Error) {
+    super(message, 'NETWORK_ERROR', undefined, undefined, originalError);
+    this.name = 'NetworkError';
+  }
+}
+
+/**
+ * Timeout error
+ */
+export class TimeoutError extends GitHubMCPError {
+  constructor(operation: string, timeout: number) {
+    super(
+      `Operation '${operation}' timed out after ${timeout}ms`,
+      'TIMEOUT',
+      undefined,
+      { operation, timeout }
+    );
+    this.name = 'TimeoutError';
+  }
+}
+
+/**
+ * Configuration error
+ */
+export class ConfigurationError extends GitHubMCPError {
+  constructor(message: string, missingConfig?: string[]) {
+    super(message, 'CONFIGURATION_ERROR', undefined, { missingConfig });
+    this.name = 'ConfigurationError';
+  }
+}
+
+/**
+ * Error handler wrapper for consistent error handling
+ */
+export async function withErrorHandling<T>(
+  operation: string,
+  fn: () => Promise<T>,
+  context?: Record<string, any>
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    throw normalizeError(error, operation, context);
+  }
+}
+
+/**
+ * Normalize various error types into GitHubMCPError
+ */
+export function normalizeError(
+  error: any,
+  operation?: string,
+  context?: Record<string, any>
+): GitHubMCPError {
+  // Already a GitHubMCPError
+  if (error instanceof GitHubMCPError) {
+    return error;
+  }
+
+  // GitHub API error (from Octokit)
+  if (error.status) {
+    const message = error.message || 'GitHub API error';
+    const statusCode = error.status;
+    
+    // Check for specific error types
+    if (statusCode === 401) {
+      return new AuthenticationError(message, { ...context, operation });
+    }
+    if (statusCode === 403) {
+      // Check if it's a rate limit error
+      if (error.response?.headers?.['x-ratelimit-remaining'] === '0') {
+        return new RateLimitError(
+          'GitHub API rate limit exceeded',
+          error.response.headers['x-ratelimit-reset'],
+          error.response.headers['x-ratelimit-limit'],
+          0
+        );
+      }
+      return new AuthorizationError(message, { ...context, operation });
+    }
+    if (statusCode === 404) {
+      return new NotFoundError(operation || 'Unknown resource', context);
+    }
+    if (statusCode === 429) {
+      return new RateLimitError(
+        message,
+        error.response?.headers?.['x-ratelimit-reset'],
+        error.response?.headers?.['x-ratelimit-limit'],
+        error.response?.headers?.['x-ratelimit-remaining']
+      );
+    }
+
+    return new GitHubMCPError(
+      message,
+      'GITHUB_API_ERROR',
+      statusCode,
+      { ...context, operation },
+      error
+    );
+  }
+
+  // Network errors
+  if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
+    return new NetworkError(
+      `Network error during ${operation}: ${error.message}`,
+      error
+    );
+  }
+
+  // Timeout errors
+  if (error.name === 'TimeoutError' || error.code === 'ETIMEDOUT') {
+    return new TimeoutError(operation || 'Unknown operation', 30000);
+  }
+
+  // Generic error
+  return new GitHubMCPError(
+    error.message || 'An unknown error occurred',
+    'UNKNOWN_ERROR',
+    undefined,
+    { ...context, operation },
+    error
+  );
+}
+
+/**
+ * Retry logic for retryable errors
+ */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: {
+    maxAttempts?: number;
+    backoffMs?: number;
+    maxBackoffMs?: number;
+    onRetry?: (attempt: number, error: Error) => void;
+  } = {}
+): Promise<T> {
+  const {
+    maxAttempts = 3,
+    backoffMs = 1000,
+    maxBackoffMs = 10000,
+    onRetry,
+  } = options;
+
+  let lastError: Error | undefined;
+  
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+      
+      const normalizedError = error instanceof GitHubMCPError 
+        ? error 
+        : normalizeError(error);
+      
+      // Don't retry if not retryable or last attempt
+      if (!normalizedError.isRetryable || attempt === maxAttempts) {
+        throw normalizedError;
+      }
+
+      // Calculate backoff with exponential increase
+      const delay = Math.min(backoffMs * Math.pow(2, attempt - 1), maxBackoffMs);
+      
+      // Call retry callback if provided
+      if (onRetry) {
+        onRetry(attempt, normalizedError);
+      }
+
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError;
+}
+
+/**
+ * Error response formatter for MCP
+ */
+export function formatErrorResponse(error: Error): {
+  error: {
+    code: string;
+    message: string;
+    details?: Record<string, any>;
+  };
+} {
+  if (error instanceof GitHubMCPError) {
+    return {
+      error: {
+        code: error.code,
+        message: error.message,
+        details: {
+          statusCode: error.statusCode,
+          context: error.context,
+          isRetryable: error.isRetryable,
+        },
+      },
+    };
+  }
+
+  return {
+    error: {
+      code: 'UNKNOWN_ERROR',
+      message: error.message || 'An unknown error occurred',
+    },
+  };
+}
