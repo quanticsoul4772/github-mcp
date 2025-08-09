@@ -18,6 +18,10 @@ import { createNotificationTools } from './tools/notifications.js';
 import { createDiscussionTools } from './tools/discussions.js';
 import { createDependabotTools } from './tools/dependabot.js';
 import { createSecretScanningTools } from './tools/secret-scanning.js';
+import { createRepositoryInsightsTools } from './tools/repository-insights.js';
+import { createAdvancedSearchTools } from './tools/advanced-search.js';
+import { createProjectManagementTools } from './tools/project-management.js';
+import { createBatchOperationsTools } from './tools/batch-operations.js';
 
 // Server configuration
 const SERVER_NAME = 'github-mcp';
@@ -37,6 +41,10 @@ const DEFAULT_TOOLSETS = [
   'discussions',
   'dependabot',
   'secret_protection',
+  'graphql_insights',
+  'advanced_search',
+  'project_management',
+  'batch_operations',
 ];
 
 /**
@@ -305,6 +313,38 @@ class GitHubMCPServer {
     if (this.enabledToolsets.has('secret_protection')) {
       const secretTools = createSecretScanningTools(this.octokit, this.readOnly);
       for (const config of secretTools) {
+        this.registerToolConfig(config);
+      }
+    }
+
+    // GraphQL repository insights tools
+    if (this.enabledToolsets.has('graphql_insights')) {
+      const insightsTools = createRepositoryInsightsTools(this.octokit, this.readOnly);
+      for (const config of insightsTools) {
+        this.registerToolConfig(config);
+      }
+    }
+
+    // Advanced search tools
+    if (this.enabledToolsets.has('advanced_search')) {
+      const advancedSearchTools = createAdvancedSearchTools(this.octokit, this.readOnly);
+      for (const config of advancedSearchTools) {
+        this.registerToolConfig(config);
+      }
+    }
+
+    // Project management tools
+    if (this.enabledToolsets.has('project_management')) {
+      const projectTools = createProjectManagementTools(this.octokit, this.readOnly);
+      for (const config of projectTools) {
+        this.registerToolConfig(config);
+      }
+    }
+
+    // Batch operations tools
+    if (this.enabledToolsets.has('batch_operations')) {
+      const batchTools = createBatchOperationsTools(this.octokit, this.readOnly);
+      for (const config of batchTools) {
         this.registerToolConfig(config);
       }
     }

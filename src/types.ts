@@ -15,6 +15,10 @@ import { Tool } from '@modelcontextprotocol/sdk/types.js';
  * - discussions: Discussion tools
  * - dependabot: Dependabot alerts and settings
  * - secret_protection: Secret scanning tools
+ * - graphql_insights: GraphQL-powered repository insights and analytics
+ * - advanced_search: GraphQL-powered advanced search operations
+ * - project_management: GraphQL-powered project management tools
+ * - batch_operations: GraphQL batch query operations
  * - experiments: Experimental features
  */
 export type GitHubToolset = 
@@ -30,6 +34,10 @@ export type GitHubToolset =
   | 'discussions'
   | 'dependabot'
   | 'secret_protection'
+  | 'graphql_insights'
+  | 'advanced_search'
+  | 'project_management'
+  | 'batch_operations'
   | 'experiments';
 
 /**
