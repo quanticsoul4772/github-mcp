@@ -140,12 +140,13 @@ export class HealthManager {
 
       if (error instanceof Error) {
         const githubError = error as any;
-        if (githubError.status === 401) {
+        const statusCode = typeof githubError?.status === 'number' ? githubError.status : undefined;
+        if (statusCode === 401) {
           message = 'GitHub API authentication failed';
-        } else if (githubError.status === 403) {
+        } else if (statusCode === 403) {
           message = 'GitHub API access forbidden';
           status = 'degraded'; // Might be rate limited but API is up
-        } else if (githubError.status >= 500) {
+        } else if (statusCode !== undefined && statusCode >= 500) {
           message = 'GitHub API server error';
         } else {
           message = `GitHub API error: ${error.message}`;
