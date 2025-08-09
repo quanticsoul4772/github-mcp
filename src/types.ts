@@ -20,6 +20,15 @@ export interface ToolConfig<TParams = any, TResult = any> {
   handler: (args: TParams) => Promise<TResult>;
 }
 
+export interface PerformanceOptions {
+  enableCache?: boolean;
+  enableDeduplication?: boolean;
+  enablePerformanceMonitoring?: boolean;
+  cacheTTL?: number;
+  maxPages?: number;
+  concurrency?: number;
+}
+
 export interface GitHubError {
   status: number;
   message: string;

@@ -18,6 +18,11 @@ import { createNotificationTools } from './tools/notifications.js';
 import { createDiscussionTools } from './tools/discussions.js';
 import { createDependabotTools } from './tools/dependabot.js';
 import { createSecretScanningTools } from './tools/secret-scanning.js';
+import { createOptimizedRepositoryTools } from './tools/optimized-repositories.js';
+
+// Performance optimizations
+import { OptimizedAPIClient } from './optimized-api-client.js';
+import { globalPerformanceMonitor } from './performance-monitor.js';
 
 // Server configuration
 const SERVER_NAME = 'github-mcp';
@@ -42,6 +47,7 @@ const DEFAULT_TOOLSETS = [
 class GitHubMCPServer {
   private server: McpServer;
   private octokit: Octokit;
+  private optimizedClient: OptimizedAPIClient;
   private enabledToolsets: Set<string>;
   private readOnly: boolean;
   private registeredTools = new Set<string>();
@@ -66,6 +72,14 @@ class GitHubMCPServer {
 
     this.octokit = new Octokit({
       auth: token,
+    });
+
+    // Initialize optimized API client
+    this.optimizedClient = new OptimizedAPIClient({
+      octokit: this.octokit,
+      enableCache: process.env.GITHUB_ENABLE_CACHE !== 'false',
+      enableDeduplication: process.env.GITHUB_ENABLE_DEDUPLICATION !== 'false',
+      enablePerformanceMonitoring: process.env.GITHUB_ENABLE_MONITORING !== 'false',
     });
 
     // Parse configuration
@@ -273,6 +287,82 @@ class GitHubMCPServer {
         this.registerToolConfig(config);
       }
     }
+
+    // Performance monitoring tools
+    this.registerPerformanceTools();
+
+    // Optimized repository tools (showcase performance optimizations)
+    if (this.enabledToolsets.has('repos')) {
+      const optimizedRepoTools = createOptimizedRepositoryTools(this.optimizedClient, this.readOnly);
+      for (const config of optimizedRepoTools) {
+        this.registerToolConfig(config);
+      }
+    }
+  }
+
+  private registerPerformanceTools() {
+    // Performance metrics tool
+    this.registerToolConfig({
+      tool: {
+        name: 'get_performance_metrics',
+        description: 'Get comprehensive performance metrics and statistics',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            detailed: {
+              type: 'boolean',
+              description: 'Include detailed operation metrics',
+            },
+          },
+        },
+      },
+      handler: async (args: any) => {
+        const metrics = this.optimizedClient.getMetrics();
+        
+        if (args.detailed) {
+          return {
+            summary: metrics,
+            report: this.optimizedClient.getPerformanceReport(),
+          };
+        }
+        
+        return metrics;
+      },
+    });
+
+    // Cache management tool
+    this.registerToolConfig({
+      tool: {
+        name: 'manage_cache',
+        description: 'Manage API response cache (clear, invalidate patterns)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            action: {
+              type: 'string',
+              description: 'Action to perform: clear, invalidate',
+              enum: ['clear', 'invalidate'],
+            },
+            pattern: {
+              type: 'string',
+              description: 'Pattern to match for invalidation (regex or string)',
+            },
+          },
+          required: ['action'],
+        },
+      },
+      handler: async (args: any) => {
+        if (args.action === 'clear') {
+          this.optimizedClient.clearAll();
+          return { message: 'Cache cleared successfully' };
+        } else if (args.action === 'invalidate' && args.pattern) {
+          const count = this.optimizedClient.invalidateCache(args.pattern);
+          return { message: `Invalidated ${count} cache entries matching pattern: ${args.pattern}` };
+        }
+        
+        return { error: 'Invalid action or missing pattern for invalidate' };
+      },
+    });
   }
 
   public async start() {
