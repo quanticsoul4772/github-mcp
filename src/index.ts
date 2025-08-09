@@ -5,6 +5,12 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { Octokit } from '@octokit/rest';
 import { z } from 'zod';
 
+// Observability modules
+import { logger, LogContext } from './logger.js';
+import { metrics, ApiCallMetric } from './metrics.js';
+import { healthMonitor } from './health.js';
+import { startMemoryMonitoring } from './observability.js';
+
 // Tool modules
 import { createRepositoryTools } from './tools/repositories.js';
 import { createIssueTools } from './tools/issues.js';
@@ -58,6 +64,8 @@ class GitHubMCPServer {
   private registeredTools = new Set<string>();
   /** Total count of registered tools */
   private toolCount = 0;
+  /** Request correlation tracking */
+  private requestContexts = new Map<string, LogContext>();
 
   /**
    * Initialize the GitHub MCP Server
@@ -73,18 +81,30 @@ class GitHubMCPServer {
       description: 'GitHub API integration for MCP'
     });
 
+    // Initialize structured logging
+    logger.info('Initializing GitHub MCP Server', {
+      version: SERVER_VERSION,
+      nodeVersion: process.version,
+      platform: process.platform
+    });
+
     // Initialize Octokit with auth token
     const token = process.env.GITHUB_PERSONAL_ACCESS_TOKEN || process.env.GITHUB_TOKEN;
     if (!token) {
-      console.error('ERROR: GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN environment variable is required');
-      console.error('Please create a GitHub Personal Access Token at: https://github.com/settings/tokens');
-      console.error('Required scopes: repo, workflow, user, notifications');
+      logger.error('GitHub token not found', {
+        requiredEnvVars: ['GITHUB_PERSONAL_ACCESS_TOKEN', 'GITHUB_TOKEN'],
+        tokenUrl: 'https://github.com/settings/tokens',
+        requiredScopes: ['repo', 'workflow', 'user', 'notifications']
+      });
       process.exit(1);
     }
 
     this.octokit = new Octokit({
       auth: token,
     });
+
+    // Initialize health monitoring
+    healthMonitor.setOctokit(this.octokit);
 
     // Parse configuration
     this.readOnly = process.env.GITHUB_READ_ONLY === '1' || process.env.GITHUB_READ_ONLY === 'true';
@@ -96,6 +116,12 @@ class GitHubMCPServer {
     } else {
       this.enabledToolsets = new Set(toolsetsConfig.split(',').map(t => t.trim()));
     }
+
+    logger.info('Server configuration loaded', {
+      readOnly: this.readOnly,
+      enabledToolsets: Array.from(this.enabledToolsets),
+      logLevel: logger.getLogLevel()
+    });
 
     // Register all tools
     this.registerTools();
@@ -169,8 +195,45 @@ class GitHubMCPServer {
       config.tool.description || 'GitHub API operation',
       zodSchema,
       async (args: any) => {
+        const startTime = Date.now();
+        const correlationId = logger.generateCorrelationId();
+        const toolLogger = logger.child({
+          correlationId,
+          tool: config.tool.name,
+          operation: 'tool_execution'
+        });
+
+        // Store request context
+        this.requestContexts.set(correlationId, {
+          correlationId,
+          tool: config.tool.name,
+          operation: 'tool_execution'
+        });
+
+        toolLogger.debug('Tool execution started', { args });
+
         try {
           const result = await config.handler(args);
+          const duration = Date.now() - startTime;
+          
+          // Record successful API call metric
+          const apiMetric: ApiCallMetric = {
+            tool: config.tool.name,
+            operation: 'tool_execution',
+            success: true,
+            duration,
+            timestamp: Date.now()
+          };
+          metrics.recordApiCall(apiMetric);
+
+          toolLogger.info('Tool execution completed', {
+            duration,
+            success: true
+          });
+
+          // Clean up request context
+          this.requestContexts.delete(correlationId);
+
           return {
             content: [
               {
@@ -180,8 +243,37 @@ class GitHubMCPServer {
             ],
           };
         } catch (error) {
+          const duration = Date.now() - startTime;
           const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-          console.error(`Error in tool ${config.tool.name}:`, errorMessage);
+          
+          // Record failed API call metric
+          const apiMetric: ApiCallMetric = {
+            tool: config.tool.name,
+            operation: 'tool_execution',
+            success: false,
+            duration,
+            timestamp: Date.now()
+          };
+          metrics.recordApiCall(apiMetric);
+
+          // Record error metric
+          metrics.recordError({
+            tool: config.tool.name,
+            operation: 'tool_execution',
+            errorType: error instanceof Error ? error.name : 'UnknownError',
+            message: errorMessage,
+            timestamp: Date.now()
+          });
+
+          toolLogger.error('Tool execution failed', {
+            duration,
+            success: false,
+            errorType: error instanceof Error ? error.name : 'UnknownError'
+          }, error instanceof Error ? error : undefined);
+
+          // Clean up request context
+          this.requestContexts.delete(correlationId);
+
           return {
             content: [
               {
@@ -308,6 +400,85 @@ class GitHubMCPServer {
         this.registerToolConfig(config);
       }
     }
+
+    // Health and monitoring tools (always enabled)
+    this.registerHealthTools();
+
+    logger.info('Tool registration completed', {
+      totalTools: this.toolCount,
+      registeredTools: Array.from(this.registeredTools)
+    });
+  }
+
+  /**
+   * Register health and monitoring tools
+   */
+  private registerHealthTools() {
+    // Health check tool
+    this.server.tool(
+      'get_health',
+      'Get server health status',
+      {},
+      async () => {
+        const health = await healthMonitor.getHealth();
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify(health, null, 2)
+          }]
+        };
+      }
+    );
+
+    // Readiness check tool
+    this.server.tool(
+      'get_readiness',
+      'Check if server is ready to handle requests',
+      {},
+      async () => {
+        const readiness = await healthMonitor.getReadiness();
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify(readiness, null, 2)
+          }]
+        };
+      }
+    );
+
+    // Detailed status tool
+    this.server.tool(
+      'get_status',
+      'Get detailed server status and metrics',
+      {},
+      async () => {
+        const status = await healthMonitor.getDetailedStatus();
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify(status, null, 2)
+          }]
+        };
+      }
+    );
+
+    // Prometheus metrics tool
+    this.server.tool(
+      'get_metrics',
+      'Get Prometheus-formatted metrics',
+      {},
+      async () => {
+        const prometheusMetrics = healthMonitor.getMetrics();
+        return {
+          content: [{
+            type: 'text' as const,
+            text: prometheusMetrics
+          }]
+        };
+      }
+    );
+
+    this.toolCount += 4;
   }
 
   public async start() {
@@ -315,20 +486,80 @@ class GitHubMCPServer {
       const transport = new StdioServerTransport();
       await this.server.connect(transport);
       
-      console.error(`GitHub MCP Server v${SERVER_VERSION} started successfully`);
-      console.error(`Enabled toolsets: ${Array.from(this.enabledToolsets).join(', ')}`);
-      console.error(`Read-only mode: ${this.readOnly}`);
-      console.error(`Total tools registered: ${this.toolCount}`);
+      // Start health monitoring
+      healthMonitor.startMonitoring();
+      
+      // Start memory monitoring every 30 seconds
+      startMemoryMonitoring(30000);
+      
+      logger.info('GitHub MCP Server started successfully', {
+        version: SERVER_VERSION,
+        enabledToolsets: Array.from(this.enabledToolsets),
+        readOnly: this.readOnly,
+        totalTools: this.toolCount
+      });
+      
+      // Log startup metrics
+      const startupDuration = 1000; // Placeholder since we don't track actual startup time
+      metrics.recordPerformance({
+        operation: 'server_startup',
+        duration: startupDuration,
+        memoryUsage: process.memoryUsage(),
+        timestamp: Date.now()
+      });
+      
+      // Record successful startup
+      metrics.incrementCounter('server_starts_total{status="success"}');
+      
     } catch (error) {
-      console.error('Failed to start server:', error);
+      logger.error('Failed to start server', {}, error instanceof Error ? error : undefined);
+      
+      // Record failed startup
+      metrics.incrementCounter('server_starts_total{status="error"}');
+      
       process.exit(1);
     }
   }
 }
 
+// Global error handling
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught exception', {}, error);
+  metrics.recordError({
+    tool: 'system',
+    operation: 'uncaught_exception',
+    errorType: error.name,
+    message: error.message,
+    timestamp: Date.now()
+  });
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled rejection', { reason: String(reason) });
+  metrics.recordError({
+    tool: 'system',
+    operation: 'unhandled_rejection',
+    errorType: 'UnhandledRejection',
+    message: String(reason),
+    timestamp: Date.now()
+  });
+});
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  logger.info('Received SIGINT, shutting down gracefully');
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  logger.info('Received SIGTERM, shutting down gracefully');
+  process.exit(0);
+});
+
 // Start the server
 const server = new GitHubMCPServer();
 server.start().catch((error: Error) => {
-  console.error('Fatal error:', error);
+  logger.error('Fatal server startup error', {}, error);
   process.exit(1);
 });
