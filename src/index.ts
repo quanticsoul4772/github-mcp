@@ -5,6 +5,9 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { Octokit } from '@octokit/rest';
 import { z } from 'zod';
 
+// Environment configuration
+import { env, getGitHubToken, getEnabledToolsets, displayConfig } from './env.js';
+
 // Tool modules
 import { createRepositoryTools } from './tools/repositories.js';
 import { createIssueTools } from './tools/issues.js';
@@ -23,21 +26,7 @@ import { createSecretScanningTools } from './tools/secret-scanning.js';
 const SERVER_NAME = 'github-mcp';
 const SERVER_VERSION = '1.0.0';
 
-// Tool categories configuration
-const DEFAULT_TOOLSETS = [
-  'context',
-  'repos', 
-  'issues',
-  'pull_requests',
-  'actions',
-  'code_security',
-  'users',
-  'orgs',
-  'notifications',
-  'discussions',
-  'dependabot',
-  'secret_protection',
-];
+// Tool categories configuration (moved to env.ts)
 
 /**
  * GitHub MCP Server - Provides GitHub API integration for the Model Context Protocol
@@ -73,29 +62,16 @@ class GitHubMCPServer {
       description: 'GitHub API integration for MCP'
     });
 
-    // Initialize Octokit with auth token
-    const token = process.env.GITHUB_PERSONAL_ACCESS_TOKEN || process.env.GITHUB_TOKEN;
-    if (!token) {
-      console.error('ERROR: GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN environment variable is required');
-      console.error('Please create a GitHub Personal Access Token at: https://github.com/settings/tokens');
-      console.error('Required scopes: repo, workflow, user, notifications');
-      process.exit(1);
-    }
-
+    // Initialize Octokit with validated token
+    const token = getGitHubToken();
     this.octokit = new Octokit({
       auth: token,
+      baseUrl: env.GITHUB_HOST,
     });
 
-    // Parse configuration
-    this.readOnly = process.env.GITHUB_READ_ONLY === '1' || process.env.GITHUB_READ_ONLY === 'true';
-
-    // Parse enabled toolsets
-    const toolsetsConfig = process.env.GITHUB_TOOLSETS;
-    if (toolsetsConfig === 'all' || !toolsetsConfig) {
-      this.enabledToolsets = new Set(DEFAULT_TOOLSETS);
-    } else {
-      this.enabledToolsets = new Set(toolsetsConfig.split(',').map(t => t.trim()));
-    }
+    // Parse configuration from validated environment
+    this.readOnly = env.GITHUB_READ_ONLY;
+    this.enabledToolsets = new Set(getEnabledToolsets());
 
     // Register all tools
     this.registerTools();
@@ -315,10 +291,9 @@ class GitHubMCPServer {
       const transport = new StdioServerTransport();
       await this.server.connect(transport);
       
-      console.error(`GitHub MCP Server v${SERVER_VERSION} started successfully`);
-      console.error(`Enabled toolsets: ${Array.from(this.enabledToolsets).join(', ')}`);
-      console.error(`Read-only mode: ${this.readOnly}`);
-      console.error(`Total tools registered: ${this.toolCount}`);
+      console.error(`🚀 GitHub MCP Server v${SERVER_VERSION} started successfully`);
+      displayConfig();
+      console.error(`🛠️  Total tools registered: ${this.toolCount}`);
     } catch (error) {
       console.error('Failed to start server:', error);
       process.exit(1);
