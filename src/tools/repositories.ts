@@ -5,7 +5,7 @@ import {
   validateRepoName, 
   validateFilePath, 
   validateRef,
-  ValidationError 
+  LegacyValidationError 
 } from '../validation.js';
 
 export function createRepositoryTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
@@ -42,10 +42,10 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
     handler: async (args: any) => {
       // Validate inputs
       if (!validateOwnerName(args.owner)) {
-        throw new ValidationError('owner', 'Invalid repository owner name');
+        throw new LegacyValidationError('owner', 'Invalid repository owner name');
       }
       if (!validateRepoName(args.repo)) {
-        throw new ValidationError('repo', 'Invalid repository name');
+        throw new LegacyValidationError('repo', 'Invalid repository name');
       }
       
       // Validate and sanitize path if provided
@@ -53,14 +53,14 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
       if (args.path) {
         const validated = validateFilePath(args.path);
         if (validated === null) {
-          throw new ValidationError('path', 'Invalid file path');
+          throw new LegacyValidationError('path', 'Invalid file path');
         }
         safePath = validated;
       }
       
       // Validate ref if provided
       if (args.ref && !validateRef(args.ref)) {
-        throw new ValidationError('ref', 'Invalid Git ref');
+        throw new LegacyValidationError('ref', 'Invalid Git ref');
       }
       
       const { data } = await octokit.repos.getContent({
@@ -463,21 +463,21 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
       handler: async (args: any) => {
         // Validate inputs
         if (!validateOwnerName(args.owner)) {
-          throw new ValidationError('owner', 'Invalid repository owner name');
+          throw new LegacyValidationError('owner', 'Invalid repository owner name');
         }
         if (!validateRepoName(args.repo)) {
-          throw new ValidationError('repo', 'Invalid repository name');
+          throw new LegacyValidationError('repo', 'Invalid repository name');
         }
         
         // Validate and sanitize path
         const safePath = validateFilePath(args.path);
         if (safePath === null) {
-          throw new ValidationError('path', 'Invalid file path');
+          throw new LegacyValidationError('path', 'Invalid file path');
         }
         
         // Validate branch name
         if (!validateRef(args.branch)) {
-          throw new ValidationError('branch', 'Invalid branch name');
+          throw new LegacyValidationError('branch', 'Invalid branch name');
         }
         
         const content = Buffer.from(args.content).toString('base64');
