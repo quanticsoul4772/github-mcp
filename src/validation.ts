@@ -273,10 +273,41 @@ export function validateEnvironmentVariable(name: string, value: string): string
 function validateApiUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
-    return parsed.protocol === 'https:' && 
-           parsed.hostname.length > 0 &&
-           !parsed.hostname.includes('localhost') &&
-           !parsed.hostname.includes('127.0.0.1');
+    if (parsed.protocol !== 'https:') return false;
+
+    const host = parsed.hostname.toLowerCase();
+
+    // Disallow loopback and unspecified hosts
+    const disallowedHosts = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0']);
+    if (disallowedHosts.has(host)) return false;
+
+    // Disallow private and link-local IP ranges
+    const isIpv4 = /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
+    if (isIpv4) {
+      const parts = host.split('.').map(Number);
+      const [a, b] = parts;
+      // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16
+      const isPrivate =
+        a === 10 ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168) ||
+        (a === 169 && b === 254);
+      if (isPrivate) return false;
+    }
+
+    // For IPv6 literals, reject link-local/unique-local ranges
+    if (host.includes(':')) {
+      const h = host.replace(/\[/g, '').replace(/\]/g, '');
+      // Block fc00::/7 (ULA) and fe80::/10 (link-local)
+      if (h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe8') || h.startsWith('fe9') || h.startsWith('fea') || h.startsWith('feb')) {
+        return false;
+      }
+    }
+
+    // Hostname must be non-empty
+    if (!host) return false;
+
+    return true;
   } catch {
     return false;
   }
