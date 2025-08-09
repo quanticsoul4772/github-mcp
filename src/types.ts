@@ -13,6 +13,7 @@ export type GitHubToolset =
   | 'discussions'
   | 'dependabot'
   | 'secret_protection'
+  | 'health'
   | 'experiments';
 
 export interface ToolConfig<TParams = any, TResult = any> {
