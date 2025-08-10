@@ -19,10 +19,22 @@ import { createDiscussionTools } from './tools/discussions.js';
 import { createDependabotTools } from './tools/dependabot.js';
 import { createSecretScanningTools } from './tools/secret-scanning.js';
 import { createOptimizedRepositoryTools } from './tools/optimized-repositories.js';
+import { validateEnvironmentConfiguration } from './validation.js';
 
 // Performance optimizations
 import { OptimizedAPIClient } from './optimized-api-client.js';
 import { globalPerformanceMonitor } from './performance-monitor.js';
+
+// Reliability and health monitoring
+import { 
+  ReliabilityManager, 
+  RetryManager, 
+  ConsoleTelemetry, 
+  NoOpTelemetry,
+  DEFAULT_RETRY_CONFIG 
+} from './reliability.js';
+import { HealthManager, createHealthTools } from './health.js';
+import { formatErrorResponse } from './errors.js';
 
 // Server configuration
 const SERVER_NAME = 'github-mcp';
@@ -44,15 +56,38 @@ const DEFAULT_TOOLSETS = [
   'secret_protection',
 ];
 
+/**
+ * GitHub MCP Server - Provides GitHub API integration for the Model Context Protocol
+ * 
+ * This server enables AI assistants to interact with GitHub repositories, issues,
+ * pull requests, actions, and more through a comprehensive set of tools.
+ */
 class GitHubMCPServer {
+  /** The MCP server instance */
   private server: McpServer;
+  /** GitHub API client (Octokit) */
   private octokit: Octokit;
+  /** Optimized API client with performance features */
   private optimizedClient: OptimizedAPIClient;
+  /** Set of enabled toolsets */
   private enabledToolsets: Set<string>;
+  /** Whether the server is running in read-only mode */
   private readOnly: boolean;
+  /** Set of registered tool names to prevent duplicates */
   private registeredTools = new Set<string>();
+  /** Total count of registered tools */
   private toolCount = 0;
+  /** Reliability manager for circuit breaker and retry logic */
+  private reliabilityManager: ReliabilityManager;
+  /** Health manager for system monitoring */
+  private healthManager: HealthManager;
 
+  /**
+   * Initialize the GitHub MCP Server
+   * 
+   * Sets up the MCP server, configures GitHub authentication,
+   * parses environment variables, and registers tools.
+   */
   constructor() {
     // Initialize MCP server
     this.server = new McpServer({
@@ -61,15 +96,19 @@ class GitHubMCPServer {
       description: 'GitHub API integration for MCP'
     });
 
-    // Initialize Octokit with auth token
-    const token = process.env.GITHUB_PERSONAL_ACCESS_TOKEN || process.env.GITHUB_TOKEN;
-    if (!token) {
-      console.error('ERROR: GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN environment variable is required');
-      console.error('Please create a GitHub Personal Access Token at: https://github.com/settings/tokens');
+    // Validate environment configuration for security
+    const envValidation = validateEnvironmentConfiguration();
+    if (!envValidation.isValid) {
+      console.error('ERROR: Environment configuration validation failed:');
+      envValidation.errors.forEach(error => console.error(`  - ${error}`));
+      console.error('Please check your environment variables and try again.');
+      console.error('Create a GitHub Personal Access Token at: https://github.com/settings/tokens');
       console.error('Required scopes: repo, workflow, user, notifications');
       process.exit(1);
     }
 
+    // Initialize Octokit with validated token
+    const token = envValidation.sanitizedValues.GITHUB_TOKEN;
     this.octokit = new Octokit({
       auth: token,
     });
@@ -93,10 +132,26 @@ class GitHubMCPServer {
       this.enabledToolsets = new Set(toolsetsConfig.split(',').map(t => t.trim()));
     }
 
+    // Initialize reliability infrastructure
+    const enableVerboseTelemetry = process.env.GITHUB_TELEMETRY_VERBOSE === 'true';
+    const telemetry = process.env.GITHUB_TELEMETRY_DISABLE === 'true' 
+      ? new NoOpTelemetry() 
+      : new ConsoleTelemetry(enableVerboseTelemetry);
+    
+    const retryManager = new RetryManager(DEFAULT_RETRY_CONFIG, telemetry);
+    this.reliabilityManager = new ReliabilityManager(retryManager, telemetry);
+    this.healthManager = new HealthManager(this.octokit, this.reliabilityManager);
+
     // Register all tools
     this.registerTools();
   }
 
+  /**
+   * Convert a JSON Schema to a Zod schema for validation
+   * 
+   * @param schema - The JSON schema to convert
+   * @returns A Zod schema object for input validation
+   */
   private convertSchemaToZod(schema: any): any {
     if (!schema || !schema.properties) {
       return {};
@@ -136,254 +191,252 @@ class GitHubMCPServer {
     return zodSchema;
   }
 
-  private registerToolConfig(config: any) {
-    // Skip if already registered
+  /**
+   * Register a tool configuration with the MCP server
+   * 
+   * @param config - Tool configuration object containing tool definition and handler
+   */
+  private registerTool(config: ToolConfig) {
+    // Skip if tool name is already registered (prevent duplicates)
     if (this.registeredTools.has(config.tool.name)) {
+      console.warn(`Tool ${config.tool.name} is already registered. Skipping duplicate.`);
       return;
     }
 
-    this.registeredTools.add(config.tool.name);
-    this.toolCount++;
-
-    // Convert the JSON schema to Zod schema
+    // Convert the JSON schema to Zod schema for validation
     const zodSchema = this.convertSchemaToZod(config.tool.inputSchema);
 
-    // Register the tool with the correct signature
+    // Register the tool handler with the MCP server
     this.server.tool(
       config.tool.name,
-      config.tool.description || 'GitHub API operation',
-      zodSchema,
+      config.tool.description || '',
+      z.object(zodSchema),
       async (args: any) => {
         try {
+          // Execute the tool handler
           const result = await config.handler(args);
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: typeof result === 'string' ? result : JSON.stringify(result, null, 2),
-              },
-            ],
-          };
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-          console.error(`Error in tool ${config.tool.name}:`, errorMessage);
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: `Error: ${errorMessage}`,
-              },
-            ],
-            isError: true,
-          };
+          return result;
+        } catch (error: any) {
+          // Log error details for debugging
+          console.error(`Error in tool ${config.tool.name}:`, error);
+          
+          // Return standardized error response
+          throw new Error(formatErrorResponse(error));
         }
       }
     );
+
+    // Track registered tool
+    this.registeredTools.add(config.tool.name);
+    this.toolCount++;
   }
 
+  /**
+   * Register all available GitHub tools with the server
+   * 
+   * Conditionally registers tools based on enabled toolsets
+   * and read-only mode configuration.
+   */
   private registerTools() {
-    // Context tools (always enabled)
+    console.log('\n====================================');
+    console.log('  GitHub MCP Server Initialization');
+    console.log('====================================\n');
+    
+    console.log('Configuration:');
+    console.log(`  Read-only mode: ${this.readOnly}`);
+    console.log(`  Enabled toolsets: ${Array.from(this.enabledToolsets).join(', ')}`);
+    console.log('\nRegistering tools...\n');
+
+    // Register context tools
     if (this.enabledToolsets.has('context')) {
-      const contextTools = createUserTools(this.octokit, this.readOnly);
-      // Only add get_me from user tools
-      const getMeTool = contextTools.find(t => t.tool.name === 'get_me');
-      if (getMeTool) {
-        this.registerToolConfig(getMeTool);
-      }
+      const contextTools = [
+        {
+          tool: {
+            name: 'get_me',
+            description: 'Get my GitHub user profile',
+            inputSchema: {
+              type: 'object',
+              properties: {}
+            }
+          },
+          handler: async () => {
+            const reliableCall = this.reliabilityManager.wrapApiCall(
+              () => this.octokit.users.getAuthenticated(),
+              'users.getAuthenticated',
+              { skipRateLimit: false }
+            );
+            const { data } = await reliableCall();
+            return data;
+          }
+        }
+      ];
+      contextTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Context tools (${contextTools.length})`);
     }
 
-    // Repository tools
+    // Register repository tools
     if (this.enabledToolsets.has('repos')) {
+      // Standard repository tools
       const repoTools = createRepositoryTools(this.octokit, this.readOnly);
-      for (const config of repoTools) {
-        this.registerToolConfig(config);
-      }
+      repoTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Repository tools (${repoTools.length})`);
+
+      // Optimized repository tools
+      const optimizedRepoTools = createOptimizedRepositoryTools(
+        this.optimizedClient,
+        this.readOnly
+      );
+      optimizedRepoTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Optimized repository tools (${optimizedRepoTools.length})`);
     }
 
-    // Issue tools
+    // Register issue tools
     if (this.enabledToolsets.has('issues')) {
       const issueTools = createIssueTools(this.octokit, this.readOnly);
-      for (const config of issueTools) {
-        this.registerToolConfig(config);
-      }
+      issueTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Issue tools (${issueTools.length})`);
     }
 
-    // Pull request tools
+    // Register pull request tools
     if (this.enabledToolsets.has('pull_requests')) {
       const prTools = createPullRequestTools(this.octokit, this.readOnly);
-      for (const config of prTools) {
-        this.registerToolConfig(config);
-      }
+      prTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Pull Request tools (${prTools.length})`);
     }
 
-    // Actions tools
+    // Register GitHub Actions tools
     if (this.enabledToolsets.has('actions')) {
       const actionTools = createActionTools(this.octokit, this.readOnly);
-      for (const config of actionTools) {
-        this.registerToolConfig(config);
-      }
+      actionTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ GitHub Actions tools (${actionTools.length})`);
     }
 
-    // Code security tools
+    // Register code security tools
     if (this.enabledToolsets.has('code_security')) {
-      const securityTools = createCodeSecurityTools(this.octokit, this.readOnly);
-      for (const config of securityTools) {
-        this.registerToolConfig(config);
-      }
+      const codeSecurityTools = createCodeSecurityTools(this.octokit, this.readOnly);
+      codeSecurityTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Code Security tools (${codeSecurityTools.length})`);
     }
 
-    // Search tools (always enabled)
+    // Register search tools
     const searchTools = createSearchTools(this.octokit);
-    for (const config of searchTools) {
-      this.registerToolConfig(config);
-    }
+    searchTools.forEach(tool => this.registerTool(tool));
+    console.log(`  ✓ Search tools (${searchTools.length})`);
 
-    // User tools
+    // Register user tools
     if (this.enabledToolsets.has('users')) {
       const userTools = createUserTools(this.octokit, this.readOnly);
-      // Filter out duplicate get_me if already added from context
-      const filteredUserTools = userTools.filter(t => !this.registeredTools.has(t.tool.name));
-      for (const config of filteredUserTools) {
-        this.registerToolConfig(config);
-      }
+      userTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ User tools (${userTools.length})`);
     }
 
-    // Organization tools
+    // Register organization tools
     if (this.enabledToolsets.has('orgs')) {
       const orgTools = createOrganizationTools(this.octokit, this.readOnly);
-      for (const config of orgTools) {
-        this.registerToolConfig(config);
-      }
+      orgTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Organization tools (${orgTools.length})`);
     }
 
-    // Notification tools
+    // Register notification tools
     if (this.enabledToolsets.has('notifications')) {
       const notificationTools = createNotificationTools(this.octokit, this.readOnly);
-      for (const config of notificationTools) {
-        this.registerToolConfig(config);
-      }
+      notificationTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Notification tools (${notificationTools.length})`);
     }
 
-    // Discussion tools
+    // Register discussion tools
     if (this.enabledToolsets.has('discussions')) {
       const discussionTools = createDiscussionTools(this.octokit, this.readOnly);
-      for (const config of discussionTools) {
-        this.registerToolConfig(config);
-      }
+      discussionTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Discussion tools (${discussionTools.length})`);
     }
 
-    // Dependabot tools
+    // Register Dependabot tools
     if (this.enabledToolsets.has('dependabot')) {
       const dependabotTools = createDependabotTools(this.octokit, this.readOnly);
-      for (const config of dependabotTools) {
-        this.registerToolConfig(config);
-      }
+      dependabotTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Dependabot tools (${dependabotTools.length})`);
     }
 
-    // Secret scanning tools
+    // Register secret scanning tools
     if (this.enabledToolsets.has('secret_protection')) {
-      const secretTools = createSecretScanningTools(this.octokit, this.readOnly);
-      for (const config of secretTools) {
-        this.registerToolConfig(config);
-      }
+      const secretScanningTools = createSecretScanningTools(this.octokit, this.readOnly);
+      secretScanningTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Secret Scanning tools (${secretScanningTools.length})`);
     }
 
-    // Performance monitoring tools
-    this.registerPerformanceTools();
+    // Register health monitoring tools
+    const healthTools = createHealthTools(this.healthManager);
+    healthTools.forEach(tool => this.registerTool(tool));
+    console.log(`  ✓ Health monitoring tools (${healthTools.length})`);
 
-    // Optimized repository tools (showcase performance optimizations)
-    if (this.enabledToolsets.has('repos')) {
-      const optimizedRepoTools = createOptimizedRepositoryTools(this.optimizedClient, this.readOnly);
-      for (const config of optimizedRepoTools) {
-        this.registerToolConfig(config);
+    // Register performance monitoring tools
+    const perfTools = [
+      {
+        tool: {
+          name: 'get_performance_metrics',
+          description: 'Get current performance metrics and statistics',
+          inputSchema: {
+            type: 'object',
+            properties: {}
+          }
+        },
+        handler: async () => globalPerformanceMonitor.getMetrics()
+      },
+      {
+        tool: {
+          name: 'get_performance_report',
+          description: 'Generate a comprehensive performance report',
+          inputSchema: {
+            type: 'object',
+            properties: {}
+          }
+        },
+        handler: async () => globalPerformanceMonitor.generateReport()
+      },
+      {
+        tool: {
+          name: 'clear_api_cache',
+          description: 'Clear all API response caches',
+          inputSchema: {
+            type: 'object',
+            properties: {}
+          }
+        },
+        handler: async () => {
+          this.optimizedClient.clearCache();
+          return { success: true, message: 'All caches cleared' };
+        }
       }
-    }
+    ];
+    perfTools.forEach(tool => this.registerTool(tool));
+    console.log(`  ✓ Performance monitoring tools (${perfTools.length})`);
+
+    console.log(`\nTotal tools registered: ${this.toolCount}`);
+    console.log('\n====================================\n');
   }
 
-  private registerPerformanceTools() {
-    // Performance metrics tool
-    this.registerToolConfig({
-      tool: {
-        name: 'get_performance_metrics',
-        description: 'Get comprehensive performance metrics and statistics',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            detailed: {
-              type: 'boolean',
-              description: 'Include detailed operation metrics',
-            },
-          },
-        },
-      },
-      handler: async (args: any) => {
-        const metrics = this.optimizedClient.getMetrics();
-        
-        if (args.detailed) {
-          return {
-            summary: metrics,
-            report: this.optimizedClient.getPerformanceReport(),
-          };
-        }
-        
-        return metrics;
-      },
-    });
-
-    // Cache management tool
-    this.registerToolConfig({
-      tool: {
-        name: 'manage_cache',
-        description: 'Manage API response cache (clear, invalidate patterns)',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            action: {
-              type: 'string',
-              description: 'Action to perform: clear, invalidate',
-              enum: ['clear', 'invalidate'],
-            },
-            pattern: {
-              type: 'string',
-              description: 'Pattern to match for invalidation (regex or string)',
-            },
-          },
-          required: ['action'],
-        },
-      },
-      handler: async (args: any) => {
-        if (args.action === 'clear') {
-          this.optimizedClient.clearAll();
-          return { message: 'Cache cleared successfully' };
-        } else if (args.action === 'invalidate' && args.pattern) {
-          const count = this.optimizedClient.invalidateCache(args.pattern);
-          return { message: `Invalidated ${count} cache entries matching pattern: ${args.pattern}` };
-        }
-        
-        return { error: 'Invalid action or missing pattern for invalidate' };
-      },
-    });
-  }
-
-  public async start() {
-    try {
-      const transport = new StdioServerTransport();
-      await this.server.connect(transport);
-      
-      console.error(`GitHub MCP Server v${SERVER_VERSION} started successfully`);
-      console.error(`Enabled toolsets: ${Array.from(this.enabledToolsets).join(', ')}`);
-      console.error(`Read-only mode: ${this.readOnly}`);
-      console.error(`Total tools registered: ${this.toolCount}`);
-    } catch (error) {
-      console.error('Failed to start server:', error);
-      process.exit(1);
-    }
+  /**
+   * Start the MCP server
+   * 
+   * Establishes a stdio connection for communication with the MCP client
+   */
+  async start() {
+    const transport = new StdioServerTransport();
+    await this.server.connect(transport);
+    
+    console.log(`GitHub MCP server (v${SERVER_VERSION}) is running`);
+    console.log('Ready to accept MCP requests via stdio\n');
   }
 }
 
-// Start the server
-const server = new GitHubMCPServer();
-server.start().catch((error: Error) => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
+// Main execution
+(async () => {
+  try {
+    const server = new GitHubMCPServer();
+    await server.start();
+  } catch (error) {
+    console.error('Failed to start GitHub MCP server:', error);
+    process.exit(1);
+  }
+})();

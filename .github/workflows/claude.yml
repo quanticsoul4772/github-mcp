@@ -1,5 +1,4 @@
 name: Claude Code
-
 on:
   issue_comment:
     types: [created]
@@ -17,28 +16,39 @@ jobs:
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body || '', '@claude')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body || '', '@claude')) ||
       (github.event_name == 'issues' && (contains(github.event.issue.body || '', '@claude') || contains(github.event.issue.title || '', '@claude')))
+    
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write      # Required for committing files
       pull-requests: write
       issues: write
       id-token: write
-      actions: read # Required for Claude to read CI results on PRs
+      actions: read        # Required for Claude to read CI results on PRs
+      checks: write        # Required for creating check runs
+      statuses: write      # Required for commit statuses
+      security-events: write # Required for security scanning results
+      packages: read       # Required for reading package information
+      deployments: write   # Required for deployment status
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-
+          
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@beta
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-
-          # This is an optional setting that allows Claude to read CI results on PRs
+          
+          # Enhanced permissions for security operations
           additional_permissions: |
             actions: read
+            checks: write
+            security-events: write
+            contents: write
+            packages: read
           
           # Optional: Specify model (defaults to Claude Sonnet 4, uncomment for Claude Opus 4.1)
           # model: "claude-opus-4-1-20250805"
@@ -49,16 +59,35 @@ jobs:
           # Optional: Trigger when specific user is assigned to an issue
           # assignee_trigger: "claude-bot"
           
-          # Optional: Allow Claude to run specific commands
-          # allowed_tools: "Bash(npm install),Bash(npm run build),Bash(npm run test:*),Bash(npm run lint:*)"
+          # Enhanced allowed tools for security operations
+          allowed_tools: |
+            Bash(npm install)
+            Bash(npm run build)
+            Bash(npm run test:*)
+            Bash(npm run lint:*)
+            Bash(npm audit)
+            Bash(npm audit fix)
+            Bash(git log --oneline -n 20)
+            Bash(git diff HEAD~1)
+            Bash(git status)
+            Bash(npx license-checker)
+            Bash(npx depcheck)
+            Bash(npx npm-check-updates)
           
-          # Optional: Add custom instructions for Claude to customize its behavior for your project
-          # custom_instructions: |
-          #   Follow our coding standards
-          #   Ensure all new code has tests
-          #   Use TypeScript for new files
+          # Custom instructions with security focus
+          custom_instructions: |
+            Follow our coding standards
+            Ensure all new code has tests
+            Use TypeScript for new files
+            Check for security vulnerabilities in dependencies
+            Never commit hardcoded secrets or API keys
+            Always validate user input
+            Use parameterized queries for database operations
+            Implement proper error handling without exposing sensitive information
+            Follow the principle of least privilege for permissions
+            Document security considerations in code comments
           
           # Optional: Custom environment variables for Claude
           # claude_env: |
           #   NODE_ENV: test
-
+          #   SECURITY_SCAN: true
