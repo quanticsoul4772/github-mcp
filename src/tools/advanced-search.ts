@@ -1,6 +1,25 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
 
+/**
+ * Creates advanced search tools using GraphQL API for enhanced search capabilities.
+ * 
+ * These tools provide sophisticated search functionality that leverages GraphQL's
+ * ability to fetch nested relationships and contextual data in single queries,
+ * offering performance and feature advantages over REST-based search.
+ * 
+ * @param octokit - Configured Octokit instance with GraphQL support
+ * @param readOnly - Whether to exclude write operations (all search tools are read-only)
+ * @returns Array of advanced search tool configurations
+ * 
+ * @example
+ * ```typescript
+ * const tools = createAdvancedSearchTools(octokit, true);
+ * // Returns tools: search_across_repos, advanced_code_search, etc.
+ * ```
+ * 
+ * @see https://docs.github.com/en/graphql/reference/queries#search
+ */
 export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
 
