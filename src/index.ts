@@ -18,6 +18,18 @@ import { createNotificationTools } from './tools/notifications.js';
 import { createDiscussionTools } from './tools/discussions.js';
 import { createDependabotTools } from './tools/dependabot.js';
 import { createSecretScanningTools } from './tools/secret-scanning.js';
+import { validateEnvironmentConfiguration } from './validation.js';
+
+// Reliability and health monitoring
+import { 
+  ReliabilityManager, 
+  RetryManager, 
+  ConsoleTelemetry, 
+  NoOpTelemetry,
+  DEFAULT_RETRY_CONFIG 
+} from './reliability.js';
+import { HealthManager, createHealthTools } from './health.js';
+import { formatErrorResponse } from './errors.js';
 
 // Server configuration
 const SERVER_NAME = 'github-mcp';
@@ -58,6 +70,8 @@ class GitHubMCPServer {
   private registeredTools = new Set<string>();
   /** Total count of registered tools */
   private toolCount = 0;
+  private reliabilityManager: ReliabilityManager;
+  private healthManager: HealthManager;
 
   /**
    * Initialize the GitHub MCP Server
@@ -73,15 +87,19 @@ class GitHubMCPServer {
       description: 'GitHub API integration for MCP'
     });
 
-    // Initialize Octokit with auth token
-    const token = process.env.GITHUB_PERSONAL_ACCESS_TOKEN || process.env.GITHUB_TOKEN;
-    if (!token) {
-      console.error('ERROR: GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN environment variable is required');
-      console.error('Please create a GitHub Personal Access Token at: https://github.com/settings/tokens');
+    // Validate environment configuration for security
+    const envValidation = validateEnvironmentConfiguration();
+    if (!envValidation.isValid) {
+      console.error('ERROR: Environment configuration validation failed:');
+      envValidation.errors.forEach(error => console.error(`  - ${error}`));
+      console.error('Please check your environment variables and try again.');
+      console.error('Create a GitHub Personal Access Token at: https://github.com/settings/tokens');
       console.error('Required scopes: repo, workflow, user, notifications');
       process.exit(1);
     }
 
+    // Initialize Octokit with validated token
+    const token = envValidation.sanitizedValues.GITHUB_TOKEN;
     this.octokit = new Octokit({
       auth: token,
     });
@@ -96,6 +114,16 @@ class GitHubMCPServer {
     } else {
       this.enabledToolsets = new Set(toolsetsConfig.split(',').map(t => t.trim()));
     }
+
+    // Initialize reliability infrastructure
+    const enableVerboseTelemetry = process.env.GITHUB_TELEMETRY_VERBOSE === 'true';
+    const telemetry = process.env.GITHUB_TELEMETRY_DISABLE === 'true' 
+      ? new NoOpTelemetry() 
+      : new ConsoleTelemetry(enableVerboseTelemetry);
+    
+    const retryManager = new RetryManager(DEFAULT_RETRY_CONFIG, telemetry);
+    this.reliabilityManager = new ReliabilityManager(retryManager, telemetry);
+    this.healthManager = new HealthManager(this.octokit, this.reliabilityManager);
 
     // Register all tools
     this.registerTools();
@@ -170,7 +198,17 @@ class GitHubMCPServer {
       zodSchema,
       async (args: any) => {
         try {
-          const result = await config.handler(args);
+          const result = await this.reliabilityManager.executeWithReliability(
+            config.tool.name,
+            () => config.handler(args),
+            {
+              metadata: { 
+                toolName: config.tool.name,
+                args: Object.keys(args).length > 0 ? Object.keys(args) : undefined 
+              }
+            }
+          );
+          
           return {
             content: [
               {
@@ -180,13 +218,14 @@ class GitHubMCPServer {
             ],
           };
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-          console.error(`Error in tool ${config.tool.name}:`, errorMessage);
+          const formattedError = formatErrorResponse(error as Error);
+          console.error(`Error in tool ${config.tool.name}:`, formattedError);
+          
           return {
             content: [
               {
                 type: 'text' as const,
-                text: `Error: ${errorMessage}`,
+                text: JSON.stringify(formattedError, null, 2),
               },
             ],
             isError: true,
@@ -308,6 +347,12 @@ class GitHubMCPServer {
         this.registerToolConfig(config);
       }
     }
+
+    // Health monitoring tools (always enabled)
+    const healthTools = createHealthTools(this.healthManager);
+    for (const config of healthTools) {
+      this.registerToolConfig(config);
+    }
   }
 
   public async start() {
@@ -319,10 +364,39 @@ class GitHubMCPServer {
       console.error(`Enabled toolsets: ${Array.from(this.enabledToolsets).join(', ')}`);
       console.error(`Read-only mode: ${this.readOnly}`);
       console.error(`Total tools registered: ${this.toolCount}`);
+      console.error(`Reliability features: Circuit breakers, retry logic, telemetry enabled`);
+      
+      // Setup graceful shutdown
+      this.setupGracefulShutdown();
     } catch (error) {
       console.error('Failed to start server:', error);
       process.exit(1);
     }
+  }
+
+  private setupGracefulShutdown() {
+    const shutdown = async (signal: string) => {
+      console.error(`\n${signal} received. Shutting down gracefully...`);
+      
+      try {
+        // Log final health status
+        const health = await this.healthManager.getQuickHealth();
+        console.error(`Final health status: ${health.status}`);
+        console.error(`Server uptime: ${Math.round(health.uptime / 1000)}s`);
+        
+        // Reset circuit breakers to clean state
+        this.reliabilityManager.resetCircuitBreakers();
+        
+        console.error('Graceful shutdown completed');
+        process.exit(0);
+      } catch (error) {
+        console.error('Error during shutdown:', error);
+        process.exit(1);
+      }
+    };
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
   }
 }
 

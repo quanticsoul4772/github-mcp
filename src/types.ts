@@ -30,6 +30,7 @@ export type GitHubToolset =
   | 'discussions'
   | 'dependabot'
   | 'secret_protection'
+  | 'health'
   | 'experiments';
 
 /**

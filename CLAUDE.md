@@ -36,6 +36,8 @@ npm run test:coverage # Run tests with coverage report
 - **Error Handling**: `src/errors.ts` - Standardized error types and handling
 - **Caching**: `src/cache.ts` - API response caching with LRU eviction
 - **Batch Operations**: `src/batch-operations.ts` - Efficient batch processing utilities
+- **Reliability**: `src/reliability.ts` - Circuit breaker, retry logic, and telemetry
+- **Health Monitoring**: `src/health.ts` - Health checks and system status monitoring
 
 ### Tool Organization
 The server organizes GitHub functionality into toolsets:
@@ -51,12 +53,15 @@ The server organizes GitHub functionality into toolsets:
 - `users.ts` - User profile operations
 - `organizations.ts` - Organization management
 - `search.ts` - Code and repository search
+- `health.ts` - System health monitoring and diagnostics
 
 ### Key Patterns
 1. **Tool Registration**: Each tool module exports a `create*Tools()` function that returns an array of `ToolConfig` objects
 2. **Schema Conversion**: The main server converts JSON schemas to Zod schemas for validation
 3. **Read-Only Mode**: Tools check the `readOnly` flag to prevent write operations when enabled
 4. **Error Handling**: Consistent error responses with status codes and messages
+5. **Reliability Features**: All API operations use circuit breakers, exponential backoff retry, and telemetry tracking
+6. **Health Monitoring**: Continuous monitoring of GitHub API connectivity and rate limits
 
 ## Configuration
 
@@ -70,6 +75,8 @@ GITHUB_PERSONAL_ACCESS_TOKEN=<token>  # Required: GitHub PAT for authentication
 GITHUB_READ_ONLY=true                 # Enable read-only mode
 GITHUB_TOOLSETS=repos,issues,pull_requests  # Specify enabled toolsets (default: all)
 GITHUB_HOST=https://github.enterprise.com/api/v3  # GitHub Enterprise API endpoint
+GITHUB_TELEMETRY_DISABLE=true        # Disable telemetry and monitoring
+GITHUB_TELEMETRY_VERBOSE=true        # Enable verbose telemetry logging
 NODE_OPTIONS=--max-old-space-size=4096  # Memory settings for large operations
 ```
 
@@ -95,5 +102,8 @@ Currently, there are no test files in the project. When adding tests:
 1. **GraphQL Operations**: Discussion tools use raw GraphQL queries via `octokit.graphql()`
 2. **Pagination**: Most list operations support `page` and `perPage` parameters
 3. **Token Scopes**: Different operations require specific GitHub token scopes
-4. **Rate Limiting**: GitHub API has rate limits (5000 authenticated requests/hour)
+4. **Rate Limiting**: GitHub API has rate limits (5000 authenticated requests/hour) - automatically handled with backoff
 5. **File Content**: When retrieving file contents, base64 decoding is handled automatically for text files
+6. **Circuit Breakers**: Prevent cascade failures by temporarily blocking requests to failing operations
+7. **Telemetry**: All operations are tracked with metrics, error rates, and performance data
+8. **Correlation IDs**: Each request gets a unique ID for debugging and tracing across operations
