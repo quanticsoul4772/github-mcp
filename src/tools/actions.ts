@@ -1,5 +1,113 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import {
+  ListWorkflowsParams,
+  GetWorkflowParams,
+  ListWorkflowRunsParams,
+  TriggerWorkflowParams,
+  CancelWorkflowRunParams,
+  RerunWorkflowParams,
+  GetWorkflowRunLogsParams
+} from '../tool-types.js';
+
+interface GetWorkflowRunParams {
+  owner: string;
+  repo: string;
+  run_id: number;
+}
+
+interface ListWorkflowRunJobsParams {
+  owner: string;
+  repo: string;
+  run_id: number;
+  page?: number;
+  perPage?: number;
+}
+
+interface GetJobLogsParams {
+  owner: string;
+  repo: string;
+  job_id: number;
+}
+
+interface ListRepositorySecretsParams {
+  owner: string;
+  repo: string;
+  page?: number;
+  perPage?: number;
+}
+
+interface CreateRepositorySecretParams {
+  owner: string;
+  repo: string;
+  secret_name: string;
+  encrypted_value: string;
+  key_id: string;
+}
+
+interface DeleteRepositorySecretParams {
+  owner: string;
+  repo: string;
+  secret_name: string;
+}
+
+interface ListWorkflowRunsWithFilterParams {
+  owner: string;
+  repo: string;
+  workflow_id: string;
+  actor?: string;
+  branch?: string;
+  event?: string;
+  status?: string;
+  page?: number;
+  perPage?: number;
+}
+
+interface ListWorkflowRunArtifactsParams {
+  owner: string;
+  repo: string;
+  run_id: number;
+  page?: number;
+  perPage?: number;
+}
+
+interface GetWorkflowRunUsageParams {
+  owner: string;
+  repo: string;
+  run_id: number;
+}
+
+interface RunWorkflowParams {
+  owner: string;
+  repo: string;
+  workflow_id: string;
+  ref: string;
+  inputs?: object;
+}
+
+interface CancelWorkflowRunParams {
+  owner: string;
+  repo: string;
+  run_id: number;
+}
+
+interface RerunWorkflowRunParams {
+  owner: string;
+  repo: string;
+  run_id: number;
+}
+
+interface RerunFailedJobsParams {
+  owner: string;
+  repo: string;
+  run_id: number;
+}
+
+interface DeleteWorkflowRunLogsParams {
+  owner: string;
+  repo: string;
+  run_id: number;
+}
 
 export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
@@ -35,7 +143,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: ListWorkflowsParams) => {
       const { data } = await octokit.actions.listRepoWorkflows({
         owner: args.owner,
         repo: args.repo,
@@ -45,7 +153,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
 
       return {
         total_count: data.total_count,
-        workflows: data.workflows.map((workflow: any) => ({
+        workflows: data.workflows.map((workflow) => ({
           id: workflow.id,
           name: workflow.name,
           path: workflow.path,
@@ -111,7 +219,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
         required: ['owner', 'repo', 'workflow_id'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: ListWorkflowRunsWithFilterParams) => {
       const { data } = await octokit.actions.listWorkflowRuns({
         owner: args.owner,
         repo: args.repo,
@@ -126,7 +234,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
 
       return {
         total_count: data.total_count,
-        workflow_runs: data.workflow_runs.map((run: any) => ({
+        workflow_runs: data.workflow_runs.map((run) => ({
           id: run.id,
           name: run.name,
           head_branch: run.head_branch,
@@ -168,7 +276,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
         required: ['owner', 'repo', 'run_id'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetWorkflowRunParams) => {
       const { data } = await octokit.actions.getWorkflowRun({
         owner: args.owner,
         repo: args.repo,
@@ -239,7 +347,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
         required: ['owner', 'repo', 'run_id'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: ListWorkflowRunJobsParams) => {
       const { data } = await octokit.actions.listJobsForWorkflowRun({
         owner: args.owner,
         repo: args.repo,
@@ -251,7 +359,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
 
       return {
         total_count: data.total_count,
-        jobs: data.jobs.map((job: any) => ({
+        jobs: data.jobs.map((job) => ({
           id: job.id,
           run_id: job.run_id,
           run_url: job.run_url,
@@ -262,7 +370,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
           started_at: job.started_at,
           completed_at: job.completed_at,
           name: job.name,
-          steps: job.steps?.map((step: any) => ({
+          steps: job.steps?.map((step) => ({
             name: step.name,
             status: step.status,
             conclusion: step.conclusion,
@@ -316,7 +424,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetJobLogsParams) => {
       if (args.failed_only && args.run_id) {
         // Get all failed jobs in the run
         const { data: jobsData } = await octokit.actions.listJobsForWorkflowRun({
@@ -325,7 +433,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
           run_id: args.run_id,
         });
 
-        const failedJobs = jobsData.jobs.filter((job: any) => 
+        const failedJobs = jobsData.jobs.filter((job) => 
           job.conclusion === 'failure' || job.status === 'failure'
         );
 
@@ -405,7 +513,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
         required: ['owner', 'repo', 'run_id'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetWorkflowRunLogsParams) => {
       const response = await octokit.actions.downloadWorkflowRunLogs({
         owner: args.owner,
         repo: args.repo,
@@ -453,7 +561,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
         required: ['owner', 'repo', 'run_id'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: ListWorkflowRunArtifactsParams) => {
       const { data } = await octokit.actions.listWorkflowRunArtifacts({
         owner: args.owner,
         repo: args.repo,
@@ -464,7 +572,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
 
       return {
         total_count: data.total_count,
-        artifacts: data.artifacts.map((artifact: any) => ({
+        artifacts: data.artifacts.map((artifact) => ({
           id: artifact.id,
           node_id: artifact.node_id,
           name: artifact.name,
@@ -504,7 +612,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
         required: ['owner', 'repo', 'run_id'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetWorkflowRunUsageParams) => {
       const { data } = await octokit.actions.getWorkflowRunUsage({
         owner: args.owner,
         repo: args.repo,
@@ -552,7 +660,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
           required: ['owner', 'repo', 'workflow_id', 'ref'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: RunWorkflowParams) => {
         await octokit.actions.createWorkflowDispatch({
           owner: args.owner,
           repo: args.repo,
@@ -592,7 +700,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
           required: ['owner', 'repo', 'run_id'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: CancelWorkflowRunParams) => {
         await octokit.actions.cancelWorkflowRun({
           owner: args.owner,
           repo: args.repo,
@@ -630,7 +738,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
           required: ['owner', 'repo', 'run_id'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: RerunWorkflowRunParams) => {
         await octokit.actions.reRunWorkflow({
           owner: args.owner,
           repo: args.repo,
@@ -668,7 +776,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
           required: ['owner', 'repo', 'run_id'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: RerunFailedJobsParams) => {
         await octokit.actions.reRunWorkflowFailedJobs({
           owner: args.owner,
           repo: args.repo,
@@ -706,7 +814,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
           required: ['owner', 'repo', 'run_id'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: DeleteWorkflowRunLogsParams) => {
         await octokit.actions.deleteWorkflowRunLogs({
           owner: args.owner,
           repo: args.repo,
