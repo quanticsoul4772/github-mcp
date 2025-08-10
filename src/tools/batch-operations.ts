@@ -151,7 +151,7 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
         }
       `;
 
-      const result: any = await octokit.graphql(query);
+      const result: any = await (octokit as any).graphqlWithComplexity(query);
 
       // Process results
       const repositories = Object.keys(result).map(key => {
@@ -367,7 +367,7 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
         }
       `;
 
-      const result: any = await octokit.graphql(query);
+      const result: any = await (octokit as any).graphqlWithComplexity(query);
 
       // Process results - combine user and organization results
       const entities = [];
@@ -484,7 +484,7 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
       `;
 
       try {
-        const result: any = await octokit.graphql(fullQuery, allVariables);
+        const result: any = await (octokit as any).graphqlWithComplexity(fullQuery, allVariables);
         
         return {
           successful: true,

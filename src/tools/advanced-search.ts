@@ -153,7 +153,7 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         searchQuery: args.query,
         type: args.type,
         first: args.first || 25,
@@ -337,7 +337,7 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
         }
       `;
 
-      const result: any = await octokit.graphql(baseQuery, {
+      const result: any = await (octokit as any).graphqlWithComplexity(baseQuery, {
         searchQuery,
         first: args.first || 25,
       });
@@ -531,7 +531,7 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         searchQuery: args.query,
         entityType: args.entityType,
         first: args.first || 10,

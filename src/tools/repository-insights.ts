@@ -84,7 +84,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
       });
@@ -198,7 +198,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
         first: args.first || 25,
@@ -331,7 +331,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
         branch: args.branch,
