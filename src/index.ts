@@ -4,6 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { Octokit } from '@octokit/rest';
 import { z } from 'zod';
+import { createRateLimitedOctokit, GitHubRateLimiter, ResponseSizeLimiter } from './rate-limiter.js';
 
 // Tool modules
 import { createRepositoryTools } from './tools/repositories.js';
@@ -75,6 +76,8 @@ class GitHubMCPServer {
   private server: McpServer;
   /** GitHub API client (Octokit) */
   private octokit: Octokit;
+  /** Rate limiter for GitHub API */
+  private rateLimiter: GitHubRateLimiter;
   /** Optimized API client with performance features */
   private optimizedClient: OptimizedAPIClient;
   /** Set of enabled toolsets */
@@ -129,14 +132,34 @@ class GitHubMCPServer {
 
     // Initialize Octokit with validated token
     const token = envValidation.sanitizedValues.GITHUB_TOKEN;
-    this.octokit = new Octokit({
-      auth: token,
-      log: {
-        debug: (message: string) => logger.debug(message),
-        info: (message: string) => logger.info(message),
-        warn: (message: string) => logger.warn(message),
-        error: (message: string) => logger.error(message),
-      },
+    // Create rate-limited Octokit instance with logging
+    const rateLimitedSetup = createRateLimitedOctokit(token);
+    this.octokit = rateLimitedSetup.octokit;
+    this.rateLimiter = rateLimitedSetup.rateLimiter;
+    
+    // Add logging to Octokit
+    this.octokit.hook.before('request', async (options) => {
+      logger.debug('API request', {
+        method: options.method,
+        url: options.url
+      });
+    });
+    
+    this.octokit.hook.after('request', async (response, options) => {
+      logger.debug('API response', {
+        method: options.method,
+        url: options.url,
+        status: response.status
+      });
+    });
+    
+    this.octokit.hook.error('request', async (error, options) => {
+      logger.error('API error', {
+        method: options.method,
+        url: options.url,
+        error: error.message
+      });
+      throw error;
     });
 
     // Initialize health monitor
@@ -299,7 +322,29 @@ class GitHubMCPServer {
             success: true 
           });
           
-          return result;
+          // Apply response size limiting
+          const { data: limitedResult, truncated, originalSize } = ResponseSizeLimiter.limitResponseSize(result);
+          
+          let responseText: string;
+          if (typeof limitedResult === 'string') {
+            responseText = limitedResult;
+          } else {
+            responseText = JSON.stringify(limitedResult, null, 2);
+            // Add truncation warning if response was limited
+            if (truncated) {
+              const warningMsg = `\n\n[Response truncated - original size: ${originalSize ? Math.round(originalSize / 1024) + 'KB' : 'unknown'}]`;
+              responseText += warningMsg;
+            }
+          }
+          
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: responseText,
+              },
+            ],
+          };
         } catch (error: any) {
           const duration = Date.now() - startTime;
           metrics.recordError('TOOL_ERROR', error.message);
@@ -311,8 +356,17 @@ class GitHubMCPServer {
             args
           });
           
-          // Return standardized error response
-          throw new Error(formatErrorResponse(error));
+          // Return standardized error response with both approaches
+          const errorMessage = formatErrorResponse(error);
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: `Error: ${errorMessage}`,
+              },
+            ],
+            isError: true,
+          };
         }
       }
     );
@@ -337,6 +391,45 @@ class GitHubMCPServer {
     console.log(`  Read-only mode: ${this.readOnly}`);
     console.log(`  Enabled toolsets: ${Array.from(this.enabledToolsets).join(', ')}`);
     console.log('\nRegistering tools...\n');
+
+    // Add rate limit status tool (always enabled)
+    this.registerTool({
+      tool: {
+        name: 'get_rate_limit_status',
+        description: 'Get current GitHub API rate limit status',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+      handler: async () => {
+        const status = this.rateLimiter.getStatus();
+        return {
+          rate_limits: {
+            core: {
+              limit: status.core.limit,
+              remaining: status.core.remaining,
+              reset: status.core.reset.toISOString(),
+              used: status.core.limit - status.core.remaining,
+            },
+            search: {
+              limit: status.search.limit,
+              remaining: status.search.remaining,
+              reset: status.search.reset.toISOString(),
+              used: status.search.limit - status.search.remaining,
+            },
+            graphql: {
+              limit: status.graphql.limit,
+              remaining: status.graphql.remaining,
+              reset: status.graphql.reset.toISOString(),
+              used: status.graphql.limit - status.graphql.remaining,
+            },
+          },
+          queue_length: status.queueLength,
+        };
+      },
+    });
+    console.log(`  ✓ Rate limit status tool (1)`);
 
     // Register context tools
     if (this.enabledToolsets.has('context')) {
