@@ -4,9 +4,9 @@
  */
 
 /**
- * Validation error with detailed context
+ * Validation error detail with context information
  */
-export interface ValidationError {
+export interface ValidationErrorDetail {
   code: string;
   message: string;
   field: string;
@@ -31,7 +31,7 @@ export interface ValidationWarning {
 export interface ValidationResult<T = any> {
   valid: boolean;
   value?: T;
-  errors: ValidationError[];
+  errors: ValidationErrorDetail[];
   warnings: ValidationWarning[];
   suggestions: string[];
 }
@@ -80,9 +80,9 @@ const validationCache = new Map<string, { result: ValidationResult; timestamp: n
  */
 const CACHE_CLEANUP_INTERVAL = 5 * 60 * 1000;
 
-// Setup cache cleanup
+// Setup cache cleanup with environment safety
 let cacheCleanupTimer: NodeJS.Timeout | null = null;
-if (typeof process !== 'undefined') {
+if (typeof process !== 'undefined' && typeof setInterval !== 'undefined') {
   cacheCleanupTimer = setInterval(() => {
     const now = Date.now();
     for (const [key, entry] of validationCache.entries()) {
@@ -94,9 +94,13 @@ if (typeof process !== 'undefined') {
 }
 
 /**
- * Development mode bypass check
+ * Development mode bypass check with environment safety
  */
 function shouldBypassValidation(): boolean {
+  // Safe environment check for universal compatibility
+  if (typeof process === 'undefined' || !process.env) {
+    return false;
+  }
   return process.env.NODE_ENV === 'development' && process.env.SKIP_VALIDATION === 'true';
 }
 
@@ -116,7 +120,7 @@ function createSuccessResult<T>(value: T, warnings: ValidationWarning[] = [], su
 /**
  * Creates a validation result with errors
  */
-function createErrorResult<T>(errors: ValidationError[], warnings: ValidationWarning[] = [], suggestions: string[] = []): ValidationResult<T> {
+function createErrorResult<T>(errors: ValidationErrorDetail[], warnings: ValidationWarning[] = [], suggestions: string[] = []): ValidationResult<T> {
   return {
     valid: false,
     errors,
@@ -128,7 +132,7 @@ function createErrorResult<T>(errors: ValidationError[], warnings: ValidationWar
 /**
  * Creates a validation error
  */
-function createValidationError(code: string, message: string, field: string, severity: 'error' | 'warning' | 'info' = 'error', recoverable = false, suggestion?: string): ValidationError {
+function createValidationError(code: string, message: string, field: string, severity: 'error' | 'warning' | 'info' = 'error', recoverable = false, suggestion?: string): ValidationErrorDetail {
   return { code, message, field, severity, recoverable, suggestion };
 }
 
@@ -325,7 +329,7 @@ export function validateRepoName(name: string): boolean {
  * - Maximum 100 characters
  */
 export function validateRepoNameWithResult(name: string): ValidationResult<string> {
-  // Development mode bypass
+  // Development mode bypass with safe check
   if (shouldBypassValidation()) {
     return createSuccessResult(name, [
       createValidationWarning('DEV_BYPASS', 'Validation bypassed in development mode', 'repoName')
@@ -339,7 +343,7 @@ export function validateRepoNameWithResult(name: string): ValidationResult<strin
     return cached;
   }
 
-  const errors: ValidationError[] = [];
+  const errors: ValidationErrorDetail[] = [];
   const warnings: ValidationWarning[] = [];
   const suggestions: string[] = [];
 
@@ -920,7 +924,8 @@ export function validateGitHubTokenWithResult(token: string): ValidationResult<s
   }
 
   // Additional security warnings
-  if (cleanToken.length > 0 && !process.env.NODE_ENV) {
+  const nodeEnv = typeof process !== 'undefined' && process.env ? process.env.NODE_ENV : undefined;
+  if (cleanToken.length > 0 && !nodeEnv) {
     warnings.push(createValidationWarning(
       'NODE_ENV_NOT_SET',
       'NODE_ENV environment variable not set',
@@ -963,6 +968,18 @@ export async function validateGitHubTokenWithAPI(
       [createValidationWarning('DEV_BYPASS', 'API validation bypassed in development mode', 'githubToken')],
       ['Set NODE_ENV=production to enable full API validation']
     );
+  }
+
+  // Check for fetch API availability
+  if (typeof fetch === 'undefined') {
+    return createErrorResult<{ token: string; user: any }>([createValidationError(
+      'FETCH_UNAVAILABLE',
+      'Fetch API not available in this environment',
+      'githubToken',
+      'error',
+      false,
+      'API validation requires fetch support (Node.js 18+ or modern browser)'
+    )]);
   }
 
   // Use retry logic with circuit breaker
@@ -1212,8 +1229,16 @@ export function validateEnvironmentConfigurationWithResult(): ValidationResult<R
   const sanitizedValues: Record<string, string> = {};
   const suggestions: string[] = [];
 
+  // Safe environment variable access
+  const getEnvVar = (name: string): string | undefined => {
+    if (typeof process === 'undefined' || !process.env) {
+      return undefined;
+    }
+    return process.env[name];
+  };
+
   // Required variables - GitHub token
-  const token = process.env.GITHUB_PERSONAL_ACCESS_TOKEN || process.env.GITHUB_TOKEN;
+  const token = getEnvVar('GITHUB_PERSONAL_ACCESS_TOKEN') || getEnvVar('GITHUB_TOKEN');
   if (!token) {
     errors.push(createValidationError(
       'MISSING_REQUIRED_TOKEN',
@@ -1248,7 +1273,7 @@ export function validateEnvironmentConfigurationWithResult(): ValidationResult<R
   ];
 
   for (const { name, validator } of optionalVars) {
-    const value = process.env[name];
+    const value = getEnvVar(name);
     if (value) {
       const sanitized = validateEnvironmentVariable(validator, value);
       if (sanitized === null) {
@@ -1277,7 +1302,8 @@ export function validateEnvironmentConfigurationWithResult(): ValidationResult<R
   }
 
   // Additional environment checks
-  if (!process.env.NODE_ENV) {
+  const nodeEnv = getEnvVar('NODE_ENV');
+  if (!nodeEnv) {
     warnings.push(createValidationWarning(
       'NODE_ENV_NOT_SET',
       'NODE_ENV environment variable is not set',
@@ -1286,7 +1312,7 @@ export function validateEnvironmentConfigurationWithResult(): ValidationResult<R
     ));
   }
 
-  if (process.env.NODE_ENV === 'development') {
+  if (nodeEnv === 'development') {
     warnings.push(createValidationWarning(
       'DEVELOPMENT_MODE',
       'Running in development mode',
@@ -1296,7 +1322,7 @@ export function validateEnvironmentConfigurationWithResult(): ValidationResult<R
   }
 
   // Security checks
-  if (process.env.DEBUG && process.env.NODE_ENV === 'production') {
+  if (getEnvVar('DEBUG') && nodeEnv === 'production') {
     warnings.push(createValidationWarning(
       'DEBUG_IN_PRODUCTION',
       'DEBUG environment variable is set in production mode',
@@ -1345,8 +1371,16 @@ export function validateEnvironmentConfigurationGraceful(): ValidationResult<{
     return createErrorResult(result.errors, warnings, suggestions);
   }
 
+  // Safe environment variable access for degraded mode
+  const getEnvVar = (name: string): string | undefined => {
+    if (typeof process === 'undefined' || !process.env) {
+      return undefined;
+    }
+    return process.env[name];
+  };
+
   // For recoverable errors, provide degraded functionality
-  const token = process.env.GITHUB_PERSONAL_ACCESS_TOKEN || process.env.GITHUB_TOKEN;
+  const token = getEnvVar('GITHUB_PERSONAL_ACCESS_TOKEN') || getEnvVar('GITHUB_TOKEN');
   if (token) {
     // Even if token validation failed, try to proceed with warnings
     sanitizedValues.GITHUB_TOKEN = token;
@@ -1362,7 +1396,7 @@ export function validateEnvironmentConfigurationGraceful(): ValidationResult<{
   // Add other environment variables that might be partially valid
   const optionalVars = ['GITHUB_HOST', 'GITHUB_API_URL', 'GITHUB_READ_ONLY', 'GITHUB_TOOLSETS', 'NODE_OPTIONS'];
   for (const varName of optionalVars) {
-    const value = process.env[varName];
+    const value = getEnvVar(varName);
     if (value) {
       sanitizedValues[varName] = value; // Use raw value in degraded mode
       missingFeatures.push(`${varName} validation`);
@@ -1528,12 +1562,12 @@ export function getValidationStats(): {
 }
 
 /**
- * Creates a validation error with consistent format (legacy)
- * @deprecated Use ValidationError interface for better error handling
+ * Creates a validation error with consistent format
+ * This class maintains backward compatibility with existing code
  */
-export class LegacyValidationError extends Error {
+export class ValidationError extends Error {
   constructor(field: string, message: string) {
     super(`Validation failed for ${field}: ${message}`);
-    this.name = 'LegacyValidationError';
+    this.name = 'ValidationError';
   }
 }

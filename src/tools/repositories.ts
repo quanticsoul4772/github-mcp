@@ -5,7 +5,7 @@ import {
   validateRepoName, 
   validateFilePath, 
   validateRef,
-  LegacyValidationError 
+  ValidationError 
 } from '../validation.js';
 import {
   GetFileContentsParams,
@@ -83,10 +83,10 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
     handler: async (args: GetFileContentsParams) => {
       // Validate inputs
       if (!validateOwnerName(args.owner)) {
-        throw new LegacyValidationError('owner', 'Invalid repository owner name');
+        throw new ValidationError('owner', 'Invalid repository owner name');
       }
       if (!validateRepoName(args.repo)) {
-        throw new LegacyValidationError('repo', 'Invalid repository name');
+        throw new ValidationError('repo', 'Invalid repository name');
       }
       
       // Validate and sanitize path if provided
@@ -94,14 +94,14 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
       if (args.path) {
         const validated = validateFilePath(args.path);
         if (validated === null) {
-          throw new LegacyValidationError('path', 'Invalid file path');
+          throw new ValidationError('path', 'Invalid file path');
         }
         safePath = validated;
       }
       
       // Validate ref if provided
       if (args.ref && !validateRef(args.ref)) {
-        throw new LegacyValidationError('ref', 'Invalid Git ref');
+        throw new ValidationError('ref', 'Invalid Git ref');
       }
       
       const { data } = await octokit.repos.getContent({

@@ -10,7 +10,6 @@ import {
   validateGitHubTokenFormat,
   ValidationLevel,
   ValidationError,
-  LegacyValidationError,
 } from './validation.js';
 
 describe('Validation Module', () => {
@@ -273,11 +272,11 @@ describe('Validation Module', () => {
     });
   });
 
-  describe('LegacyValidationError', () => {
+  describe('ValidationError', () => {
     it('should create error with proper message', () => {
-      const error = new LegacyValidationError('repo', 'Invalid repository name');
+      const error = new ValidationError('repo', 'Invalid repository name');
       expect(error.message).toBe('Validation failed for repo: Invalid repository name');
-      expect(error.name).toBe('LegacyValidationError');
+      expect(error.name).toBe('ValidationError');
     });
   });
 });
