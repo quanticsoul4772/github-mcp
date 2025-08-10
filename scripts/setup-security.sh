@@ -251,6 +251,10 @@ setup_virtual_environment() {
     
     # Activate virtual environment
     log "DEBUG" "Activating virtual environment"
+    if [[ ! -f "${VENV_DIR}/bin/activate" ]]; then
+        log "ERROR" "Virtual environment activation script not found at ${VENV_DIR}/bin/activate"
+        return 1
+    fi
     # shellcheck source=/dev/null
     source "${VENV_DIR}/bin/activate"
     
