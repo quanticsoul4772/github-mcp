@@ -84,15 +84,30 @@ export function createOptimizedRepositoryTools(optimizedClient: OptimizedAPIClie
           sha: item.sha,
         }));
       } else if (data.type === 'file') {
-        // File content
-        const content = Buffer.from(data.content, 'base64').toString('utf-8');
-        return {
-          name: data.name,
-          path: data.path,
-          size: data.size,
-          sha: data.sha,
-          content: content,
-        };
+          // File content: only decode when content and encoding are provided and content is not excessively large
+          const encoding = (data as any).encoding;
+          const rawContent = (data as any).content;
+          let decoded: string | undefined;
+          if (typeof rawContent === 'string' && encoding === 'base64') {
+            // Avoid decoding extremely large contents into memory
+            const maxDecodableSize = 5 * 1024 * 1024; // 5MB safety limit
+            const approximateBytes = rawContent.length * 0.75; // base64 size approximation
+            if (approximateBytes <= maxDecodableSize) {
+              decoded = Buffer.from(rawContent, 'base64').toString('utf-8');
+            }
+          }
+          return {
+            name: (data as any).name,
+            path: (data as any).path,
+            size: (data as any).size,
+            sha: (data as any).sha,
+            encoding,
+            // If decoding failed or was skipped, return raw content and a flag
+            content: decoded,
+            content_raw: decoded ? undefined : rawContent,
+            is_decoded: !!decoded,
+            media_type: (data as any).type,
+          };
       } else {
         return data;
       }
