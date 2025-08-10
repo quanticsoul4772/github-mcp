@@ -38,6 +38,13 @@ import {
 import { HealthManager, createHealthTools } from './health.js';
 import { formatErrorResponse } from './errors.js';
 
+// Monitoring and observability
+import { metrics } from './metrics.js';
+import { logger } from './logger.js';
+import { createHealthEndpoints } from './health-endpoints.js';
+import { HealthMonitor } from './health.js';
+import { createMonitoringTools } from './tools/monitoring.js';
+
 // Server configuration
 const SERVER_NAME = 'github-mcp';
 const SERVER_VERSION = '1.0.0';
@@ -56,6 +63,7 @@ const DEFAULT_TOOLSETS = [
   'discussions',
   'dependabot',
   'secret_protection',
+  'monitoring',
 ];
 
 /**
@@ -85,6 +93,8 @@ class GitHubMCPServer {
   private reliabilityManager: ReliabilityManager;
   /** Health manager for system monitoring */
   private healthManager: HealthManager;
+  /** Health monitor for observability */
+  private healthMonitor: HealthMonitor;
 
   /**
    * Initialize the GitHub MCP Server
@@ -93,6 +103,13 @@ class GitHubMCPServer {
    * parses environment variables, and registers tools.
    */
   constructor() {
+    // Initialize monitoring first
+    logger.info('Starting GitHub MCP Server', { 
+      version: SERVER_VERSION,
+      node: process.version,
+      platform: process.platform
+    });
+
     // Initialize MCP server
     this.server = new McpServer({
       name: SERVER_NAME,
@@ -103,6 +120,9 @@ class GitHubMCPServer {
     // Validate environment configuration for security
     const envValidation = validateEnvironmentConfiguration();
     if (!envValidation.isValid) {
+      logger.error('Environment configuration validation failed', { 
+        errors: envValidation.errors 
+      });
       console.error('ERROR: Environment configuration validation failed:');
       envValidation.errors.forEach(error => console.error(`  - ${error}`));
       console.error('Please check your environment variables and try again.');
@@ -113,11 +133,39 @@ class GitHubMCPServer {
 
     // Initialize Octokit with validated token
     const token = envValidation.sanitizedValues.GITHUB_TOKEN;
-    
-    // Create rate-limited Octokit instance
+    // Create rate-limited Octokit instance with logging
     const rateLimitedSetup = createRateLimitedOctokit(token);
     this.octokit = rateLimitedSetup.octokit;
     this.rateLimiter = rateLimitedSetup.rateLimiter;
+    
+    // Add logging to Octokit
+    this.octokit.hook.before('request', async (options) => {
+      logger.debug('API request', {
+        method: options.method,
+        url: options.url
+      });
+    });
+    
+    this.octokit.hook.after('request', async (response, options) => {
+      logger.debug('API response', {
+        method: options.method,
+        url: options.url,
+        status: response.status
+      });
+    });
+    
+    this.octokit.hook.error('request', async (error, options) => {
+      logger.error('API error', {
+        method: options.method,
+        url: options.url,
+        error: error.message
+      });
+      throw error;
+    });
+
+    // Initialize health monitor
+    this.healthMonitor = HealthMonitor.getInstance();
+    this.healthMonitor.setOctokit(this.octokit);
 
     // Initialize optimized API client
     this.optimizedClient = new OptimizedAPIClient({
@@ -148,8 +196,49 @@ class GitHubMCPServer {
     this.reliabilityManager = new ReliabilityManager(retryManager, telemetry);
     this.healthManager = new HealthManager(this.octokit, this.reliabilityManager);
 
+    // Set up request interception for metrics
+    this.setupRequestInterception();
+
     // Register all tools
     this.registerTools();
+
+    logger.info('GitHub MCP Server initialized', {
+      readOnly: this.readOnly,
+      toolsets: Array.from(this.enabledToolsets),
+      toolCount: this.toolCount
+    });
+  }
+
+  /**
+   * Set up request interception for metrics collection
+   */
+  private setupRequestInterception() {
+    // Hook into Octokit's request lifecycle
+    this.octokit.hook.before('request', async (options) => {
+      metrics.recordApiCall(options.method, options.url);
+      logger.debug('API request', {
+        method: options.method,
+        url: options.url
+      });
+    });
+
+    this.octokit.hook.after('request', async (response, options) => {
+      logger.debug('API response', {
+        method: options.method,
+        url: options.url,
+        status: response.status
+      });
+    });
+
+    this.octokit.hook.error('request', async (error, options) => {
+      metrics.recordError(error.name, error.message);
+      logger.error('API error', {
+        method: options.method,
+        url: options.url,
+        error: error.message
+      });
+      throw error;
+    });
   }
 
   /**
@@ -233,9 +322,20 @@ class GitHubMCPServer {
       config.tool.description || 'GitHub API operation',
       z.object(zodSchema),
       async (args: Record<string, unknown>) => {
+        const startTime = Date.now();
+        const toolName = config.tool.name;
         try {
+          logger.debug(`Tool invoked: ${toolName}`, { args });
+          metrics.recordApiCall('TOOL', toolName);
+          
           // Execute the tool handler
           const result = await config.handler(args);
+          
+          const duration = Date.now() - startTime;
+          logger.info(`Tool completed: ${toolName}`, { 
+            duration, 
+            success: true 
+          });
           
           // Apply response size limiting
           const { data: limitedResult, truncated, originalSize } = ResponseSizeLimiter.limitResponseSize(result);
@@ -261,8 +361,15 @@ class GitHubMCPServer {
             ],
           };
         } catch (error: any) {
+          const duration = Date.now() - startTime;
+          metrics.recordError('TOOL_ERROR', error.message);
+          
           // Log error details for debugging
-          console.error(`Error in tool ${config.tool.name}:`, error);
+          logger.error(`Tool error: ${toolName}`, {
+            error: error.message,
+            duration,
+            args
+          });
           
           // Return standardized error response with both approaches
           const errorMessage = formatErrorResponse(error);
@@ -462,6 +569,18 @@ class GitHubMCPServer {
     healthTools.forEach(tool => this.registerTool(tool));
     console.log(`  ✓ Health monitoring tools (${healthTools.length})`);
 
+    // Register monitoring and observability tools
+    if (this.enabledToolsets.has('monitoring')) {
+      const monitoringTools = createMonitoringTools(this.healthMonitor, metrics);
+      monitoringTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Monitoring tools (${monitoringTools.length})`);
+
+      // Register health endpoints
+      const healthEndpoints = createHealthEndpoints(this.healthMonitor);
+      healthEndpoints.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Health endpoints (${healthEndpoints.length})`);
+    }
+
     // Register performance monitoring tools
     const perfTools = [
       {
@@ -517,6 +636,11 @@ class GitHubMCPServer {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
     
+    logger.info('GitHub MCP server started', {
+      version: SERVER_VERSION,
+      transport: 'stdio'
+    });
+    
     console.log(`GitHub MCP server (v${SERVER_VERSION}) is running`);
     console.log('Ready to accept MCP requests via stdio\n');
   }
@@ -528,6 +652,7 @@ class GitHubMCPServer {
     const server = new GitHubMCPServer();
     await server.start();
   } catch (error) {
+    logger.error('Failed to start GitHub MCP server', { error });
     console.error('Failed to start GitHub MCP server:', error);
     process.exit(1);
   }
