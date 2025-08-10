@@ -1,7 +1,7 @@
 /**
  * Test setup and global configuration
  */
-import { beforeEach, vi } from 'vitest';
+import { beforeEach, vi, expect } from 'vitest';
 
 // Mock environment variables
 beforeEach(() => {

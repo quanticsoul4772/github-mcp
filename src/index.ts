@@ -79,7 +79,7 @@ class GitHubMCPServer {
    * Sets up the MCP server, configures GitHub authentication,
    * parses environment variables, and registers tools.
    */
-  constructor() {
+  constructor(testMode: boolean = false) {
     // Initialize MCP server
     this.server = new McpServer({
       name: SERVER_NAME,
@@ -95,7 +95,11 @@ class GitHubMCPServer {
       console.error('Please check your environment variables and try again.');
       console.error('Create a GitHub Personal Access Token at: https://github.com/settings/tokens');
       console.error('Required scopes: repo, workflow, user, notifications');
-      process.exit(1);
+      if (!testMode) {
+        process.exit(1);
+      } else {
+        throw new Error('Environment validation failed: ' + envValidation.errors.join(', '));
+      }
     }
 
     // Initialize Octokit with validated token
@@ -399,6 +403,9 @@ class GitHubMCPServer {
     process.on('SIGINT', () => shutdown('SIGINT'));
   }
 }
+
+// Export for testing
+export { GitHubMCPServer };
 
 // Start the server
 const server = new GitHubMCPServer();

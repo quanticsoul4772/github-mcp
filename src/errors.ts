@@ -195,8 +195,8 @@ export function normalizeError(
       if (error.response?.headers?.['x-ratelimit-remaining'] === '0') {
         return new RateLimitError(
           'GitHub API rate limit exceeded',
-          error.response.headers['x-ratelimit-reset'],
-          error.response.headers['x-ratelimit-limit'],
+          parseInt(error.response.headers['x-ratelimit-reset'], 10),
+          parseInt(error.response.headers['x-ratelimit-limit'], 10),
           0
         );
       }
@@ -208,9 +208,9 @@ export function normalizeError(
     if (statusCode === 429) {
       return new RateLimitError(
         message,
-        error.response?.headers?.['x-ratelimit-reset'],
-        error.response?.headers?.['x-ratelimit-limit'],
-        error.response?.headers?.['x-ratelimit-remaining']
+        parseInt(error.response?.headers?.['x-ratelimit-reset'], 10),
+        parseInt(error.response?.headers?.['x-ratelimit-limit'], 10),
+        parseInt(error.response?.headers?.['x-ratelimit-remaining'], 10)
       );
     }
 
