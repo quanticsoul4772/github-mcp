@@ -1,5 +1,13 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import {
+  validateGraphQLInput,
+  validateGraphQLVariableValue,
+  BatchRepositoryQuerySchema,
+  BatchUserQuerySchema,
+  BatchGraphQLQuerySchema,
+  GraphQLValidationError
+} from '../graphql-validation.js';
 
 export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
@@ -47,11 +55,14 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
       },
     },
     handler: async (args: any) => {
-      // Build dynamic GraphQL query for multiple repositories
-      const repositoryQueries = args.repositories.map((repo: any, index: number) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(BatchRepositoryQuerySchema, args, 'batch_query_repositories');
+      
+      // Build dynamic GraphQL query for multiple repositories using proper variables
+      const repositoryQueries = validatedArgs.repositories.map((repo: any, index: number) => {
         const alias = repo.alias || `repo${index}`;
         return `
-          ${alias}: repository(owner: "${repo.owner}", name: "${repo.repo}") {
+          ${alias}: repository(owner: $owner${index}, name: $repo${index}) {
             id
             name
             nameWithOwner
@@ -73,7 +84,7 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
               name
               spdxId
             }
-            ${args.includeLanguages ? `
+            ${validatedArgs.includeLanguages ? `
             languages(first: 10, orderBy: {field: SIZE, direction: DESC}) {
               edges {
                 size
@@ -85,7 +96,7 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
               totalSize
             }
             ` : ''}
-            ${args.includeContributors ? `
+            ${validatedArgs.includeContributors ? `
             collaborators(first: 10) {
               totalCount
               nodes {
@@ -98,7 +109,7 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
               }
             }
             ` : ''}
-            ${args.includeIssuesSummary ? `
+            ${validatedArgs.includeIssuesSummary ? `
             issues {
               totalCount
             }
@@ -112,7 +123,7 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
               totalCount
             }
             ` : ''}
-            ${args.includeRecentCommits ? `
+            ${validatedArgs.includeRecentCommits ? `
             defaultBranchRef {
               name
               target {
@@ -145,13 +156,24 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
         `;
       }).join('\n');
 
+      // Build variable declarations and values
+      const variableDeclarations: string[] = [];
+      const variableValues: Record<string, any> = {};
+      
+      validatedArgs.repositories.forEach((repo: any, index: number) => {
+        variableDeclarations.push(`$owner${index}: String!`);
+        variableDeclarations.push(`$repo${index}: String!`);
+        variableValues[`owner${index}`] = validateGraphQLVariableValue(repo.owner, `owner${index}`);
+        variableValues[`repo${index}`] = validateGraphQLVariableValue(repo.repo, `repo${index}`);
+      });
+
       const query = `
-        query BatchRepositoryQuery {
+        query BatchRepositoryQuery(${variableDeclarations.join(', ')}) {
           ${repositoryQueries}
         }
       `;
 
-      const result: any = await octokit.graphql(query);
+      const result: any = await octokit.graphql(query, variableValues);
 
       // Process results
       const repositories = Object.keys(result).map(key => {
@@ -179,7 +201,7 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
           },
         };
 
-        if (args.includeLanguages && repo.languages) {
+        if (validatedArgs.includeLanguages && repo.languages) {
           processed.languages = {
             totalSize: repo.languages.totalSize,
             breakdown: repo.languages.edges.map((edge: any) => ({
@@ -191,7 +213,7 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
           };
         }
 
-        if (args.includeContributors && repo.collaborators) {
+        if (validatedArgs.includeContributors && repo.collaborators) {
           processed.contributors = {
             totalCount: repo.collaborators.totalCount,
             top: repo.collaborators.nodes.map((contributor: any) => ({
@@ -203,7 +225,7 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
           };
         }
 
-        if (args.includeIssuesSummary) {
+        if (validatedArgs.includeIssuesSummary) {
           processed.issues = {
             total: repo.issues?.totalCount || 0,
             open: repo.openIssues?.totalCount || 0,
@@ -216,7 +238,7 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
           };
         }
 
-        if (args.includeRecentCommits && repo.defaultBranchRef?.target?.history) {
+        if (validatedArgs.includeRecentCommits && repo.defaultBranchRef?.target?.history) {
           processed.recentCommits = {
             branch: repo.defaultBranchRef.name,
             commits: repo.defaultBranchRef.target.history.nodes.map((commit: any) => ({
@@ -233,9 +255,9 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
       }).filter(Boolean);
 
       return {
-        totalQueried: args.repositories.length,
+        totalQueried: validatedArgs.repositories.length,
         successful: repositories.length,
-        failed: args.repositories.length - repositories.length,
+        failed: validatedArgs.repositories.length - repositories.length,
         repositories,
         summary: {
           totalStars: repositories.reduce((sum: number, repo: any) => sum + (repo.statistics?.stars || 0), 0),
@@ -283,9 +305,12 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
       },
     },
     handler: async (args: any) => {
-      // Build dynamic GraphQL query for multiple users
-      const userQueries = args.usernames.map((username: string, index: number) => `
-        user${index}: user(login: "${username}") {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(BatchUserQuerySchema, args, 'batch_query_users');
+      
+      // Build dynamic GraphQL query for multiple users using proper variables
+      const userQueries = validatedArgs.usernames.map((username: string, index: number) => `
+        user${index}: user(login: $username${index}) {
           id
           login
           name
@@ -297,7 +322,7 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
           avatarUrl
           createdAt
           updatedAt
-          ${args.includeFollowers ? `
+          ${validatedArgs.includeFollowers ? `
           followers {
             totalCount
           }
@@ -305,8 +330,8 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
             totalCount
           }
           ` : ''}
-          ${args.includeRepositories ? `
-          repositories(first: ${args.repositoryLimit || 5}, orderBy: {field: STARGAZERS, direction: DESC}) {
+          ${validatedArgs.includeRepositories ? `
+          repositories(first: ${validatedArgs.repositoryLimit || 5}, orderBy: {field: STARGAZERS, direction: DESC}) {
             totalCount
             nodes {
               name
@@ -325,7 +350,7 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
           }
           ` : ''}
         }
-        org${index}: organization(login: "${username}") {
+        org${index}: organization(login: $username${index}) {
           id
           login
           name
@@ -339,8 +364,8 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
           membersWithRole {
             totalCount
           }
-          ${args.includeRepositories ? `
-          repositories(first: ${args.repositoryLimit || 5}, orderBy: {field: STARGAZERS, direction: DESC}) {
+          ${validatedArgs.includeRepositories ? `
+          repositories(first: ${validatedArgs.repositoryLimit || 5}, orderBy: {field: STARGAZERS, direction: DESC}) {
             totalCount
             nodes {
               name
@@ -361,17 +386,26 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
         }
       `).join('\n');
 
+      // Build variable declarations and values
+      const variableDeclarations: string[] = [];
+      const variableValues: Record<string, any> = {};
+      
+      validatedArgs.usernames.forEach((username: string, index: number) => {
+        variableDeclarations.push(`$username${index}: String!`);
+        variableValues[`username${index}`] = validateGraphQLVariableValue(username, `username${index}`);
+      });
+
       const query = `
-        query BatchUserQuery {
+        query BatchUserQuery(${variableDeclarations.join(', ')}) {
           ${userQueries}
         }
       `;
 
-      const result: any = await octokit.graphql(query);
+      const result: any = await octokit.graphql(query, variableValues);
 
       // Process results - combine user and organization results
       const entities = [];
-      for (let i = 0; i < args.usernames.length; i++) {
+      for (let i = 0; i < validatedArgs.usernames.length; i++) {
         const user = result[`user${i}`];
         const org = result[`org${i}`];
         
@@ -392,14 +426,14 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
           });
         } else {
           entities.push({
-            login: args.usernames[i],
+            login: validatedArgs.usernames[i],
             error: 'User or organization not found',
           });
         }
       }
 
       return {
-        totalQueried: args.usernames.length,
+        totalQueried: validatedArgs.usernames.length,
         found: entities.filter(e => !e.error).length,
         notFound: entities.filter(e => e.error).length,
         entities,
@@ -452,18 +486,22 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
       },
     },
     handler: async (args: any) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(BatchGraphQLQuerySchema, args, 'batch_graphql_query');
+      
       // Build the combined query with all variables
       const allVariables: any = {};
       const queryFragments = [];
 
-      for (let i = 0; i < args.queries.length; i++) {
-        const queryDef = args.queries[i];
+      for (let i = 0; i < validatedArgs.queries.length; i++) {
+        const queryDef = validatedArgs.queries[i];
         queryFragments.push(`${queryDef.alias}: ${queryDef.query}`);
         
         // Add variables with prefixed names to avoid conflicts
         if (queryDef.variables) {
           for (const [key, value] of Object.entries(queryDef.variables)) {
-            allVariables[`${queryDef.alias}_${key}`] = value;
+            const variableName = `${queryDef.alias}_${key}`;
+            allVariables[variableName] = validateGraphQLVariableValue(value, variableName);
           }
         }
       }
@@ -488,7 +526,7 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
         
         return {
           successful: true,
-          totalQueries: args.queries.length,
+          totalQueries: validatedArgs.queries.length,
           results: result,
           executedQuery: fullQuery,
           variables: allVariables,

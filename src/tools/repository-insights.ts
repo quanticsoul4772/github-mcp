@@ -1,5 +1,13 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import {
+  validateGraphQLInput,
+  validateGraphQLVariableValue,
+  RepositoryInsightsSchema,
+  ContributionStatsSchema,
+  CommitActivitySchema,
+  GraphQLValidationError
+} from '../graphql-validation.js';
 
 export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
@@ -29,6 +37,9 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
       },
     },
     handler: async (args: any) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(RepositoryInsightsSchema, args, 'get_repository_insights');
+      
       const query = `
         query($owner: String!, $repo: String!) {
           repository(owner: $owner, name: $repo) {
@@ -84,10 +95,13 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
-        owner: args.owner,
-        repo: args.repo,
-      });
+      // Validate GraphQL variables before execution
+      const variables = {
+        owner: validateGraphQLVariableValue(validatedArgs.owner, 'owner'),
+        repo: validateGraphQLVariableValue(validatedArgs.repo, 'repo'),
+      };
+      
+      const result: any = await octokit.graphql(query, variables);
 
       const repository = result.repository;
 
@@ -153,6 +167,9 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
       },
     },
     handler: async (args: any) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(ContributionStatsSchema, args, 'get_contribution_stats');
+      
       const query = `
         query($owner: String!, $repo: String!, $first: Int!) {
           repository(owner: $owner, name: $repo) {
@@ -198,11 +215,14 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
-        owner: args.owner,
-        repo: args.repo,
-        first: args.first || 25,
-      });
+      // Validate GraphQL variables before execution
+      const variables = {
+        owner: validateGraphQLVariableValue(validatedArgs.owner, 'owner'),
+        repo: validateGraphQLVariableValue(validatedArgs.repo, 'repo'),
+        first: validateGraphQLVariableValue(validatedArgs.first || 25, 'first'),
+      };
+      
+      const result: any = await octokit.graphql(query, variables);
 
       const repository = result.repository;
       const commitHistory = repository.defaultBranchRef?.target?.history?.nodes || [];
@@ -279,6 +299,9 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
       },
     },
     handler: async (args: any) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(CommitActivitySchema, args, 'get_commit_activity');
+      
       const query = `
         query($owner: String!, $repo: String!, $branch: String, $since: GitTimestamp, $until: GitTimestamp) {
           repository(owner: $owner, name: $repo) {
@@ -331,13 +354,16 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
-        owner: args.owner,
-        repo: args.repo,
-        branch: args.branch,
-        since: args.since,
-        until: args.until,
-      });
+      // Validate GraphQL variables before execution
+      const variables = {
+        owner: validateGraphQLVariableValue(validatedArgs.owner, 'owner'),
+        repo: validateGraphQLVariableValue(validatedArgs.repo, 'repo'),
+        branch: validatedArgs.branch ? validateGraphQLVariableValue(validatedArgs.branch, 'branch') : undefined,
+        since: validatedArgs.since ? validateGraphQLVariableValue(validatedArgs.since, 'since') : undefined,
+        until: validatedArgs.until ? validateGraphQLVariableValue(validatedArgs.until, 'until') : undefined,
+      };
+      
+      const result: any = await octokit.graphql(query, variables);
 
       const repository = result.repository;
       const history = args.branch 

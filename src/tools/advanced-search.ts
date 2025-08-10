@@ -1,5 +1,13 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import {
+  validateGraphQLInput,
+  validateGraphQLVariableValue,
+  CrossRepoSearchSchema,
+  AdvancedRepoSearchSchema,
+  SearchWithRelationshipsSchema,
+  GraphQLValidationError
+} from '../graphql-validation.js';
 
 export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
@@ -36,6 +44,9 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
       },
     },
     handler: async (args: any) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(CrossRepoSearchSchema, args, 'search_across_repos');
+      
       const query = `
         query($searchQuery: String!, $type: SearchType!, $first: Int!, $after: String) {
           search(query: $searchQuery, type: $type, first: $first, after: $after) {
@@ -153,12 +164,15 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
-        searchQuery: args.query,
-        type: args.type,
-        first: args.first || 25,
-        after: args.after,
-      });
+      // Validate GraphQL variables before execution
+      const variables = {
+        searchQuery: validateGraphQLVariableValue(validatedArgs.query, 'searchQuery'),
+        type: validateGraphQLVariableValue(validatedArgs.type, 'type'),
+        first: validateGraphQLVariableValue(validatedArgs.first || 25, 'first'),
+        after: validatedArgs.after ? validateGraphQLVariableValue(validatedArgs.after, 'after') : undefined,
+      };
+      
+      const result: any = await octokit.graphql(query, variables);
 
       return {
         totalCount: {
@@ -233,18 +247,21 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
       },
     },
     handler: async (args: any) => {
-      // Build search query with filters
-      let searchQuery = args.query;
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(AdvancedRepoSearchSchema, args, 'search_repositories_advanced');
       
-      if (args.language) searchQuery += ` language:${args.language}`;
-      if (args.stars) searchQuery += ` stars:${args.stars}`;
-      if (args.forks) searchQuery += ` forks:${args.forks}`;
-      if (args.size) searchQuery += ` size:${args.size}`;
-      if (args.created) searchQuery += ` created:${args.created}`;
-      if (args.pushed) searchQuery += ` pushed:${args.pushed}`;
-      if (args.license) searchQuery += ` license:${args.license}`;
-      if (args.topics) {
-        for (const topic of args.topics) {
+      // Build search query with filters
+      let searchQuery = validatedArgs.query;
+      
+      if (validatedArgs.language) searchQuery += ` language:${validatedArgs.language}`;
+      if (validatedArgs.stars) searchQuery += ` stars:${validatedArgs.stars}`;
+      if (validatedArgs.forks) searchQuery += ` forks:${validatedArgs.forks}`;
+      if (validatedArgs.size) searchQuery += ` size:${validatedArgs.size}`;
+      if (validatedArgs.created) searchQuery += ` created:${validatedArgs.created}`;
+      if (validatedArgs.pushed) searchQuery += ` pushed:${validatedArgs.pushed}`;
+      if (validatedArgs.license) searchQuery += ` license:${validatedArgs.license}`;
+      if (validatedArgs.topics) {
+        for (const topic of validatedArgs.topics) {
           searchQuery += ` topic:${topic}`;
         }
       }
@@ -309,7 +326,7 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                     }
                   }
                 }
-                ${args.includeMetrics ? `
+                ${validatedArgs.includeMetrics ? `
                 issues {
                   totalCount
                 }
@@ -337,10 +354,13 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
         }
       `;
 
-      const result: any = await octokit.graphql(baseQuery, {
-        searchQuery,
-        first: args.first || 25,
-      });
+      // Validate GraphQL variables before execution
+      const variables = {
+        searchQuery: validateGraphQLVariableValue(searchQuery, 'searchQuery'),
+        first: validateGraphQLVariableValue(validatedArgs.first || 25, 'first'),
+      };
+      
+      const result: any = await octokit.graphql(baseQuery, variables);
 
       return {
         query: searchQuery,
@@ -357,7 +377,7 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
             forks: repo.forkCount,
             watchers: repo.watchers.totalCount,
             size: repo.diskUsage,
-            ...(args.includeMetrics && {
+            ...(validatedArgs.includeMetrics && {
               issues: repo.issues?.totalCount,
               pullRequests: repo.pullRequests?.totalCount,
               releases: repo.releases?.totalCount,
@@ -431,6 +451,9 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
       },
     },
     handler: async (args: any) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(SearchWithRelationshipsSchema, args, 'search_with_relationships');
+      
       const query = `
         query($searchQuery: String!, $entityType: SearchType!, $first: Int!, $repoLimit: Int!) {
           search(query: $searchQuery, type: $entityType, first: $first) {
@@ -452,7 +475,7 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                 avatarUrl
                 createdAt
                 updatedAt
-                ${args.includeRepositories ? `
+                ${validatedArgs.includeRepositories ? `
                 repositories(first: $repoLimit, orderBy: {field: STARGAZERS, direction: DESC}) {
                   totalCount
                   nodes {
@@ -471,7 +494,7 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                   }
                 }
                 ` : ''}
-                ${args.includeGists ? `
+                ${validatedArgs.includeGists ? `
                 gists(first: 10) {
                   totalCount
                   nodes {
@@ -483,7 +506,7 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                   }
                 }
                 ` : ''}
-                ${args.includeFollowers ? `
+                ${validatedArgs.includeFollowers ? `
                 followers {
                   totalCount
                 }
@@ -503,7 +526,7 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                 avatarUrl
                 createdAt
                 updatedAt
-                ${args.includeRepositories ? `
+                ${validatedArgs.includeRepositories ? `
                 repositories(first: $repoLimit, orderBy: {field: STARGAZERS, direction: DESC}) {
                   totalCount
                   nodes {
@@ -531,12 +554,15 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
-        searchQuery: args.query,
-        entityType: args.entityType,
-        first: args.first || 10,
-        repoLimit: args.repositoryLimit || 10,
-      });
+      // Validate GraphQL variables before execution
+      const variables = {
+        searchQuery: validateGraphQLVariableValue(validatedArgs.query, 'searchQuery'),
+        entityType: validateGraphQLVariableValue(validatedArgs.entityType, 'entityType'),
+        first: validateGraphQLVariableValue(validatedArgs.first || 10, 'first'),
+        repoLimit: validateGraphQLVariableValue(validatedArgs.repositoryLimit || 10, 'repoLimit'),
+      };
+      
+      const result: any = await octokit.graphql(query, variables);
 
       return {
         totalCount: result.search.userCount,
