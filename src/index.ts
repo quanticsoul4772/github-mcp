@@ -62,7 +62,7 @@ const SERVER_VERSION = '1.0.0';
  * This server enables AI assistants to interact with GitHub repositories, issues,
  * pull requests, actions, and more through a comprehensive set of tools.
  */
-class GitHubMCPServer {
+export class GitHubMCPServer {
   /** The MCP server instance */
   private server: McpServer;
   /** GitHub API client (Octokit) */

@@ -12,7 +12,7 @@ export interface ValidationErrorDetail {
   field: string;
   severity: 'error' | 'warning' | 'info';
   recoverable: boolean;
-  suggestion?: string;
+  suggestion?: string | undefined;
 }
 
 /**
@@ -22,7 +22,7 @@ export interface ValidationWarning {
   code: string;
   message: string;
   field: string;
-  suggestion?: string;
+  suggestion?: string | undefined;
 }
 
 /**
@@ -697,8 +697,8 @@ const TOKEN_FORMATS: TokenFormat[] = [
  */
 interface TokenValidationResult {
   isValid: boolean;
-  format?: TokenFormat;
-  error?: string;
+  format?: TokenFormat | undefined;
+  error?: string | undefined;
 }
 
 /**
@@ -809,7 +809,7 @@ export function validateGitHubTokenWithResult(token: string): ValidationResult<s
     return cached;
   }
 
-  const errors: ValidationError[] = [];
+  const errors: ValidationErrorDetail[] = [];
   const warnings: ValidationWarning[] = [];
   const suggestions: string[] = [
     'Create a new token at: https://github.com/settings/tokens',
@@ -1120,7 +1120,7 @@ function validateApiUrl(url: string): boolean {
     const isIpv4 = /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
     if (isIpv4) {
       const parts = host.split('.').map(Number);
-      const [a, b] = parts;
+      const [a, b = 0] = parts;
       // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16
       const isPrivate =
         a === 10 ||
@@ -1224,7 +1224,7 @@ export function validateEnvironmentConfigurationWithResult(): ValidationResult<R
     ], ['Set NODE_ENV=production to enable full environment validation']);
   }
 
-  const errors: ValidationError[] = [];
+  const errors: ValidationErrorDetail[] = [];
   const warnings: ValidationWarning[] = [];
   const sanitizedValues: Record<string, string> = {};
   const suggestions: string[] = [];

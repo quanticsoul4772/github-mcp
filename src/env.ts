@@ -23,7 +23,7 @@ const envSchema = z.object({
   GITHUB_TOKEN: z.string().min(1, 'GitHub Token is required').optional(),
   
   // GitHub optional configuration
-  GITHUB_READ_ONLY: z.string().transform((val) => val === '1' || val === 'true').default('false'),
+  GITHUB_READ_ONLY: z.string().optional().transform((val) => val === '1' || val === 'true').default(false),
   GITHUB_TOOLSETS: z.string().default('all'),
   GITHUB_HOST: z.string().url().optional(),
   
@@ -50,7 +50,7 @@ export const env = (() => {
     console.error('❌ Environment validation failed:');
     
     if (error instanceof z.ZodError) {
-      error.errors.forEach((err) => {
+      error.errors.forEach((err: any) => {
         console.error(`  - ${err.path.join('.')}: ${err.message}`);
       });
       
