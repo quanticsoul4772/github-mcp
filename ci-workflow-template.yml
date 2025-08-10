@@ -1,0 +1,201 @@
+# Updated CI Workflow with Enforced Quality Gates
+# This file should replace .github/workflows/ci.yml
+#
+# Key changes:
+# - Enforces coverage thresholds (fails on < 80%)
+# - Removes soft failure patterns (|| echo "::warning::")
+# - Adds PR coverage comments
+# - Implements proper quality gates
+
+name: CI
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # HARD FAIL: TypeScript compilation must pass
+      - name: Run TypeScript compiler check
+        run: npm run build
+
+      # HARD FAIL: Linting must pass
+      - name: Run linter
+        run: npm run lint
+
+      # HARD FAIL: Type checking must pass  
+      - name: Run type checking
+        run: npm run typecheck
+
+      # HARD FAIL: Tests with coverage enforcement
+      - name: Run tests with coverage
+        run: npm run ci:test
+        env:
+          CI: true
+
+      # Check coverage thresholds - HARD FAIL if below 80%
+      - name: Check coverage thresholds
+        run: |
+          npx nyc check-coverage \
+            --lines 80 \
+            --functions 80 \
+            --branches 80 \
+            --statements 80
+
+      # Upload coverage reports
+      - name: Upload coverage to Codecov
+        if: matrix.node-version == '20.x'
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage/lcov.info,./coverage/cobertura-coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: true  # HARD FAIL on upload errors
+
+      # Add coverage comment to PR
+      - name: Comment coverage on PR
+        if: github.event_name == 'pull_request' && matrix.node-version == '20.x'
+        uses: 5monkeys/cobertura-action@master
+        with:
+          path: coverage/cobertura-coverage.xml
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          minimum_coverage: 80
+          fail_below_threshold: true  # HARD FAIL if below threshold
+
+      # Store coverage reports as artifacts
+      - name: Upload coverage artifacts
+        if: matrix.node-version == '20.x'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            coverage/
+            !coverage/tmp/
+
+  quality-check:
+    runs-on: ubuntu-latest
+    needs: test  # Only run if tests pass
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # HARD FAIL: Code complexity check
+      - name: Analyze code complexity
+        run: npm run quality:complexity
+
+      # HARD FAIL: Check for unused dependencies
+      - name: Check for unused dependencies
+        run: npm run quality:dependencies
+
+      # HARD FAIL: License compliance check
+      - name: License compliance check
+        run: npm run quality:licenses
+
+      # Upload complexity report
+      - name: Upload complexity report
+        uses: actions/upload-artifact@v4
+        with:
+          name: complexity-report
+          path: complexity-report.html
+
+  security-check:
+    runs-on: ubuntu-latest
+    needs: test  # Only run if tests pass
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # HARD FAIL: Security audit
+      - name: Run npm security audit
+        run: npm audit --audit-level=moderate
+
+      # HARD FAIL: Check for known vulnerabilities  
+      - name: Check for known vulnerabilities
+        run: |
+          npx better-npm-audit audit --level moderate
+
+      # Run secret scanning if configured
+      - name: Run secret detection
+        run: |
+          if [ -f .secrets.baseline ]; then
+            npm run security:secrets
+          else
+            echo "Secret scanning not configured - skipping"
+          fi
+        continue-on-error: false
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [test, quality-check, security-check]  # All quality gates must pass
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # HARD FAIL: Build must succeed
+      - name: Build project
+        run: npm run build
+
+      - name: Check bundle size
+        run: |
+          echo "Checking build output size..."
+          du -sh dist/ || echo "No dist folder found"
+          du -sh build/ || echo "No build folder found"
+
+      # Upload build artifacts
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: build/
