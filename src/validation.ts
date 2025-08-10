@@ -605,12 +605,183 @@ export function sanitizeText(text: string, maxLength: number = 1000): string {
 }
 
 /**
+ * Token format configuration interface
+ */
+interface TokenFormat {
+  prefix: string;
+  minLength: number;
+  maxLength: number;
+  pattern?: RegExp;
+  description: string;
+}
+
+/**
+ * Validation level enum for configurable strictness
+ */
+export enum ValidationLevel {
+  STRICT = 'strict',     // Current behavior with exact format matching
+  MODERATE = 'moderate', // Check prefix and length range
+  LENIENT = 'lenient'    // Only check if non-empty
+}
+
+/**
+ * Supported GitHub token formats with flexible validation
+ * This configuration can be extended as GitHub introduces new token types
+ */
+const TOKEN_FORMATS: TokenFormat[] = [
+  {
+    prefix: 'ghp_',
+    minLength: 40,
+    maxLength: 255,
+    pattern: /^ghp_[A-Za-z0-9_]{36,}$/,
+    description: 'GitHub Personal Access Token (classic)'
+  },
+  {
+    prefix: 'github_pat_',
+    minLength: 82,
+    maxLength: 255,
+    pattern: /^github_pat_[A-Za-z0-9]{70,}$/,
+    description: 'GitHub Fine-grained Personal Access Token'
+  },
+  {
+    prefix: 'gho_',
+    minLength: 40,
+    maxLength: 255,
+    pattern: /^gho_[A-Za-z0-9_]{36,}$/,
+    description: 'GitHub OAuth token'
+  },
+  {
+    prefix: 'ghu_',
+    minLength: 40,
+    maxLength: 255,
+    pattern: /^ghu_[A-Za-z0-9_]{36,}$/,
+    description: 'GitHub user access token'
+  },
+  {
+    prefix: 'ghs_',
+    minLength: 40,
+    maxLength: 255,
+    pattern: /^ghs_[A-Za-z0-9_]{36,}$/,
+    description: 'GitHub server-to-server token'
+  },
+  {
+    prefix: 'ghr_',
+    minLength: 40,
+    maxLength: 255,
+    pattern: /^ghr_[A-Za-z0-9_]{36,}$/,
+    description: 'GitHub refresh token'
+  },
+  {
+    prefix: 'ghi_',
+    minLength: 40,
+    maxLength: 255,
+    pattern: /^ghi_[A-Za-z0-9_]{36,}$/,
+    description: 'GitHub installation access token'
+  },
+  // Legacy format - no prefix
+  {
+    prefix: '',
+    minLength: 40,
+    maxLength: 40,
+    pattern: /^[a-f0-9]{40}$/i,
+    description: 'Legacy GitHub token (40-character hex)'
+  }
+];
+
+/**
+ * Token validation result interface
+ */
+interface TokenValidationResult {
+  isValid: boolean;
+  format?: TokenFormat;
+  error?: string;
+}
+
+/**
+ * Validates a GitHub token format with configurable strictness
+ * @param token - The token to validate
+ * @param level - Validation level (defaults to MODERATE for backward compatibility)
+ * @returns Token validation result
+ */
+export function validateGitHubTokenFormat(
+  token: string,
+  level: ValidationLevel = ValidationLevel.MODERATE
+): TokenValidationResult {
+  if (!token || typeof token !== 'string') {
+    return {
+      isValid: false,
+      error: 'Token must be a non-empty string'
+    };
+  }
+
+  // LENIENT: Only check if token is non-empty
+  if (level === ValidationLevel.LENIENT) {
+    return {
+      isValid: token.trim().length > 0,
+      error: token.trim().length === 0 ? 'Token cannot be empty' : undefined
+    };
+  }
+
+  // Find matching token format
+  const format = TOKEN_FORMATS.find(fmt => {
+    if (fmt.prefix === '') {
+      // Legacy format - only match if no other prefixes match AND it looks like hex
+      const hasKnownPrefix = TOKEN_FORMATS.some(otherFmt => 
+        otherFmt.prefix !== '' && token.startsWith(otherFmt.prefix)
+      );
+      if (hasKnownPrefix) return false;
+      
+      // For legacy format, also check that it's the right length and looks like hex
+      return token.length === 40 && /^[a-f0-9]{40}$/i.test(token);
+    }
+    return token.startsWith(fmt.prefix);
+  });
+
+  if (!format) {
+    return {
+      isValid: false,
+      error: 'Unrecognized token format'
+    };
+  }
+
+  // Check length constraints
+  if (token.length < format.minLength || token.length > format.maxLength) {
+    return {
+      isValid: false,
+      format,
+      error: `${format.description} must be between ${format.minLength} and ${format.maxLength} characters (got ${token.length})`
+    };
+  }
+
+  // MODERATE: Only check prefix and length
+  if (level === ValidationLevel.MODERATE) {
+    return {
+      isValid: true,
+      format
+    };
+  }
+
+  // STRICT: Full pattern validation
+  if (format.pattern && !format.pattern.test(token)) {
+    return {
+      isValid: false,
+      format,
+      error: `${format.description} has invalid character pattern`
+    };
+  }
+
+  return {
+    isValid: true,
+    format
+  };
+}
+
+/**
  * Validates a GitHub Personal Access Token format (legacy boolean version)
- * @deprecated Use validateGitHubTokenWithResult for better error handling
+ * @deprecated Use validateGitHubTokenWithResult or validateGitHubTokenFormat for better error handling
  */
 export function validateGitHubToken(token: string): boolean {
-  const result = validateGitHubTokenWithResult(token);
-  return result.valid;
+  return validateGitHubTokenFormat(token, ValidationLevel.MODERATE).isValid;
 }
 
 /**
@@ -669,178 +840,81 @@ export function validateGitHubTokenWithResult(token: string): ValidationResult<s
 
   const cleanToken = trimmedToken;
 
-  // Check for obviously invalid tokens
-  if (cleanToken.length < 4) {
-    const result = createErrorResult<string>([
-      createValidationError(
+  // Use the new flexible validation approach
+  const formatResult = validateGitHubTokenFormat(cleanToken, ValidationLevel.MODERATE);
+  
+  if (!formatResult.isValid) {
+    // Map format validation errors to ValidationError format
+    if (formatResult.error?.includes('too short')) {
+      errors.push(createValidationError(
         'TOKEN_TOO_SHORT',
         'Token is too short to be valid',
         'githubToken',
         'error',
         false,
         'GitHub tokens are at least 40 characters long'
-      )
-    ], warnings, suggestions);
-    setCachedValidationResult(cacheKey, result, 10000);
-    return result;
-  }
-
-  // GitHub Personal Access Token (classic) - starts with ghp_
-  if (cleanToken.startsWith('ghp_')) {
-    if (cleanToken.length !== 40) {
-      errors.push(createValidationError(
-        'INVALID_TOKEN_LENGTH',
-        `Classic Personal Access Token should be 40 characters, got ${cleanToken.length}`,
-        'githubToken',
-        'error',
-        false,
-        'Verify the complete token was copied'
       ));
-    } else if (!/^ghp_[A-Za-z0-9]{36}$/.test(cleanToken)) {
-      errors.push(createValidationError(
-        'INVALID_TOKEN_FORMAT',
-        'Classic Personal Access Token contains invalid characters',
-        'githubToken',
-        'error',
-        false,
-        'Token should only contain letters and numbers after the ghp_ prefix'
-      ));
-    }
-  }
-  // GitHub OAuth token - starts with gho_
-  else if (cleanToken.startsWith('gho_')) {
-    if (cleanToken.length !== 40) {
-      errors.push(createValidationError(
-        'INVALID_TOKEN_LENGTH',
-        `OAuth token should be 40 characters, got ${cleanToken.length}`,
-        'githubToken',
-        'error',
-        false,
-        'Verify the complete token was copied'
-      ));
-    } else if (!/^gho_[A-Za-z0-9]{36}$/.test(cleanToken)) {
-      errors.push(createValidationError(
-        'INVALID_TOKEN_FORMAT',
-        'OAuth token contains invalid characters',
-        'githubToken',
-        'error',
-        false,
-        'Token should only contain letters and numbers after the gho_ prefix'
-      ));
-    }
-  }
-  // GitHub user access token - starts with ghu_
-  else if (cleanToken.startsWith('ghu_')) {
-    if (cleanToken.length !== 40) {
-      errors.push(createValidationError(
-        'INVALID_TOKEN_LENGTH',
-        `User access token should be 40 characters, got ${cleanToken.length}`,
-        'githubToken',
-        'error',
-        false,
-        'Verify the complete token was copied'
-      ));
-    } else if (!/^ghu_[A-Za-z0-9]{36}$/.test(cleanToken)) {
-      errors.push(createValidationError(
-        'INVALID_TOKEN_FORMAT',
-        'User access token contains invalid characters',
-        'githubToken',
-        'error',
-        false,
-        'Token should only contain letters and numbers after the ghu_ prefix'
-      ));
-    }
-  }
-  // GitHub server-to-server token - starts with ghs_
-  else if (cleanToken.startsWith('ghs_')) {
-    if (cleanToken.length !== 40) {
-      errors.push(createValidationError(
-        'INVALID_TOKEN_LENGTH',
-        `Server-to-server token should be 40 characters, got ${cleanToken.length}`,
-        'githubToken',
-        'error',
-        false,
-        'Verify the complete token was copied'
-      ));
-    } else if (!/^ghs_[A-Za-z0-9]{36}$/.test(cleanToken)) {
-      errors.push(createValidationError(
-        'INVALID_TOKEN_FORMAT',
-        'Server-to-server token contains invalid characters',
-        'githubToken',
-        'error',
-        false,
-        'Token should only contain letters and numbers after the ghs_ prefix'
-      ));
-    }
-  }
-  // GitHub refresh token - starts with ghr_
-  else if (cleanToken.startsWith('ghr_')) {
-    if (cleanToken.length !== 40) {
-      errors.push(createValidationError(
-        'INVALID_TOKEN_LENGTH',
-        `Refresh token should be 40 characters, got ${cleanToken.length}`,
-        'githubToken',
-        'error',
-        false,
-        'Verify the complete token was copied'
-      ));
-    } else if (!/^ghr_[A-Za-z0-9]{36}$/.test(cleanToken)) {
-      errors.push(createValidationError(
-        'INVALID_TOKEN_FORMAT',
-        'Refresh token contains invalid characters',
-        'githubToken',
-        'error',
-        false,
-        'Token should only contain letters and numbers after the ghr_ prefix'
-      ));
-    }
-  }
-  // Legacy format (40 characters, hex) - deprecated but still supported
-  else if (cleanToken.length === 40 && /^[a-f0-9]{40}$/i.test(cleanToken)) {
-    warnings.push(createValidationWarning(
-      'LEGACY_TOKEN_FORMAT',
-      'Using legacy token format (40-character hex)',
-      'githubToken',
-      'Consider creating a new Personal Access Token with ghp_ prefix for better security'
-    ));
-  }
-  else {
-    // Try to provide helpful guidance based on common issues
-    if (cleanToken.startsWith('github_pat_')) {
-      errors.push(createValidationError(
-        'UNSUPPORTED_TOKEN_TYPE',
-        'Fine-grained Personal Access Tokens (github_pat_) are not yet supported',
-        'githubToken',
-        'error',
-        false,
-        'Use a classic Personal Access Token instead'
-      ));
-    } else if (cleanToken.includes(' ') || cleanToken.includes('\n') || cleanToken.includes('\t')) {
-      errors.push(createValidationError(
-        'TOKEN_CONTAINS_WHITESPACE',
-        'Token contains spaces or line breaks',
-        'githubToken',
-        'error',
-        false,
-        'Remove all whitespace from the token'
-      ));
-    } else if (cleanToken.length > 100) {
-      errors.push(createValidationError(
-        'TOKEN_TOO_LONG',
-        'Token is unusually long and likely invalid',
-        'githubToken',
-        'error',
-        false,
-        'GitHub tokens are typically 40 characters'
-      ));
+    } else if (formatResult.error?.includes('Unrecognized token format')) {
+      // Check for common issues
+      if (cleanToken.startsWith('github_pat_')) {
+        // Fine-grained PAT - now supported
+        if (cleanToken.length < 82) {
+          errors.push(createValidationError(
+            'INVALID_TOKEN_LENGTH',
+            `Fine-grained Personal Access Token should be at least 82 characters, got ${cleanToken.length}`,
+            'githubToken',
+            'error',
+            false,
+            'Verify the complete token was copied'
+          ));
+        }
+      } else if (cleanToken.includes(' ') || cleanToken.includes('\n') || cleanToken.includes('\t')) {
+        errors.push(createValidationError(
+          'TOKEN_CONTAINS_WHITESPACE',
+          'Token contains spaces or line breaks',
+          'githubToken',
+          'error',
+          false,
+          'Remove all whitespace from the token'
+        ));
+      } else if (cleanToken.length > 100) {
+        errors.push(createValidationError(
+          'TOKEN_TOO_LONG',
+          'Token is unusually long and likely invalid',
+          'githubToken',
+          'error',
+          false,
+          'GitHub tokens are typically 40-100 characters'
+        ));
+      } else {
+        errors.push(createValidationError(
+          'UNRECOGNIZED_TOKEN_FORMAT',
+          formatResult.error || 'Token format not recognized',
+          'githubToken',
+          'error',
+          false,
+          'Ensure you copied the complete token from GitHub settings'
+        ));
+      }
     } else {
+      // Generic format error
       errors.push(createValidationError(
-        'UNRECOGNIZED_TOKEN_FORMAT',
-        'Token format not recognized',
+        'INVALID_TOKEN_FORMAT',
+        formatResult.error || 'Invalid token format',
         'githubToken',
         'error',
         false,
-        'Ensure you copied the complete token from GitHub settings'
+        'Check token format and length'
+      ));
+    }
+  } else if (formatResult.format) {
+    // Add warnings for specific token types
+    if (formatResult.format.description.includes('Legacy')) {
+      warnings.push(createValidationWarning(
+        'LEGACY_TOKEN_FORMAT',
+        'Using legacy token format (40-character hex)',
+        'githubToken',
+        'Consider creating a new Personal Access Token with ghp_ prefix for better security'
       ));
     }
   }
@@ -866,10 +940,17 @@ export function validateGitHubTokenWithResult(token: string): ValidationResult<s
 }
 
 /**
- * Validates GitHub token with API call and retry logic
+ * Runtime API verification for GitHub tokens
+ * Validates token by making a test API call
  */
-export async function validateGitHubTokenWithAPI(token: string): Promise<ValidationResult<{ token: string; user: any }>> {
-  // First check format
+export async function validateGitHubTokenWithAPI(
+  token: string,
+  options: {
+    timeout?: number;
+    retries?: number;
+  } = {}
+): Promise<ValidationResult<{ token: string; user: any }>> {
+  // First check format using the comprehensive validation
   const formatResult = validateGitHubTokenWithResult(token);
   if (!formatResult.valid) {
     return createErrorResult<{ token: string; user: any }>(formatResult.errors, formatResult.warnings, formatResult.suggestions);

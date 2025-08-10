@@ -15,6 +15,10 @@ import { Tool } from '@modelcontextprotocol/sdk/types.js';
  * - discussions: Discussion tools
  * - dependabot: Dependabot alerts and settings
  * - secret_protection: Secret scanning tools
+ * - graphql_insights: GraphQL-powered repository insights and analytics
+ * - advanced_search: GraphQL-powered advanced search operations
+ * - project_management: GraphQL-powered project management tools
+ * - batch_operations: GraphQL batch query operations
  * - experiments: Experimental features
  */
 export type GitHubToolset = 
@@ -30,8 +34,30 @@ export type GitHubToolset =
   | 'discussions'
   | 'dependabot'
   | 'secret_protection'
+  | 'graphql_insights'
+  | 'advanced_search'
+  | 'project_management'
+  | 'batch_operations'
   | 'health'
   | 'experiments';
+
+/**
+ * JSON Schema property definition
+ */
+export interface JSONSchemaProperty {
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
+  description?: string;
+  items?: JSONSchemaProperty;
+}
+
+/**
+ * JSON Schema definition
+ */
+export interface JSONSchema {
+  type: 'object';
+  properties?: Record<string, JSONSchemaProperty>;
+  required?: string[];
+}
 
 /**
  * Configuration object for MCP tools
@@ -39,7 +65,7 @@ export type GitHubToolset =
  * @template TParams - Type for tool input parameters
  * @template TResult - Type for tool result
  */
-export interface ToolConfig<TParams = any, TResult = any> {
+export interface ToolConfig<TParams = unknown, TResult = unknown> {
   /** MCP tool definition with name, description, and input schema */
   tool: Tool;
   /** Handler function that processes tool requests */

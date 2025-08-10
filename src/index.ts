@@ -4,6 +4,12 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { Octokit } from '@octokit/rest';
 import { z } from 'zod';
+import { JSONSchema, JSONSchemaProperty, ToolConfig } from './types.js';
+import { createRateLimitedOctokit, GitHubRateLimiter, ResponseSizeLimiter } from './rate-limiter.js';
+
+// Environment configuration
+import { env, getGitHubToken, getEnabledToolsets, displayConfig } from './env.js';
+import { validateEnvironmentConfiguration } from './validation.js';
 
 // Tool modules
 import { createRepositoryTools } from './tools/repositories.js';
@@ -18,8 +24,11 @@ import { createNotificationTools } from './tools/notifications.js';
 import { createDiscussionTools } from './tools/discussions.js';
 import { createDependabotTools } from './tools/dependabot.js';
 import { createSecretScanningTools } from './tools/secret-scanning.js';
+import { createRepositoryInsightsTools } from './tools/repository-insights.js';
+import { createAdvancedSearchTools } from './tools/advanced-search.js';
+import { createProjectManagementTools } from './tools/project-management.js';
+import { createBatchOperationsTools } from './tools/batch-operations.js';
 import { createOptimizedRepositoryTools } from './tools/optimized-repositories.js';
-import { validateEnvironmentConfiguration } from './validation.js';
 
 // Performance optimizations
 import { OptimizedAPIClient } from './optimized-api-client.js';
@@ -36,25 +45,16 @@ import {
 import { HealthManager, createHealthTools } from './health.js';
 import { formatErrorResponse } from './errors.js';
 
+// Monitoring and observability
+import { metrics } from './metrics.js';
+import { logger } from './logger.js';
+import { createHealthEndpoints } from './health-endpoints.js';
+import { HealthMonitor } from './health.js';
+import { createMonitoringTools } from './tools/monitoring.js';
+
 // Server configuration
 const SERVER_NAME = 'github-mcp';
 const SERVER_VERSION = '1.0.0';
-
-// Tool categories configuration
-const DEFAULT_TOOLSETS = [
-  'context',
-  'repos', 
-  'issues',
-  'pull_requests',
-  'actions',
-  'code_security',
-  'users',
-  'orgs',
-  'notifications',
-  'discussions',
-  'dependabot',
-  'secret_protection',
-];
 
 /**
  * GitHub MCP Server - Provides GitHub API integration for the Model Context Protocol
@@ -67,6 +67,8 @@ class GitHubMCPServer {
   private server: McpServer;
   /** GitHub API client (Octokit) */
   private octokit: Octokit;
+  /** Rate limiter for GitHub API */
+  private rateLimiter: GitHubRateLimiter;
   /** Optimized API client with performance features */
   private optimizedClient: OptimizedAPIClient;
   /** Set of enabled toolsets */
@@ -81,6 +83,8 @@ class GitHubMCPServer {
   private reliabilityManager: ReliabilityManager;
   /** Health manager for system monitoring */
   private healthManager: HealthManager;
+  /** Health monitor for observability */
+  private healthMonitor: HealthMonitor;
 
   /**
    * Initialize the GitHub MCP Server
@@ -89,6 +93,13 @@ class GitHubMCPServer {
    * parses environment variables, and registers tools.
    */
   constructor() {
+    // Initialize monitoring first
+    logger.info('Starting GitHub MCP Server', { 
+      version: SERVER_VERSION,
+      node: process.version,
+      platform: process.platform
+    });
+
     // Initialize MCP server
     this.server = new McpServer({
       name: SERVER_NAME,
@@ -99,6 +110,9 @@ class GitHubMCPServer {
     // Validate environment configuration for security
     const envValidation = validateEnvironmentConfiguration();
     if (!envValidation.isValid) {
+      logger.error('Environment configuration validation failed', { 
+        errors: envValidation.errors 
+      });
       console.error('ERROR: Environment configuration validation failed:');
       envValidation.errors.forEach(error => console.error(`  - ${error}`));
       console.error('Please check your environment variables and try again.');
@@ -107,11 +121,50 @@ class GitHubMCPServer {
       process.exit(1);
     }
 
-    // Initialize Octokit with validated token
-    const token = envValidation.sanitizedValues.GITHUB_TOKEN;
-    this.octokit = new Octokit({
-      auth: token,
+    // Get token from environment configuration
+    const token = getGitHubToken() || envValidation.sanitizedValues.GITHUB_TOKEN;
+    
+    // Create rate-limited Octokit instance with logging
+    const rateLimitedSetup = createRateLimitedOctokit(token);
+    this.octokit = rateLimitedSetup.octokit;
+    this.rateLimiter = rateLimitedSetup.rateLimiter;
+    
+    // Configure base URL if using GitHub Enterprise
+    if (env.GITHUB_HOST) {
+      this.octokit = new Octokit({
+        auth: token,
+        baseUrl: env.GITHUB_HOST,
+      });
+    }
+    
+    // Add logging to Octokit
+    this.octokit.hook.before('request', async (options) => {
+      logger.debug('API request', {
+        method: options.method,
+        url: options.url
+      });
     });
+    
+    this.octokit.hook.after('request', async (response, options) => {
+      logger.debug('API response', {
+        method: options.method,
+        url: options.url,
+        status: response.status
+      });
+    });
+    
+    this.octokit.hook.error('request', async (error, options) => {
+      logger.error('API error', {
+        method: options.method,
+        url: options.url,
+        error: error.message
+      });
+      throw error;
+    });
+
+    // Initialize health monitor
+    this.healthMonitor = HealthMonitor.getInstance();
+    this.healthMonitor.setOctokit(this.octokit);
 
     // Initialize optimized API client
     this.optimizedClient = new OptimizedAPIClient({
@@ -121,16 +174,9 @@ class GitHubMCPServer {
       enablePerformanceMonitoring: process.env.GITHUB_ENABLE_MONITORING !== 'false',
     });
 
-    // Parse configuration
-    this.readOnly = process.env.GITHUB_READ_ONLY === '1' || process.env.GITHUB_READ_ONLY === 'true';
-
-    // Parse enabled toolsets
-    const toolsetsConfig = process.env.GITHUB_TOOLSETS;
-    if (toolsetsConfig === 'all' || !toolsetsConfig) {
-      this.enabledToolsets = new Set(DEFAULT_TOOLSETS);
-    } else {
-      this.enabledToolsets = new Set(toolsetsConfig.split(',').map(t => t.trim()));
-    }
+    // Parse configuration from validated environment
+    this.readOnly = env.GITHUB_READ_ONLY;
+    this.enabledToolsets = new Set(getEnabledToolsets());
 
     // Initialize reliability infrastructure
     const enableVerboseTelemetry = process.env.GITHUB_TELEMETRY_VERBOSE === 'true';
@@ -142,8 +188,49 @@ class GitHubMCPServer {
     this.reliabilityManager = new ReliabilityManager(retryManager, telemetry);
     this.healthManager = new HealthManager(this.octokit, this.reliabilityManager);
 
+    // Set up request interception for metrics
+    this.setupRequestInterception();
+
     // Register all tools
     this.registerTools();
+
+    logger.info('GitHub MCP Server initialized', {
+      readOnly: this.readOnly,
+      toolsets: Array.from(this.enabledToolsets),
+      toolCount: this.toolCount
+    });
+  }
+
+  /**
+   * Set up request interception for metrics collection
+   */
+  private setupRequestInterception() {
+    // Hook into Octokit's request lifecycle
+    this.octokit.hook.before('request', async (options) => {
+      metrics.recordApiCall(options.method, options.url);
+      logger.debug('API request', {
+        method: options.method,
+        url: options.url
+      });
+    });
+
+    this.octokit.hook.after('request', async (response, options) => {
+      logger.debug('API response', {
+        method: options.method,
+        url: options.url,
+        status: response.status
+      });
+    });
+
+    this.octokit.hook.error('request', async (error, options) => {
+      metrics.recordError(error.name, error.message);
+      logger.error('API error', {
+        method: options.method,
+        url: options.url,
+        error: error.message
+      });
+      throw error;
+    });
   }
 
   /**
@@ -152,15 +239,15 @@ class GitHubMCPServer {
    * @param schema - The JSON schema to convert
    * @returns A Zod schema object for input validation
    */
-  private convertSchemaToZod(schema: any): any {
-    if (!schema || !schema.properties) {
+  private convertSchemaToZod(schema: JSONSchema): Record<string, z.ZodType> {
+    if (!schema?.properties) {
       return {};
     }
 
-    const zodSchema: any = {};
+    const zodSchema: Record<string, z.ZodType> = {};
     for (const [key, value] of Object.entries(schema.properties)) {
-      const prop = value as any;
-      let zodType: any;
+      const prop = value as JSONSchemaProperty;
+      let zodType: z.ZodType;
       
       if (prop.type === 'string') {
         zodType = z.string();
@@ -169,11 +256,26 @@ class GitHubMCPServer {
       } else if (prop.type === 'boolean') {
         zodType = z.boolean();
       } else if (prop.type === 'array') {
-        zodType = z.array(z.any());
+        // Try to infer array element type from items property
+        if (prop.items) {
+          if (prop.items.type === 'string') {
+            zodType = z.array(z.string());
+          } else if (prop.items.type === 'number') {
+            zodType = z.array(z.number());
+          } else if (prop.items.type === 'boolean') {
+            zodType = z.array(z.boolean());
+          } else if (prop.items.type === 'object') {
+            zodType = z.array(z.object({}));
+          } else {
+            zodType = z.array(z.unknown());
+          }
+        } else {
+          zodType = z.array(z.unknown());
+        }
       } else if (prop.type === 'object') {
         zodType = z.object({});
       } else {
-        zodType = z.any();
+        zodType = z.unknown();
       }
 
       if (prop.description) {
@@ -196,7 +298,7 @@ class GitHubMCPServer {
    * 
    * @param config - Tool configuration object containing tool definition and handler
    */
-  private registerTool(config: ToolConfig) {
+  private registerTool(config: ToolConfig<unknown, unknown>): void {
     // Skip if tool name is already registered (prevent duplicates)
     if (this.registeredTools.has(config.tool.name)) {
       console.warn(`Tool ${config.tool.name} is already registered. Skipping duplicate.`);
@@ -204,24 +306,74 @@ class GitHubMCPServer {
     }
 
     // Convert the JSON schema to Zod schema for validation
-    const zodSchema = this.convertSchemaToZod(config.tool.inputSchema);
+    const zodSchema = this.convertSchemaToZod(config.tool.inputSchema as JSONSchema);
 
     // Register the tool handler with the MCP server
     this.server.tool(
       config.tool.name,
-      config.tool.description || '',
+      config.tool.description || 'GitHub API operation',
       z.object(zodSchema),
-      async (args: any) => {
+      async (args: Record<string, unknown>) => {
+        const startTime = Date.now();
+        const toolName = config.tool.name;
         try {
+          logger.debug(`Tool invoked: ${toolName}`, { args });
+          metrics.recordApiCall('TOOL', toolName);
+          
           // Execute the tool handler
           const result = await config.handler(args);
-          return result;
-        } catch (error: any) {
-          // Log error details for debugging
-          console.error(`Error in tool ${config.tool.name}:`, error);
           
-          // Return standardized error response
-          throw new Error(formatErrorResponse(error));
+          const duration = Date.now() - startTime;
+          logger.info(`Tool completed: ${toolName}`, { 
+            duration, 
+            success: true 
+          });
+          
+          // Apply response size limiting
+          const { data: limitedResult, truncated, originalSize } = ResponseSizeLimiter.limitResponseSize(result);
+          
+          let responseText: string;
+          if (typeof limitedResult === 'string') {
+            responseText = limitedResult;
+          } else {
+            responseText = JSON.stringify(limitedResult, null, 2);
+            // Add truncation warning if response was limited
+            if (truncated) {
+              const warningMsg = `\n\n[Response truncated - original size: ${originalSize ? Math.round(originalSize / 1024) + 'KB' : 'unknown'}]`;
+              responseText += warningMsg;
+            }
+          }
+          
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: responseText,
+              },
+            ],
+          };
+        } catch (error: any) {
+          const duration = Date.now() - startTime;
+          metrics.recordError('TOOL_ERROR', error.message);
+          
+          // Log error details for debugging
+          logger.error(`Tool error: ${toolName}`, {
+            error: error.message,
+            duration,
+            args
+          });
+          
+          // Return standardized error response with both approaches
+          const errorMessage = formatErrorResponse(error);
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: `Error: ${errorMessage}`,
+              },
+            ],
+            isError: true,
+          };
         }
       }
     );
@@ -246,6 +398,45 @@ class GitHubMCPServer {
     console.log(`  Read-only mode: ${this.readOnly}`);
     console.log(`  Enabled toolsets: ${Array.from(this.enabledToolsets).join(', ')}`);
     console.log('\nRegistering tools...\n');
+
+    // Add rate limit status tool (always enabled)
+    this.registerTool({
+      tool: {
+        name: 'get_rate_limit_status',
+        description: 'Get current GitHub API rate limit status',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+      handler: async () => {
+        const status = this.rateLimiter.getStatus();
+        return {
+          rate_limits: {
+            core: {
+              limit: status.core.limit,
+              remaining: status.core.remaining,
+              reset: status.core.reset.toISOString(),
+              used: status.core.limit - status.core.remaining,
+            },
+            search: {
+              limit: status.search.limit,
+              remaining: status.search.remaining,
+              reset: status.search.reset.toISOString(),
+              used: status.search.limit - status.search.remaining,
+            },
+            graphql: {
+              limit: status.graphql.limit,
+              remaining: status.graphql.remaining,
+              reset: status.graphql.reset.toISOString(),
+              used: status.graphql.limit - status.graphql.remaining,
+            },
+          },
+          queue_length: status.queueLength,
+        };
+      },
+    });
+    console.log(`  ✓ Rate limit status tool (1)`);
 
     // Register context tools
     if (this.enabledToolsets.has('context')) {
@@ -365,10 +556,50 @@ class GitHubMCPServer {
       console.log(`  ✓ Secret Scanning tools (${secretScanningTools.length})`);
     }
 
+    // GraphQL repository insights tools
+    if (this.enabledToolsets.has('graphql_insights')) {
+      const insightsTools = createRepositoryInsightsTools(this.octokit, this.readOnly);
+      insightsTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Repository Insights tools (${insightsTools.length})`);
+    }
+
+    // Advanced search tools
+    if (this.enabledToolsets.has('advanced_search')) {
+      const advancedSearchTools = createAdvancedSearchTools(this.octokit, this.readOnly);
+      advancedSearchTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Advanced Search tools (${advancedSearchTools.length})`);
+    }
+
+    // Project management tools
+    if (this.enabledToolsets.has('project_management')) {
+      const projectTools = createProjectManagementTools(this.octokit, this.readOnly);
+      projectTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Project Management tools (${projectTools.length})`);
+    }
+
+    // Batch operations tools
+    if (this.enabledToolsets.has('batch_operations')) {
+      const batchTools = createBatchOperationsTools(this.octokit, this.readOnly);
+      batchTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Batch Operations tools (${batchTools.length})`);
+    }
+
     // Register health monitoring tools
     const healthTools = createHealthTools(this.healthManager);
     healthTools.forEach(tool => this.registerTool(tool));
     console.log(`  ✓ Health monitoring tools (${healthTools.length})`);
+
+    // Register monitoring and observability tools
+    if (this.enabledToolsets.has('monitoring')) {
+      const monitoringTools = createMonitoringTools(this.healthMonitor, metrics);
+      monitoringTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Monitoring tools (${monitoringTools.length})`);
+
+      // Register health endpoints
+      const healthEndpoints = createHealthEndpoints(this.healthMonitor);
+      healthEndpoints.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Health endpoints (${healthEndpoints.length})`);
+    }
 
     // Register performance monitoring tools
     const perfTools = [
@@ -421,12 +652,25 @@ class GitHubMCPServer {
    * 
    * Establishes a stdio connection for communication with the MCP client
    */
-  async start() {
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
-    
-    console.log(`GitHub MCP server (v${SERVER_VERSION}) is running`);
-    console.log('Ready to accept MCP requests via stdio\n');
+  public async start() {
+    try {
+      const transport = new StdioServerTransport();
+      await this.server.connect(transport);
+      
+      logger.info('GitHub MCP server started', {
+        version: SERVER_VERSION,
+        transport: 'stdio'
+      });
+      
+      console.error(`🚀 GitHub MCP Server v${SERVER_VERSION} started successfully`);
+      displayConfig();
+      console.error(`🛠️  Total tools registered: ${this.toolCount}`);
+      console.log('Ready to accept MCP requests via stdio\n');
+    } catch (error) {
+      logger.error('Failed to start GitHub MCP server', { error });
+      console.error('Failed to start server:', error);
+      process.exit(1);
+    }
   }
 }
 
@@ -436,6 +680,7 @@ class GitHubMCPServer {
     const server = new GitHubMCPServer();
     await server.start();
   } catch (error) {
+    logger.error('Failed to start GitHub MCP server', { error });
     console.error('Failed to start GitHub MCP server:', error);
     process.exit(1);
   }
