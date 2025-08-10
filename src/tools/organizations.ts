@@ -1,6 +1,64 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
 
+interface SearchOrgsParams {
+  query: string;
+  sort?: string;
+  order?: string;
+  page?: number;
+  perPage?: number;
+}
+
+interface GetOrgParams {
+  org: string;
+}
+
+interface ListOrgMembersParams {
+  org: string;
+  filter?: string;
+  role?: string;
+  page?: number;
+  perPage?: number;
+}
+
+interface ListOrgReposParams {
+  org: string;
+  type?: string;
+  sort?: string;
+  direction?: string;
+  page?: number;
+  perPage?: number;
+}
+
+interface ListOrgTeamsParams {
+  org: string;
+  page?: number;
+  perPage?: number;
+}
+
+interface CheckOrgMembershipParams {
+  org: string;
+  username: string;
+}
+
+interface ListUserOrgsParams {
+  username?: string;
+  page?: number;
+  perPage?: number;
+}
+
+interface UpdateOrgParams {
+  org: string;
+  billing_email?: string;
+  company?: string;
+  email?: string;
+  twitter_username?: string;
+  location?: string;
+  name?: string;
+  description?: string;
+  blog?: string;
+}
+
 export function createOrganizationTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
 
@@ -41,7 +99,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         required: ['query'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: SearchOrgsParams) => {
       const { data } = await octokit.search.users({
         q: `${args.query} type:org`,
         sort: args.sort,
@@ -53,7 +111,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
       return {
         total_count: data.total_count,
         incomplete_results: data.incomplete_results,
-        items: data.items.map((org: any) => ({
+        items: data.items.map((org) => ({
           login: org.login,
           id: org.id,
           node_id: org.node_id,
@@ -85,7 +143,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         required: ['org'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetOrgParams) => {
       const { data } = await octokit.orgs.get({
         org: args.org,
       });
@@ -167,7 +225,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         required: ['org'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: ListOrgMembersParams) => {
       const { data } = await octokit.orgs.listMembers({
         org: args.org,
         filter: args.filter,
@@ -176,7 +234,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         per_page: args.perPage,
       });
 
-      return data.map((member: any) => ({
+      return data.map((member) => ({
         login: member.login,
         id: member.id,
         node_id: member.node_id,
@@ -232,7 +290,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         required: ['org'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: ListOrgReposParams) => {
       const { data } = await octokit.repos.listForOrg({
         org: args.org,
         type: args.type,
@@ -242,7 +300,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         per_page: args.perPage,
       });
 
-      return data.map((repo: any) => ({
+      return data.map((repo) => ({
         id: repo.id,
         name: repo.name,
         full_name: repo.full_name,
@@ -297,14 +355,14 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         required: ['org'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: ListOrgTeamsParams) => {
       const { data } = await octokit.teams.list({
         org: args.org,
         page: args.page,
         per_page: args.perPage,
       });
 
-      return data.map((team: any) => ({
+      return data.map((team) => ({
         id: team.id,
         node_id: team.node_id,
         url: team.url,
@@ -341,7 +399,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         required: ['org', 'username'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: CheckOrgMembershipParams) => {
       try {
         await octokit.orgs.checkMembershipForUser({
           org: args.org,
@@ -390,7 +448,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         },
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: ListUserOrgsParams) => {
       let data;
       
       if (args.username) {
@@ -408,7 +466,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         data = response.data;
       }
 
-      return data.map((org: any) => ({
+      return data.map((org) => ({
         login: org.login,
         id: org.id,
         node_id: org.node_id,
@@ -469,7 +527,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
           required: ['org'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: UpdateOrgParams) => {
         const { data } = await octokit.orgs.update({
           org: args.org,
           billing_email: args.billing_email,
