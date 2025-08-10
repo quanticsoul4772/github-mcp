@@ -400,6 +400,9 @@ class GitHubMCPServer {
   }
 }
 
+// Export for testing
+export { GitHubMCPServer };
+
 // Start the server
 const server = new GitHubMCPServer();
 server.start().catch((error: Error) => {

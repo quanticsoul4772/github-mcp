@@ -99,6 +99,40 @@ export const createMockOctokit = () => {
       },
     },
     graphql: vi.fn(),
+    // Direct methods for compatibility with tools
+    issues: {
+      listForRepo: vi.fn(),
+      get: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      lock: vi.fn(),
+      unlock: vi.fn(),
+      listComments: vi.fn(),
+      createComment: vi.fn(),
+      updateComment: vi.fn(),
+      deleteComment: vi.fn(),
+      addLabels: vi.fn(),
+      removeLabel: vi.fn(),
+      addAssignees: vi.fn(),
+      removeAssignees: vi.fn(),
+    },
+    repos: {
+      get: vi.fn(),
+      getContent: vi.fn(),
+    },
+    pulls: {
+      list: vi.fn(),
+      get: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      merge: vi.fn(),
+      listFiles: vi.fn(),
+      createReview: vi.fn(),
+      listReviews: vi.fn(),
+      dismissReview: vi.fn(),
+      listComments: vi.fn(),
+      createReviewComment: vi.fn(),
+    }
   };
 };
 
