@@ -63,3 +63,14 @@ pnpm-lock.yaml
 # Test/debug scripts with potential secrets
 debug-api.js
 test-api.js
+# Security - Never commit files that might contain secrets
+*.env
+*.env.*
+!*.env.example
+.env.local
+.env.*.local
+
+# Test files that might contain example tokens
+**/test-tokens.ts
+**/test-secrets.ts
+**/*-secrets.test.ts
