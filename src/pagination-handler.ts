@@ -70,12 +70,14 @@ export class PaginationHandler {
           onProgress(totalYielded, response.totalCount);
         }
 
-        // Respect rate limiting
+        // Respect rate limiting with capped backoff
         if (response.rateLimit && response.rateLimit.remaining < 100) {
-          const waitTime = Math.max(0, response.rateLimit.resetAt.getTime() - Date.now());
-          if (waitTime > 0) {
-            console.log(`⏳ Rate limit approaching, waiting ${waitTime}ms...`);
-            await new Promise(resolve => setTimeout(resolve, waitTime));
+          const untilResetMs = Math.max(0, response.rateLimit.resetAt.getTime() - Date.now());
+          // Cap backoff to a reasonable upper limit (e.g., 5 seconds) to avoid stalling
+          const backoffMs = Math.min(untilResetMs, 5000);
+          if (backoffMs > 0) {
+            console.warn(`Rate limit low (${response.rateLimit.remaining}), backing off for ${backoffMs}ms`);
+            await new Promise(resolve => setTimeout(resolve, backoffMs));
           }
         }
       } catch (error) {
