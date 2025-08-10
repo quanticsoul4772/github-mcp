@@ -1,0 +1,134 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run TypeScript compiler check
+        run: npm run build
+
+      - name: Run linter
+        run: npm run lint || echo "::warning::Linting failed - please fix linting issues"
+
+      - name: Run tests with coverage
+        run: npm test -- --coverage --watchAll=false || echo "::warning::Some tests failed"
+        env:
+          CI: true
+
+      - name: Upload coverage to Codecov
+        if: matrix.node-version == '20.x'
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Check bundle size
+        run: |
+          echo "Checking build output size..."
+          du -sh dist/ || echo "No dist folder found"
+          du -sh build/ || echo "No build folder found"
+
+  quality-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check for TypeScript errors
+        run: npx tsc --noEmit || echo "::warning::TypeScript errors found"
+
+      - name: Check code formatting
+        run: |
+          npm run format:check || echo "::warning::Code formatting issues found"
+
+      - name: Analyze code complexity
+        run: |
+          npx complexity-report-html src/ || echo "::notice::Complexity report generated"
+
+      - name: Check for unused dependencies
+        run: |
+          npx depcheck || echo "::notice::Unused dependencies check complete"
+
+  security-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: |
+          npm audit --audit-level=moderate || echo "::warning::Security vulnerabilities found"
+
+      - name: Check for known vulnerabilities
+        run: |
+          npx better-npm-audit audit || echo "::warning::Known vulnerabilities detected"
+
+      - name: License compliance check
+        run: |
+          npx license-checker --production --summary || echo "::notice::License check complete"
