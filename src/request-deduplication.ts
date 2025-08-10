@@ -36,10 +36,13 @@ export class RequestDeduplicator {
       pendingRequests: 0,
     };
 
-    // Start periodic cleanup
+    // Start periodic cleanup without keeping the event loop alive
     this.cleanupInterval = setInterval(() => {
       this.cleanup();
     }, this.maxPendingTime);
+    if (typeof this.cleanupInterval.unref === 'function') {
+      this.cleanupInterval.unref();
+    }
   }
 
   /**
