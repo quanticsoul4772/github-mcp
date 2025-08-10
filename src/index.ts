@@ -7,6 +7,10 @@ import { z } from 'zod';
 import { JSONSchema, JSONSchemaProperty, ToolConfig } from './types.js';
 import { createRateLimitedOctokit, GitHubRateLimiter, ResponseSizeLimiter } from './rate-limiter.js';
 
+// Environment configuration
+import { env, getGitHubToken, getEnabledToolsets, displayConfig } from './env.js';
+import { validateEnvironmentConfiguration } from './validation.js';
+
 // Tool modules
 import { createRepositoryTools } from './tools/repositories.js';
 import { createIssueTools } from './tools/issues.js';
@@ -25,7 +29,6 @@ import { createAdvancedSearchTools } from './tools/advanced-search.js';
 import { createProjectManagementTools } from './tools/project-management.js';
 import { createBatchOperationsTools } from './tools/batch-operations.js';
 import { createOptimizedRepositoryTools } from './tools/optimized-repositories.js';
-import { validateEnvironmentConfiguration } from './validation.js';
 
 // Performance optimizations
 import { OptimizedAPIClient } from './optimized-api-client.js';
@@ -52,27 +55,6 @@ import { createMonitoringTools } from './tools/monitoring.js';
 // Server configuration
 const SERVER_NAME = 'github-mcp';
 const SERVER_VERSION = '1.0.0';
-
-// Tool categories configuration
-const DEFAULT_TOOLSETS = [
-  'context',
-  'repos', 
-  'issues',
-  'pull_requests',
-  'actions',
-  'code_security',
-  'users',
-  'orgs',
-  'notifications',
-  'discussions',
-  'dependabot',
-  'secret_protection',
-  'graphql_insights',
-  'advanced_search',
-  'project_management',
-  'batch_operations',
-  'monitoring',
-];
 
 /**
  * GitHub MCP Server - Provides GitHub API integration for the Model Context Protocol
@@ -139,12 +121,21 @@ class GitHubMCPServer {
       process.exit(1);
     }
 
-    // Initialize Octokit with validated token
-    const token = envValidation.sanitizedValues.GITHUB_TOKEN;
+    // Get token from environment configuration
+    const token = getGitHubToken() || envValidation.sanitizedValues.GITHUB_TOKEN;
+    
     // Create rate-limited Octokit instance with logging
     const rateLimitedSetup = createRateLimitedOctokit(token);
     this.octokit = rateLimitedSetup.octokit;
     this.rateLimiter = rateLimitedSetup.rateLimiter;
+    
+    // Configure base URL if using GitHub Enterprise
+    if (env.GITHUB_HOST) {
+      this.octokit = new Octokit({
+        auth: token,
+        baseUrl: env.GITHUB_HOST,
+      });
+    }
     
     // Add logging to Octokit
     this.octokit.hook.before('request', async (options) => {
@@ -183,16 +174,9 @@ class GitHubMCPServer {
       enablePerformanceMonitoring: process.env.GITHUB_ENABLE_MONITORING !== 'false',
     });
 
-    // Parse configuration
-    this.readOnly = process.env.GITHUB_READ_ONLY === '1' || process.env.GITHUB_READ_ONLY === 'true';
-
-    // Parse enabled toolsets
-    const toolsetsConfig = process.env.GITHUB_TOOLSETS;
-    if (toolsetsConfig === 'all' || !toolsetsConfig) {
-      this.enabledToolsets = new Set(DEFAULT_TOOLSETS);
-    } else {
-      this.enabledToolsets = new Set(toolsetsConfig.split(',').map(t => t.trim()));
-    }
+    // Parse configuration from validated environment
+    this.readOnly = env.GITHUB_READ_ONLY;
+    this.enabledToolsets = new Set(getEnabledToolsets());
 
     // Initialize reliability infrastructure
     const enableVerboseTelemetry = process.env.GITHUB_TELEMETRY_VERBOSE === 'true';
@@ -668,17 +652,25 @@ class GitHubMCPServer {
    * 
    * Establishes a stdio connection for communication with the MCP client
    */
-  async start() {
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
-    
-    logger.info('GitHub MCP server started', {
-      version: SERVER_VERSION,
-      transport: 'stdio'
-    });
-    
-    console.log(`GitHub MCP server (v${SERVER_VERSION}) is running`);
-    console.log('Ready to accept MCP requests via stdio\n');
+  public async start() {
+    try {
+      const transport = new StdioServerTransport();
+      await this.server.connect(transport);
+      
+      logger.info('GitHub MCP server started', {
+        version: SERVER_VERSION,
+        transport: 'stdio'
+      });
+      
+      console.error(`🚀 GitHub MCP Server v${SERVER_VERSION} started successfully`);
+      displayConfig();
+      console.error(`🛠️  Total tools registered: ${this.toolCount}`);
+      console.log('Ready to accept MCP requests via stdio\n');
+    } catch (error) {
+      logger.error('Failed to start GitHub MCP server', { error });
+      console.error('Failed to start server:', error);
+      process.exit(1);
+    }
   }
 }
 
