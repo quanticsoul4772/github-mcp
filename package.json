@@ -17,7 +17,11 @@
     "test:run": "vitest run",
     "test:integration": "vitest run --testNamePattern=\"Integration\"",
     "test:unit": "vitest run --testNamePattern=\"^(?!.*Integration).*$\"",
-    "lint": "echo 'Linting not configured yet'",
+    "security:setup": "bash scripts/setup-security.sh",
+    "security:scan": "npm audit && npm run security:secrets",
+    "security:secrets": "detect-secrets scan --baseline .secrets.baseline",
+    "security:pre-commit": "pre-commit run --all-files",
+    "lint": "npx tsc --noEmit",
     "typecheck": "npx tsc --noEmit"
   },
   "keywords": [
