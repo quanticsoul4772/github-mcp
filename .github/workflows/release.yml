@@ -117,7 +117,7 @@ jobs:
           cat CHANGELOG.md
 
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v5
         with:
           name: build-artifacts
 
