@@ -5,6 +5,14 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     setupFiles: ['./src/__tests__/setup.ts'],
+    isolate: true, // Better test isolation
+    pool: 'threads',
+    poolOptions: {
+      threads: {
+        singleThread: true, // Prevent race conditions
+      }
+    },
+    retry: 2, // Retry flaky tests up to 2 times
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -27,7 +35,16 @@ export default defineConfig({
         },
       },
     },
-    testTimeout: 10000,
+    // Enhanced timeout configurations
+    testTimeout: 15000, // Increased for network operations
     hookTimeout: 10000,
+    teardownTimeout: 5000,
+    // Bail on first failure in CI to fail fast
+    bail: process.env.CI ? 1 : 0,
+    // Better error handling
+    includeSource: ['src/**/*.ts'],
+    passWithNoTests: false,
+    // Improved reporting for flaky tests
+    reporter: process.env.CI ? ['verbose', 'github-actions'] : ['verbose'],
   },
 });

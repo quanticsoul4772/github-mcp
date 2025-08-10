@@ -1,7 +1,7 @@
 /**
  * Test helper utilities
  */
-import { vi } from 'vitest';
+import { vi, expect } from 'vitest';
 
 /**
  * Mock process.exit to prevent tests from exiting
@@ -150,4 +150,177 @@ export const validateResponseStructure = (response: any, expectedKeys: string[])
   for (const key of expectedKeys) {
     expect(responseKeys).toContain(key);
   }
+};
+
+/**
+ * Retry a function with exponential backoff
+ */
+export const retry = async <T>(
+  fn: () => Promise<T>,
+  options: {
+    retries?: number;
+    delay?: number;
+    backoffFactor?: number;
+    maxDelay?: number;
+  } = {}
+): Promise<T> => {
+  const {
+    retries = 3,
+    delay = 100,
+    backoffFactor = 2,
+    maxDelay = 5000
+  } = options;
+
+  let attempt = 0;
+  let lastError: Error;
+
+  while (attempt <= retries) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+      attempt++;
+
+      if (attempt > retries) {
+        throw lastError;
+      }
+
+      const currentDelay = Math.min(delay * Math.pow(backoffFactor, attempt - 1), maxDelay);
+      await sleep(currentDelay);
+    }
+  }
+
+  throw lastError!;
+};
+
+/**
+ * Wait for a condition to be true with timeout
+ */
+export const waitFor = async (
+  condition: () => boolean | Promise<boolean>,
+  options: {
+    timeout?: number;
+    interval?: number;
+  } = {}
+): Promise<void> => {
+  const { timeout = 5000, interval = 100 } = options;
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeout) {
+    const result = await condition();
+    if (result) {
+      return;
+    }
+    await sleep(interval);
+  }
+
+  throw new Error(`Condition not met within ${timeout}ms timeout`);
+};
+
+/**
+ * Create a timeout wrapper for async operations
+ */
+export const withTimeout = <T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message = `Operation timed out after ${timeoutMs}ms`
+): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(message)), timeoutMs)
+    ),
+  ]);
+};
+
+/**
+ * Mock system time for consistent date testing
+ */
+export const mockSystemTime = (fixedTime?: Date | string | number) => {
+  const fixed = fixedTime ? new Date(fixedTime) : new Date('2024-01-01T12:00:00Z');
+  const originalDate = Date;
+  
+  // Mock Date constructor
+  const mockDate = vi.fn((date?: any) => {
+    if (date !== undefined) {
+      return new originalDate(date);
+    }
+    return new originalDate(fixed);
+  });
+  
+  // Mock static methods
+  mockDate.now = vi.fn(() => fixed.getTime());
+  mockDate.parse = originalDate.parse;
+  mockDate.UTC = originalDate.UTC;
+  mockDate.prototype = originalDate.prototype;
+  
+  (global as any).Date = mockDate;
+  
+  return {
+    restore: () => {
+      (global as any).Date = originalDate;
+    },
+    setTime: (newTime: Date | string | number) => {
+      const newFixed = new Date(newTime);
+      mockDate.mockImplementation((date?: any) => {
+        if (date !== undefined) {
+          return new originalDate(date);
+        }
+        return new originalDate(newFixed);
+      });
+      mockDate.now.mockReturnValue(newFixed.getTime());
+    }
+  };
+};
+
+/**
+ * Enhanced error assertion with retry logic
+ */
+export const expectEventually = async <T>(
+  fn: () => T | Promise<T>,
+  assertion: (result: T) => void | Promise<void>,
+  options: {
+    timeout?: number;
+    interval?: number;
+    retries?: number;
+  } = {}
+): Promise<T> => {
+  const { timeout = 5000, interval = 100, retries = 3 } = options;
+  
+  return retry(async () => {
+    const result = await withTimeout(Promise.resolve(fn()), timeout);
+    await assertion(result);
+    return result;
+  }, { retries, delay: interval });
+};
+
+/**
+ * Create a flaky test detector
+ */
+export const createFlakeDetector = () => {
+  const results = new Map<string, { passed: number; failed: number }>();
+  
+  return {
+    recordResult: (testName: string, passed: boolean) => {
+      const current = results.get(testName) || { passed: 0, failed: 0 };
+      if (passed) {
+        current.passed++;
+      } else {
+        current.failed++;
+      }
+      results.set(testName, current);
+    },
+    
+    isFlaky: (testName: string, threshold = 0.1) => {
+      const result = results.get(testName);
+      if (!result || result.passed + result.failed < 5) {
+        return false; // Need more runs to determine
+      }
+      const failureRate = result.failed / (result.passed + result.failed);
+      return failureRate > threshold && failureRate < 0.9; // Flaky if sometimes fails
+    },
+    
+    getStats: () => Object.fromEntries(results),
+    clear: () => results.clear(),
+  };
 };

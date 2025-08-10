@@ -1,6 +1,17 @@
 /**
  * Test fixtures and data factories
+ * Enhanced with dynamic data generation to prevent test flakiness
  */
+
+// Utility functions for dynamic data generation
+const generateId = () => Math.floor(Math.random() * 1000000) + 1000;
+const generateTimestamp = (offsetDays = 0) => {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  return date.toISOString();
+};
+const generateString = (prefix: string, length = 8) => `${prefix}-${Math.random().toString(36).substring(2, length + 2)}`;
+const generateSha = () => Math.random().toString(36).substring(2, 42);
 
 export const testFixtures = {
   // Repository fixtures
@@ -237,38 +248,211 @@ export const testFixtures = {
   },
 };
 
-// Data factories for generating test data
-export const createRepository = (overrides = {}) => ({
-  ...testFixtures.repositories.public,
-  ...overrides,
-});
+// Enhanced data factories for generating dynamic test data
+export const createRepository = (overrides = {}) => {
+  const id = generateId();
+  const name = generateString('repo');
+  const owner = generateString('user');
+  
+  return {
+    id,
+    name,
+    full_name: `${owner}/${name}`,
+    owner: { login: owner, id: generateId() },
+    private: Math.random() > 0.5,
+    description: `Test repository ${name}`,
+    default_branch: 'main',
+    created_at: generateTimestamp(-30),
+    updated_at: generateTimestamp(-1),
+    pushed_at: generateTimestamp(-1),
+    stargazers_count: Math.floor(Math.random() * 100),
+    watchers_count: Math.floor(Math.random() * 50),
+    forks_count: Math.floor(Math.random() * 20),
+    open_issues_count: Math.floor(Math.random() * 10),
+    language: ['TypeScript', 'JavaScript', 'Python', 'Go'][Math.floor(Math.random() * 4)],
+    topics: [`mcp`, `github`, `api`, `test-${generateId()}`],
+    ...overrides,
+  };
+};
 
-export const createUser = (overrides = {}) => ({
-  ...testFixtures.users.authenticated,
-  ...overrides,
-});
+export const createUser = (overrides = {}) => {
+  const login = generateString('user');
+  return {
+    id: generateId(),
+    login,
+    name: `Test User ${login}`,
+    email: `${login}@example.com`,
+    bio: `Test user for GitHub MCP - ${login}`,
+    location: 'Test City',
+    company: 'Test Company',
+    blog: `https://${login}.example.com`,
+    public_repos: Math.floor(Math.random() * 100),
+    public_gists: Math.floor(Math.random() * 50),
+    followers: Math.floor(Math.random() * 1000),
+    following: Math.floor(Math.random() * 500),
+    created_at: generateTimestamp(-365),
+    updated_at: generateTimestamp(-1),
+    ...overrides,
+  };
+};
 
-export const createIssue = (overrides = {}) => ({
-  ...testFixtures.issues.open,
-  ...overrides,
-});
+export const createIssue = (overrides = {}) => {
+  const id = generateId();
+  const number = Math.floor(Math.random() * 1000) + 1;
+  const user = createUser();
+  
+  return {
+    id,
+    number,
+    title: `Test Issue ${number}`,
+    body: `This is a test issue for testing purposes - ${generateId()}`,
+    state: Math.random() > 0.7 ? 'closed' : 'open',
+    user: { login: user.login, id: user.id },
+    labels: [
+      { name: 'bug', color: 'ff0000' },
+      { name: `priority-${['low', 'medium', 'high'][Math.floor(Math.random() * 3)]}`, color: 'ff6600' },
+    ].slice(0, Math.floor(Math.random() * 3)),
+    assignees: Math.random() > 0.5 ? [{ login: user.login, id: user.id }] : [],
+    milestone: Math.random() > 0.7 ? { title: `v${Math.floor(Math.random() * 5) + 1}.0.0`, number: 1 } : null,
+    created_at: generateTimestamp(-7),
+    updated_at: generateTimestamp(-1),
+    closed_at: Math.random() > 0.7 ? generateTimestamp(-1) : null,
+    comments: Math.floor(Math.random() * 10),
+    ...overrides,
+  };
+};
 
-export const createPullRequest = (overrides = {}) => ({
-  ...testFixtures.pullRequests.open,
-  ...overrides,
-});
+export const createPullRequest = (overrides = {}) => {
+  const id = generateId();
+  const number = Math.floor(Math.random() * 1000) + 1;
+  const user = createUser();
+  const repo = createRepository();
+  const state = ['open', 'closed'][Math.floor(Math.random() * 2)];
+  const merged = state === 'closed' && Math.random() > 0.3;
+  
+  return {
+    id,
+    number,
+    title: `${['Add', 'Fix', 'Update', 'Remove'][Math.floor(Math.random() * 4)]} feature ${number}`,
+    body: `This PR implements feature ${number} - ${generateId()}`,
+    state,
+    user: { login: user.login, id: user.id },
+    head: {
+      ref: `feature-${generateString('branch')}`,
+      sha: generateSha(),
+      repo: { name: repo.name, owner: { login: repo.owner.login } },
+    },
+    base: {
+      ref: 'main',
+      sha: generateSha(),
+      repo: { name: repo.name, owner: { login: repo.owner.login } },
+    },
+    mergeable: Math.random() > 0.1,
+    merged,
+    draft: Math.random() > 0.8,
+    created_at: generateTimestamp(-7),
+    updated_at: generateTimestamp(-1),
+    closed_at: state === 'closed' ? generateTimestamp(-1) : null,
+    merged_at: merged ? generateTimestamp(-1) : null,
+    ...overrides,
+  };
+};
 
-export const createWorkflow = (overrides = {}) => ({
-  ...testFixtures.workflows.active,
-  ...overrides,
-});
+export const createWorkflow = (overrides = {}) => {
+  const id = generateId();
+  const name = generateString('workflow');
+  
+  return {
+    id,
+    name: name.charAt(0).toUpperCase() + name.slice(1),
+    path: `.github/workflows/${name}.yml`,
+    state: ['active', 'disabled_manually'][Math.floor(Math.random() * 2)],
+    created_at: generateTimestamp(-30),
+    updated_at: generateTimestamp(-1),
+    url: `https://api.github.com/repos/test-owner/test-repo/workflows/${id}`,
+    html_url: `https://github.com/test-owner/test-repo/actions/workflows/${name}.yml`,
+    badge_url: `https://github.com/test-owner/test-repo/workflows/${name}/badge.svg`,
+    ...overrides,
+  };
+};
 
-export const createCommit = (overrides = {}) => ({
-  ...testFixtures.commits.recent,
-  ...overrides,
-});
+export const createCommit = (overrides = {}) => {
+  const sha = generateSha();
+  const user = createUser();
+  
+  return {
+    sha,
+    commit: {
+      message: `${['Add', 'Fix', 'Update', 'Remove'][Math.floor(Math.random() * 4)]} implementation - ${generateId()}`,
+      author: {
+        name: user.name,
+        email: user.email,
+        date: generateTimestamp(-1),
+      },
+      committer: {
+        name: user.name,
+        email: user.email,
+        date: generateTimestamp(-1),
+      },
+    },
+    author: { login: user.login, id: user.id },
+    committer: { login: user.login, id: user.id },
+    parents: [{ sha: generateSha() }],
+    ...overrides,
+  };
+};
 
-export const createFile = (overrides = {}) => ({
-  ...testFixtures.files.readme,
-  ...overrides,
-});
+export const createFile = (overrides = {}) => {
+  const name = `${generateString('file')}.${['md', 'ts', 'js', 'json', 'yml'][Math.floor(Math.random() * 5)]}`;
+  const content = `# ${name}\n\nThis is test content for ${name} - ${generateId()}`;
+  
+  return {
+    name,
+    path: name,
+    sha: generateSha(),
+    size: content.length,
+    content: Buffer.from(content).toString('base64'),
+    encoding: 'base64',
+    type: 'file',
+    ...overrides,
+  };
+};
+
+// Random data generators for specific use cases
+export const generateRandomApiError = () => {
+  const codes = [400, 401, 403, 404, 422, 429, 500, 502, 503, 504];
+  const statusCode = codes[Math.floor(Math.random() * codes.length)];
+  
+  return {
+    response: {
+      status: statusCode,
+      data: {
+        message: `API Error ${statusCode} - ${generateId()}`,
+        errors: [
+          {
+            field: 'test_field',
+            code: 'invalid',
+            message: `Field validation failed - ${generateId()}`
+          }
+        ]
+      },
+      headers: statusCode === 429 ? {
+        'x-ratelimit-limit': '5000',
+        'x-ratelimit-remaining': '0',
+        'x-ratelimit-reset': Math.floor(Date.now() / 1000) + 3600,
+      } : {}
+    }
+  };
+};
+
+export const generateNetworkError = () => {
+  const codes = ['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNRESET'];
+  const code = codes[Math.floor(Math.random() * codes.length)];
+  
+  return {
+    code,
+    message: `Network error: ${code} - ${generateId()}`,
+    errno: -Math.floor(Math.random() * 100),
+    syscall: 'connect',
+  };
+};
