@@ -82,6 +82,20 @@ const CACHE_CLEANUP_INTERVAL = 5 * 60 * 1000;
 
 // Setup cache cleanup with environment safety
 let cacheCleanupTimer: NodeJS.Timeout | null = null;
+
+/**
+ * Cleanup function to clear timer and cache
+ */
+export function cleanupValidation(): void {
+  if (cacheCleanupTimer) {
+    clearInterval(cacheCleanupTimer);
+    cacheCleanupTimer = null;
+  }
+  validationCache.clear();
+  circuitBreakers.clear();
+}
+
+// Start cache cleanup timer
 if (typeof process !== 'undefined' && typeof setInterval !== 'undefined') {
   cacheCleanupTimer = setInterval(() => {
     const now = Date.now();
@@ -91,6 +105,24 @@ if (typeof process !== 'undefined' && typeof setInterval !== 'undefined') {
       }
     }
   }, CACHE_CLEANUP_INTERVAL);
+
+  // Register cleanup handlers for process exit
+  if (process.on) {
+    process.on('exit', cleanupValidation);
+    process.on('SIGINT', () => {
+      cleanupValidation();
+      process.exit(0);
+    });
+    process.on('SIGTERM', () => {
+      cleanupValidation();
+      process.exit(0);
+    });
+    process.on('uncaughtException', (error) => {
+      console.error('Uncaught exception:', error);
+      cleanupValidation();
+      process.exit(1);
+    });
+  }
 }
 
 /**
