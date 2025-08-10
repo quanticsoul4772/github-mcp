@@ -1,5 +1,70 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import {
+  ListPullRequestsParams,
+  CreatePullRequestParams,
+  UpdatePullRequestParams,
+  MergePullRequestParams,
+  GetPullRequestDiffParams
+} from '../tool-types.js';
+
+interface GetPullRequestParams {
+  owner: string;
+  repo: string;
+  pullNumber: number;
+}
+
+interface GetPullRequestCommitsParams {
+  owner: string;
+  repo: string;
+  pullNumber: number;
+  page?: number;
+  perPage?: number;
+}
+
+interface GetPullRequestFilesParams {
+  owner: string;
+  repo: string;
+  pullNumber: number;
+  page?: number;
+  perPage?: number;
+}
+
+interface GetPullRequestReviewsParams {
+  owner: string;
+  repo: string;
+  pullNumber: number;
+  page?: number;
+  perPage?: number;
+}
+
+interface CreatePullRequestReviewParams {
+  owner: string;
+  repo: string;
+  pullNumber: number;
+  event?: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT';
+  body?: string;
+  comments?: Array<{
+    path: string;
+    position: number;
+    body: string;
+  }>;
+}
+
+interface AddPullRequestCommentParams {
+  owner: string;
+  repo: string;
+  pullNumber: number;
+  body: string;
+}
+
+interface RequestPullRequestReviewersParams {
+  owner: string;
+  repo: string;
+  pullNumber: number;
+  reviewers?: string[];
+  team_reviewers?: string[];
+}
 
 export function createPullRequestTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
@@ -28,7 +93,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         required: ['owner', 'repo', 'pullNumber'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetPullRequestParams) => {
       const { data } = await octokit.pulls.get({
         owner: args.owner,
         repo: args.repo,
@@ -131,7 +196,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: ListPullRequestsParams) => {
       const { data } = await octokit.pulls.list({
         owner: args.owner,
         repo: args.repo,
@@ -144,7 +209,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         per_page: args.perPage,
       });
 
-      return data.map((pr: any) => ({
+      return data.map((pr) => ({
         number: pr.number,
         title: pr.title,
         state: pr.state,
@@ -202,7 +267,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         required: ['owner', 'repo', 'pullNumber'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetPullRequestFilesParams) => {
       const { data } = await octokit.pulls.listFiles({
         owner: args.owner,
         repo: args.repo,
@@ -211,7 +276,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         per_page: args.perPage,
       });
 
-      return data.map((file: any) => ({
+      return data.map((file) => ({
         filename: file.filename,
         status: file.status,
         additions: file.additions,
@@ -250,7 +315,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         required: ['owner', 'repo', 'pullNumber'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetPullRequestDiffParams) => {
       const response = await octokit.pulls.get({
         owner: args.owner,
         repo: args.repo,
@@ -290,14 +355,14 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         required: ['owner', 'repo', 'pullNumber'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetPullRequestParams) => {
       const { data } = await octokit.pulls.listReviewComments({
         owner: args.owner,
         repo: args.repo,
         pull_number: args.pullNumber,
       });
 
-      return data.map((comment: any) => ({
+      return data.map((comment) => ({
         id: comment.id,
         body: comment.body,
         path: comment.path,
@@ -339,14 +404,14 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         required: ['owner', 'repo', 'pullNumber'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetPullRequestReviewsParams) => {
       const { data } = await octokit.pulls.listReviews({
         owner: args.owner,
         repo: args.repo,
         pull_number: args.pullNumber,
       });
 
-      return data.map((review: any) => ({
+      return data.map((review) => ({
         id: review.id,
         user: {
           login: review.user?.login,
@@ -383,7 +448,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         required: ['owner', 'repo', 'pullNumber'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetPullRequestParams) => {
       // First get the PR to get the head SHA
       const { data: pr } = await octokit.pulls.get({
         owner: args.owner,
@@ -400,7 +465,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
 
       return {
         state: status.state,
-        statuses: status.statuses.map((s: any) => ({
+        statuses: status.statuses.map((s) => ({
           state: s.state,
           description: s.description,
           context: s.context,
@@ -459,7 +524,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         required: ['query'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetPullRequestParams) => {
       let query = `is:pr ${args.query}`;
       
       // Add repo filter if provided
@@ -478,7 +543,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
       return {
         total_count: data.total_count,
         incomplete_results: data.incomplete_results,
-        items: data.items.map((item: any) => ({
+        items: data.items.map((item) => ({
           number: item.number,
           title: item.title,
           state: item.state,
@@ -540,7 +605,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
           required: ['owner', 'repo', 'title', 'head', 'base'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: CreatePullRequestParams) => {
         const { data } = await octokit.pulls.create({
           owner: args.owner,
           repo: args.repo,
@@ -615,7 +680,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
           required: ['owner', 'repo', 'pullNumber'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: UpdatePullRequestParams) => {
         const { data } = await octokit.pulls.update({
           owner: args.owner,
           repo: args.repo,
@@ -675,7 +740,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
           required: ['owner', 'repo', 'pullNumber'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: MergePullRequestParams) => {
         const { data } = await octokit.pulls.merge({
           owner: args.owner,
           repo: args.repo,
@@ -730,7 +795,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
           required: ['owner', 'repo', 'pullNumber', 'body', 'event'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: CreatePullRequestReviewParams) => {
         const { data } = await octokit.pulls.createReview({
           owner: args.owner,
           repo: args.repo,
@@ -781,7 +846,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
           required: ['owner', 'repo', 'pullNumber'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: GetPullRequestParams) => {
         const { data } = await octokit.pulls.updateBranch({
           owner: args.owner,
           repo: args.repo,
