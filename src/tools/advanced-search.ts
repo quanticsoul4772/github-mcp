@@ -1,8 +1,10 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import { GraphQLPaginationHandler, GraphQLPaginationOptions, GraphQLPaginationUtils } from '../graphql-pagination-handler.js';
 
 export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
+  const paginationHandler = new GraphQLPaginationHandler(octokit);
 
   // Cross-repository search tool
   tools.push({
@@ -31,144 +33,49 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
             type: 'string',
             description: 'Cursor for pagination',
           },
+          autoPage: {
+            type: 'boolean',
+            description: 'Automatically paginate through all results',
+          },
+          maxPages: {
+            type: 'number',
+            description: 'Maximum number of pages to fetch (default 10)',
+            minimum: 1,
+          },
+          maxItems: {
+            type: 'number',
+            description: 'Maximum number of items to fetch across all pages',
+            minimum: 1,
+          },
         },
         required: ['query', 'type'],
       },
     },
     handler: async (args: any) => {
-      const query = `
-        query($searchQuery: String!, $type: SearchType!, $first: Int!, $after: String) {
-          search(query: $searchQuery, type: $type, first: $first, after: $after) {
-            repositoryCount
-            issueCount
-            userCount
-            discussionCount
-            pageInfo {
-              hasNextPage
-              endCursor
-            }
-            nodes {
-              ... on Repository {
-                id
-                name
-                nameWithOwner
-                description
-                url
-                stargazerCount
-                forkCount
-                createdAt
-                updatedAt
-                primaryLanguage {
-                  name
-                  color
-                }
-                owner {
-                  login
-                  avatarUrl
-                }
-                licenseInfo {
-                  name
-                  spdxId
-                }
-                repositoryTopics(first: 10) {
-                  nodes {
-                    topic {
-                      name
-                    }
-                  }
-                }
-              }
-              ... on Issue {
-                id
-                number
-                title
-                body
-                url
-                state
-                createdAt
-                updatedAt
-                author {
-                  login
-                  avatarUrl
-                }
-                repository {
-                  name
-                  nameWithOwner
-                }
-                labels(first: 10) {
-                  nodes {
-                    name
-                    color
-                  }
-                }
-                comments {
-                  totalCount
-                }
-              }
-              ... on User {
-                id
-                login
-                name
-                email
-                bio
-                company
-                location
-                url
-                avatarUrl
-                createdAt
-                followers {
-                  totalCount
-                }
-                following {
-                  totalCount
-                }
-                repositories {
-                  totalCount
-                }
-              }
-              ... on Discussion {
-                id
-                number
-                title
-                body
-                url
-                createdAt
-                updatedAt
-                author {
-                  login
-                  avatarUrl
-                }
-                repository {
-                  name
-                  nameWithOwner
-                }
-                category {
-                  name
-                  slug
-                }
-                upvoteCount
-              }
-            }
-          }
-        }
-      `;
+      try {
+        GraphQLPaginationUtils.validatePaginationParams(args);
+      } catch (error) {
+        throw new Error(`Invalid pagination parameters: ${error.message}`);
+      }
 
-      const result: any = await octokit.graphql(query, {
-        searchQuery: args.query,
-        type: args.type,
-        first: args.first || 25,
+      const queryBuilder = paginationHandler.createSearchQuery(args.query, args.type);
+
+      const paginationOptions: GraphQLPaginationOptions = {
+        first: args.first,
         after: args.after,
-      });
+        autoPage: args.autoPage,
+        maxPages: args.maxPages,
+        maxItems: args.maxItems,
+      };
+
+      const result = await paginationHandler.paginate(queryBuilder, paginationOptions);
 
       return {
-        totalCount: {
-          repositories: result.search.repositoryCount,
-          issues: result.search.issueCount,
-          users: result.search.userCount,
-          discussions: result.search.discussionCount,
-        },
-        pageInfo: result.search.pageInfo,
-        results: result.search.nodes,
+        totalCount: result.totalCount,
+        hasNextPage: result.hasMore,
+        endCursor: result.nextCursor,
+        pageInfo: result.pageInfo,
+        results: result.data,
       };
     },
   });

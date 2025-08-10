@@ -1,8 +1,10 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import { GraphQLPaginationHandler, GraphQLPaginationOptions, GraphQLPaginationUtils } from '../graphql-pagination-handler.js';
 
 export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
+  const paginationHandler = new GraphQLPaginationHandler(octokit);
 
   // Get repository statistics tool
   tools.push({
@@ -405,6 +407,142 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
           deletions: commit.deletions,
           filesChanged: commit.changedFiles,
         })),
+      };
+    },
+  });
+
+  // Get commit history with proper pagination
+  tools.push({
+    tool: {
+      name: 'get_commit_history_paginated',
+      description: 'Get repository commit history with comprehensive pagination support',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          owner: {
+            type: 'string',
+            description: 'Repository owner',
+          },
+          repo: {
+            type: 'string',
+            description: 'Repository name',
+          },
+          branch: {
+            type: 'string',
+            description: 'Branch to analyze (default: default branch)',
+          },
+          since: {
+            type: 'string',
+            description: 'ISO 8601 date to analyze commits since',
+          },
+          until: {
+            type: 'string',
+            description: 'ISO 8601 date to analyze commits until',
+          },
+          first: {
+            type: 'number',
+            description: 'Number of commits to return per page (min 1, max 100)',
+            minimum: 1,
+            maximum: 100,
+          },
+          after: {
+            type: 'string',
+            description: 'Cursor for pagination',
+          },
+          autoPage: {
+            type: 'boolean',
+            description: 'Automatically paginate through all results',
+          },
+          maxPages: {
+            type: 'number',
+            description: 'Maximum number of pages to fetch (default 10)',
+            minimum: 1,
+          },
+          maxItems: {
+            type: 'number',
+            description: 'Maximum number of items to fetch across all pages',
+            minimum: 1,
+          },
+        },
+        required: ['owner', 'repo'],
+      },
+    },
+    handler: async (args: any) => {
+      try {
+        GraphQLPaginationUtils.validatePaginationParams(args);
+      } catch (error) {
+        throw new Error(`Invalid pagination parameters: ${error.message}`);
+      }
+
+      const queryBuilder = paginationHandler.createCommitHistoryQuery(
+        args.owner,
+        args.repo,
+        args.branch,
+        args.since,
+        args.until
+      );
+
+      const paginationOptions: GraphQLPaginationOptions = {
+        first: args.first,
+        after: args.after,
+        autoPage: args.autoPage,
+        maxPages: args.maxPages,
+        maxItems: args.maxItems,
+      };
+
+      const result = await paginationHandler.paginate(queryBuilder, paginationOptions);
+
+      // Calculate statistics from the commits
+      const commits = result.data;
+      let totalAdditions = 0;
+      let totalDeletions = 0;
+      let totalFilesChanged = 0;
+      const authorActivity: { [author: string]: number } = {};
+      const hourlyActivity: { [hour: string]: number } = {};
+      const dailyActivity: { [day: string]: number } = {};
+
+      for (const commit of commits) {
+        const date = new Date(commit.committedDate);
+        const hour = date.getUTCHours().toString();
+        const day = date.toISOString().split('T')[0];
+        const author = commit.author?.user?.login || 'unknown';
+
+        hourlyActivity[hour] = (hourlyActivity[hour] || 0) + 1;
+        dailyActivity[day] = (dailyActivity[day] || 0) + 1;
+        authorActivity[author] = (authorActivity[author] || 0) + 1;
+
+        totalAdditions += commit.additions || 0;
+        totalDeletions += commit.deletions || 0;
+        totalFilesChanged += commit.changedFiles || 0;
+      }
+
+      return {
+        totalCount: result.totalCount,
+        hasNextPage: result.hasMore,
+        endCursor: result.nextCursor,
+        pageInfo: result.pageInfo,
+        analyzedCommits: commits.length,
+        summary: {
+          totalAdditions,
+          totalDeletions,
+          totalFilesChanged,
+          averageAdditionsPerCommit: commits.length > 0 ? Math.round(totalAdditions / commits.length) : 0,
+          averageDeletionsPerCommit: commits.length > 0 ? Math.round(totalDeletions / commits.length) : 0,
+          averageFilesPerCommit: commits.length > 0 ? Math.round(totalFilesChanged / commits.length) : 0,
+        },
+        patterns: {
+          hourlyActivity: Object.entries(hourlyActivity)
+            .map(([hour, count]) => ({ hour: parseInt(hour), commits: count }))
+            .sort((a, b) => a.hour - b.hour),
+          dailyActivity: Object.entries(dailyActivity)
+            .map(([day, count]) => ({ date: day, commits: count }))
+            .sort((a, b) => a.date.localeCompare(b.date)),
+          topAuthors: Object.entries(authorActivity)
+            .map(([author, count]) => ({ author, commits: count }))
+            .sort((a, b) => b.commits - a.commits)
+            .slice(0, 10),
+        },
+        commits,
       };
     },
   });

@@ -1,5 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import { GraphQLPaginationHandler, GraphQLPaginationOptions, GraphQLPaginationUtils } from '../graphql-pagination-handler.js';
 
 interface ListDiscussionsParams {
   owner: string;
@@ -7,6 +8,9 @@ interface ListDiscussionsParams {
   category?: string;
   after?: string;
   perPage?: number;
+  autoPage?: boolean;
+  maxPages?: number;
+  maxItems?: number;
 }
 
 interface GetDiscussionParams {
@@ -21,6 +25,9 @@ interface GetDiscussionCommentsParams {
   discussionNumber: number;
   after?: string;
   perPage?: number;
+  autoPage?: boolean;
+  maxPages?: number;
+  maxItems?: number;
 }
 
 interface ListDiscussionCategoriesParams {
@@ -62,6 +69,7 @@ interface DeleteDiscussionParams {
 
 export function createDiscussionTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
+  const paginationHandler = new GraphQLPaginationHandler(octokit);
 
   // Note: GitHub Discussions are accessed through GraphQL API
   // These are simplified implementations - full GraphQL support would be more complex
@@ -96,59 +104,53 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
             minimum: 1,
             maximum: 100,
           },
+          autoPage: {
+            type: 'boolean',
+            description: 'Automatically paginate through all results',
+          },
+          maxPages: {
+            type: 'number',
+            description: 'Maximum number of pages to fetch (default 10)',
+            minimum: 1,
+          },
+          maxItems: {
+            type: 'number',
+            description: 'Maximum number of items to fetch across all pages',
+            minimum: 1,
+          },
         },
         required: ['owner', 'repo'],
       },
     },
     handler: async (args: ListDiscussionsParams) => {
-      const query = `
-        query($owner: String!, $repo: String!, $first: Int!, $after: String, $categoryId: ID) {
-          repository(owner: $owner, name: $repo) {
-            discussions(first: $first, after: $after, categoryId: $categoryId) {
-              totalCount
-              pageInfo {
-                hasNextPage
-                endCursor
-              }
-              nodes {
-                id
-                number
-                title
-                body
-                createdAt
-                updatedAt
-                author {
-                  login
-                }
-                category {
-                  id
-                  name
-                  slug
-                }
-                comments {
-                  totalCount
-                }
-                upvoteCount
-                url
-              }
-            }
-          }
-        }
-      `;
+      try {
+        GraphQLPaginationUtils.validatePaginationParams(args);
+      } catch (error) {
+        throw new Error(`Invalid pagination parameters: ${error.message}`);
+      }
 
-      const result: any = await octokit.graphql(query, {
-        owner: args.owner,
-        repo: args.repo,
-        first: args.perPage || 25,
+      const queryBuilder = paginationHandler.createDiscussionsQuery(
+        args.owner,
+        args.repo,
+        args.category
+      );
+
+      const paginationOptions: GraphQLPaginationOptions = {
+        first: args.perPage,
         after: args.after,
-        categoryId: args.category,
-      });
+        autoPage: args.autoPage,
+        maxPages: args.maxPages,
+        maxItems: args.maxItems,
+      };
+
+      const result = await paginationHandler.paginate(queryBuilder, paginationOptions);
 
       return {
-        total_count: result.repository.discussions.totalCount,
-        has_next_page: result.repository.discussions.pageInfo.hasNextPage,
-        end_cursor: result.repository.discussions.pageInfo.endCursor,
-        discussions: result.repository.discussions.nodes,
+        total_count: result.totalCount,
+        has_next_page: result.hasMore,
+        end_cursor: result.nextCursor,
+        page_info: result.pageInfo,
+        discussions: result.data,
       };
     },
   });
@@ -261,67 +263,53 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
             minimum: 1,
             maximum: 100,
           },
+          autoPage: {
+            type: 'boolean',
+            description: 'Automatically paginate through all results',
+          },
+          maxPages: {
+            type: 'number',
+            description: 'Maximum number of pages to fetch (default 10)',
+            minimum: 1,
+          },
+          maxItems: {
+            type: 'number',
+            description: 'Maximum number of items to fetch across all pages',
+            minimum: 1,
+          },
         },
         required: ['owner', 'repo', 'discussionNumber'],
       },
     },
     handler: async (args: GetDiscussionCommentsParams) => {
-      const query = `
-        query($owner: String!, $repo: String!, $number: Int!, $first: Int!, $after: String) {
-          repository(owner: $owner, name: $repo) {
-            discussion(number: $number) {
-              comments(first: $first, after: $after) {
-                totalCount
-                pageInfo {
-                  hasNextPage
-                  endCursor
-                }
-                nodes {
-                  id
-                  body
-                  bodyHTML
-                  createdAt
-                  updatedAt
-                  author {
-                    login
-                    avatarUrl
-                  }
-                  upvoteCount
-                  viewerHasUpvoted
-                  viewerCanUpvote
-                  viewerCanDelete
-                  viewerCanUpdate
-                  replies(first: 5) {
-                    totalCount
-                    nodes {
-                      id
-                      body
-                      createdAt
-                      author {
-                        login
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      `;
+      try {
+        GraphQLPaginationUtils.validatePaginationParams(args);
+      } catch (error) {
+        throw new Error(`Invalid pagination parameters: ${error.message}`);
+      }
 
-      const result: any = await octokit.graphql(query, {
-        owner: args.owner,
-        repo: args.repo,
-        number: args.discussionNumber,
-        first: args.perPage || 25,
+      const queryBuilder = paginationHandler.createDiscussionCommentsQuery(
+        args.owner,
+        args.repo,
+        args.discussionNumber
+      );
+
+      const paginationOptions: GraphQLPaginationOptions = {
+        first: args.perPage,
         after: args.after,
-      });
+        autoPage: args.autoPage,
+        maxPages: args.maxPages,
+        maxItems: args.maxItems,
+      };
+
+      const result = await paginationHandler.paginate(queryBuilder, paginationOptions);
 
       return {
-        total_count: result.repository.discussion.comments.totalCount,
-        has_next_page: result.repository.discussion.comments.pageInfo.hasNextPage,
-        end_cursor: result.repository.discussion.comments.pageInfo.endCursor,
-        comments: result.repository.discussion.comments.nodes,
+        total_count: result.totalCount,
+        has_next_page: result.hasMore,
+        end_cursor: result.nextCursor,
+        page_info: result.pageInfo,
+        comments: result.data,
       };
     },
   });
