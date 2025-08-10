@@ -1,0 +1,204 @@
+name: PR and Issue Management
+
+on:
+  issues:
+    types: [opened, edited]
+  pull_request_target:
+    types: [opened, edited, synchronize, ready_for_review]
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  auto-label:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Label issues based on content
+        if: github.event_name == 'issues'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const labels = [];
+            
+            // Auto-label based on title and body content
+            const content = (issue.title + ' ' + issue.body).toLowerCase();
+            
+            if (content.includes('bug') || content.includes('error') || content.includes('broken')) {
+              labels.push('bug');
+            }
+            if (content.includes('feature') || content.includes('enhancement') || content.includes('add')) {
+              labels.push('enhancement');
+            }
+            if (content.includes('documentation') || content.includes('docs') || content.includes('readme')) {
+              labels.push('documentation');
+            }
+            if (content.includes('security') || content.includes('vulnerability') || content.includes('cve')) {
+              labels.push('security');
+            }
+            if (content.includes('performance') || content.includes('slow') || content.includes('optimization')) {
+              labels.push('performance');
+            }
+            if (content.includes('test') || content.includes('testing') || content.includes('coverage')) {
+              labels.push('testing');
+            }
+            if (content.includes('dependency') || content.includes('package') || content.includes('npm')) {
+              labels.push('dependencies');
+            }
+            
+            if (labels.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: labels
+              });
+            }
+
+      - name: Label PRs based on files changed
+        if: github.event_name == 'pull_request_target'
+        uses: actions/labeler@v4
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          configuration-path: .github/labeler.yml
+
+  pr-size-labeler:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request_target'
+    
+    steps:
+      - name: Assign size labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            
+            // Get PR diff stats
+            const { data: pullRequest } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number
+            });
+            
+            const additions = pullRequest.additions;
+            const deletions = pullRequest.deletions;
+            const changes = additions + deletions;
+            
+            // Remove existing size labels
+            const labels = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number
+            });
+            
+            const sizeLabels = labels.data
+              .filter(label => label.name.startsWith('size/'))
+              .map(label => label.name);
+            
+            if (sizeLabels.length > 0) {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                name: sizeLabels[0]
+              }).catch(() => {});
+            }
+            
+            // Add appropriate size label
+            let size;
+            if (changes < 10) size = 'size/XS';
+            else if (changes < 50) size = 'size/S';
+            else if (changes < 150) size = 'size/M';
+            else if (changes < 500) size = 'size/L';
+            else if (changes < 1000) size = 'size/XL';
+            else size = 'size/XXL';
+            
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              labels: [size]
+            });
+
+  welcome-message:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues' || github.event_name == 'pull_request_target'
+    
+    steps:
+      - name: Welcome first-time contributors
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const isIssue = !!context.payload.issue;
+            const item = context.payload.issue || context.payload.pull_request;
+            const itemType = isIssue ? 'issue' : 'pull request';
+            
+            // Check if this is their first contribution
+            const author = item.user.login;
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              creator: author,
+              state: 'all'
+            });
+            
+            if (issues.length === 1) {
+              const message = `👋 Welcome @${author}! Thank you for your first ${itemType} in this repository! 
+              
+              We appreciate your contribution to the GitHub MCP project. A maintainer will review this soon.
+              
+              In the meantime, please make sure you've:
+              ${isIssue ? 
+                '- Provided a clear description of the issue\n- Added steps to reproduce (if it\'s a bug)\n- Included any relevant error messages or logs' :
+                '- Followed our contribution guidelines\n- Added tests for your changes\n- Updated documentation if needed'}
+              
+              If you have any questions, feel free to ask!`;
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: item.number,
+                body: message
+              });
+            }
+
+  stale-check:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Mark stale issues and PRs
+        uses: actions/stale@v9
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          stale-issue-message: 'This issue has been inactive for 30 days and will be closed in 7 days if there is no further activity.'
+          stale-pr-message: 'This pull request has been inactive for 30 days and will be closed in 7 days if there is no further activity.'
+          close-issue-message: 'This issue was closed due to inactivity.'
+          close-pr-message: 'This pull request was closed due to inactivity.'
+          days-before-stale: 30
+          days-before-close: 7
+          stale-issue-label: 'stale'
+          stale-pr-label: 'stale'
+          exempt-issue-labels: 'pinned,security,critical'
+          exempt-pr-labels: 'pinned,security,critical'
+
+  dependency-review:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request_target'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+          deny-licenses: GPL-3.0, AGPL-3.0
