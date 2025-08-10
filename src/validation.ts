@@ -316,7 +316,7 @@ export function validateGitHubTokenFormat(
   if (!format) {
     return {
       isValid: false,
-      error: `Unrecognized token format. Supported prefixes: ${TOKEN_FORMATS.map(f => f.prefix || 'legacy').join(', ')}`
+      error: 'Unrecognized token format'
     };
   }
 
