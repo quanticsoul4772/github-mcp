@@ -38,7 +38,26 @@ export type GitHubToolset =
   | 'advanced_search'
   | 'project_management'
   | 'batch_operations'
+  | 'health'
   | 'experiments';
+
+/**
+ * JSON Schema property definition
+ */
+export interface JSONSchemaProperty {
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
+  description?: string;
+  items?: JSONSchemaProperty;
+}
+
+/**
+ * JSON Schema definition
+ */
+export interface JSONSchema {
+  type: 'object';
+  properties?: Record<string, JSONSchemaProperty>;
+  required?: string[];
+}
 
 /**
  * Configuration object for MCP tools
@@ -46,11 +65,29 @@ export type GitHubToolset =
  * @template TParams - Type for tool input parameters
  * @template TResult - Type for tool result
  */
-export interface ToolConfig<TParams = any, TResult = any> {
+export interface ToolConfig<TParams = unknown, TResult = unknown> {
   /** MCP tool definition with name, description, and input schema */
   tool: Tool;
   /** Handler function that processes tool requests */
   handler: (args: TParams) => Promise<TResult>;
+}
+
+/**
+ * Performance optimization configuration options
+ */
+export interface PerformanceOptions {
+  /** Enable API response caching */
+  enableCache?: boolean;
+  /** Enable request deduplication */
+  enableDeduplication?: boolean;
+  /** Enable performance monitoring */
+  enablePerformanceMonitoring?: boolean;
+  /** Cache time-to-live in milliseconds */
+  cacheTTL?: number;
+  /** Maximum number of pages to fetch */
+  maxPages?: number;
+  /** Concurrency limit for parallel operations */
+  concurrency?: number;
 }
 
 /**
