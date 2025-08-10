@@ -37,7 +37,7 @@ repos:
       - id: typescript-check
         name: TypeScript Check
         description: Check TypeScript compilation
-        entry: npx tsc --noEmit
+        entry: npx tsc --noEmit --pretty false --project tsconfig.json
         language: system
         files: \.(ts|tsx)$
         pass_filenames: false
