@@ -12,31 +12,35 @@ export class ErrorHandler {
     if (error instanceof ValidationError) {
       throw error;
     }
-    
-    if (error.status === 404) {
-      throw new Error(`${context}: Resource not found`);
+
+    const messageFrom = (msg: string) =>
+      new Error(`${context}: ${msg}`, { cause: error });
+
+    if (error?.status === 404) {
+      throw messageFrom('Resource not found');
     }
-    
-    if (error.status === 403) {
-      throw new Error(`${context}: Access forbidden - check token permissions`);
+
+    if (error?.status === 403) {
+      throw messageFrom('Access forbidden - check token permissions');
     }
-    
-    if (error.status === 401) {
-      throw new Error(`${context}: Authentication failed - check token`);
+
+    if (error?.status === 401) {
+      throw messageFrom('Authentication failed - check token');
     }
-    
-    if (error.status === 422) {
-      const message = error.response?.data?.message || 'Validation failed';
-      const errors = error.response?.data?.errors || [];
-      const errorDetails = errors.length > 0 ? `: ${errors.map((e: any) => e.message).join(', ')}` : '';
-      throw new Error(`${context}: ${message}${errorDetails}`);
+
+    if (error?.status === 422) {
+      const message = error?.response?.data?.message || 'Validation failed';
+      const errors = Array.isArray(error?.response?.data?.errors) ? error.response.data.errors : [];
+      const errorDetails = errors.length > 0 ? `: ${errors.map((e: any) => e?.message).filter(Boolean).join(', ')}` : '';
+      throw messageFrom(`${message}${errorDetails}`);
     }
-    
-    if (error.status && error.message) {
-      throw new Error(`${context}: GitHub API error (${error.status}): ${error.message}`);
+
+    if (error?.status && error?.message) {
+      throw messageFrom(`GitHub API error (${error.status}): ${error.message}`);
     }
-    
-    throw new Error(`${context}: ${error.message || 'Unknown error'}`);
+
+    const fallbackMsg = typeof error?.message === 'string' && error.message.length > 0 ? error.message : 'Unknown error';
+    throw messageFrom(fallbackMsg);
   }
 
   /**
