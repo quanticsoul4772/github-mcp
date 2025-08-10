@@ -133,7 +133,9 @@ function shouldBypassValidation(): boolean {
   if (typeof process === 'undefined' || !process.env) {
     return false;
   }
-  return process.env.NODE_ENV === 'development' && process.env.SKIP_VALIDATION === 'true';
+  // Allow bypass in development mode OR when explicitly set
+  return (process.env.NODE_ENV === 'development' && process.env.SKIP_VALIDATION === 'true') ||
+         process.env.BYPASS_VALIDATION === 'true';
 }
 
 /**
@@ -349,8 +351,28 @@ function setCachedValidationResult<T>(cacheKey: string, result: ValidationResult
  * @deprecated Use validateRepoNameWithResult for better error handling
  */
 export function validateRepoName(name: string): boolean {
-  const result = validateRepoNameWithResult(name);
-  return result.valid;
+  if (!name || typeof name !== 'string') {
+    return false;
+  }
+  
+  // Check length - minimum 2 characters
+  if (name.length < 2 || name.length > 100) {
+    return false;
+  }
+  
+  // Cannot start or end with a dot
+  if (name.startsWith('.') || name.endsWith('.')) {
+    return false;
+  }
+  
+  // Cannot contain consecutive dots
+  if (name.includes('..')) {
+    return false;
+  }
+  
+  // Only allow alphanumeric, hyphen, underscore, and dot
+  const validPattern = /^[a-zA-Z0-9._-]+$/;
+  return validPattern.test(name);
 }
 
 /**
@@ -507,8 +529,8 @@ export function validateOwnerName(name: string): boolean {
     return false;
   }
   
-  // Check length
-  if (name.length === 0 || name.length > 39) {
+  // Check length - minimum 2 characters, maximum 39
+  if (name.length < 2 || name.length > 39) {
     return false;
   }
   
@@ -546,16 +568,16 @@ export function validateFilePath(path: string): string | null {
     return null;
   }
   
-  // Remove leading slashes to ensure relative path
-  sanitized = sanitized.replace(/^\/+/, '');
-  
-  // Prevent absolute Windows paths
-  if (/^[a-zA-Z]:/.test(sanitized)) {
+  // Reject absolute paths (Unix and Windows)
+  if (sanitized.startsWith('/') || /^[a-zA-Z]:/.test(sanitized)) {
     return null;
   }
   
   // Normalize multiple slashes
   sanitized = sanitized.replace(/\/+/g, '/');
+  
+  // Remove trailing slashes
+  sanitized = sanitized.replace(/\/$/, '');
   
   // Maximum path length (GitHub's limit)
   if (sanitized.length > 255) {
@@ -734,15 +756,51 @@ interface TokenValidationResult {
 }
 
 /**
+ * Legacy GitHub token validation function (boolean return)
+ * @deprecated Use validateGitHubTokenWithResult for better error handling
+ */
+export function validateGitHubToken(token: string): boolean {
+  if (shouldBypassValidation()) {
+    return true;
+  }
+  
+  if (!token || typeof token !== 'string') {
+    return false;
+  }
+  
+  // Check for known token formats
+  const format = TOKEN_FORMATS.find(fmt => {
+    if (fmt.prefix === '') {
+      // Legacy format - only match if no other prefixes match AND it looks like hex
+      const hasKnownPrefix = TOKEN_FORMATS.some(otherFmt => 
+        otherFmt.prefix !== '' && token.startsWith(otherFmt.prefix)
+      );
+      if (hasKnownPrefix) return false;
+      
+      // For legacy format, also check that it's the right length and looks like hex
+      return token.length === 40 && /^[a-f0-9]{40}$/i.test(token);
+    }
+    return token.startsWith(fmt.prefix);
+  });
+  
+  if (!format) {
+    return false;
+  }
+  
+  // Check length constraints
+  return token.length >= format.minLength && token.length <= format.maxLength;
+}
+
+/**
  * Validates a GitHub token format with configurable strictness
  * @param token - The token to validate
  * @param level - Validation level (defaults to MODERATE for backward compatibility)
- * @returns Token validation result
+ * @returns Token validation result or format type string for backward compatibility
  */
 export function validateGitHubTokenFormat(
   token: string,
   level: ValidationLevel = ValidationLevel.MODERATE
-): TokenValidationResult {
+): TokenValidationResult | string {
   if (!token || typeof token !== 'string') {
     return {
       isValid: false,
@@ -752,9 +810,13 @@ export function validateGitHubTokenFormat(
 
   // LENIENT: Only check if token is non-empty
   if (level === ValidationLevel.LENIENT) {
+    const isValid = token.trim().length > 0;
+    if (isValid && token.length === 40 && /^[a-f0-9]{40}$/i.test(token)) {
+      return 'legacy';
+    }
     return {
-      isValid: token.trim().length > 0,
-      error: token.trim().length === 0 ? 'Token cannot be empty' : undefined
+      isValid,
+      error: !isValid ? 'Token cannot be empty' : undefined
     };
   }
 
@@ -791,6 +853,38 @@ export function validateGitHubTokenFormat(
 
   // MODERATE: Only check prefix and length
   if (level === ValidationLevel.MODERATE) {
+    // Return format type for backward compatibility
+    if (format.prefix === 'ghp_') {
+      return {
+        isValid: true,
+        format: 'classic_pat'
+      };
+    }
+    if (format.prefix === 'gho_') {
+      return {
+        isValid: true,
+        format: 'oauth'
+      };
+    }
+    if (format.prefix === 'github_pat_') {
+      return {
+        isValid: true,
+        format: 'fine_grained_pat'
+      };
+    }
+    if (format.prefix === 'ghi_') {
+      return {
+        isValid: true,
+        format: 'installation'
+      };
+    }
+    if (format.prefix === '') {
+      return {
+        isValid: true,
+        format: 'legacy'
+      };
+    }
+    
     return {
       isValid: true,
       format
@@ -812,13 +906,7 @@ export function validateGitHubTokenFormat(
   };
 }
 
-/**
- * Validates a GitHub Personal Access Token format (legacy boolean version)
- * @deprecated Use validateGitHubTokenWithResult or validateGitHubTokenFormat for better error handling
- */
-export function validateGitHubToken(token: string): boolean {
-  return validateGitHubTokenFormat(token, ValidationLevel.MODERATE).isValid;
-}
+
 
 /**
  * Validates a GitHub Personal Access Token format with detailed error reporting
@@ -826,154 +914,74 @@ export function validateGitHubToken(token: string): boolean {
  * - Must be the correct length for the token type
  * - Must contain only valid characters
  */
-export function validateGitHubTokenWithResult(token: string): ValidationResult<string> {
-  // Development mode bypass
-  if (shouldBypassValidation()) {
-    return createSuccessResult(token, [
-      createValidationWarning('DEV_BYPASS', 'Token validation bypassed in development mode', 'githubToken')
-    ], ['Set NODE_ENV=production to enable full token validation']);
-  }
-
-  // Check cache first (short TTL for security)
-  const cacheKey = `github-token:${token ? token.substring(0, 8) : 'null'}:${token ? token.length : 0}`;
-  const cached = getCachedValidationResult<string>(cacheKey);
-  if (cached) {
-    return cached;
-  }
-
+/**
+ * Validates a GitHub token with detailed result information
+ * @param token - The token to validate
+ * @param level - Validation level (defaults to MODERATE)
+ * @returns Detailed validation result with errors and warnings
+ */
+export function validateGitHubTokenWithResult(
+  token: string,
+  level: ValidationLevel = ValidationLevel.MODERATE
+): ValidationResult<string> {
   const errors: ValidationErrorDetail[] = [];
   const warnings: ValidationWarning[] = [];
-  const suggestions: string[] = [
-    'Create a new token at: https://github.com/settings/tokens',
-    'Required scopes: repo, workflow, user, notifications'
-  ];
-
-  if (!token || typeof token !== 'string') {
-    const result = createErrorResult<string>([
-      createValidationError(
-        'MISSING_TOKEN',
-        'GitHub token is required',
-        'githubToken',
-        'error',
-        false,
-        'Set GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN environment variable'
-      )
-    ], [], suggestions);
-    setCachedValidationResult(cacheKey, result, 10000); // Short cache for security
-    return result;
-  }
-
-  // Remove whitespace that might be accidentally included
-  const trimmedToken = token.trim();
-  if (trimmedToken !== token) {
-    warnings.push(createValidationWarning(
-      'WHITESPACE_DETECTED',
-      'Token contains leading or trailing whitespace',
-      'githubToken',
-      'Remove any spaces from the token'
-    ));
-  }
-
-  const cleanToken = trimmedToken;
-
-  // Use the new flexible validation approach
-  const formatResult = validateGitHubTokenFormat(cleanToken, ValidationLevel.MODERATE);
   
-  if (!formatResult.isValid) {
-    // Map format validation errors to ValidationError format
-    if (formatResult.error?.includes('too short')) {
-      errors.push(createValidationError(
-        'TOKEN_TOO_SHORT',
-        'Token is too short to be valid',
-        'githubToken',
-        'error',
-        false,
-        'GitHub tokens are at least 40 characters long'
-      ));
-    } else if (formatResult.error?.includes('Unrecognized token format')) {
-      // Check for common issues
-      if (cleanToken.startsWith('github_pat_')) {
-        // Fine-grained PAT - now supported
-        if (cleanToken.length < 82) {
-          errors.push(createValidationError(
-            'INVALID_TOKEN_LENGTH',
-            `Fine-grained Personal Access Token should be at least 82 characters, got ${cleanToken.length}`,
-            'githubToken',
-            'error',
-            false,
-            'Verify the complete token was copied'
-          ));
-        }
-      } else if (cleanToken.includes(' ') || cleanToken.includes('\n') || cleanToken.includes('\t')) {
-        errors.push(createValidationError(
-          'TOKEN_CONTAINS_WHITESPACE',
-          'Token contains spaces or line breaks',
-          'githubToken',
-          'error',
-          false,
-          'Remove all whitespace from the token'
-        ));
-      } else if (cleanToken.length > 100) {
-        errors.push(createValidationError(
-          'TOKEN_TOO_LONG',
-          'Token is unusually long and likely invalid',
-          'githubToken',
-          'error',
-          false,
-          'GitHub tokens are typically 40-100 characters'
-        ));
-      } else {
-        errors.push(createValidationError(
-          'UNRECOGNIZED_TOKEN_FORMAT',
-          formatResult.error || 'Token format not recognized',
-          'githubToken',
-          'error',
-          false,
-          'Ensure you copied the complete token from GitHub settings'
-        ));
-      }
-    } else {
-      // Generic format error
-      errors.push(createValidationError(
-        'INVALID_TOKEN_FORMAT',
-        formatResult.error || 'Invalid token format',
-        'githubToken',
-        'error',
-        false,
-        'Check token format and length'
-      ));
-    }
-  } else if (formatResult.format) {
-    // Add warnings for specific token types
-    if (formatResult.format.description.includes('Legacy')) {
-      warnings.push(createValidationWarning(
-        'LEGACY_TOKEN_FORMAT',
-        'Using legacy token format (40-character hex)',
-        'githubToken',
-        'Consider creating a new Personal Access Token with ghp_ prefix for better security'
-      ));
-    }
-  }
-
-  // Additional security warnings
-  const nodeEnv = typeof process !== 'undefined' && process.env ? process.env.NODE_ENV : undefined;
-  if (cleanToken.length > 0 && !nodeEnv) {
+  // Early bypass for development mode
+  if (shouldBypassValidation()) {
     warnings.push(createValidationWarning(
-      'NODE_ENV_NOT_SET',
-      'NODE_ENV environment variable not set',
-      'environment',
-      'Set NODE_ENV=production for production deployments'
+      'DEV_BYPASS',
+      'Validation bypassed in development mode',
+      'githubToken',
+      'Only use this in development environments'
+    ));
+    return createSuccessResult(token, warnings);
+  }
+  
+  // Check for missing token
+  if (!token || typeof token !== 'string') {
+    errors.push(createValidationError(
+      'MISSING_TOKEN',
+      'GitHub token is required',
+      'githubToken',
+      'error',
+      true,
+      'Provide a valid GitHub Personal Access Token'
+    ));
+    return createErrorResult(errors, warnings, ['Create a token at https://github.com/settings/tokens']);
+  }
+  
+  // Check for whitespace
+  const hasWhitespace = token.trim() !== token || token.includes(' ') || token.includes('\n') || token.includes('\t');
+  if (hasWhitespace) {
+    errors.push(createValidationError(
+      'TOKEN_CONTAINS_WHITESPACE',
+      'Token contains whitespace characters',
+      'githubToken',
+      'error',
+      true,
+      'Remove any spaces, tabs, or newlines from the token'
     ));
   }
-
-  const result = errors.length > 0 
-    ? createErrorResult<string>(errors, warnings, suggestions)
-    : createSuccessResult(cleanToken, warnings, suggestions);
-
-  // Cache results briefly for security
-  setCachedValidationResult(cacheKey, result, 10000); // 10 seconds
-
-  return result;
+  
+  // Validate token format
+  const formatResult = validateGitHubTokenFormat(token, level);
+  if (typeof formatResult === 'object' && !formatResult.isValid) {
+    errors.push(createValidationError(
+      'INVALID_TOKEN_FORMAT',
+      formatResult.error || 'Invalid token format',
+      'githubToken',
+      'error',
+      true,
+      'Ensure the token follows GitHub\'s format requirements'
+    ));
+  }
+  
+  if (errors.length > 0) {
+    return createErrorResult(errors, warnings, ['Check your token format and try again']);
+  }
+  
+  return createSuccessResult(token, warnings);
 }
 
 /**
@@ -1003,13 +1011,13 @@ export async function validateGitHubTokenWithAPI(
   }
 
   // Check for fetch API availability
-  if (typeof fetch === 'undefined') {
+  if (typeof fetch === 'undefined' && typeof global !== 'undefined' && !global.fetch) {
     return createErrorResult<{ token: string; user: any }>([createValidationError(
-      'FETCH_UNAVAILABLE',
+      'FETCH_NOT_AVAILABLE',
       'Fetch API not available in this environment',
       'githubToken',
       'error',
-      false,
+      true,
       'API validation requires fetch support (Node.js 18+ or modern browser)'
     )]);
   }
@@ -1594,12 +1602,230 @@ export function getValidationStats(): {
 }
 
 /**
+ * Validates a branch name according to Git naming rules
+ * - Cannot be empty or too long
+ * - Cannot contain certain characters
+ * - Cannot start with a dot or dash
+ * - Cannot end with .lock
+ * - Cannot contain consecutive dots or @{
+ */
+export function validateBranchName(branch: string): boolean {
+  if (!branch || typeof branch !== 'string') {
+    return false;
+  }
+  
+  // Cannot be empty or too long
+  if (branch.length === 0 || branch.length > 255) {
+    return false;
+  }
+  
+  // Cannot contain certain characters
+  const invalidChars = ['~', '^', ':', '\\', ' ', '\t', '\n', '?', '*', '['];
+  for (const char of invalidChars) {
+    if (branch.includes(char)) {
+      return false;
+    }
+  }
+  
+  // Cannot start or end with a dot or dash
+  if (branch.startsWith('.') || branch.startsWith('-') || branch.endsWith('.')) {
+    return false;
+  }
+  
+  // Cannot end with .lock
+  if (branch.endsWith('.lock')) {
+    return false;
+  }
+  
+  // Cannot contain consecutive dots or @{
+  if (branch.includes('..') || branch.includes('@{')) {
+    return false;
+  }
+  
+  return true;
+}
+
+/**
+ * Validates a SHA hash (40-character hex string)
+ */
+export function validateSHA(sha: string): boolean {
+  if (!sha || typeof sha !== 'string') {
+    return false;
+  }
+  
+  // Must be exactly 40 hex characters
+  const shaPattern = /^[a-f0-9]{40}$/i;
+  return shaPattern.test(sha);
+}
+
+/**
+ * Validates a URL for security
+ * - Must be HTTP/HTTPS
+ * - Cannot contain authentication
+ * - Cannot point to private IP ranges
+ */
+export function validateURL(url: string): boolean {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+  
+  try {
+    const parsed = new URL(url);
+    
+    // Only allow HTTP/HTTPS
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return false;
+    }
+    
+    // No authentication in URL
+    if (parsed.username || parsed.password) {
+      return false;
+    }
+    
+    const host = parsed.hostname.toLowerCase();
+    
+    // Disallow loopback and unspecified hosts
+    const disallowedHosts = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0']);
+    if (disallowedHosts.has(host)) {
+      return false;
+    }
+    
+    // Disallow private IP ranges
+    const isIpv4 = /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
+    if (isIpv4) {
+      const parts = host.split('.').map(Number);
+      const [a, b = 0] = parts;
+      // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16
+      const isPrivate =
+        a === 10 ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168) ||
+        (a === 169 && b === 254);
+      if (isPrivate) {
+        return false;
+      }
+    }
+    
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validates an issue number
+ */
+export function validateIssueNumber(issueNumber: number): boolean {
+  return Number.isInteger(issueNumber) && issueNumber > 0;
+}
+
+/**
+ * Validates per_page parameter for pagination
+ */
+export function validatePerPage(perPage: number): boolean {
+  return Number.isInteger(perPage) && perPage >= 1 && perPage <= 100;
+}
+
+/**
+ * Validates a search query
+ */
+export function validateSearchQuery(query: string): boolean {
+  if (!query || typeof query !== 'string') {
+    return false;
+  }
+  
+  const trimmed = query.trim();
+  return trimmed.length > 0 && trimmed.length <= 256;
+}
+
+/**
+ * Validates a workflow file name
+ */
+export function validateWorkflowFileName(filename: string): boolean {
+  if (!filename || typeof filename !== 'string') {
+    return false;
+  }
+  
+  // Must end with .yml or .yaml
+  if (!filename.endsWith('.yml') && !filename.endsWith('.yaml')) {
+    return false;
+  }
+  
+  // Must be a valid file path
+  const sanitized = validateFilePath(filename);
+  return sanitized !== null;
+}
+
+/**
+ * Validates environment variables (legacy version)
+ */
+export function validateEnvironment(env: Record<string, string>): ValidationResult<Record<string, string>> {
+  const result = validateEnvironmentConfigurationWithResult();
+  return result;
+}
+
+/**
+ * Validates git operations for security
+ */
+export function validateGitOperation(operation: string): boolean {
+  if (!operation || typeof operation !== 'string') {
+    return false;
+  }
+  
+  const safeOperations = [
+    'status', 'log', 'diff', 'branch', 'show', 'ls-files',
+    'rev-parse', 'describe', 'tag', 'remote', 'config'
+  ];
+  
+  const dangerousPatterns = [
+    '--force', '--hard', 'rm -rf', 'clean -f', '--exec=',
+    'push --force', 'reset --hard'
+  ];
+  
+  // Check if operation contains dangerous patterns
+  for (const pattern of dangerousPatterns) {
+    if (operation.includes(pattern)) {
+      return false;
+    }
+  }
+  
+  // Check if it's a safe operation
+  const baseOperation = operation.split(' ')[0];
+  return safeOperations.includes(baseOperation);
+}
+
+/**
+ * Validates command options for security
+ */
+export function validateCommandOptions(options: string): boolean {
+  if (!options || typeof options !== 'string') {
+    return true; // Empty options are safe
+  }
+  
+  const dangerousOptions = [
+    '--force', '--exec=', '--upload-pack=', '--receive-pack=',
+    '--config=', '--work-tree=', '--git-dir='
+  ];
+  
+  for (const dangerous of dangerousOptions) {
+    if (options.includes(dangerous)) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+/**
  * Creates a validation error with consistent format
  * This class maintains backward compatibility with existing code
  */
 export class ValidationError extends Error {
+  public field: string;
+  
   constructor(field: string, message: string) {
-    super(`Validation failed for ${field}: ${message}`);
+    super(message);
     this.name = 'ValidationError';
+    this.field = field;
   }
 }

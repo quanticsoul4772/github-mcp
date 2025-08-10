@@ -108,12 +108,16 @@ export class GitHubMCPServer {
       logger.error('Environment configuration validation failed', { 
         errors: envValidation.errors 
       });
-      console.error('ERROR: Environment configuration validation failed:');
-      envValidation.errors.forEach(error => console.error(`  - ${error}`));
-      console.error('Please check your environment variables and try again.');
-      console.error('Create a GitHub Personal Access Token at: https://github.com/settings/tokens');
-      console.error('Required scopes: repo, workflow, user, notifications');
-      process.exit(1);
+      
+      // Don't exit in test environment
+      if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+        console.error('ERROR: Environment configuration validation failed:');
+        envValidation.errors.forEach(error => console.error(`  - ${error}`));
+        console.error('Please check your environment variables and try again.');
+        console.error('Create a GitHub Personal Access Token at: https://github.com/settings/tokens');
+        console.error('Required scopes: repo, workflow, user, notifications');
+        process.exit(1);
+      }
     }
 
     // Get token from environment configuration
@@ -659,7 +663,10 @@ export class GitHubMCPServer {
     } catch (error) {
       logger.error('Failed to start GitHub MCP server', { error });
       console.error('Failed to start server:', error);
-      process.exit(1);
+      if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+        process.exit(1);
+      }
+      throw error;
     }
   }
 }
@@ -672,6 +679,8 @@ export class GitHubMCPServer {
   } catch (error) {
     logger.error('Failed to start GitHub MCP server', { error });
     console.error('Failed to start GitHub MCP server:', error);
-    process.exit(1);
+    if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+      process.exit(1);
+    }
   }
 })();
