@@ -20,6 +20,10 @@ import { createNotificationTools } from './tools/notifications.js';
 import { createDiscussionTools } from './tools/discussions.js';
 import { createDependabotTools } from './tools/dependabot.js';
 import { createSecretScanningTools } from './tools/secret-scanning.js';
+import { createRepositoryInsightsTools } from './tools/repository-insights.js';
+import { createAdvancedSearchTools } from './tools/advanced-search.js';
+import { createProjectManagementTools } from './tools/project-management.js';
+import { createBatchOperationsTools } from './tools/batch-operations.js';
 import { createOptimizedRepositoryTools } from './tools/optimized-repositories.js';
 import { validateEnvironmentConfiguration } from './validation.js';
 
@@ -63,6 +67,10 @@ const DEFAULT_TOOLSETS = [
   'discussions',
   'dependabot',
   'secret_protection',
+  'graphql_insights',
+  'advanced_search',
+  'project_management',
+  'batch_operations',
   'monitoring',
 ];
 
@@ -562,6 +570,34 @@ class GitHubMCPServer {
       const secretScanningTools = createSecretScanningTools(this.octokit, this.readOnly);
       secretScanningTools.forEach(tool => this.registerTool(tool));
       console.log(`  ✓ Secret Scanning tools (${secretScanningTools.length})`);
+    }
+
+    // GraphQL repository insights tools
+    if (this.enabledToolsets.has('graphql_insights')) {
+      const insightsTools = createRepositoryInsightsTools(this.octokit, this.readOnly);
+      insightsTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Repository Insights tools (${insightsTools.length})`);
+    }
+
+    // Advanced search tools
+    if (this.enabledToolsets.has('advanced_search')) {
+      const advancedSearchTools = createAdvancedSearchTools(this.octokit, this.readOnly);
+      advancedSearchTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Advanced Search tools (${advancedSearchTools.length})`);
+    }
+
+    // Project management tools
+    if (this.enabledToolsets.has('project_management')) {
+      const projectTools = createProjectManagementTools(this.octokit, this.readOnly);
+      projectTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Project Management tools (${projectTools.length})`);
+    }
+
+    // Batch operations tools
+    if (this.enabledToolsets.has('batch_operations')) {
+      const batchTools = createBatchOperationsTools(this.octokit, this.readOnly);
+      batchTools.forEach(tool => this.registerTool(tool));
+      console.log(`  ✓ Batch Operations tools (${batchTools.length})`);
     }
 
     // Register health monitoring tools
