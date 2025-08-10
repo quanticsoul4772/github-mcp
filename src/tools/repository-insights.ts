@@ -1,7 +1,12 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import { OptimizedAPIClient } from '../optimized-api-client.js';
+import { cachedGraphQL, GraphQLTTL } from '../graphql-utils.js';
 
-export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
+export function createRepositoryInsightsTools(
+  client: Octokit | OptimizedAPIClient, 
+  readOnly: boolean
+): ToolConfig[] {
   const tools: ToolConfig[] = [];
 
   // Get repository statistics tool
@@ -84,9 +89,12 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await cachedGraphQL(client, query, {
         owner: args.owner,
         repo: args.repo,
+      }, {
+        ttl: GraphQLTTL.REPOSITORY_INSIGHTS,
+        operation: 'get_repository_insights'
       });
 
       const repository = result.repository;
@@ -198,10 +206,13 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await cachedGraphQL(client, query, {
         owner: args.owner,
         repo: args.repo,
         first: args.first || 25,
+      }, {
+        ttl: GraphQLTTL.CONTRIBUTORS,
+        operation: 'get_contribution_stats'
       });
 
       const repository = result.repository;
@@ -331,12 +342,15 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await cachedGraphQL(client, query, {
         owner: args.owner,
         repo: args.repo,
         branch: args.branch,
         since: args.since,
         until: args.until,
+      }, {
+        ttl: GraphQLTTL.COMMIT_ACTIVITY,
+        operation: 'get_commit_activity'
       });
 
       const repository = result.repository;

@@ -1,5 +1,7 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import { OptimizedAPIClient } from '../optimized-api-client.js';
+import { cachedGraphQL, smartGraphQL, GraphQLTTL } from '../graphql-utils.js';
 
 interface ListDiscussionsParams {
   owner: string;
@@ -60,7 +62,10 @@ interface DeleteDiscussionParams {
   discussionId: string;
 }
 
-export function createDiscussionTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
+export function createDiscussionTools(
+  client: Octokit | OptimizedAPIClient, 
+  readOnly: boolean
+): ToolConfig[] {
   const tools: ToolConfig[] = [];
 
   // Note: GitHub Discussions are accessed through GraphQL API
@@ -136,12 +141,15 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await cachedGraphQL(client, query, {
         owner: args.owner,
         repo: args.repo,
         first: args.perPage || 25,
         after: args.after,
         categoryId: args.category,
+      }, {
+        ttl: GraphQLTTL.DISCUSSIONS_LIST,
+        operation: 'list_discussions'
       });
 
       return {
@@ -221,10 +229,13 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await cachedGraphQL(client, query, {
         owner: args.owner,
         repo: args.repo,
         number: args.discussionNumber,
+      }, {
+        ttl: GraphQLTTL.DISCUSSION_DETAIL,
+        operation: 'get_discussion'
       });
 
       return result.repository.discussion;
@@ -309,12 +320,15 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await cachedGraphQL(client, query, {
         owner: args.owner,
         repo: args.repo,
         number: args.discussionNumber,
         first: args.perPage || 25,
         after: args.after,
+      }, {
+        ttl: GraphQLTTL.DISCUSSION_COMMENTS,
+        operation: 'get_discussion_comments'
       });
 
       return {
@@ -367,9 +381,12 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await cachedGraphQL(client, query, {
         owner: args.owner,
         repo: args.repo,
+      }, {
+        ttl: GraphQLTTL.DISCUSSION_CATEGORIES,
+        operation: 'list_discussion_categories'
       });
 
       return {
@@ -443,9 +460,12 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await cachedGraphQL(client, query, {
         searchQuery,
         first: args.first || 25,
+      }, {
+        ttl: GraphQLTTL.SEARCH_RESULTS,
+        operation: 'search_discussions'
       });
 
       return {
@@ -499,9 +519,12 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           }
         `;
 
-        const repoResult: any = await octokit.graphql(repoQuery, {
+        const repoResult: any = await cachedGraphQL(client, repoQuery, {
           owner: args.owner,
           repo: args.repo,
+        }, {
+          ttl: GraphQLTTL.REPOSITORY_INFO,
+          operation: 'get_repository_id'
         });
 
         const mutation = `
@@ -530,11 +553,14 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           }
         `;
 
-        const result: any = await octokit.graphql(mutation, {
+        const result: any = await smartGraphQL(client, mutation, {
           repositoryId: repoResult.repository.id,
           title: args.title,
           body: args.body,
           categoryId: args.categoryId,
+        }, {
+          isMutation: true,
+          operation: 'create_discussion'
         });
 
         return result.createDiscussion.discussion;
@@ -585,10 +611,13 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           }
         `;
 
-        const result: any = await octokit.graphql(mutation, {
+        const result: any = await smartGraphQL(client, mutation, {
           discussionId: args.discussionId,
           body: args.body,
           replyToId: args.replyToId,
+        }, {
+          isMutation: true,
+          operation: 'add_discussion_comment'
         });
 
         return result.addDiscussionComment.comment;
@@ -646,11 +675,14 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           }
         `;
 
-        const result: any = await octokit.graphql(mutation, {
+        const result: any = await smartGraphQL(client, mutation, {
           discussionId: args.discussionId,
           title: args.title,
           body: args.body,
           categoryId: args.categoryId,
+        }, {
+          isMutation: true,
+          operation: 'update_discussion'
         });
 
         return result.updateDiscussion.discussion;
@@ -684,8 +716,11 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           }
         `;
 
-        await octokit.graphql(mutation, {
+        await smartGraphQL(client, mutation, {
           discussionId: args.discussionId,
+        }, {
+          isMutation: true,
+          operation: 'delete_discussion'
         });
 
         return {

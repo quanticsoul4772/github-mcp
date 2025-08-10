@@ -25,6 +25,7 @@ import { createAdvancedSearchTools } from './tools/advanced-search.js';
 import { createProjectManagementTools } from './tools/project-management.js';
 import { createBatchOperationsTools } from './tools/batch-operations.js';
 import { createOptimizedRepositoryTools } from './tools/optimized-repositories.js';
+import { createCacheManagementTools } from './tools/cache-management.js';
 import { validateEnvironmentConfiguration } from './validation.js';
 
 // Performance optimizations
@@ -179,6 +180,7 @@ class GitHubMCPServer {
     this.optimizedClient = new OptimizedAPIClient({
       octokit: this.octokit,
       enableCache: process.env.GITHUB_ENABLE_CACHE !== 'false',
+      enableGraphQLCache: process.env.GITHUB_ENABLE_GRAPHQL_CACHE !== 'false',
       enableDeduplication: process.env.GITHUB_ENABLE_DEDUPLICATION !== 'false',
       enablePerformanceMonitoring: process.env.GITHUB_ENABLE_MONITORING !== 'false',
     });
@@ -553,7 +555,7 @@ class GitHubMCPServer {
 
     // Register discussion tools
     if (this.enabledToolsets.has('discussions')) {
-      const discussionTools = createDiscussionTools(this.octokit, this.readOnly);
+      const discussionTools = createDiscussionTools(this.optimizedClient, this.readOnly);
       discussionTools.forEach(tool => this.registerTool(tool));
       console.log(`  ✓ Discussion tools (${discussionTools.length})`);
     }
@@ -574,7 +576,7 @@ class GitHubMCPServer {
 
     // GraphQL repository insights tools
     if (this.enabledToolsets.has('graphql_insights')) {
-      const insightsTools = createRepositoryInsightsTools(this.octokit, this.readOnly);
+      const insightsTools = createRepositoryInsightsTools(this.optimizedClient, this.readOnly);
       insightsTools.forEach(tool => this.registerTool(tool));
       console.log(`  ✓ Repository Insights tools (${insightsTools.length})`);
     }
@@ -604,6 +606,11 @@ class GitHubMCPServer {
     const healthTools = createHealthTools(this.healthManager);
     healthTools.forEach(tool => this.registerTool(tool));
     console.log(`  ✓ Health monitoring tools (${healthTools.length})`);
+
+    // Register cache management tools
+    const cacheManagementTools = createCacheManagementTools(this.optimizedClient);
+    cacheManagementTools.forEach(tool => this.registerTool(tool));
+    console.log(`  ✓ Cache management tools (${cacheManagementTools.length})`);
 
     // Register monitoring and observability tools
     if (this.enabledToolsets.has('monitoring')) {
