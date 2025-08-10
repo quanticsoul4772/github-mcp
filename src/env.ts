@@ -50,7 +50,7 @@ export const env = (() => {
     console.error('❌ Environment validation failed:');
     
     if (error instanceof z.ZodError) {
-      error.errors.forEach((err: any) => {
+      error.issues.forEach((err: any) => {
         console.error(`  - ${err.path.join('.')}: ${err.message}`);
       });
       

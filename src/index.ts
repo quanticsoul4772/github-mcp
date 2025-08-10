@@ -48,9 +48,6 @@ import { formatErrorResponse } from './errors.js';
 // Monitoring and observability
 import { metrics } from './metrics.js';
 import { logger } from './logger.js';
-import { createHealthEndpoints } from './health-endpoints.js';
-import { HealthMonitor } from './health.js';
-import { createMonitoringTools } from './tools/monitoring.js';
 
 // Server configuration
 const SERVER_NAME = 'github-mcp';
@@ -83,8 +80,6 @@ export class GitHubMCPServer {
   private reliabilityManager: ReliabilityManager;
   /** Health manager for system monitoring */
   private healthManager: HealthManager;
-  /** Health monitor for observability */
-  private healthMonitor: HealthMonitor;
 
   /**
    * Initialize the GitHub MCP Server
@@ -163,8 +158,7 @@ export class GitHubMCPServer {
     });
 
     // Initialize health monitor
-    this.healthMonitor = HealthMonitor.getInstance();
-    this.healthMonitor.setOctokit(this.octokit);
+    this.healthManager = new HealthManager();
 
     // Initialize optimized API client
     this.optimizedClient = new OptimizedAPIClient({
@@ -591,14 +585,10 @@ export class GitHubMCPServer {
 
     // Register monitoring and observability tools
     if (this.enabledToolsets.has('monitoring')) {
-      const monitoringTools = createMonitoringTools(this.healthMonitor, metrics);
-      monitoringTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Monitoring tools (${monitoringTools.length})`);
-
-      // Register health endpoints
-      const healthEndpoints = createHealthEndpoints(this.healthMonitor);
-      healthEndpoints.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Health endpoints (${healthEndpoints.length})`);
+      // Register health tools
+      const healthTools = createHealthTools(this.healthManager);
+      healthTools.forEach((tool: any) => this.registerTool(tool));
+      console.log(`  ✓ Health tools (${healthTools.length})`);
     }
 
     // Register performance monitoring tools
