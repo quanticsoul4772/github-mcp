@@ -1,5 +1,7 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import { typedGraphQL, createTypedHandler } from '../graphql-utils.js';
+import { RepositoryInsightsResponse, ContributionStatsResponse, CommitActivityResponse } from '../graphql-types.js';
 
 export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
@@ -28,7 +30,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: any) => {
+    handler: createTypedHandler<{owner: string, repo: string, since?: string}, any>(async (args: {owner: string, repo: string, since?: string}) => {
       const query = `
         query($owner: String!, $repo: String!) {
           repository(owner: $owner, name: $repo) {
@@ -84,7 +86,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result = await typedGraphQL<RepositoryInsightsResponse>(octokit, query, {
         owner: args.owner,
         repo: args.repo,
       });
@@ -123,7 +125,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
           visibility: repository.visibility,
         },
       };
-    },
+    }),
   });
 
   // Get contribution statistics tool
