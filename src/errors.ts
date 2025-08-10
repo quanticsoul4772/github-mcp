@@ -11,11 +11,11 @@ import { metrics } from './metrics.js';
  */
 export class GitHubMCPError extends Error {
   public readonly code: string;
-  public readonly statusCode?: number;
-  public readonly context?: Record<string, any>;
+  public readonly statusCode?: number | undefined;
+  public readonly context?: Record<string, any> | undefined;
   public readonly isRetryable: boolean;
-  public readonly originalError?: Error;
-  public readonly correlationId?: string;
+  public readonly originalError?: Error | undefined;
+  public readonly correlationId?: string | undefined;
   public readonly timestamp: Date;
 
   constructor(
@@ -102,9 +102,9 @@ export class NotFoundError extends GitHubMCPError {
  * Rate limit error
  */
 export class RateLimitError extends GitHubMCPError {
-  public readonly resetTime?: Date;
-  public readonly limit?: number;
-  public readonly remaining?: number;
+  public readonly resetTime?: Date | undefined;
+  public readonly limit?: number | undefined;
+  public readonly remaining?: number | undefined;
 
   constructor(
     message: string,

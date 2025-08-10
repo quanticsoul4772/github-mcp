@@ -1,7 +1,7 @@
 /**
  * Test helper utilities
  */
-import { vi } from 'vitest';
+import { vi, expect } from 'vitest';
 
 /**
  * Mock process.exit to prevent tests from exiting
