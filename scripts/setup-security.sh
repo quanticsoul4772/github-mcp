@@ -126,6 +126,13 @@ parse_args() {
 }
 
 # Version comparison function
+# Compares two semantic versions to check if version1 >= version2
+# Works by:
+# 1. Printing both versions on separate lines
+# 2. Using sort -V (version sort) to sort them naturally 
+# 3. Taking the first (smallest) version
+# 4. Checking if it matches version2 (meaning version2 <= version1)
+# Returns: 0 if version1 >= version2, 1 otherwise
 version_ge() {
     local version1="$1"
     local version2="$2"
@@ -285,7 +292,8 @@ install_security_tools() {
     source "${VENV_DIR}/bin/activate"
     
     log "INFO" "Installing packages with hash verification..."
-    pip install --require-hashes --no-deps -r "$REQUIREMENTS_FILE" --quiet
+    # Install all dependencies with hash verification (no --no-deps since we have complete tree)
+    pip install --require-hashes -r "$REQUIREMENTS_FILE" --quiet
     
     # Verify installations
     log "INFO" "Verifying installations..."
