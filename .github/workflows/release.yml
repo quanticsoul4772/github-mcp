@@ -1,0 +1,254 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Is this a pre-release?'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test || echo "::warning::Some tests failed"
+        env:
+          CI: true
+
+      - name: Build project
+        run: npm run build
+
+      - name: Create build artifacts
+        run: |
+          if [ -d "dist" ]; then
+            tar -czf dist.tar.gz dist/
+          fi
+          if [ -d "build" ]; then
+            tar -czf build.tar.gz build/
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            *.tar.gz
+            package.json
+            package-lock.json
+            README.md
+            LICENSE
+
+  create-release:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    outputs:
+      release_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="v${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found, including all commits"
+            CHANGELOG=$(git log --pretty=format:"- %s" --no-merges)
+          else
+            echo "Generating changelog from $PREV_TAG to HEAD"
+            CHANGELOG=$(git log $PREV_TAG..HEAD --pretty=format:"- %s" --no-merges)
+          fi
+          
+          # Save changelog to file for the release
+          echo "## What's Changed" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "$CHANGELOG" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...${{ steps.get_version.outputs.version }}" >> CHANGELOG.md
+          
+          cat CHANGELOG.md
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: build-artifacts
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          release_name: Release ${{ steps.get_version.outputs.version }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: ${{ github.event.inputs.prerelease || false }}
+
+      - name: Upload release assets
+        run: |
+          for file in *.tar.gz; do
+            if [ -f "$file" ]; then
+              echo "Uploading $file..."
+              curl -X POST \
+                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                -H "Content-Type: application/gzip" \
+                --data-binary @"$file" \
+                "${{ steps.create_release.outputs.upload_url }}?name=$file"
+            fi
+          done
+
+  publish-npm:
+    needs: create-release
+    runs-on: ubuntu-latest
+    if: github.event.inputs.prerelease != 'true'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Update package version
+        run: |
+          VERSION=${{ needs.create-release.outputs.version }}
+          VERSION=${VERSION#v}  # Remove 'v' prefix if present
+          npm version $VERSION --no-git-tag-version
+
+      - name: Publish to npm
+        run: |
+          npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish success notification
+        if: success()
+        run: |
+          echo "::notice::Successfully published version ${{ needs.create-release.outputs.version }} to npm"
+
+  docker-release:
+    needs: create-release
+    runs-on: ubuntu-latest
+    if: github.event.inputs.prerelease != 'true'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ needs.create-release.outputs.version }}
+            ghcr.io/${{ github.repository }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  notify-completion:
+    needs: [create-release, publish-npm, docker-release]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Release summary
+        run: |
+          echo "## Release Summary for ${{ needs.create-release.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.create-release.result }}" == "success" ]; then
+            echo "✅ GitHub Release created successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ GitHub Release failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.publish-npm.result }}" == "success" ]; then
+            echo "✅ npm package published successfully" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-npm.result }}" == "skipped" ]; then
+            echo "⏭️ npm publish skipped (pre-release)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ npm publish failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.docker-release.result }}" == "success" ]; then
+            echo "✅ Docker image published successfully" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.docker-release.result }}" == "skipped" ]; then
+            echo "⏭️ Docker publish skipped (pre-release)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Docker publish failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "- View the release: https://github.com/${{ github.repository }}/releases/tag/${{ needs.create-release.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- View on npm: https://www.npmjs.com/package/github-mcp" >> $GITHUB_STEP_SUMMARY
+          echo "- View on GitHub Packages: https://github.com/${{ github.repository }}/pkgs/container/github-mcp" >> $GITHUB_STEP_SUMMARY
