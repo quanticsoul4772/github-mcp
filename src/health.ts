@@ -1,329 +1,293 @@
 /**
- * Health check and monitoring endpoints for GitHub MCP Server
- * 
- * Provides health, readiness, metrics, and status endpoints
- * for monitoring and observability.
+ * Health check and monitoring utilities for GitHub MCP Server
  */
 
-import { metrics } from './metrics.js';
-import { logger } from './logger.js';
 import { Octokit } from '@octokit/rest';
+import { GitHubMCPError } from './errors.js';
+import { ReliabilityManager } from './reliability.js';
 
-export interface HealthStatus {
-  status: 'healthy' | 'unhealthy' | 'degraded';
-  timestamp: string;
-  uptime: number;
-  version: string;
-}
+/**
+ * Health status levels
+ */
+export type HealthStatus = 'healthy' | 'degraded' | 'unhealthy';
 
-export interface ReadinessStatus {
-  ready: boolean;
-  timestamp: string;
-  checks: {
-    github: {
-      status: 'ok' | 'error';
-      message?: string;
-      responseTime?: number;
-    };
-    memory: {
-      status: 'ok' | 'warning' | 'critical';
-      usage: NodeJS.MemoryUsage;
-      usagePercent: number;
-    };
-    rateLimit: {
-      status: 'ok' | 'warning' | 'critical';
-      remaining: number;
-      resetTime: number;
-    };
-  };
-}
-
-export interface DetailedStatus {
-  health: HealthStatus;
-  readiness: ReadinessStatus;
-  metrics: {
-    apiCalls: ReturnType<typeof metrics.getApiCallStats>;
-    errors: ReturnType<typeof metrics.getErrorStats>;
-    memory: NodeJS.MemoryUsage;
-    rateLimit: ReturnType<typeof metrics.getRateLimitStatus>;
-  };
-  server: {
-    name: string;
-    version: string;
-    uptime: number;
-    startTime: string;
-    nodeVersion: string;
-    platform: string;
-    arch: string;
-  };
+/**
+ * Individual component health check result
+ */
+export interface ComponentHealth {
+  name: string;
+  status: HealthStatus;
+  message?: string;
+  metadata?: Record<string, any>;
+  lastChecked: string;
+  responseTime?: number;
 }
 
 /**
- * Health monitoring service
+ * Overall system health result
  */
-export class HealthMonitor {
-  private static instance: HealthMonitor;
-  private startTime: number;
-  private readonly serverName: string;
-  private readonly serverVersion: string;
-  private octokit?: Octokit;
+export interface SystemHealth {
+  status: HealthStatus;
+  timestamp: string;
+  uptime: number;
+  components: ComponentHealth[];
+  reliability?: Record<string, any>;
+  metadata?: Record<string, any>;
+}
 
-  private constructor() {
-    this.startTime = Date.now();
-    this.serverName = 'github-mcp';
-    this.serverVersion = '1.0.0';
-  }
+/**
+ * Health check manager
+ */
+export class HealthManager {
+  private startTime: Date = new Date();
+  private lastGitHubCheck?: ComponentHealth;
 
-  public static getInstance(): HealthMonitor {
-    if (!HealthMonitor.instance) {
-      HealthMonitor.instance = new HealthMonitor();
-    }
-    return HealthMonitor.instance;
-  }
-
-  /**
-   * Set the Octokit instance for GitHub API checks
-   */
-  public setOctokit(octokit: Octokit): void {
-    this.octokit = octokit;
-  }
+  constructor(
+    private octokit: Octokit,
+    private reliabilityManager?: ReliabilityManager
+  ) {}
 
   /**
-   * Get basic health status
+   * Perform comprehensive health check
    */
-  public async getHealth(): Promise<HealthStatus> {
-    const uptime = Date.now() - this.startTime;
-    const memory = process.memoryUsage();
+  async getSystemHealth(): Promise<SystemHealth> {
+    const components: ComponentHealth[] = [];
     
-    // Determine health status based on memory usage and error rates
-    let status: 'healthy' | 'unhealthy' | 'degraded' = 'healthy';
+    // Check GitHub API connectivity
+    const githubHealth = await this.checkGitHubAPI();
+    components.push(githubHealth);
+
+    // Check rate limiting status
+    const rateLimitHealth = await this.checkRateLimit();
+    components.push(rateLimitHealth);
+
+    // Determine overall status
+    const overallStatus = this.determineOverallStatus(components);
     
-    // Check memory usage (warn at 80%, critical at 90%)
-    const memoryUsagePercent = (memory.heapUsed / memory.heapTotal) * 100;
-    if (memoryUsagePercent > 90) {
-      status = 'unhealthy';
-    } else if (memoryUsagePercent > 80) {
-      status = 'degraded';
-    }
-
-    // Check error rates
-    const errorStats = metrics.getErrorStats();
-    const apiStats = metrics.getApiCallStats();
-    if (apiStats.total > 0 && apiStats.successRate < 0.9) {
-      status = status === 'unhealthy' ? 'unhealthy' : 'degraded';
-    }
-
-    return {
-      status,
+    const health: SystemHealth = {
+      status: overallStatus,
       timestamp: new Date().toISOString(),
-      uptime: Math.floor(uptime / 1000),
-      version: this.serverVersion,
-    };
-  }
-
-  /**
-   * Check if the service is ready to handle requests
-   */
-  public async getReadiness(): Promise<ReadinessStatus> {
-    const timestamp = new Date().toISOString();
-    const checks = {
-      github: await this.checkGitHubAPI(),
-      memory: this.checkMemoryUsage(),
-      rateLimit: this.checkRateLimit(),
-    };
-
-    const ready = Object.values(checks).every(check => 
-      check.status === 'ok' || check.status === 'warning'
-    );
-
-    return {
-      ready,
-      timestamp,
-      checks,
-    };
-  }
-
-  /**
-   * Get detailed server status
-   */
-  public async getDetailedStatus(): Promise<DetailedStatus> {
-    const [health, readiness] = await Promise.all([
-      this.getHealth(),
-      this.getReadiness(),
-    ]);
-
-    return {
-      health,
-      readiness,
-      metrics: {
-        apiCalls: metrics.getApiCallStats(),
-        errors: metrics.getErrorStats(),
-        memory: process.memoryUsage(),
-        rateLimit: metrics.getRateLimitStatus(),
-      },
-      server: {
-        name: this.serverName,
-        version: this.serverVersion,
-        uptime: Math.floor((Date.now() - this.startTime) / 1000),
-        startTime: new Date(this.startTime).toISOString(),
+      uptime: Date.now() - this.startTime.getTime(),
+      components,
+      metadata: {
         nodeVersion: process.version,
         platform: process.platform,
-        arch: process.arch,
+        memory: process.memoryUsage(),
+        pid: process.pid,
       },
     };
-  }
 
-  /**
-   * Get Prometheus metrics
-   */
-  public getMetrics(): string {
-    return metrics.exportPrometheusMetrics();
-  }
-
-  /**
-   * Check GitHub API connectivity and rate limits
-   */
-  private async checkGitHubAPI(): Promise<ReadinessStatus['checks']['github']> {
-    if (!this.octokit) {
-      return {
-        status: 'error',
-        message: 'GitHub client not initialized',
-      };
+    // Add reliability information if available
+    if (this.reliabilityManager) {
+      health.reliability = this.reliabilityManager.getHealthStatus();
     }
 
+    return health;
+  }
+
+  /**
+   * Quick health check (lightweight)
+   */
+  async getQuickHealth(): Promise<{ status: HealthStatus; timestamp: string; uptime: number }> {
+    // Use cached GitHub check if recent (< 30 seconds old)
+    const now = new Date();
+    const useCache = this.lastGitHubCheck && 
+      (now.getTime() - new Date(this.lastGitHubCheck.lastChecked).getTime()) < 30000;
+
+    let status: HealthStatus = 'healthy';
+    
+    if (!useCache) {
+      const githubHealth = await this.checkGitHubAPI();
+      if (githubHealth.status !== 'healthy') {
+        status = githubHealth.status;
+      }
+    } else if (this.lastGitHubCheck!.status !== 'healthy') {
+      status = this.lastGitHubCheck!.status;
+    }
+
+    return {
+      status,
+      timestamp: now.toISOString(),
+      uptime: now.getTime() - this.startTime.getTime(),
+    };
+  }
+
+  /**
+   * Check GitHub API connectivity and authentication
+   */
+  private async checkGitHubAPI(): Promise<ComponentHealth> {
+    const startTime = Date.now();
+    
     try {
-      const startTime = Date.now();
-      const response = await this.octokit.rest.meta.get();
-      const responseTime = Date.now() - startTime;
-
-      // Update rate limit metrics
-      const rateLimit = response.headers['x-ratelimit-remaining'];
-      const rateLimitReset = response.headers['x-ratelimit-reset'];
+      // Simple API call to check connectivity and auth
+      await this.octokit.rest.users.getAuthenticated();
       
-      if (rateLimit) {
-        metrics.setGauge('github_rate_limit_remaining', parseInt(rateLimit));
-      }
-      if (rateLimitReset) {
-        metrics.setGauge('github_rate_limit_reset_timestamp', parseInt(rateLimitReset));
-      }
-
-      return {
-        status: 'ok',
+      const responseTime = Date.now() - startTime;
+      const health: ComponentHealth = {
+        name: 'github_api',
+        status: 'healthy',
+        message: 'GitHub API is accessible and authenticated',
+        lastChecked: new Date().toISOString(),
         responseTime,
       };
+      
+      this.lastGitHubCheck = health;
+      return health;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('GitHub API health check failed', { error: errorMessage }, error instanceof Error ? error : undefined);
+      const responseTime = Date.now() - startTime;
+      let status: HealthStatus = 'unhealthy';
+      let message = 'GitHub API is not accessible';
+
+      if (error instanceof Error) {
+        const githubError = error as any;
+        const statusCode = typeof githubError?.status === 'number' ? githubError.status : undefined;
+        if (statusCode === 401) {
+          message = 'GitHub API authentication failed';
+        } else if (statusCode === 403) {
+          message = 'GitHub API access forbidden';
+          status = 'degraded'; // Might be rate limited but API is up
+        } else if (statusCode !== undefined && statusCode >= 500) {
+          message = 'GitHub API server error';
+        } else {
+          message = `GitHub API error: ${error.message}`;
+        }
+      }
+
+      const health: ComponentHealth = {
+        name: 'github_api',
+        status,
+        message,
+        lastChecked: new Date().toISOString(),
+        responseTime,
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+          statusCode: (error as any)?.status,
+        },
+      };
+
+      this.lastGitHubCheck = health;
+      return health;
+    }
+  }
+
+  /**
+   * Check GitHub API rate limiting status
+   */
+  private async checkRateLimit(): Promise<ComponentHealth> {
+    const startTime = Date.now();
+
+    try {
+      const response = await this.octokit.rest.rateLimit.get();
+      const responseTime = Date.now() - startTime;
+      
+      const core = response.data.rate;
+      const remaining = core.remaining;
+      const limit = core.limit;
+      const resetTime = new Date(core.reset * 1000);
+      
+      let status: HealthStatus = 'healthy';
+      let message = `Rate limit: ${remaining}/${limit} remaining`;
+
+      if (remaining === 0) {
+        status = 'degraded';
+        message = `Rate limit exhausted. Resets at ${resetTime.toISOString()}`;
+      } else if (remaining < limit * 0.1) { // Less than 10% remaining
+        status = 'degraded';
+        message = `Rate limit low: ${remaining}/${limit} remaining`;
+      }
+
+      return {
+        name: 'rate_limit',
+        status,
+        message,
+        lastChecked: new Date().toISOString(),
+        responseTime,
+        metadata: {
+          limit,
+          remaining,
+          resetTime: resetTime.toISOString(),
+          used: limit - remaining,
+          percentUsed: Math.round(((limit - remaining) / limit) * 100),
+        },
+      };
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
       
       return {
-        status: 'error',
-        message: errorMessage,
+        name: 'rate_limit',
+        status: 'unhealthy',
+        message: 'Failed to check rate limit status',
+        lastChecked: new Date().toISOString(),
+        responseTime,
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+        },
       };
     }
   }
 
   /**
-   * Check memory usage levels
+   * Determine overall system status from component statuses
    */
-  private checkMemoryUsage(): ReadinessStatus['checks']['memory'] {
-    const memory = process.memoryUsage();
-    const usagePercent = (memory.heapUsed / memory.heapTotal) * 100;
+  private determineOverallStatus(components: ComponentHealth[]): HealthStatus {
+    const statuses = components.map(c => c.status);
     
-    let status: 'ok' | 'warning' | 'critical';
-    if (usagePercent > 90) {
-      status = 'critical';
-    } else if (usagePercent > 80) {
-      status = 'warning';
-    } else {
-      status = 'ok';
+    if (statuses.some(s => s === 'unhealthy')) {
+      return 'unhealthy';
     }
-
-    return {
-      status,
-      usage: memory,
-      usagePercent,
-    };
+    
+    if (statuses.some(s => s === 'degraded')) {
+      return 'degraded';
+    }
+    
+    return 'healthy';
   }
 
   /**
-   * Check GitHub API rate limit status
+   * Get server uptime in milliseconds
    */
-  private checkRateLimit(): ReadinessStatus['checks']['rateLimit'] {
-    const rateLimit = metrics.getRateLimitStatus();
-    
-    let status: 'ok' | 'warning' | 'critical';
-    if (rateLimit.remaining < 100) {
-      status = 'critical';
-    } else if (rateLimit.remaining < 500) {
-      status = 'warning';
-    } else {
-      status = 'ok';
-    }
-
-    return {
-      status,
-      remaining: rateLimit.remaining,
-      resetTime: rateLimit.resetTimeRemaining,
-    };
+  getUptime(): number {
+    return Date.now() - this.startTime.getTime();
   }
 
   /**
-   * Start health monitoring alerts
+   * Get server startup time
    */
-  public startMonitoring(): void {
-    // Check health every minute
-    setInterval(async () => {
-      try {
-        const health = await this.getHealth();
-        
-        if (health.status === 'unhealthy') {
-          logger.error('Health check failed - server unhealthy', {
-            status: health.status,
-            uptime: health.uptime,
-          });
-        } else if (health.status === 'degraded') {
-          logger.warn('Health check warning - server degraded', {
-            status: health.status,
-            uptime: health.uptime,
-          });
-        }
-
-        const readiness = await this.getReadiness();
-        if (!readiness.ready) {
-          logger.error('Readiness check failed', {
-            checks: readiness.checks,
-          });
-        }
-
-        // Check for high error rates
-        const errorStats = metrics.getErrorStats();
-        const apiStats = metrics.getApiCallStats();
-        
-        if (apiStats.total > 10 && apiStats.successRate < 0.8) {
-          logger.error('High error rate detected', {
-            successRate: apiStats.successRate,
-            totalCalls: apiStats.total,
-            errorCount: apiStats.failed,
-          });
-        }
-
-        // Check rate limit warnings
-        const rateLimit = metrics.getRateLimitStatus();
-        if (rateLimit.remaining < 100) {
-          logger.warn('GitHub rate limit running low', {
-            remaining: rateLimit.remaining,
-            resetTimeRemaining: rateLimit.resetTimeRemaining,
-          });
-        }
-
-      } catch (error) {
-        logger.error('Health monitoring check failed', {}, error instanceof Error ? error : undefined);
-      }
-    }, 60 * 1000); // Every minute
-
-    logger.info('Health monitoring started');
+  getStartupTime(): Date {
+    return this.startTime;
   }
 }
 
-// Export singleton instance
-export const healthMonitor = HealthMonitor.getInstance();
+/**
+ * Create health check tools for MCP server
+ */
+export function createHealthTools(healthManager: HealthManager) {
+  return [
+    {
+      tool: {
+        name: 'get_system_health',
+        description: 'Get comprehensive system health status including GitHub API connectivity and rate limits',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+      handler: async () => {
+        return await healthManager.getSystemHealth();
+      },
+    },
+    {
+      tool: {
+        name: 'get_quick_health',
+        description: 'Get quick health status (lightweight check)',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+      handler: async () => {
+        return await healthManager.getQuickHealth();
+      },
+    },
+  ];
+}

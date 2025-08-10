@@ -30,6 +30,7 @@ export type GitHubToolset =
   | 'discussions'
   | 'dependabot'
   | 'secret_protection'
+  | 'health'
   | 'experiments';
 
 /**
@@ -43,6 +44,24 @@ export interface ToolConfig<TParams = any, TResult = any> {
   tool: Tool;
   /** Handler function that processes tool requests */
   handler: (args: TParams) => Promise<TResult>;
+}
+
+/**
+ * Performance optimization configuration options
+ */
+export interface PerformanceOptions {
+  /** Enable API response caching */
+  enableCache?: boolean;
+  /** Enable request deduplication */
+  enableDeduplication?: boolean;
+  /** Enable performance monitoring */
+  enablePerformanceMonitoring?: boolean;
+  /** Cache time-to-live in milliseconds */
+  cacheTTL?: number;
+  /** Maximum number of pages to fetch */
+  maxPages?: number;
+  /** Concurrency limit for parallel operations */
+  concurrency?: number;
 }
 
 /**

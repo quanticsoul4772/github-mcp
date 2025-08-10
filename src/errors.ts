@@ -15,13 +15,16 @@ export class GitHubMCPError extends Error {
   public readonly context?: Record<string, any>;
   public readonly isRetryable: boolean;
   public readonly originalError?: Error;
+  public readonly correlationId?: string;
+  public readonly timestamp: Date;
 
   constructor(
     message: string,
     code: string,
     statusCode?: number,
     context?: Record<string, any>,
-    originalError?: Error
+    originalError?: Error,
+    correlationId?: string
   ) {
     super(message);
     this.name = 'GitHubMCPError';
@@ -29,6 +32,8 @@ export class GitHubMCPError extends Error {
     this.statusCode = statusCode;
     this.context = context;
     this.originalError = originalError;
+    this.correlationId = correlationId;
+    this.timestamp = new Date();
     this.isRetryable = this.determineRetryability();
     
     // Maintain proper stack trace
@@ -57,6 +62,8 @@ export class GitHubMCPError extends Error {
       statusCode: this.statusCode,
       context: this.context,
       isRetryable: this.isRetryable,
+      correlationId: this.correlationId,
+      timestamp: this.timestamp.toISOString(),
     };
   }
 }
