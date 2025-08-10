@@ -34,15 +34,13 @@ spec:
         - containerPort: 3000
           name: http
           protocol: TCP
-        
-        # Environment variables from ConfigMap and Secret
+  
         envFrom:
         - configMapRef:
             name: github-mcp-config
         - secretRef:
             name: github-mcp-secrets
-        
-        # Resource requests and limits
+  
         resources:
           requests:
             memory: "256Mi"
@@ -50,31 +48,25 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
-        
-        # Health checks
+  
         livenessProbe:
-          exec:
-            command:
-            - node
-            - -e
-            - "process.exit(0)"
+          httpGet:
+            path: /health
+            port: http
           initialDelaySeconds: 30
           periodSeconds: 30
           timeoutSeconds: 5
           failureThreshold: 3
-        
+  
         readinessProbe:
-          exec:
-            command:
-            - node
-            - -e
-            - "process.exit(0)"
+          httpGet:
+            path: /ready
+            port: http
           initialDelaySeconds: 10
           periodSeconds: 10
           timeoutSeconds: 3
           failureThreshold: 3
-        
-        # Security context
+  
         securityContext:
           runAsNonRoot: true
           runAsUser: 1001
@@ -84,13 +76,21 @@ spec:
             drop:
             - ALL
           readOnlyRootFilesystem: true
-        
-        # Volume mounts for tmp directory (since root filesystem is read-only)
+  
         volumeMounts:
         - name: tmp
           mountPath: /tmp
         - name: app-tmp
           mountPath: /app/tmp
+        - name: npm-cache
+          mountPath: /tmp/.npm
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: app-tmp
+        emptyDir: {}
+      - name: npm-cache
+        emptyDir: {}
       
       # Security context for the pod
       securityContext:
