@@ -3,13 +3,13 @@
 
 # Pre-commit framework for git hooks
 pre-commit==3.6.0 \
-    --hash=sha256:244a1d34c8f6e99928903063e7f6b6667f42a07c98de3c919b9e9a66b728e5ca \
-    --hash=sha256:a92b5fc5a95dc0ffe2f2e96dd93b1fb6e7a9dddcbd82a7aea06c9fd9e67a6c81
+    --hash=sha256:c255039ef399049a5544b6ce13d135caba8f2c28c3b4033277a788f434308376 \
+    --hash=sha256:d30bad9abf165f7785c15a21a1f46da7d0677cb00ee7ff4c579fd38922efe15d
 
 # Secret detection tool
 detect-secrets==1.4.0 \
-    --hash=sha256:c7017a72c02bc57825cf6c1b3fb61e3faa7a1e2dd46a39b53c0e51a20b1b6b1b \
-    --hash=sha256:b95a72f5d61b2e9b9e5c9a3bea0cfbb8c6e8eaa8d8b57b1a62f5e4f8a7b5c7be
+    --hash=sha256:d08ecabeee8b68c0acb0e8a354fb98d822a653f6ed05e520cead4c6fc1fc02cd \
+    --hash=sha256:d56787e339758cef48c9ccd6692f7a094b9963c979c9813580b0169e41132833
 
 # Additional dependencies for detect-secrets
 PyYAML==6.0.1 \
