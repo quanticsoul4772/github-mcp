@@ -502,10 +502,11 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
               logs: args.return_content ? logContent : response.url,
             });
           } catch (error) {
+            console.error('Failed to get logs for job:', job.id, error); // Log for debugging
             results.push({
               job_id: job.id,
               job_name: job.name,
-              error: error instanceof Error ? error.message : 'Failed to get logs',
+              error: 'Failed to retrieve logs for this job',
             });
           }
         }

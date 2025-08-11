@@ -993,10 +993,11 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
               sha: data.content?.sha,
             });
           } catch (error) {
+            console.error('Failed to push file:', file.path, error); // Log for debugging
             results.push({
               path: file.path,
               success: false,
-              error: error instanceof Error ? error.message : 'Unknown error',
+              error: 'Failed to push file',
             });
           }
         }
