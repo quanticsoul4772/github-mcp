@@ -649,9 +649,9 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
             sha: {
               type: 'string',
               description: 'Required if updating an existing file. The blob SHA of the file being replaced.',
-          required: ['owner', 'repo', 'path', 'message', 'content', 'branch'],
+            },
           },
-          required: ['owner', 'repo', 'path', 'message', 'content'],
+          required: ['owner', 'repo', 'path', 'message', 'content', 'branch'],
         },
       },
       handler: async (args: CreateOrUpdateFileParams) => {
@@ -731,9 +731,9 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
             branch: {
               type: 'string',
               description: 'Branch to delete the file from',
-          required: ['owner', 'repo', 'path', 'message', 'branch'],
+            },
           },
-          required: ['owner', 'repo', 'path', 'message'],
+          required: ['owner', 'repo', 'path', 'message', 'branch'],
         },
       },
       handler: async (args: DeleteFileParams) => {

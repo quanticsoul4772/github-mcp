@@ -2,6 +2,11 @@ name: '🏷️ Gemini Automated Issue Triage'
 
 on:
   workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'issue number to triage'
+        required: true
+        type: 'number'
   issues:
     types:
       - 'opened'
@@ -9,12 +14,6 @@ on:
   issue_comment:
     types:
       - 'created'
-  workflow_dispatch:
-    inputs:
-      issue_number:
-        description: 'issue number to triage'
-        required: true
-        type: 'number'
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.event.issue.number }}'
