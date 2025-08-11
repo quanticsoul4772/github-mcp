@@ -246,7 +246,7 @@ describe('Repository Tools', () => {
         repo: 'test-repo',
         path: 'existing-file.txt',
         message: 'Update file',
-        content: btoa('Updated content'),
+        content: Buffer.from('Updated content').toString('base64'),
         sha: 'existing-sha',
         branch: undefined,
       });
