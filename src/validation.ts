@@ -133,9 +133,8 @@ function shouldBypassValidation(): boolean {
   if (typeof process === 'undefined' || !process.env) {
     return false;
   }
-  // Allow bypass in development mode OR when explicitly set
-  return (process.env.NODE_ENV === 'development' && process.env.SKIP_VALIDATION === 'true') ||
-         process.env.BYPASS_VALIDATION === 'true';
+  // Only allow bypass in development mode with explicit flag
+  return (process.env.NODE_ENV === 'development' && process.env.SKIP_VALIDATION === 'true');
 }
 
 /**

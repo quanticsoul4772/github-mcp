@@ -14,7 +14,9 @@ import {
   CreateRepoParams,
   CreateOrUpdateFileParams,
   DeleteFileParams,
-  PushFilesParams
+  PushFilesParams,
+  ListUserRepositoriesParams,
+  GetRepositoryParams
 } from '../tool-types.js';
 
 interface GetCommitParams {
@@ -99,7 +101,7 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
         },
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: ListUserRepositoriesParams) => {
       const { data } = await octokit.rest.repos.listForAuthenticatedUser({
         visibility: args.visibility || 'all',
         affiliation: args.affiliation,
@@ -151,7 +153,7 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetRepositoryParams) => {
       // Validate inputs
       if (!validateOwnerName(args.owner)) {
         throw new ValidationError('owner', 'Invalid repository owner name');

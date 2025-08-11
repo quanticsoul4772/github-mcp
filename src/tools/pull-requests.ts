@@ -5,7 +5,9 @@ import {
   CreatePullRequestParams,
   UpdatePullRequestParams,
   MergePullRequestParams,
-  GetPullRequestDiffParams
+  GetPullRequestDiffParams,
+  DismissPullRequestReviewParams,
+  CreatePullRequestReviewCommentParams
 } from '../tool-types.js';
 
 interface GetPullRequestParams {
@@ -893,7 +895,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
           required: ['owner', 'repo', 'pullNumber', 'review_id', 'message'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: DismissPullRequestReviewParams) => {
         const { data } = await octokit.pulls.dismissReview({
           owner: args.owner,
           repo: args.repo,
@@ -960,7 +962,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
           required: ['owner', 'repo', 'pullNumber', 'body', 'commit_id', 'path', 'line'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: CreatePullRequestReviewCommentParams) => {
         const { data } = await octokit.pulls.createReviewComment({
           owner: args.owner,
           repo: args.repo,

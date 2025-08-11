@@ -5,7 +5,13 @@ import {
   CreateIssueParams,
   UpdateIssueParams,
   CreateIssueCommentParams,
-  SearchIssuesParams
+  SearchIssuesParams,
+  UpdateIssueCommentParams,
+  DeleteIssueCommentParams, 
+  AddLabelsToIssueParams,
+  RemoveLabelFromIssueParams,
+  LockIssueParams,
+  UnlockIssueParams
 } from '../tool-types.js';
 
 interface GetIssueParams {
@@ -546,7 +552,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           required: ['owner', 'repo', 'comment_id', 'body'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: UpdateIssueCommentParams) => {
         const { data } = await octokit.issues.updateComment({
           owner: args.owner,
           repo: args.repo,
@@ -590,7 +596,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           required: ['owner', 'repo', 'comment_id'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: DeleteIssueCommentParams) => {
         await octokit.issues.deleteComment({
           owner: args.owner,
           repo: args.repo,
@@ -633,7 +639,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           required: ['owner', 'repo', 'issue_number', 'labels'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: AddLabelsToIssueParams) => {
         const { data } = await octokit.issues.addLabels({
           owner: args.owner,
           repo: args.repo,
@@ -677,7 +683,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           required: ['owner', 'repo', 'issue_number', 'name'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: RemoveLabelFromIssueParams) => {
         await octokit.issues.removeLabel({
           owner: args.owner,
           repo: args.repo,
@@ -721,7 +727,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           required: ['owner', 'repo', 'issue_number'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: LockIssueParams) => {
         await octokit.issues.lock({
           owner: args.owner,
           repo: args.repo,
@@ -760,7 +766,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           required: ['owner', 'repo', 'issue_number'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: UnlockIssueParams) => {
         await octokit.issues.unlock({
           owner: args.owner,
           repo: args.repo,
