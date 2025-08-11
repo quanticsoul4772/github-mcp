@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "noEmitOnError": false,
     "target": "ES2022",
     "module": "node16",
     "lib": ["ES2022"],
