@@ -526,7 +526,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         required: ['query'],
       },
     },
-    handler: async (args: GetPullRequestParams) => {
+    handler: async (args: any) => {
       let query = `is:pr ${args.query}`;
       
       // Add repo filter if provided
