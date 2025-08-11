@@ -729,7 +729,7 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
             branch: {
               type: 'string',
               description: 'Branch to delete the file from',
-            },
+          required: ['owner', 'repo', 'path', 'message', 'branch'],
           },
           required: ['owner', 'repo', 'path', 'message'],
         },
