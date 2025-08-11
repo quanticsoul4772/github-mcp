@@ -799,7 +799,7 @@ export function validateGitHubToken(token: string): boolean {
 export function validateGitHubTokenFormat(
   token: string,
   level: ValidationLevel = ValidationLevel.MODERATE
-): TokenValidationResult | string {
+): TokenValidationResult {
   if (!token || typeof token !== 'string') {
     return {
       isValid: false,
@@ -811,7 +811,10 @@ export function validateGitHubTokenFormat(
   if (level === ValidationLevel.LENIENT) {
     const isValid = token.trim().length > 0;
     if (isValid && token.length === 40 && /^[a-f0-9]{40}$/i.test(token)) {
-      return 'legacy';
+      return {
+        isValid: true,
+        format: 'legacy'
+      };
     }
     return {
       isValid,
@@ -1683,32 +1686,122 @@ export function validateURL(url: string): boolean {
     
     const host = parsed.hostname.toLowerCase();
     
-    // Disallow loopback and unspecified hosts
-    const disallowedHosts = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0']);
-    if (disallowedHosts.has(host)) {
-      return false;
-    }
-    
-    // Disallow private IP ranges
-    const isIpv4 = /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
-    if (isIpv4) {
-      const parts = host.split('.').map(Number);
-      const [a, b = 0] = parts;
-      // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16
-      const isPrivate =
-        a === 10 ||
-        (a === 172 && b >= 16 && b <= 31) ||
-        (a === 192 && b === 168) ||
-        (a === 169 && b === 254);
-      if (isPrivate) {
-        return false;
-      }
-    }
-    
-    return true;
+    // Comprehensive IP address validation
+    return !isPrivateOrReservedIP(host);
   } catch {
     return false;
   }
+}
+
+/**
+ * Checks if an IP address or hostname is private, reserved, or otherwise dangerous for SSRF
+ * Covers IPv4, IPv6, and hostname-based checks
+ */
+function isPrivateOrReservedIP(host: string): boolean {
+  // Disallow explicit loopback and unspecified hosts
+  const disallowedHosts = new Set([
+    'localhost', 'broadcasthost',
+    '127.0.0.1', '0.0.0.0', 
+    '::1', '::', 'ip6-localhost', 'ip6-loopback'
+  ]);
+  
+  if (disallowedHosts.has(host)) {
+    return true;
+  }
+  
+  // Check IPv4 private and reserved ranges
+  const ipv4Pattern = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+  const ipv4Match = host.match(ipv4Pattern);
+  
+  if (ipv4Match) {
+    const [, a, b, c, d] = ipv4Match.map(Number);
+    
+    // Validate each octet is in range 0-255
+    if (a > 255 || b > 255 || c > 255 || d > 255) {
+      return true; // Invalid IPv4 format
+    }
+    
+    return (
+      // 10.0.0.0/8 - Private
+      a === 10 ||
+      
+      // 172.16.0.0/12 - Private
+      (a === 172 && b >= 16 && b <= 31) ||
+      
+      // 192.168.0.0/16 - Private  
+      (a === 192 && b === 168) ||
+      
+      // 169.254.0.0/16 - Link-local
+      (a === 169 && b === 254) ||
+      
+      // 127.0.0.0/8 - Loopback
+      a === 127 ||
+      
+      // 0.0.0.0/8 - "This" Network
+      a === 0 ||
+      
+      // 224.0.0.0/4 - Multicast
+      a >= 224 && a <= 239 ||
+      
+      // 240.0.0.0/4 - Reserved for future use
+      a >= 240 ||
+      
+      // 100.64.0.0/10 - Carrier-grade NAT
+      (a === 100 && b >= 64 && b <= 127) ||
+      
+      // 198.18.0.0/15 - Benchmarking
+      (a === 198 && (b === 18 || b === 19)) ||
+      
+      // 203.0.113.0/24 - Documentation  
+      (a === 203 && b === 0 && c === 113) ||
+      
+      // 192.0.2.0/24 - Documentation
+      (a === 192 && b === 0 && c === 2) ||
+      
+      // 198.51.100.0/24 - Documentation
+      (a === 198 && b === 51 && c === 100)
+    );
+  }
+  
+  // Check IPv6 patterns
+  // IPv6 addresses can be in various formats, so we check for common dangerous prefixes
+  if (host.includes(':')) {
+    // Normalize IPv6 address by removing leading zeros and converting to lowercase
+    const normalizedHost = host.toLowerCase();
+    
+    return (
+      // ::1 - Loopback (already caught above, but for completeness)
+      normalizedHost === '::1' ||
+      
+      // :: - Unspecified address (already caught above)
+      normalizedHost === '::' ||
+      
+      // fc00::/7 - Unique local addresses (private)
+      normalizedHost.startsWith('fc') ||
+      normalizedHost.startsWith('fd') ||
+      
+      // fe80::/10 - Link-local
+      normalizedHost.startsWith('fe8') ||
+      normalizedHost.startsWith('fe9') ||
+      normalizedHost.startsWith('fea') ||
+      normalizedHost.startsWith('feb') ||
+      
+      // ff00::/8 - Multicast
+      normalizedHost.startsWith('ff') ||
+      
+      // 2001:db8::/32 - Documentation
+      normalizedHost.startsWith('2001:db8') ||
+      normalizedHost.startsWith('2001:0db8') ||
+      
+      // ::ffff:0:0/96 - IPv4-mapped IPv6 addresses that could bypass IPv4 checks
+      normalizedHost.includes('::ffff:') ||
+      
+      // 2002::/16 - 6to4 (may expose internal networks)  
+      normalizedHost.startsWith('2002:')
+    );
+  }
+  
+  return false;
 }
 
 /**
