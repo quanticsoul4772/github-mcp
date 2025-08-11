@@ -494,9 +494,10 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
           variables: allVariables,
         };
       } catch (error: any) {
+        console.error('Batch GraphQL operation failed:', error); // Log for debugging
         return {
           successful: false,
-          error: error.message,
+          error: 'Batch operation failed',
           executedQuery: fullQuery,
           variables: allVariables,
         };

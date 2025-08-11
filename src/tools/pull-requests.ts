@@ -5,7 +5,9 @@ import {
   CreatePullRequestParams,
   UpdatePullRequestParams,
   MergePullRequestParams,
-  GetPullRequestDiffParams
+  GetPullRequestDiffParams,
+  DismissPullRequestReviewParams,
+  CreatePullRequestReviewCommentParams
 } from '../tool-types.js';
 
 interface GetPullRequestParams {
@@ -232,10 +234,10 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
     },
   });
 
-  // Get pull request files tool
+  // List pull request files tool
   tools.push({
     tool: {
-      name: 'get_pull_request_files',
+      name: 'list_pull_request_files',
       description: 'Get files changed in a pull request',
       inputSchema: {
         type: 'object',
@@ -331,10 +333,10 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
     },
   });
 
-  // Get pull request comments tool
+  // List pull request comments tool
   tools.push({
     tool: {
-      name: 'get_pull_request_comments',
+      name: 'list_pull_request_comments',
       description: 'Get review comments on a pull request',
       inputSchema: {
         type: 'object',
@@ -380,10 +382,10 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
     },
   });
 
-  // Get pull request reviews tool
+  // List pull request reviews tool
   tools.push({
     tool: {
-      name: 'get_pull_request_reviews',
+      name: 'list_pull_request_reviews',
       description: 'Get reviews on a pull request',
       inputSchema: {
         type: 'object',
@@ -761,7 +763,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
     // Create pull request review tool
     tools.push({
       tool: {
-        name: 'create_and_submit_pull_request_review',
+        name: 'create_pull_request_review',
         description: 'Create and submit a pull request review',
         inputSchema: {
           type: 'object',
@@ -857,6 +859,132 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         return {
           message: data.message,
           url: data.url,
+        };
+      },
+    });
+
+    // Dismiss pull request review tool
+    tools.push({
+      tool: {
+        name: 'dismiss_pull_request_review',
+        description: 'Dismiss a pull request review',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            owner: {
+              type: 'string',
+              description: 'Repository owner',
+            },
+            repo: {
+              type: 'string',
+              description: 'Repository name',
+            },
+            pullNumber: {
+              type: 'number',
+              description: 'Pull request number',
+            },
+            review_id: {
+              type: 'number',
+              description: 'Review ID to dismiss',
+            },
+            message: {
+              type: 'string',
+              description: 'Dismissal message',
+            },
+          },
+          required: ['owner', 'repo', 'pullNumber', 'review_id', 'message'],
+        },
+      },
+      handler: async (args: DismissPullRequestReviewParams) => {
+        const { data } = await octokit.pulls.dismissReview({
+          owner: args.owner,
+          repo: args.repo,
+          pull_number: args.pullNumber,
+          review_id: args.review_id,
+          message: args.message,
+        });
+
+        return {
+          id: data.id,
+          state: data.state,
+          user: {
+            login: data.user?.login,
+          },
+          body: data.body,
+          submitted_at: data.submitted_at,
+          html_url: data.html_url,
+        };
+      },
+    });
+
+    // Create pull request review comment tool
+    tools.push({
+      tool: {
+        name: 'create_pull_request_review_comment',
+        description: 'Create a review comment on a pull request',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            owner: {
+              type: 'string',
+              description: 'Repository owner',
+            },
+            repo: {
+              type: 'string',
+              description: 'Repository name',
+            },
+            pullNumber: {
+              type: 'number',
+              description: 'Pull request number',
+            },
+            body: {
+              type: 'string',
+              description: 'Comment body',
+            },
+            commit_id: {
+              type: 'string',
+              description: 'SHA of the commit to comment on',
+            },
+            path: {
+              type: 'string',
+              description: 'Relative path of the file to comment on',
+            },
+            line: {
+              type: 'number',
+              description: 'Line number in the diff to comment on',
+            },
+            side: {
+              type: 'string',
+              description: 'Side of the diff',
+              enum: ['LEFT', 'RIGHT'],
+            },
+          },
+          required: ['owner', 'repo', 'pullNumber', 'body', 'commit_id', 'path', 'line'],
+        },
+      },
+      handler: async (args: CreatePullRequestReviewCommentParams) => {
+        const { data } = await octokit.pulls.createReviewComment({
+          owner: args.owner,
+          repo: args.repo,
+          pull_number: args.pullNumber,
+          body: args.body,
+          commit_id: args.commit_id,
+          path: args.path,
+          line: args.line,
+          side: args.side,
+        });
+
+        return {
+          id: data.id,
+          body: data.body,
+          path: data.path,
+          line: data.line,
+          side: data.side,
+          user: {
+            login: data.user?.login,
+          },
+          created_at: data.created_at,
+          html_url: data.html_url,
         };
       },
     });

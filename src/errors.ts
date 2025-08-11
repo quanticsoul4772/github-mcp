@@ -157,6 +157,16 @@ export class ConfigurationError extends GitHubMCPError {
 }
 
 /**
+ * Generic API error for user-facing responses
+ */
+export class APIError extends GitHubMCPError {
+  constructor(message: string, statusCode: number = 500, context?: Record<string, any>) {
+    super(message, 'API_ERROR', statusCode, context);
+    this.name = 'APIError';
+  }
+}
+
+/**
  * Error handler wrapper for consistent error handling with observability
  */
 export async function withErrorHandling<T>(

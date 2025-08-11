@@ -169,8 +169,8 @@ describe('Repository Tools', () => {
         repo: 'test-repo',
       });
 
-      expect(result).toContain('test-repo');
-      expect(result).toContain('Test repository');
+      expect(result.name).toBe('test-repo');
+      expect(result.description).toBe('Test repository');
     });
 
     it('should validate input parameters', async () => {
