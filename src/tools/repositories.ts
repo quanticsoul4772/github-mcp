@@ -647,7 +647,7 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
             sha: {
               type: 'string',
               description: 'Required if updating an existing file. The blob SHA of the file being replaced.',
-            },
+          required: ['owner', 'repo', 'path', 'message', 'content', 'branch'],
           },
           required: ['owner', 'repo', 'path', 'message', 'content'],
         },
