@@ -388,14 +388,7 @@ export class GitHubMCPServer {
    * and read-only mode configuration.
    */
   private registerTools() {
-    console.log('\n====================================');
-    console.log('  GitHub MCP Server Initialization');
-    console.log('====================================\n');
-    
-    console.log('Configuration:');
-    console.log(`  Read-only mode: ${this.readOnly}`);
-    console.log(`  Enabled toolsets: ${Array.from(this.enabledToolsets).join(', ')}`);
-    console.log('\nRegistering tools...\n');
+    // Register tools silently - no console output to avoid breaking MCP protocol
 
     // Add rate limit status tool (always enabled)
     this.registerTool({
@@ -434,7 +427,7 @@ export class GitHubMCPServer {
         };
       },
     });
-    console.log(`  ✓ Rate limit status tool (1)`);
+    // Rate limit status tool registered
 
     // Register context tools
     if (this.enabledToolsets.has('context')) {
@@ -460,7 +453,7 @@ export class GitHubMCPServer {
         }
       ];
       contextTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Context tools (${contextTools.length})`);
+      // Context tools registered
     }
 
     // Register repository tools
@@ -468,7 +461,7 @@ export class GitHubMCPServer {
       // Standard repository tools
       const repoTools = createRepositoryTools(this.octokit, this.readOnly);
       repoTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Repository tools (${repoTools.length})`);
+      // Repository tools registered
 
       // Optimized repository tools
       const optimizedRepoTools = createOptimizedRepositoryTools(
@@ -476,123 +469,123 @@ export class GitHubMCPServer {
         this.readOnly
       );
       optimizedRepoTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Optimized repository tools (${optimizedRepoTools.length})`);
+      // Optimized repository tools registered
     }
 
     // Register issue tools
     if (this.enabledToolsets.has('issues')) {
       const issueTools = createIssueTools(this.octokit, this.readOnly);
       issueTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Issue tools (${issueTools.length})`);
+      // Issue tools registered
     }
 
     // Register pull request tools
     if (this.enabledToolsets.has('pull_requests')) {
       const prTools = createPullRequestTools(this.octokit, this.readOnly);
       prTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Pull Request tools (${prTools.length})`);
+      // Pull Request tools registered
     }
 
     // Register GitHub Actions tools
     if (this.enabledToolsets.has('actions')) {
       const actionTools = createActionTools(this.octokit, this.readOnly);
       actionTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ GitHub Actions tools (${actionTools.length})`);
+      // GitHub Actions tools registered
     }
 
     // Register code security tools
     if (this.enabledToolsets.has('code_security')) {
       const codeSecurityTools = createCodeSecurityTools(this.octokit, this.readOnly);
       codeSecurityTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Code Security tools (${codeSecurityTools.length})`);
+      // Code Security tools registered
     }
 
     // Register search tools
     const searchTools = createSearchTools(this.octokit);
     searchTools.forEach(tool => this.registerTool(tool));
-    console.log(`  ✓ Search tools (${searchTools.length})`);
+    // Search tools registered
 
     // Register user tools
     if (this.enabledToolsets.has('users')) {
       const userTools = createUserTools(this.octokit, this.readOnly);
       userTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ User tools (${userTools.length})`);
+      // User tools registered
     }
 
     // Register organization tools
     if (this.enabledToolsets.has('orgs')) {
       const orgTools = createOrganizationTools(this.octokit, this.readOnly);
       orgTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Organization tools (${orgTools.length})`);
+      // Organization tools registered
     }
 
     // Register notification tools
     if (this.enabledToolsets.has('notifications')) {
       const notificationTools = createNotificationTools(this.octokit, this.readOnly);
       notificationTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Notification tools (${notificationTools.length})`);
+      // Notification tools registered
     }
 
     // Register discussion tools
     if (this.enabledToolsets.has('discussions')) {
       const discussionTools = createDiscussionTools(this.octokit, this.readOnly);
       discussionTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Discussion tools (${discussionTools.length})`);
+      // Discussion tools registered
     }
 
     // Register Dependabot tools
     if (this.enabledToolsets.has('dependabot')) {
       const dependabotTools = createDependabotTools(this.octokit, this.readOnly);
       dependabotTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Dependabot tools (${dependabotTools.length})`);
+      // Dependabot tools registered
     }
 
     // Register secret scanning tools
     if (this.enabledToolsets.has('secret_protection')) {
       const secretScanningTools = createSecretScanningTools(this.octokit, this.readOnly);
       secretScanningTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Secret Scanning tools (${secretScanningTools.length})`);
+      // Secret Scanning tools registered
     }
 
     // GraphQL repository insights tools
     if (this.enabledToolsets.has('graphql_insights')) {
       const insightsTools = createRepositoryInsightsTools(this.octokit, this.readOnly);
       insightsTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Repository Insights tools (${insightsTools.length})`);
+      // Repository Insights tools registered
     }
 
     // Advanced search tools
     if (this.enabledToolsets.has('advanced_search')) {
       const advancedSearchTools = createAdvancedSearchTools(this.octokit, this.readOnly);
       advancedSearchTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Advanced Search tools (${advancedSearchTools.length})`);
+      // Advanced Search tools registered
     }
 
     // Project management tools
     if (this.enabledToolsets.has('project_management')) {
       const projectTools = createProjectManagementTools(this.octokit, this.readOnly);
       projectTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Project Management tools (${projectTools.length})`);
+      // Project Management tools registered
     }
 
     // Batch operations tools
     if (this.enabledToolsets.has('batch_operations')) {
       const batchTools = createBatchOperationsTools(this.octokit, this.readOnly);
       batchTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Batch Operations tools (${batchTools.length})`);
+      // Batch Operations tools registered
     }
 
     // Register health monitoring tools
     const healthTools = createHealthTools(this.healthManager);
     healthTools.forEach(tool => this.registerTool(tool));
-    console.log(`  ✓ Health monitoring tools (${healthTools.length})`);
+    // Health monitoring tools registered
 
     // Register monitoring and observability tools
     if (this.enabledToolsets.has('monitoring')) {
       // Register health tools
       const healthTools = createHealthTools(this.healthManager);
       healthTools.forEach((tool: any) => this.registerTool(tool));
-      console.log(`  ✓ Health tools (${healthTools.length})`);
+      // Health tools registered
     }
 
     // Register performance monitoring tools
@@ -635,10 +628,9 @@ export class GitHubMCPServer {
       }
     ];
     perfTools.forEach(tool => this.registerTool(tool));
-    console.log(`  ✓ Performance monitoring tools (${perfTools.length})`);
+    // Performance monitoring tools registered
 
-    console.log(`\nTotal tools registered: ${this.toolCount}`);
-    console.log('\n====================================\n');
+    // Total tools registered successfully
   }
 
   /**
@@ -656,13 +648,11 @@ export class GitHubMCPServer {
         transport: 'stdio'
       });
       
-      console.error(`🚀 GitHub MCP Server v${SERVER_VERSION} started successfully`);
-      displayConfig();
-      console.error(`🛠️  Total tools registered: ${this.toolCount}`);
-      console.log('Ready to accept MCP requests via stdio\n');
+      // Server started successfully - avoid console output to not break MCP protocol
+      // displayConfig(); // Disabled to avoid console output
     } catch (error) {
       logger.error('Failed to start GitHub MCP server', { error });
-      console.error('Failed to start server:', error);
+      // Failed to start server - logged via logger above
       if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
         process.exit(1);
       }
@@ -678,7 +668,7 @@ export class GitHubMCPServer {
     await server.start();
   } catch (error) {
     logger.error('Failed to start GitHub MCP server', { error });
-    console.error('Failed to start GitHub MCP server:', error);
+    // Error already logged via logger above
     if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
       process.exit(1);
     }
