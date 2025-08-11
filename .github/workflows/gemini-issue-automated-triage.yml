@@ -1,6 +1,7 @@
 name: '🏷️ Gemini Automated Issue Triage'
 
 on:
+  workflow_dispatch:
   issues:
     types:
       - 'opened'

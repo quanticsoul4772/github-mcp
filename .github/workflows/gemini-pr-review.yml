@@ -1,6 +1,7 @@
 name: '🧐 Gemini Pull Request Review'
 
 on:
+  workflow_dispatch:
   pull_request:
     types:
       - 'opened'
