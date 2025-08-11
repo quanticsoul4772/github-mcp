@@ -167,9 +167,9 @@ export class LoadTestRunner extends EventEmitter {
 
   private calculatePercentile(sortedTimes: number[], percentile: number): number {
     if (sortedTimes.length === 0) return 0;
-    
-    const index = Math.ceil(sortedTimes.length * percentile) - 1;
-    return sortedTimes[Math.max(0, index)];
+    const rawIndex = Math.ceil(sortedTimes.length * percentile) - 1;
+    const index = Math.min(sortedTimes.length - 1, Math.max(0, rawIndex));
+    return sortedTimes[index];
   }
 
   private sleep(ms: number): Promise<void> {
