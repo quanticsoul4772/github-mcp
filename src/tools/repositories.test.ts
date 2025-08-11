@@ -246,7 +246,9 @@ describe('Repository Tools', () => {
         repo: 'test-repo',
         path: 'existing-file.txt',
         message: 'Update file',
-        content: Buffer.from('Updated content').toString('base64'),
+        content: (typeof Buffer !== 'undefined' ? Buffer : require('buffer').Buffer)
+          .from('Updated content')
+          .toString('base64'),
         sha: 'existing-sha',
         branch: undefined,
       });
