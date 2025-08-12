@@ -199,6 +199,42 @@ GITHUB_READ_ONLY=1 npm start
    - `project` - Full control of projects
    - `delete_repo` - Delete repositories
 
+
+## Tool Reference
+
+For detailed information about all available tools and their parameters, see:
+- [Tool Reference](docs/tool-reference.md) - Complete list of tools with examples
+- [Migration Guide](docs/migration-guide.md) - Upgrading from previous versions
+- [User Preferences](docs/user-preferences.yaml) - Configuration for Claude Desktop
+
+### Quick Examples
+
+```javascript
+// Get an issue
+{
+  "owner": "quanticsoul4772",
+  "repo": "github-mcp",
+  "issue_number": 42
+}
+
+// Search repositories
+{
+  "q": "language:typescript mcp",
+  "sort": "stars",
+  "order": "desc"
+}
+
+// Create a pull request
+{
+  "owner": "quanticsoul4772",
+  "repo": "github-mcp",
+  "title": "Feature: Add new functionality",
+  "head": "feature-branch",
+  "base": "main",
+  "body": "Description of changes"
+}
+```
+
 ## Usage
 
 Once configured, the GitHub MCP server will be available in Claude Desktop. You can use natural language to interact with GitHub:

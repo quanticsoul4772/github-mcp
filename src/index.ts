@@ -118,7 +118,13 @@ export class GitHubMCPServer {
       if (!testMode && process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
         process.exit(1);
       } else if (testMode) {
+ claude/issue-38-20250810-0103
+        // In test mode, avoid throwing in constructor to prevent side effects.
+        // Consumers can inspect `envValidation.errors` or `server` state, or throw during start().
+        logger.warn('Environment validation failed (test mode): ' + envValidation.errors.join(', '));
+
         throw new Error('Environment validation failed: ' + envValidation.errors.join(', '));
+ main
       }
     }
 
@@ -363,13 +369,26 @@ export class GitHubMCPServer {
             args
           });
           
-          // Return standardized error response with both approaches
-          const errorMessage = formatErrorResponse(error);
+          // Return standardized error response with proper formatting
+          const errorResponse = formatErrorResponse(error);
+          const errorMessage = errorResponse.error.message;
+          const errorCode = errorResponse.error.code;
+          const errorDetails = errorResponse.error.details;
+          
+          // Build a helpful error message
+          let errorText = `Error: ${errorMessage}`;
+          if (errorCode && errorCode !== 'UNKNOWN_ERROR') {
+            errorText += `\nCode: ${errorCode}`;
+          }
+          if (errorDetails?.statusCode) {
+            errorText += `\nStatus: ${errorDetails.statusCode}`;
+          }
+          
           return {
             content: [
               {
                 type: 'text' as const,
-                text: `Error: ${errorMessage}`,
+                text: errorText,
               },
             ],
             isError: true,
@@ -444,12 +463,10 @@ export class GitHubMCPServer {
             }
           },
           handler: async () => {
-            const reliableCall = this.reliabilityManager.wrapApiCall(
-              () => this.octokit.users.getAuthenticated(),
+            const { data } = await this.reliabilityManager.executeWithReliability(
               'users.getAuthenticated',
-              { skipRateLimit: false }
+              () => this.octokit.users.getAuthenticated()
             );
-            const { data } = await reliableCall();
             return data;
           }
         }
