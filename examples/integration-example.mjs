@@ -3,11 +3,22 @@
  * This shows how to wrap existing tool handlers with our validation
  */
 
+import { withParameterValidation } from '../src/validation/parameter-validation.js';
 import { withParameterValidation } from '../build/validation/parameter-validation.js';
 
 // Example of wrapping the existing get_issue handler
 export function wrapIssueTools(originalTools) {
   return originalTools.map(tool => {
+    // Only wrap tools we have schemas for
+    const wrappedHandler = withParameterValidation(
+      tool.tool.name,
+      tool.handler
+    );
+    
+    return {
+      ...tool,
+      handler: wrappedHandler
+    };
     const toolName = tool?.tool?.name;
     if (!toolName || typeof tool.handler !== 'function') {
       return tool; // passthrough if structure is unexpected

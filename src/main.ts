@@ -5,6 +5,9 @@
  * to avoid side effects when importing the module for testing or integration
  */
 
+// Load environment variables from .env file
+import 'dotenv/config';
+
 import { GitHubMCPServer } from './index.js';
 import { logger } from './logger.js';
 

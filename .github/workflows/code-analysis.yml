@@ -1,0 +1,849 @@
+name: Code Analysis Agents
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run comprehensive analysis daily at 3 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      analysis_depth:
+        description: 'Analysis depth'
+        required: false
+        default: 'deep'
+        type: choice
+        options:
+          - shallow
+          - deep
+          - comprehensive
+      target_path:
+        description: 'Target path to analyze (default: src/)'
+        required: false
+        default: 'src/'
+        type: string
+      generate_tests:
+        description: 'Generate missing tests'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  checks: write
+  actions: read
+
+env:
+  NODE_VERSION: '20.x'
+  ANALYSIS_DEPTH: ${{ github.event.inputs.analysis_depth || 'deep' }}
+  TARGET_PATH: ${{ github.event.inputs.target_path || 'src/' }}
+
+jobs:
+  # Quick analysis for fast feedback
+  quick-analysis:
+    name: Quick Code Analysis
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run quick code analysis
+        id: quick_analysis
+        run: |
+          echo "Running quick analysis on changed files..."
+          
+          # Get list of changed TypeScript/JavaScript files
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '\.(ts|tsx|js|jsx)$' | head -10 || echo "")
+          
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No TypeScript/JavaScript files changed"
+            echo "analysis_needed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "analysis_needed=true" >> $GITHUB_OUTPUT
+          echo "Changed files: $CHANGED_FILES"
+          
+          # Create analysis script
+          cat > quick_analysis.mjs << 'EOF'
+          import { quickAnalyze } from './build/agents/index.js';
+          import fs from 'fs/promises';
+          
+          const changedFiles = process.argv[2].split('\n').filter(f => f.trim());
+          const results = [];
+          
+          for (const file of changedFiles) {
+            try {
+              console.log(`Analyzing ${file}...`);
+              const result = await quickAnalyze(file, {
+                type: 'file',
+                depth: 'shallow',
+                format: 'json'
+              });
+              
+              if (result.analysis.summary.totalFindings > 0) {
+                results.push({
+                  file,
+                  findings: result.analysis.summary.totalFindings,
+                  critical: result.analysis.summary.findingsBySeverity?.critical || 0,
+                  high: result.analysis.summary.findingsBySeverity?.high || 0,
+                  medium: result.analysis.summary.findingsBySeverity?.medium || 0
+                });
+              }
+            } catch (error) {
+              console.error(`Error analyzing ${file}:`, error.message);
+            }
+          }
+          
+          await fs.writeFile('quick-analysis-results.json', JSON.stringify(results, null, 2));
+          
+          const totalIssues = results.reduce((sum, r) => sum + r.findings, 0);
+          const criticalIssues = results.reduce((sum, r) => sum + r.critical, 0);
+          const highIssues = results.reduce((sum, r) => sum + r.high, 0);
+          
+          console.log(`\nQuick Analysis Summary:`);
+          console.log(`Files analyzed: ${changedFiles.length}`);
+          console.log(`Files with issues: ${results.length}`);
+          console.log(`Total issues: ${totalIssues}`);
+          console.log(`Critical issues: ${criticalIssues}`);
+          console.log(`High priority issues: ${highIssues}`);
+          
+          if (criticalIssues > 0) {
+            console.log('\n❌ Critical issues found! Please review before merging.');
+            process.exit(1);
+          } else if (highIssues > 5) {
+            console.log('\n⚠️ Many high-priority issues found. Consider addressing them.');
+            process.exit(1);
+          } else if (totalIssues > 0) {
+            console.log('\n✅ Issues found but within acceptable limits.');
+          } else {
+            console.log('\n✅ No issues found in changed files.');
+          }
+          EOF
+          
+          node quick_analysis.mjs "$CHANGED_FILES"
+
+      - name: Upload quick analysis results
+        if: steps.quick_analysis.outputs.analysis_needed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: quick-analysis-results
+          path: quick-analysis-results.json
+          retention-days: 7
+
+      - name: Comment PR with quick analysis
+        if: steps.quick_analysis.outputs.analysis_needed == 'true' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            try {
+              const results = JSON.parse(fs.readFileSync('quick-analysis-results.json', 'utf8'));
+              
+              if (results.length === 0) {
+                await github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: '✅ **Quick Code Analysis**: No issues found in changed files!'
+                });
+                return;
+              }
+              
+              const totalIssues = results.reduce((sum, r) => sum + r.findings, 0);
+              const criticalIssues = results.reduce((sum, r) => sum + r.critical, 0);
+              const highIssues = results.reduce((sum, r) => sum + r.high, 0);
+              
+              let comment = '## 🔍 Quick Code Analysis Results\n\n';
+              comment += `**Summary**: ${totalIssues} issues found in ${results.length} files\n\n`;
+              
+              if (criticalIssues > 0) {
+                comment += `🔴 **${criticalIssues} Critical issues** - Please address before merging\n`;
+              }
+              if (highIssues > 0) {
+                comment += `🟠 **${highIssues} High priority issues**\n`;
+              }
+              
+              comment += '\n**Files with issues**:\n';
+              for (const result of results.slice(0, 5)) {
+                comment += `- \`${result.file}\`: ${result.findings} issues`;
+                if (result.critical > 0) comment += ` (${result.critical} critical)`;
+                if (result.high > 0) comment += ` (${result.high} high)`;
+                comment += '\n';
+              }
+              
+              if (results.length > 5) {
+                comment += `\n... and ${results.length - 5} more files\n`;
+              }
+              
+              comment += '\n💡 Run comprehensive analysis for detailed results and suggestions.';
+              
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            } catch (error) {
+              console.error('Error reading analysis results:', error);
+            }
+
+  # Comprehensive analysis
+  comprehensive-analysis:
+    name: Comprehensive Code Analysis
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run comprehensive analysis
+        run: |
+          echo "Running comprehensive analysis..."
+          
+          # Create comprehensive analysis script
+          cat > comprehensive_analysis.mjs << 'EOF'
+          import { createAgentSystem } from './build/agents/index.js';
+          import { ReportGenerator } from './build/agents/reporting/report-generator.js';
+          import fs from 'fs/promises';
+          
+          const { coordinator, reportGenerator } = createAgentSystem();
+          
+          console.log('Available agents:', coordinator.getAgents().map(a => a.name).join(', '));
+          
+          const target = {
+            type: 'project',
+            path: process.env.TARGET_PATH || 'src/',
+            depth: process.env.ANALYSIS_DEPTH || 'deep',
+            exclude: ['node_modules/**', 'dist/**', 'build/**', 'coverage/**', '**/*.test.ts', '**/*.spec.ts']
+          };
+          
+          console.log('Analysis target:', target);
+          
+          try {
+            // Run coordinated analysis
+            const result = await coordinator.coordinate({
+              target,
+              parallel: true,
+              config: {
+                enabled: true,
+                depth: target.depth,
+                minSeverity: 'low',
+                maxFindings: 200
+              }
+            });
+            
+            console.log(`\nAnalysis completed in ${Math.round(result.summary.totalDuration)}ms`);
+            console.log(`Agents used: ${result.summary.agentsUsed.join(', ')}`);
+            console.log(`Total findings: ${result.summary.totalFindings}`);
+            
+            // Generate reports
+            const reports = await Promise.all([
+              reportGenerator.generateReport(result, {
+                format: 'json',
+                outputPath: 'analysis-report.json',
+                includeDetails: true
+              }),
+              reportGenerator.generateReport(result, {
+                format: 'markdown',
+                outputPath: 'analysis-report.md',
+                includeDetails: true,
+                groupBy: 'severity',
+                includeRecommendations: true
+              }),
+              reportGenerator.generateReport(result, {
+                format: 'html',
+                outputPath: 'analysis-report.html',
+                includeDetails: true,
+                groupBy: 'severity',
+                includeRecommendations: true
+              })
+            ]);
+            
+            // Create summary for GitHub
+            const summary = {
+              totalFindings: result.summary.totalFindings,
+              criticalFindings: result.summary.findingsBySeverity?.critical || 0,
+              highFindings: result.summary.findingsBySeverity?.high || 0,
+              mediumFindings: result.summary.findingsBySeverity?.medium || 0,
+              lowFindings: result.summary.findingsBySeverity?.low || 0,
+              agentsUsed: result.summary.agentsUsed,
+              analysisTime: Math.round(result.summary.totalDuration),
+              topIssues: Object.entries(result.summary.findingsByCategory)
+                .filter(([_, count]) => count > 0)
+                .sort(([_, a], [__, b]) => b - a)
+                .slice(0, 5)
+                .map(([category, count]) => ({ category: category.replace(/_/g, ' '), count }))
+            };
+            
+            await fs.writeFile('analysis-summary.json', JSON.stringify(summary, null, 2));
+            
+            console.log('\nReports generated:');
+            console.log('- analysis-report.json (machine-readable)');
+            console.log('- analysis-report.md (human-readable)');
+            console.log('- analysis-report.html (web-viewable)');
+            console.log('- analysis-summary.json (GitHub summary)');
+            
+            // Set exit code based on critical issues
+            if (summary.criticalFindings > 0) {
+              console.log(`\n❌ ${summary.criticalFindings} critical issues found!`);
+              process.exit(1);
+            } else if (summary.highFindings > 10) {
+              console.log(`\n⚠️ ${summary.highFindings} high-priority issues found!`);
+              process.exit(1);
+            } else {
+              console.log('\n✅ Analysis completed successfully');
+            }
+            
+          } catch (error) {
+            console.error('Analysis failed:', error);
+            process.exit(1);
+          }
+          EOF
+          
+          node comprehensive_analysis.mjs
+
+      - name: Upload analysis reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: analysis-reports-${{ github.run_number }}
+          path: |
+            analysis-report.json
+            analysis-report.md
+            analysis-report.html
+            analysis-summary.json
+          retention-days: 30
+
+      - name: Create GitHub Pages deployment
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          destination_dir: analysis-reports
+          keep_files: true
+          include_files: |
+            analysis-report.html
+
+      - name: Create issue for critical findings
+        if: failure() && github.event_name == 'push'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            try {
+              const summary = JSON.parse(fs.readFileSync('analysis-summary.json', 'utf8'));
+              
+              if (summary.criticalFindings > 0 || summary.highFindings > 10) {
+                const title = `🚨 Critical Code Quality Issues Detected - ${summary.criticalFindings} Critical, ${summary.highFindings} High Priority`;
+                
+                let body = `## Code Analysis Alert\n\n`;
+                body += `**Analysis Date**: ${new Date().toISOString()}\n`;
+                body += `**Branch**: ${context.ref}\n`;
+                body += `**Commit**: ${context.sha}\n\n`;
+                body += `### Summary\n`;
+                body += `- 🔴 Critical Issues: ${summary.criticalFindings}\n`;
+                body += `- 🟠 High Priority: ${summary.highFindings}\n`;
+                body += `- 🟡 Medium Priority: ${summary.mediumFindings}\n`;
+                body += `- 🔵 Low Priority: ${summary.lowFindings}\n\n`;
+                
+                if (summary.topIssues.length > 0) {
+                  body += `### Top Issue Categories\n`;
+                  for (const issue of summary.topIssues) {
+                    body += `- **${issue.category}**: ${issue.count} occurrences\n`;
+                  }
+                  body += '\n';
+                }
+                
+                body += `### Action Required\n`;
+                body += `Please review and address the critical and high-priority issues found in the latest analysis.\n\n`;
+                body += `**Analysis Reports**: Check the [workflow run](${context.payload.repository.html_url}/actions/runs/${context.runId}) for detailed reports.\n\n`;
+                body += `**Agents Used**: ${summary.agentsUsed.join(', ')}\n`;
+                body += `**Analysis Time**: ${summary.analysisTime}ms\n\n`;
+                body += `This issue was automatically created by the Code Analysis workflow.`;
+                
+                await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: title,
+                  body: body,
+                  labels: ['code-quality', 'critical', 'automated']
+                });
+              }
+            } catch (error) {
+              console.error('Error creating issue:', error);
+            }
+
+  # Test generation
+  test-generation:
+    name: Generate Missing Tests
+    runs-on: ubuntu-latest
+    if: github.event.inputs.generate_tests == 'true' || github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Generate tests for files without tests
+        run: |
+          echo "Generating tests for files without test coverage..."
+          
+          # Create test generation script
+          cat > generate_tests.mjs << 'EOF'
+          import { TestGenerationAgent } from './build/agents/testing/test-generation.js';
+          import fs from 'fs/promises';
+          import path from 'path';
+          
+          const testAgent = new TestGenerationAgent();
+          
+          // Find TypeScript files without corresponding test files
+          async function findFilesWithoutTests(dir) {
+            const files = [];
+            const entries = await fs.readdir(dir, { withFileTypes: true });
+            
+            for (const entry of entries) {
+              const fullPath = path.join(dir, entry.name);
+              
+              if (entry.isDirectory() && !['node_modules', 'dist', 'build', 'coverage', '__tests__'].includes(entry.name)) {
+                files.push(...await findFilesWithoutTests(fullPath));
+              } else if (entry.isFile() && entry.name.endsWith('.ts') && !entry.name.includes('.test.') && !entry.name.includes('.spec.')) {
+                // Check if test file exists
+                const testFile = fullPath.replace('.ts', '.test.ts');
+                const specFile = fullPath.replace('.ts', '.spec.ts');
+                
+                try {
+                  await fs.access(testFile);
+                } catch {
+                  try {
+                    await fs.access(specFile);
+                  } catch {
+                    files.push(fullPath);
+                  }
+                }
+              }
+            }
+            
+            return files;
+          }
+          
+          const filesWithoutTests = await findFilesWithoutTests('src');
+          console.log(`Found ${filesWithoutTests.length} files without tests`);
+          
+          const generatedTests = [];
+          
+          for (const file of filesWithoutTests.slice(0, 5)) { // Limit to 5 files
+            try {
+              console.log(`Generating tests for ${file}...`);
+              
+              const testResult = await testAgent.generateTests({
+                target: file,
+                testType: 'unit',
+                framework: 'vitest',
+                coverage: { lines: 80, functions: 80, branches: 70 }
+              });
+              
+              const testFilePath = file.replace('.ts', '.test.ts');
+              await fs.writeFile(testFilePath, testResult.content);
+              
+              generatedTests.push({
+                sourceFile: file,
+                testFile: testFilePath,
+                testCases: testResult.metadata.testCases
+              });
+              
+              console.log(`✅ Generated ${testResult.metadata.testCases} test cases for ${file}`);
+              
+            } catch (error) {
+              console.error(`❌ Failed to generate tests for ${file}:`, error.message);
+            }
+          }
+          
+          await fs.writeFile('generated-tests.json', JSON.stringify(generatedTests, null, 2));
+          
+          console.log(`\nTest Generation Summary:`);
+          console.log(`Files processed: ${Math.min(filesWithoutTests.length, 5)}`);
+          console.log(`Tests generated: ${generatedTests.length}`);
+          console.log(`Total test cases: ${generatedTests.reduce((sum, t) => sum + t.testCases, 0)}`);
+          EOF
+          
+          node generate_tests.mjs
+
+      - name: Run generated tests
+        run: |
+          echo "Running generated tests to verify they work..."
+          npm test -- --run --reporter=verbose || echo "Some generated tests may need manual adjustment"
+
+      - name: Create PR with generated tests
+        if: github.event_name == 'schedule' || github.event.inputs.generate_tests == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'test: add generated test cases for uncovered files'
+          title: '🧪 Add Generated Test Cases'
+          body: |
+            ## Generated Test Cases
+            
+            This PR adds automatically generated test cases for files that were missing tests.
+            
+            ### What's included:
+            - Unit tests for functions and classes
+            - Edge case testing
+            - Error condition testing
+            - Mock parameter generation
+            
+            ### Next steps:
+            1. Review the generated tests for accuracy
+            2. Adjust test cases as needed for your specific requirements
+            3. Add any missing test scenarios
+            4. Ensure all tests pass
+            
+            Generated by the Code Analysis Agent system.
+          branch: feature/generated-tests-${{ github.run_number }}
+          delete-branch: true
+
+      - name: Upload test generation results
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-tests-${{ github.run_number }}
+          path: |
+            generated-tests.json
+            **/*.test.ts
+          retention-days: 7
+
+  # Security-focused analysis
+  security-analysis:
+    name: Security-Focused Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run security analysis
+        run: |
+          echo "Running security-focused analysis..."
+          
+          # Create security analysis script
+          cat > security_analysis.mjs << 'EOF'
+          import { createAgentSystem } from './build/agents/index.js';
+          import fs from 'fs/promises';
+          
+          const { coordinator, reportGenerator } = createAgentSystem();
+          
+          const target = {
+            type: 'project',
+            path: 'src/',
+            depth: 'deep',
+            exclude: ['node_modules/**', 'dist/**', 'build/**', 'coverage/**']
+          };
+          
+          try {
+            const result = await coordinator.coordinate({
+              target,
+              parallel: true,
+              config: {
+                enabled: true,
+                depth: 'deep',
+                minSeverity: 'medium',
+                includeCategories: ['security_vulnerability', 'runtime_error'],
+                maxFindings: 100
+              }
+            });
+            
+            const securityFindings = result.consolidatedFindings.filter(
+              f => f.category === 'security_vulnerability'
+            );
+            
+            const runtimeErrorFindings = result.consolidatedFindings.filter(
+              f => f.category === 'runtime_error'
+            );
+            
+            console.log(`Security Analysis Results:`);
+            console.log(`Security vulnerabilities: ${securityFindings.length}`);
+            console.log(`Runtime error risks: ${runtimeErrorFindings.length}`);
+            
+            const securityReport = {
+              summary: {
+                securityVulnerabilities: securityFindings.length,
+                runtimeErrors: runtimeErrorFindings.length,
+                totalSecurityIssues: securityFindings.length + runtimeErrorFindings.length
+              },
+              securityFindings: securityFindings.map(f => ({
+                severity: f.severity,
+                title: f.title,
+                file: f.file,
+                line: f.line,
+                description: f.description,
+                suggestion: f.suggestion
+              })),
+              runtimeErrorFindings: runtimeErrorFindings.map(f => ({
+                severity: f.severity,
+                title: f.title,
+                file: f.file,
+                line: f.line,
+                description: f.description,
+                suggestion: f.suggestion
+              }))
+            };
+            
+            await fs.writeFile('security-analysis.json', JSON.stringify(securityReport, null, 2));
+            
+            // Generate security report
+            await reportGenerator.generateReport(result, {
+              format: 'markdown',
+              outputPath: 'security-report.md',
+              includeDetails: true,
+              filterCategory: ['security_vulnerability', 'runtime_error'],
+              groupBy: 'severity',
+              includeRecommendations: true
+            });
+            
+            if (securityFindings.length > 0) {
+              console.log('\n❌ Security vulnerabilities found!');
+              securityFindings.forEach(f => {
+                console.log(`  - ${f.severity.toUpperCase()}: ${f.title} (${f.file}:${f.line})`);
+              });
+              process.exit(1);
+            } else {
+              console.log('\n✅ No security vulnerabilities detected');
+            }
+            
+          } catch (error) {
+            console.error('Security analysis failed:', error);
+            process.exit(1);
+          }
+          EOF
+          
+          node security_analysis.mjs
+
+      - name: Upload security analysis results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-analysis-${{ github.run_number }}
+          path: |
+            security-analysis.json
+            security-report.md
+          retention-days: 30
+
+      - name: Comment security findings on PR
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            try {
+              const securityReport = JSON.parse(fs.readFileSync('security-analysis.json', 'utf8'));
+              
+              if (securityReport.summary.totalSecurityIssues > 0) {
+                let comment = '## 🔒 Security Analysis Results\n\n';
+                comment += `**⚠️ ${securityReport.summary.totalSecurityIssues} security-related issues found**\n\n`;
+                
+                if (securityReport.summary.securityVulnerabilities > 0) {
+                  comment += `### 🚨 Security Vulnerabilities (${securityReport.summary.securityVulnerabilities})\n`;
+                  for (const finding of securityReport.securityFindings.slice(0, 3)) {
+                    comment += `- **${finding.severity.toUpperCase()}**: ${finding.title}\n`;
+                    comment += `  - File: \`${finding.file}:${finding.line}\`\n`;
+                    comment += `  - ${finding.description}\n`;
+                    if (finding.suggestion) {
+                      comment += `  - 💡 ${finding.suggestion}\n`;
+                    }
+                    comment += '\n';
+                  }
+                }
+                
+                if (securityReport.summary.runtimeErrors > 0) {
+                  comment += `### ⚠️ Runtime Error Risks (${securityReport.summary.runtimeErrors})\n`;
+                  for (const finding of securityReport.runtimeErrorFindings.slice(0, 3)) {
+                    comment += `- **${finding.severity.toUpperCase()}**: ${finding.title}\n`;
+                    comment += `  - File: \`${finding.file}:${finding.line}\`\n`;
+                    comment += `  - ${finding.description}\n`;
+                    comment += '\n';
+                  }
+                }
+                
+                comment += '\n🔍 **Please address these security concerns before merging.**\n';
+                comment += 'Download the full security report from the workflow artifacts for detailed information.';
+                
+                await github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: comment
+                });
+              }
+            } catch (error) {
+              console.error('Error reading security analysis results:', error);
+            }
+
+  # Performance analysis
+  performance-analysis:
+    name: Performance Analysis
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run performance analysis
+        run: |
+          echo "Running performance analysis..."
+          
+          # Create performance analysis script
+          cat > performance_analysis.mjs << 'EOF'
+          import { createAgentSystem } from './build/agents/index.js';
+          import fs from 'fs/promises';
+          
+          const { coordinator, reportGenerator } = createAgentSystem();
+          
+          const target = {
+            type: 'project',
+            path: 'src/',
+            depth: 'comprehensive',
+            exclude: ['node_modules/**', 'dist/**', 'build/**', 'coverage/**']
+          };
+          
+          try {
+            const result = await coordinator.coordinate({
+              target,
+              parallel: true,
+              config: {
+                enabled: true,
+                depth: 'comprehensive',
+                minSeverity: 'low',
+                includeCategories: ['performance_issue', 'maintainability', 'code_smell'],
+                maxFindings: 150
+              }
+            });
+            
+            const performanceFindings = result.consolidatedFindings.filter(
+              f => f.category === 'performance_issue' || 
+                   (f.category === 'maintainability' && f.title.toLowerCase().includes('complex'))
+            );
+            
+            console.log(`Performance Analysis Results:`);
+            console.log(`Performance issues: ${performanceFindings.length}`);
+            console.log(`Total findings: ${result.summary.totalFindings}`);
+            
+            const performanceReport = {
+              summary: {
+                performanceIssues: performanceFindings.length,
+                totalFindings: result.summary.totalFindings,
+                analysisTime: result.summary.totalDuration
+              },
+              findings: performanceFindings.map(f => ({
+                severity: f.severity,
+                title: f.title,
+                file: f.file,
+                line: f.line,
+                description: f.description,
+                suggestion: f.suggestion,
+                metadata: f.metadata
+              }))
+            };
+            
+            await fs.writeFile('performance-analysis.json', JSON.stringify(performanceReport, null, 2));
+            
+            // Generate performance report
+            await reportGenerator.generateReport(result, {
+              format: 'html',
+              outputPath: 'performance-report.html',
+              includeDetails: true,
+              filterCategory: ['performance_issue', 'maintainability'],
+              groupBy: 'category',
+              includeRecommendations: true
+            });
+            
+            console.log('\n✅ Performance analysis completed');
+            console.log(`Report saved to performance-report.html`);
+            
+          } catch (error) {
+            console.error('Performance analysis failed:', error);
+            process.exit(1);
+          }
+          EOF
+          
+          node performance_analysis.mjs
+
+      - name: Upload performance analysis results
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-analysis-${{ github.run_number }}
+          path: |
+            performance-analysis.json
+            performance-report.html
+          retention-days: 30

@@ -29,6 +29,7 @@ import { createAdvancedSearchTools } from './tools/advanced-search.js';
 import { createProjectManagementTools } from './tools/project-management.js';
 import { createBatchOperationsTools } from './tools/batch-operations.js';
 import { createOptimizedRepositoryTools } from './tools/optimized-repositories.js';
+import { createAgentTools } from './agents/tools/agent-tools.js';
 import { createCacheManagementTools } from './tools/cache-management.js';
 import { validateEnvironmentConfiguration } from './validation.js';
 
@@ -120,6 +121,7 @@ export class GitHubMCPServer {
       if (!testMode && process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
         process.exit(1);
       } else if (testMode) {
+        throw new Error('Environment validation failed: ' + envValidation.errors.join(', '));
  claude/issue-38-20250810-0103
         // In test mode, avoid throwing in constructor to prevent side effects.
         // Consumers can inspect `envValidation.errors` or `server` state, or throw during start().
@@ -321,8 +323,8 @@ export class GitHubMCPServer {
     this.server.tool(
       config.tool.name,
       config.tool.description || 'GitHub API operation',
-      z.object(zodSchema),
-      async (args: Record<string, unknown>) => {
+      zodSchema,
+      async (args: Record<string, unknown>, extra: unknown) => {
         const startTime = Date.now();
         const toolName = config.tool.name;
         try {
@@ -656,6 +658,11 @@ export class GitHubMCPServer {
     ];
     perfTools.forEach(tool => this.registerTool(tool));
     // Performance monitoring tools registered
+
+    // Register code analysis agent tools
+    const agentTools = createAgentTools();
+    agentTools.forEach(tool => this.registerTool(tool));
+    // Code analysis agent tools registered
 
     // Total tools registered successfully
   }
