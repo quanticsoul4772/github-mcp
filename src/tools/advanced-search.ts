@@ -1,5 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import { GraphQLPaginationHandler, GraphQLPaginationOptions, GraphQLPaginationUtils } from '../graphql-pagination-handler.js';
 import {
   validateGraphQLInput,
   validateGraphQLVariableValue,
@@ -31,6 +32,7 @@ import { withErrorHandling } from '../errors.js';
  */
 export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
+  const paginationHandler = new GraphQLPaginationHandler(octokit);
 
   // Cross-repository search tool
   tools.push({
@@ -59,11 +61,50 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
             type: 'string',
             description: 'Cursor for pagination',
           },
+          autoPage: {
+            type: 'boolean',
+            description: 'Automatically paginate through all results',
+          },
+          maxPages: {
+            type: 'number',
+            description: 'Maximum number of pages to fetch (default 10)',
+            minimum: 1,
+          },
+          maxItems: {
+            type: 'number',
+            description: 'Maximum number of items to fetch across all pages',
+            minimum: 1,
+          },
         },
         required: ['query', 'type'],
       },
     },
     handler: async (args: any) => {
+      try {
+        GraphQLPaginationUtils.validatePaginationParams(args);
+      } catch (error) {
+        throw new Error(`Invalid pagination parameters: ${error.message}`);
+      }
+
+      const queryBuilder = paginationHandler.createSearchQuery(args.query, args.type);
+
+      const paginationOptions: GraphQLPaginationOptions = {
+        first: args.first,
+        after: args.after,
+        autoPage: args.autoPage,
+        maxPages: args.maxPages,
+        maxItems: args.maxItems,
+      };
+
+      const result = await paginationHandler.paginate(queryBuilder, paginationOptions);
+
+      return {
+        totalCount: result.totalCount,
+        hasNextPage: result.hasMore,
+        endCursor: result.nextCursor,
+        pageInfo: result.pageInfo,
+        results: result.data,
+      };
       // Validate and sanitize input parameters
       const validatedArgs = validateGraphQLInput(CrossRepoSearchSchema, args, 'search_across_repos');
       

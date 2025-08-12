@@ -1,5 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import { GraphQLPaginationHandler, GraphQLPaginationOptions, GraphQLPaginationUtils } from '../graphql-pagination-handler.js';
 import { OptimizedAPIClient } from '../optimized-api-client.js';
 import { cachedGraphQL, smartGraphQL, GraphQLTTL } from '../graphql-utils.js';
 import { typedGraphQL, createTypedHandler } from '../graphql-utils.js';
@@ -21,6 +22,9 @@ interface ListDiscussionsParams {
   category?: string;
   after?: string;
   perPage?: number;
+  autoPage?: boolean;
+  maxPages?: number;
+  maxItems?: number;
 }
 
 interface GetDiscussionParams {
@@ -35,6 +39,9 @@ interface GetDiscussionCommentsParams {
   discussionNumber: number;
   after?: string;
   perPage?: number;
+  autoPage?: boolean;
+  maxPages?: number;
+  maxItems?: number;
 }
 
 interface ListDiscussionCategoriesParams {
@@ -97,6 +104,7 @@ export function createDiscussionTools(
  */
 export function createDiscussionTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
+  const paginationHandler = new GraphQLPaginationHandler(octokit);
 
   // Note: GitHub Discussions are accessed through GraphQL API
   // These are simplified implementations - full GraphQL support would be more complex
@@ -131,10 +139,46 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
             minimum: 1,
             maximum: 100,
           },
+          autoPage: {
+            type: 'boolean',
+            description: 'Automatically paginate through all results',
+          },
+          maxPages: {
+            type: 'number',
+            description: 'Maximum number of pages to fetch (default 10)',
+            minimum: 1,
+          },
+          maxItems: {
+            type: 'number',
+            description: 'Maximum number of items to fetch across all pages',
+            minimum: 1,
+          },
         },
         required: ['owner', 'repo'],
       },
     },
+    handler: async (args: ListDiscussionsParams) => {
+      try {
+        GraphQLPaginationUtils.validatePaginationParams(args);
+      } catch (error) {
+        throw new Error(`Invalid pagination parameters: ${error.message}`);
+      }
+
+      const queryBuilder = paginationHandler.createDiscussionsQuery(
+        args.owner,
+        args.repo,
+        args.category
+      );
+
+      const paginationOptions: GraphQLPaginationOptions = {
+        first: args.perPage,
+        after: args.after,
+        autoPage: args.autoPage,
+        maxPages: args.maxPages,
+        maxItems: args.maxItems,
+      };
+
+      const result = await paginationHandler.paginate(queryBuilder, paginationOptions);
     handler: createTypedHandler<ListDiscussionsParams, any>(async (args: ListDiscussionsParams) => {
       const query = `
         query($owner: String!, $repo: String!, $first: Int!, $after: String, $categoryId: ID) {
@@ -185,10 +229,11 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
       });
 
       return {
-        total_count: result.repository.discussions.totalCount,
-        has_next_page: result.repository.discussions.pageInfo.hasNextPage,
-        end_cursor: result.repository.discussions.pageInfo.endCursor,
-        discussions: result.repository.discussions.nodes,
+        total_count: result.totalCount,
+        has_next_page: result.hasMore,
+        end_cursor: result.nextCursor,
+        page_info: result.pageInfo,
+        discussions: result.data,
       };
     }),
   });
@@ -306,54 +351,46 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
             minimum: 1,
             maximum: 100,
           },
+          autoPage: {
+            type: 'boolean',
+            description: 'Automatically paginate through all results',
+          },
+          maxPages: {
+            type: 'number',
+            description: 'Maximum number of pages to fetch (default 10)',
+            minimum: 1,
+          },
+          maxItems: {
+            type: 'number',
+            description: 'Maximum number of items to fetch across all pages',
+            minimum: 1,
+          },
         },
         required: ['owner', 'repo', 'discussionNumber'],
       },
     },
     handler: async (args: GetDiscussionCommentsParams) => {
-      const query = `
-        query($owner: String!, $repo: String!, $number: Int!, $first: Int!, $after: String) {
-          repository(owner: $owner, name: $repo) {
-            discussion(number: $number) {
-              comments(first: $first, after: $after) {
-                totalCount
-                pageInfo {
-                  hasNextPage
-                  endCursor
-                }
-                nodes {
-                  id
-                  body
-                  bodyHTML
-                  createdAt
-                  updatedAt
-                  author {
-                    login
-                    avatarUrl
-                  }
-                  upvoteCount
-                  viewerHasUpvoted
-                  viewerCanUpvote
-                  viewerCanDelete
-                  viewerCanUpdate
-                  replies(first: 5) {
-                    totalCount
-                    nodes {
-                      id
-                      body
-                      createdAt
-                      author {
-                        login
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      `;
+      try {
+        GraphQLPaginationUtils.validatePaginationParams(args);
+      } catch (error) {
+        throw new Error(`Invalid pagination parameters: ${error.message}`);
+      }
 
+      const queryBuilder = paginationHandler.createDiscussionCommentsQuery(
+        args.owner,
+        args.repo,
+        args.discussionNumber
+      );
+
+      const paginationOptions: GraphQLPaginationOptions = {
+        first: args.perPage,
+        after: args.after,
+        autoPage: args.autoPage,
+        maxPages: args.maxPages,
+        maxItems: args.maxItems,
+      };
+
+      const result = await paginationHandler.paginate(queryBuilder, paginationOptions);
       const result: any = await cachedGraphQL(client, query, {
       const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
@@ -367,10 +404,11 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
       });
 
       return {
-        total_count: result.repository.discussion.comments.totalCount,
-        has_next_page: result.repository.discussion.comments.pageInfo.hasNextPage,
-        end_cursor: result.repository.discussion.comments.pageInfo.endCursor,
-        comments: result.repository.discussion.comments.nodes,
+        total_count: result.totalCount,
+        has_next_page: result.hasMore,
+        end_cursor: result.nextCursor,
+        page_info: result.pageInfo,
+        comments: result.data,
       };
     },
   });

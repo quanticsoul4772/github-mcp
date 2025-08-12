@@ -1,5 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import { GraphQLPaginationHandler, GraphQLPaginationOptions, GraphQLPaginationUtils } from '../graphql-pagination-handler.js';
 import {
   validateGraphQLInput,
   validateGraphQLVariableValue,
@@ -32,6 +33,7 @@ import { withErrorHandling } from '../errors.js';
  */
 export function createProjectManagementTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
+  const paginationHandler = new GraphQLPaginationHandler(octokit);
 
   // Get project boards (GitHub Projects V2)
   tools.push({
@@ -905,6 +907,157 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
         },
         { tool: 'get_cross_repo_project_view', repositories: args.repositories }
       );
+    },
+  });
+
+  // Get project items with pagination
+  tools.push({
+    tool: {
+      name: 'get_project_items_paginated',
+      description: 'Get project items with proper pagination support',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          projectId: {
+            type: 'string',
+            description: 'Project ID (GraphQL Node ID)',
+          },
+          first: {
+            type: 'number',
+            description: 'Number of items to return per page (min 1, max 100)',
+            minimum: 1,
+            maximum: 100,
+          },
+          after: {
+            type: 'string',
+            description: 'Cursor for pagination',
+          },
+          autoPage: {
+            type: 'boolean',
+            description: 'Automatically paginate through all results',
+          },
+          maxPages: {
+            type: 'number',
+            description: 'Maximum number of pages to fetch (default 10)',
+            minimum: 1,
+          },
+          maxItems: {
+            type: 'number',
+            description: 'Maximum number of items to fetch across all pages',
+            minimum: 1,
+          },
+        },
+        required: ['projectId'],
+      },
+    },
+    handler: async (args: any) => {
+      try {
+        GraphQLPaginationUtils.validatePaginationParams(args);
+      } catch (error) {
+        throw new Error(`Invalid pagination parameters: ${error.message}`);
+      }
+
+      const queryBuilder = paginationHandler.createProjectItemsQuery(args.projectId);
+
+      const paginationOptions: GraphQLPaginationOptions = {
+        first: args.first,
+        after: args.after,
+        autoPage: args.autoPage,
+        maxPages: args.maxPages,
+        maxItems: args.maxItems,
+      };
+
+      const result = await paginationHandler.paginate(queryBuilder, paginationOptions);
+
+      return {
+        totalCount: result.totalCount,
+        hasNextPage: result.hasMore,
+        endCursor: result.nextCursor,
+        pageInfo: result.pageInfo,
+        items: result.data,
+      };
+    },
+  });
+
+  // Get repository collaborators with pagination
+  tools.push({
+    tool: {
+      name: 'get_collaborators_paginated',
+      description: 'Get repository collaborators with comprehensive pagination',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          owner: {
+            type: 'string',
+            description: 'Repository owner',
+          },
+          repo: {
+            type: 'string',
+            description: 'Repository name',
+          },
+          affiliation: {
+            type: 'string',
+            description: 'Filter by affiliation',
+            enum: ['ALL', 'DIRECT', 'OUTSIDE'],
+          },
+          first: {
+            type: 'number',
+            description: 'Number of collaborators to return per page (min 1, max 100)',
+            minimum: 1,
+            maximum: 100,
+          },
+          after: {
+            type: 'string',
+            description: 'Cursor for pagination',
+          },
+          autoPage: {
+            type: 'boolean',
+            description: 'Automatically paginate through all results',
+          },
+          maxPages: {
+            type: 'number',
+            description: 'Maximum number of pages to fetch (default 10)',
+            minimum: 1,
+          },
+          maxItems: {
+            type: 'number',
+            description: 'Maximum number of items to fetch across all pages',
+            minimum: 1,
+          },
+        },
+        required: ['owner', 'repo'],
+      },
+    },
+    handler: async (args: any) => {
+      try {
+        GraphQLPaginationUtils.validatePaginationParams(args);
+      } catch (error) {
+        throw new Error(`Invalid pagination parameters: ${error.message}`);
+      }
+
+      const queryBuilder = paginationHandler.createCollaboratorsQuery(
+        args.owner,
+        args.repo,
+        args.affiliation
+      );
+
+      const paginationOptions: GraphQLPaginationOptions = {
+        first: args.first,
+        after: args.after,
+        autoPage: args.autoPage,
+        maxPages: args.maxPages,
+        maxItems: args.maxItems,
+      };
+
+      const result = await paginationHandler.paginate(queryBuilder, paginationOptions);
+
+      return {
+        totalCount: result.totalCount,
+        hasNextPage: result.hasMore,
+        endCursor: result.nextCursor,
+        pageInfo: result.pageInfo,
+        collaborators: result.data,
+      };
     },
   });
 
