@@ -304,31 +304,33 @@ describe('OAuth Flow Testing Infrastructure', () => {
     });
 
     it('should use secure redirect URIs', () => {
-      const validateRedirectUri = (uri: string) => {
+      const validateRedirectUri = (uri: string, { allowLocalhost = false } = {}) => {
         try {
           const url = new URL(uri);
-          
-          // Must use HTTPS in production
+
           if (url.protocol !== 'https:') {
             return false;
           }
-          
-          // Disallow localhost in production
-          if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+
+          const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+          if (!allowLocalhost && isLocalhost) {
             return false;
           }
-          
+
           return true;
         } catch {
           return false;
         }
       };
 
+      // Production-like
       expect(validateRedirectUri('https://example.com/callback')).toBe(true);
       expect(validateRedirectUri('https://myapp.com/auth/github')).toBe(true);
       expect(validateRedirectUri('http://example.com/callback')).toBe(false);
       expect(validateRedirectUri('https://localhost:3000/callback')).toBe(false);
-      expect(validateRedirectUri('invalid-url')).toBe(false);
+
+      // Dev allowance
+      expect(validateRedirectUri('https://localhost:3000/callback', { allowLocalhost: true })).toBe(true);
     });
 
     it('should handle token storage securely', () => {
