@@ -255,10 +255,13 @@ export class GitHubRateLimiter {
           // Extract rate limit headers if available
           if (result && typeof result === 'object' && 'headers' in result) {
             this.updateRateLimit((result as any).headers, 'graphql');
+          // Extract rate limit headers if available (GraphQL often lacks headers in response objects)
+          if (result && typeof result === 'object' && (result as any).headers) {
+            this.updateRateLimit((result as any).headers, 'graphql');
+          } else {
+            // Fallback: do not alter server-derived remaining here; rely on periodic status fetch or errors to update.
+            // Optionally, consider scheduling a lightweight rate_limit REST query elsewhere to refresh headers.
           }
-
-          // Update our point tracking
-          this.updateGraphQLPoints(estimatedPoints, query);
 
           return result;
         } catch (error) {
