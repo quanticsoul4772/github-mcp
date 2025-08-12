@@ -608,13 +608,14 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
               });
             } catch (error) {
               // Log error for this repository but continue with others
-              console.warn(`Failed to fetch data for repository ${repoInfo.owner}/${repoInfo.repo}:`, error);
+              const errorMsg = (error && typeof error === 'object' && 'message' in error) ? (error as any).message : String(error);
+              console.warn(`Failed to fetch data for repository ${repoInfo.owner}/${repoInfo.repo}:`, errorMsg);
               results.push({
                 repository: {
                   name: repoInfo.repo,
                   nameWithOwner: `${repoInfo.owner}/${repoInfo.repo}`,
                   url: `https://github.com/${repoInfo.owner}/${repoInfo.repo}`,
-                  error: `Failed to fetch repository data: ${error.message}`,
+                  error: `Failed to fetch repository data: ${errorMsg}`,
                 },
                 issues: [],
                 pullRequests: [],
