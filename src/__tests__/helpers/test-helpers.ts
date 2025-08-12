@@ -151,3 +151,180 @@ export const validateResponseStructure = (response: any, expectedKeys: string[])
     expect(responseKeys).toContain(key);
   }
 };
+
+/**
+ * Retry a function with exponential backoff
+ */
+export const retry = async <T>(
+  fn: () => Promise<T>,
+  options: {
+    retries?: number;
+    delay?: number;
+    backoffFactor?: number;
+    maxDelay?: number;
+  } = {}
+): Promise<T> => {
+  const {
+    retries = 3,
+    delay = 100,
+    backoffFactor = 2,
+    maxDelay = 5000
+  } = options;
+
+  let attempt = 0;
+  let lastError: Error;
+
+  while (attempt <= retries) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+      attempt++;
+
+      if (attempt > retries) {
+        throw lastError;
+      }
+
+      const currentDelay = Math.min(delay * Math.pow(backoffFactor, attempt - 1), maxDelay);
+      await sleep(currentDelay);
+    }
+  }
+
+  throw lastError!;
+};
+
+/**
+ * Wait for a condition to be true with timeout
+ */
+export const waitFor = async (
+  condition: () => boolean | Promise<boolean>,
+  options: {
+    timeout?: number;
+    interval?: number;
+  } = {}
+): Promise<void> => {
+  const { timeout = 5000, interval = 100 } = options;
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeout) {
+    const result = await condition();
+    if (result) {
+      return;
+    }
+    await sleep(interval);
+  }
+
+  throw new Error(`Condition not met within ${timeout}ms timeout`);
+};
+
+/**
+ * Create a timeout wrapper for async operations with proper cleanup
+ */
+export const withTimeout = <T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message = `Operation timed out after ${timeoutMs}ms`
+): Promise<T> => {
+  let timeoutId: NodeJS.Timeout;
+  
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  
+  return Promise.race([
+    promise.finally(() => clearTimeout(timeoutId)),
+    timeoutPromise,
+  ]);
+};
+
+  const fixed = fixedTime ? new Date(fixedTime) : new Date('2024-01-01T12:00:00Z');
+  const OriginalDate = Date;
+
+  // Mock Date that supports both constructor and direct call semantics
+  const MockDate: any = function (this: any, ...args: any[]) {
+    if (!(this instanceof OriginalDate)) {
+      // called without new
+      return args.length ? new OriginalDate(args[0]) : new OriginalDate(fixed);
+    }
+    // called with new
+    return args.length ? new OriginalDate(args[0]) : new OriginalDate(fixed);
+  };
+
+  // Copy static methods
+  MockDate.now = vi.fn(() => fixed.getTime());
+  MockDate.parse = OriginalDate.parse.bind(OriginalDate);
+  MockDate.UTC = OriginalDate.UTC.bind(OriginalDate);
+  MockDate.prototype = OriginalDate.prototype;
+
+  (global as any).Date = MockDate;
+
+  return {
+    restore: () => {
+      (global as any).Date = OriginalDate;
+    },
+    setTime: (newTime: Date | string | number) => {
+      const newFixed = new Date(newTime);
+      MockDate.now.mockReturnValue(newFixed.getTime());
+      // Adjust default fixed time for no-arg construction
+      (global as any).Date = function (this: any, ...args: any[]) {
+        if (!(this instanceof OriginalDate)) {
+          return args.length ? new OriginalDate(args[0]) : new OriginalDate(newFixed);
+        }
+        return args.length ? new OriginalDate(args[0]) : new OriginalDate(newFixed);
+      } as any;
+      (global as any).Date.now = MockDate.now;
+      (global as any).Date.parse = MockDate.parse;
+      (global as any).Date.UTC = MockDate.UTC;
+      (global as any).Date.prototype = OriginalDate.prototype;
+    }
+/**
+ * Enhanced error assertion with retry logic
+ */
+export const expectEventually = async <T>(
+  fn: () => T | Promise<T>,
+  assertion: (result: T) => void | Promise<void>,
+  options: {
+    timeout?: number;
+    interval?: number;
+    retries?: number;
+  } = {}
+): Promise<T> => {
+  const { timeout = 5000, interval = 100, retries = 3 } = options;
+  
+  return retry(async () => {
+    const result = await withTimeout(Promise.resolve(fn()), timeout);
+    await assertion(result);
+    return result;
+  }, { retries, delay: interval });
+};
+
+/**
+ * Create a flaky test detector
+ */
+export const createFlakeDetector = () => {
+  const results = new Map<string, { passed: number; failed: number }>();
+  
+  return {
+    recordResult: (testName: string, passed: boolean) => {
+      const current = results.get(testName) || { passed: 0, failed: 0 };
+      if (passed) {
+        current.passed++;
+      } else {
+        current.failed++;
+      }
+      results.set(testName, current);
+    },
+    
+    isFlaky: (testName: string, threshold = 0.1) => {
+      const result = results.get(testName);
+      if (!result || result.passed + result.failed < 5) {
+        return false; // Need more runs to determine
+      }
+      const failureRate = result.failed / (result.passed + result.failed);
+      return failureRate > threshold && failureRate < 0.9; // Flaky if sometimes fails
+    },
+    
+    getStats: () => Object.fromEntries(results),
+    clear: () => results.clear(),
+  };
+};

@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { createMockOctokit, mockResponses } from '../mocks/octokit.js';
+import { createMockOctokit, staticMockResponses } from '../mocks/octokit.js';
 import { mockEnvVars, mockProcessExit, restoreProcessExit } from '../helpers/test-helpers.js';
 
 // Mock external dependencies
@@ -109,7 +109,7 @@ describe('GitHub MCP Server Integration', () => {
     it('should execute get_me tool successfully', async () => {
       // Setup mock response
       mockOctokit.rest.users.getAuthenticated.mockResolvedValue({
-        data: mockResponses.user,
+        data: staticMockResponses.user,
       });
 
       // Get the registered handler
@@ -120,13 +120,13 @@ describe('GitHub MCP Server Integration', () => {
 
       expect(result.content).toBeDefined();
       expect(result.content[0].type).toBe('text');
-      expect(result.content[0].text).toContain('test-user');
+      expect(result.content[0].text).toContain('Test User');
     });
 
     it('should execute get_file_contents tool successfully', async () => {
       // Setup mock response
       mockOctokit.rest.repos.getContent.mockResolvedValue({
-        data: mockResponses.fileContent,
+        data: staticMockResponses.fileContent,
       });
 
       // Get the registered handler
@@ -152,7 +152,7 @@ describe('GitHub MCP Server Integration', () => {
     it('should execute list_repositories tool successfully', async () => {
       // Setup mock response
       mockOctokit.rest.repos.listForAuthenticatedUser.mockResolvedValue({
-        data: [mockResponses.repo],
+        data: [staticMockResponses.repo],
       });
 
       // Get the registered handler
@@ -326,10 +326,10 @@ describe('GitHub MCP Server Integration', () => {
     it('should handle concurrent tool executions', async () => {
       // Setup mock responses
       mockOctokit.rest.users.getAuthenticated.mockResolvedValue({
-        data: mockResponses.user,
+        data: staticMockResponses.user,
       });
       mockOctokit.rest.repos.listForAuthenticatedUser.mockResolvedValue({
-        data: [mockResponses.repo],
+        data: [staticMockResponses.repo],
       });
 
       // Execute multiple tools concurrently
@@ -344,14 +344,14 @@ describe('GitHub MCP Server Integration', () => {
       const results = await Promise.all(promises);
 
       expect(results).toHaveLength(2);
-      expect(results[0].content[0].text).toContain('test-user');
+      expect(results[0].content[0].text).toContain('Test User');
       expect(results[1].content[0].text).toContain('test-repo');
     });
 
     it('should handle mixed success and error scenarios', async () => {
       // Setup mixed responses
       mockOctokit.rest.users.getAuthenticated.mockResolvedValue({
-        data: mockResponses.user,
+        data: staticMockResponses.user,
       });
       mockOctokit.rest.repos.get.mockRejectedValue(
         new Error('Repository not found')
@@ -367,7 +367,7 @@ describe('GitHub MCP Server Integration', () => {
       ]);
 
       expect(successResult.isError).toBeUndefined();
-      expect(successResult.content[0].text).toContain('test-user');
+      expect(successResult.content[0].text).toContain('Test User');
 
       expect(errorResult.isError).toBe(true);
       expect(errorResult.content[0].text).toContain('Repository not found');
