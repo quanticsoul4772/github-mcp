@@ -1,6 +1,51 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
 
+interface ListNotificationsParams {
+  filter?: string;
+  since?: string;
+  before?: string;
+  owner?: string;
+  repo?: string;
+  page?: number;
+  perPage?: number;
+}
+
+interface GetNotificationDetailsParams {
+  notificationID: string;
+}
+
+interface GetThreadSubscriptionParams {
+  notificationID: string;
+}
+
+interface GetRepoSubscriptionParams {
+  owner: string;
+  repo: string;
+}
+
+interface DismissNotificationParams {
+  threadID: string;
+  state?: string;
+}
+
+interface MarkAllNotificationsReadParams {
+  lastReadAt?: string;
+  owner?: string;
+  repo?: string;
+}
+
+interface ManageNotificationSubscriptionParams {
+  notificationID: string;
+  action: string;
+}
+
+interface ManageRepositoryNotificationSubscriptionParams {
+  owner: string;
+  repo: string;
+  action: string;
+}
+
 export function createNotificationTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
 
@@ -47,7 +92,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
         },
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: ListNotificationsParams) => {
       let data;
       
       if (args.owner && args.repo) {
@@ -74,7 +119,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
         data = response.data;
       }
 
-      return data.map((notification: any) => ({
+      return data.map((notification) => ({
         id: notification.id,
         unread: notification.unread,
         reason: notification.reason,
@@ -118,7 +163,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
         required: ['notificationID'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetNotificationDetailsParams) => {
       const { data } = await octokit.activity.getThread({
         thread_id: parseInt(args.notificationID),
       });
@@ -167,7 +212,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
         required: ['notificationID'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetThreadSubscriptionParams) => {
       try {
         const { data } = await octokit.activity.getThreadSubscriptionForAuthenticatedUser({
           thread_id: parseInt(args.notificationID),
@@ -213,7 +258,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetRepoSubscriptionParams) => {
       try {
         const { data } = await octokit.activity.getRepoSubscription({
           owner: args.owner,
@@ -263,7 +308,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
           required: ['threadID'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: DismissNotificationParams) => {
         await octokit.activity.markThreadAsRead({
           thread_id: parseInt(args.threadID),
         });
@@ -305,7 +350,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
           },
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: MarkAllNotificationsReadParams) => {
         if (args.owner && args.repo) {
           await octokit.activity.markRepoNotificationsAsRead({
             owner: args.owner,
@@ -351,7 +396,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
           required: ['notificationID', 'action'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: ManageNotificationSubscriptionParams) => {
         const threadId = parseInt(args.notificationID);
 
         if (args.action === 'delete') {
@@ -406,7 +451,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
           required: ['owner', 'repo', 'action'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: ManageRepositoryNotificationSubscriptionParams) => {
         if (args.action === 'delete') {
           await octokit.activity.deleteRepoSubscription({
             owner: args.owner,

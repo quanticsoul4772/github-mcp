@@ -62,7 +62,7 @@ jobs:
 
       - name: Label PRs based on files changed
         if: github.event_name == 'pull_request_target'
-        uses: actions/labeler@v4
+        uses: actions/labeler@v5
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
           configuration-path: .github/labeler.yml

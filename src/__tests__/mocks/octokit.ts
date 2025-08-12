@@ -3,123 +3,6 @@
  */
 import { vi } from 'vitest';
 
-// Mock Octokit constructor
-export const createMockOctokit = () => {
-  const reposMock = {
-    get: vi.fn(),
-    listForAuthenticatedUser: vi.fn(),
-    getContent: vi.fn(),
-    createOrUpdateFileContents: vi.fn(),
-    deleteFile: vi.fn(),
-    listBranches: vi.fn(),
-    createFork: vi.fn(),
-    listCommits: vi.fn(),
-    getCommit: vi.fn(),
-    listReleases: vi.fn(),
-    createRelease: vi.fn(),
-  };
-
-  const issuesMock = {
-    list: vi.fn(),
-    get: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    lock: vi.fn(),
-    unlock: vi.fn(),
-    listComments: vi.fn(),
-    createComment: vi.fn(),
-    updateComment: vi.fn(),
-    deleteComment: vi.fn(),
-    addLabels: vi.fn(),
-    removeLabel: vi.fn(),
-    addAssignees: vi.fn(),
-    removeAssignees: vi.fn(),
-  };
-
-  const pullsMock = {
-    list: vi.fn(),
-    get: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    merge: vi.fn(),
-    listFiles: vi.fn(),
-    createReview: vi.fn(),
-    listReviews: vi.fn(),
-    dismissReview: vi.fn(),
-    listComments: vi.fn(),
-    createReviewComment: vi.fn(),
-  };
-
-  const actionsMock = {
-    listWorkflowRuns: vi.fn(),
-    getWorkflowRun: vi.fn(),
-    cancelWorkflowRun: vi.fn(),
-    listWorkflows: vi.fn(),
-    getWorkflow: vi.fn(),
-    listJobsForWorkflowRun: vi.fn(),
-    downloadWorkflowRunLogs: vi.fn(),
-  };
-
-  const usersMock = {
-    getAuthenticated: vi.fn(),
-    getByUsername: vi.fn(),
-    listFollowersForUser: vi.fn(),
-    listFollowingForUser: vi.fn(),
-  };
-
-  return {
-    // Direct access (used by tools)
-    repos: reposMock,
-    issues: issuesMock,
-    pulls: pullsMock,
-    actions: actionsMock,
-    users: usersMock,
-    
-    // Rest API access (for compatibility)
-    rest: {
-      repos: reposMock,
-      issues: issuesMock,
-      pulls: pullsMock,
-      actions: actionsMock,
-      codeScanning: {
-        listAlertsForRepo: vi.fn(),
-        getAlert: vi.fn(),
-        updateAlert: vi.fn(),
-      },
-      secretScanning: {
-        listAlertsForRepo: vi.fn(),
-        getAlert: vi.fn(),
-        updateAlert: vi.fn(),
-      },
-      dependabot: {
-        listAlertsForRepo: vi.fn(),
-        getAlert: vi.fn(),
-        updateAlert: vi.fn(),
-      },
-      users: usersMock,
-      orgs: {
-        get: vi.fn(),
-        list: vi.fn(),
-        listMembers: vi.fn(),
-        getMembershipForUser: vi.fn(),
-      },
-      activity: {
-        listNotificationsForAuthenticatedUser: vi.fn(),
-        markNotificationsAsRead: vi.fn(),
-        getThread: vi.fn(),
-        markThreadAsRead: vi.fn(),
-      },
-      search: {
-        repos: vi.fn(),
-        code: vi.fn(),
-        issues: vi.fn(),
-        users: vi.fn(),
-      },
-    },
-    graphql: vi.fn(),
-  };
-};
-
 // Import dynamic test data generators
 import { 
   createRepository, 
@@ -181,4 +64,210 @@ export const staticMockResponses = {
     size: 17,
     type: 'file',
   },
+};
+
+// Mock Octokit constructor
+export const createMockOctokit = () => {
+  const mockFn = (returnValue: any) => {
+    const fn = vi.fn();
+    fn.mockResolvedValue({ data: returnValue });
+    return fn;
+  };
+  
+  return {
+    repos: {
+      get: mockFn(mockResponses.repo),
+      listForAuthenticatedUser: mockFn([mockResponses.repo]),
+      getContent: mockFn(mockResponses.fileContent),
+      createOrUpdateFileContents: mockFn({ content: mockResponses.fileContent, commit: mockResponses.commit }),
+      deleteFile: mockFn({ commit: mockResponses.commit }),
+      listBranches: mockFn([{ name: 'main', commit: { sha: 'abc123', url: 'test' }, protected: false }]),
+      createFork: mockFn(mockResponses.repo),
+      listCommits: mockFn([mockResponses.commit]),
+      getCommit: mockFn(mockResponses.commit),
+      listReleases: vi.fn(),
+      createRelease: vi.fn(),
+    },
+    issues: {
+      listForRepo: mockFn([mockResponses.issue]),
+      get: mockFn(mockResponses.issue),
+      create: mockFn(mockResponses.issue),
+      update: mockFn(mockResponses.issue),
+      lock: vi.fn().mockResolvedValue({}),
+      unlock: vi.fn().mockResolvedValue({}),
+      listComments: mockFn([{ id: 1, body: 'Test comment', user: { login: 'test-user' }, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z', html_url: 'test' }]),
+      createComment: mockFn({ id: 1, body: 'Test comment', user: { login: 'test-user' }, created_at: '2024-01-01T00:00:00Z', html_url: 'test' }),
+      updateComment: mockFn({ id: 1, body: 'Updated comment', user: { login: 'test-user' }, updated_at: '2024-01-01T00:00:00Z', html_url: 'test' }),
+      deleteComment: vi.fn().mockResolvedValue({}),
+      addLabels: mockFn([{ name: 'bug', color: 'ff0000', description: 'Bug label' }]),
+      removeLabel: vi.fn().mockResolvedValue({}),
+      addAssignees: vi.fn(),
+      removeAssignees: vi.fn(),
+    },
+    pulls: {
+      list: mockFn([mockResponses.pullRequest]),
+      get: mockFn(mockResponses.pullRequest),
+      create: mockFn(mockResponses.pullRequest),
+      update: mockFn(mockResponses.pullRequest),
+      merge: mockFn({ merged: true, message: 'Pull request merged', sha: 'abc123' }),
+      listFiles: mockFn([{ filename: 'test.js', status: 'modified', additions: 10, deletions: 5, changes: 15, patch: '@@ test patch @@', sha: 'file123', blob_url: 'test', raw_url: 'test', contents_url: 'test' }]),
+      createReview: mockFn({ id: 1, body: 'Test review', state: 'APPROVED', user: { login: 'test-user' }, submitted_at: '2024-01-01T00:00:00Z', html_url: 'test' }),
+      listReviews: mockFn([{ id: 1, user: { login: 'test-user' }, body: 'Test review', state: 'APPROVED', submitted_at: '2024-01-01T00:00:00Z', html_url: 'test' }]),
+      dismissReview: mockFn({ id: 1, state: 'DISMISSED', user: { login: 'test-user' }, body: 'Test review', submitted_at: '2024-01-01T00:00:00Z', html_url: 'test' }),
+      listReviewComments: mockFn([{ id: 1, body: 'Test comment', path: 'test.js', line: 10, side: 'RIGHT', user: { login: 'test-user' }, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z', html_url: 'test' }]),
+      createReviewComment: mockFn({ id: 1, body: 'Test comment', path: 'test.js', line: 10, side: 'RIGHT', user: { login: 'test-user' }, created_at: '2024-01-01T00:00:00Z', html_url: 'test' }),
+    },
+    actions: {
+      listRepoWorkflows: mockFn({ total_count: 1, workflows: [mockResponses.workflow] }),
+      getWorkflow: mockFn(mockResponses.workflow),
+      listWorkflowRuns: mockFn({ total_count: 1, workflow_runs: [mockResponses.workflowRun] }),
+      getWorkflowRun: mockFn(mockResponses.workflowRun),
+      cancelWorkflowRun: vi.fn().mockResolvedValue({ status: 202 }),
+      listJobsForWorkflowRun: mockFn({ total_count: 1, jobs: [{ id: 1, name: 'test', status: 'completed', conclusion: 'success', started_at: '2024-01-01T00:00:00Z', completed_at: '2024-01-01T00:02:00Z', steps: [{ name: 'Checkout', status: 'completed', conclusion: 'success', number: 1 }] }] }),
+      downloadWorkflowRunLogs: vi.fn().mockResolvedValue({ url: 'https://example.com/logs', data: 'Mock log data' }),
+      reRunWorkflow: vi.fn().mockResolvedValue({}),
+      reRunWorkflowFailedJobs: vi.fn().mockResolvedValue({}),
+      deleteWorkflowRunLogs: vi.fn().mockResolvedValue({}),
+    },
+    codeScanning: {
+      listAlertsForRepo: vi.fn(),
+      getAlert: vi.fn(),
+      updateAlert: vi.fn(),
+    },
+    secretScanning: {
+      listAlertsForRepo: vi.fn(),
+      getAlert: vi.fn(),
+      updateAlert: vi.fn(),
+    },
+    dependabot: {
+      listAlertsForRepo: vi.fn(),
+      getAlert: vi.fn(),
+      updateAlert: vi.fn(),
+    },
+    users: {
+      getAuthenticated: vi.fn(),
+      getByUsername: vi.fn(),
+      listFollowersForUser: vi.fn(),
+      listFollowingForUser: vi.fn(),
+    },
+    orgs: {
+      get: vi.fn(),
+      list: vi.fn(),
+      listMembers: vi.fn(),
+      getMembershipForUser: vi.fn(),
+    },
+    activity: {
+      listNotificationsForAuthenticatedUser: vi.fn(),
+      markNotificationsAsRead: vi.fn(),
+      getThread: vi.fn(),
+      markThreadAsRead: vi.fn(),
+    },
+    search: {
+      repos: vi.fn(),
+      code: vi.fn(),
+      issuesAndPullRequests: vi.fn(),
+      users: vi.fn(),
+    },
+    rest: {
+      repos: {
+        get: mockFn(mockResponses.repo),
+        listForAuthenticatedUser: mockFn([mockResponses.repo]),
+        getContent: mockFn(mockResponses.fileContent),
+        createOrUpdateFileContents: mockFn({ content: mockResponses.fileContent, commit: mockResponses.commit }),
+        deleteFile: mockFn({ commit: mockResponses.commit }),
+        listBranches: mockFn([{ name: 'main', commit: { sha: 'abc123', url: 'test' }, protected: false }]),
+        createFork: mockFn(mockResponses.repo),
+        listCommits: mockFn([mockResponses.commit]),
+        getCommit: mockFn(mockResponses.commit),
+        listReleases: vi.fn(),
+        createRelease: vi.fn(),
+      },
+      issues: {
+        listForRepo: mockFn([mockResponses.issue]),
+        get: mockFn(mockResponses.issue),
+        create: mockFn(mockResponses.issue),
+        update: mockFn(mockResponses.issue),
+        lock: vi.fn().mockResolvedValue({}),
+        unlock: vi.fn().mockResolvedValue({}),
+        listComments: mockFn([{ id: 1, body: 'Test comment', user: { login: 'test-user' }, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z', html_url: 'test' }]),
+        createComment: mockFn({ id: 1, body: 'Test comment', user: { login: 'test-user' }, created_at: '2024-01-01T00:00:00Z', html_url: 'test' }),
+        updateComment: mockFn({ id: 1, body: 'Updated comment', user: { login: 'test-user' }, updated_at: '2024-01-01T00:00:00Z', html_url: 'test' }),
+        deleteComment: vi.fn().mockResolvedValue({}),
+        addLabels: mockFn([{ name: 'bug', color: 'ff0000', description: 'Bug label' }]),
+        removeLabel: vi.fn().mockResolvedValue({}),
+        addAssignees: vi.fn(),
+        removeAssignees: vi.fn(),
+      },
+      pulls: {
+        list: mockFn([mockResponses.pullRequest]),
+        get: mockFn(mockResponses.pullRequest),
+        create: mockFn(mockResponses.pullRequest),
+        update: mockFn(mockResponses.pullRequest),
+        merge: mockFn({ merged: true, message: 'Pull request merged', sha: 'abc123' }),
+        listFiles: mockFn([{ filename: 'test.js', status: 'modified', additions: 10, deletions: 5, changes: 15, patch: '@@ test patch @@', sha: 'file123', blob_url: 'test', raw_url: 'test', contents_url: 'test' }]),
+        createReview: mockFn({ id: 1, body: 'Test review', state: 'APPROVED', user: { login: 'test-user' }, submitted_at: '2024-01-01T00:00:00Z', html_url: 'test' }),
+        listReviews: mockFn([{ id: 1, user: { login: 'test-user' }, body: 'Test review', state: 'APPROVED', submitted_at: '2024-01-01T00:00:00Z', html_url: 'test' }]),
+        dismissReview: mockFn({ id: 1, state: 'DISMISSED', user: { login: 'test-user' }, body: 'Test review', submitted_at: '2024-01-01T00:00:00Z', html_url: 'test' }),
+        listReviewComments: mockFn([{ id: 1, body: 'Test comment', path: 'test.js', line: 10, side: 'RIGHT', user: { login: 'test-user' }, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z', html_url: 'test' }]),
+        createReviewComment: mockFn({ id: 1, body: 'Test comment', path: 'test.js', line: 10, side: 'RIGHT', user: { login: 'test-user' }, created_at: '2024-01-01T00:00:00Z', html_url: 'test' }),
+      },
+      actions: {
+        listRepoWorkflows: mockFn({ total_count: 1, workflows: [mockResponses.workflow] }),
+        getWorkflow: mockFn(mockResponses.workflow),
+        listWorkflowRuns: mockFn({ total_count: 1, workflow_runs: [mockResponses.workflowRun] }),
+        getWorkflowRun: mockFn(mockResponses.workflowRun),
+        cancelWorkflowRun: vi.fn().mockResolvedValue({ status: 202 }),
+        listJobsForWorkflowRun: mockFn({ total_count: 1, jobs: [{ id: 1, name: 'test', status: 'completed', conclusion: 'success', started_at: '2024-01-01T00:00:00Z', completed_at: '2024-01-01T00:02:00Z', steps: [{ name: 'Checkout', status: 'completed', conclusion: 'success', number: 1 }] }] }),
+        downloadWorkflowRunLogs: vi.fn().mockResolvedValue({ url: 'https://example.com/logs', data: 'Mock log data' }),
+        reRunWorkflow: vi.fn().mockResolvedValue({}),
+        reRunWorkflowFailedJobs: vi.fn().mockResolvedValue({}),
+        deleteWorkflowRunLogs: vi.fn().mockResolvedValue({}),
+      },
+      codeScanning: {
+        listAlertsForRepo: vi.fn(),
+        getAlert: vi.fn(),
+        updateAlert: vi.fn(),
+      },
+      secretScanning: {
+        listAlertsForRepo: vi.fn(),
+        getAlert: vi.fn(),
+        updateAlert: vi.fn(),
+      },
+      dependabot: {
+        listAlertsForRepo: vi.fn(),
+        getAlert: vi.fn(),
+        updateAlert: vi.fn(),
+      },
+      users: {
+        getAuthenticated: vi.fn(),
+        getByUsername: vi.fn(),
+        listFollowersForUser: vi.fn(),
+        listFollowingForUser: vi.fn(),
+      },
+      orgs: {
+        get: vi.fn(),
+        list: vi.fn(),
+        listMembers: vi.fn(),
+        getMembershipForUser: vi.fn(),
+      },
+      activity: {
+        listNotificationsForAuthenticatedUser: vi.fn(),
+        markNotificationsAsRead: vi.fn(),
+        getThread: vi.fn(),
+        markThreadAsRead: vi.fn(),
+      },
+      search: {
+        repos: vi.fn(),
+        code: vi.fn(),
+        issuesAndPullRequests: vi.fn(),
+        users: vi.fn(),
+      },
+    },
+    graphql: vi.fn(),
+    hook: {
+      before: vi.fn(),
+      after: vi.fn(),
+      error: vi.fn(),
+    }
+  };
 };
