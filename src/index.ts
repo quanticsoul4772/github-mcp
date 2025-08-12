@@ -118,7 +118,9 @@ export class GitHubMCPServer {
       if (!testMode && process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
         process.exit(1);
       } else if (testMode) {
-        throw new Error('Environment validation failed: ' + envValidation.errors.join(', '));
+        // In test mode, avoid throwing in constructor to prevent side effects.
+        // Consumers can inspect `envValidation.errors` or `server` state, or throw during start().
+        logger.warn('Environment validation failed (test mode): ' + envValidation.errors.join(', '));
       }
     }
 
