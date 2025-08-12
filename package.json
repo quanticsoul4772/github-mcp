@@ -77,7 +77,6 @@
     "benchmark": "^2.1.4",
     "better-npm-audit": "^3.11.0",
     "commitlint": "^19.6.0",
-    "complexity-report": "^2.0.0-alpha",
     "depcheck": "^1.4.7",
     "eslint": "^9.17.0",
     "eslint-config-prettier": "^10.1.8",
