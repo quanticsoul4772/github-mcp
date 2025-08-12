@@ -149,9 +149,15 @@ export function createAgentTools(): ToolConfig<unknown, unknown>[] {
           logger.info('Starting coordinated analysis', { target: args.target });
           const result = await coordinator.coordinate(request);
 
+          const MAX_FINDINGS = 200;
+          const totalFindings = result.consolidatedFindings.length;
+          const findings = totalFindings > MAX_FINDINGS
+            ? result.consolidatedFindings.slice(0, MAX_FINDINGS)
+            : result.consolidatedFindings;
           return {
-            summary: result.summary,
-            findings: result.consolidatedFindings,
+            summary: { ...result.summary, totalFindings },
+            findings,
+            truncated: totalFindings > MAX_FINDINGS,
             reports: result.reports.map(r => ({
               agent: r.agentName,
               duration: r.duration,
