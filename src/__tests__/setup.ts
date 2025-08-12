@@ -3,7 +3,6 @@
  * Enhanced with better isolation and stability features
  */
 import { beforeEach, afterEach, vi } from 'vitest';
-import { mockSystemTime } from './helpers/test-helpers.js';
 
 // Store original environment
 const originalEnv = { ...process.env };

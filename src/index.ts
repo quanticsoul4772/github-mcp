@@ -87,14 +87,13 @@ export class GitHubMCPServer {
    * Sets up the MCP server, configures GitHub authentication,
    * parses environment variables, and registers tools.
    */
-  constructor() {
+  constructor(testMode: boolean = false) {
     // Initialize monitoring first
     logger.info('Starting GitHub MCP Server', { 
       version: SERVER_VERSION,
       node: process.version,
       platform: process.platform
     });
-
     // Initialize MCP server
     this.server = new McpServer({
       name: SERVER_NAME,
@@ -109,14 +108,17 @@ export class GitHubMCPServer {
         errors: envValidation.errors 
       });
       
+      console.error('ERROR: Environment configuration validation failed:');
+      envValidation.errors.forEach(error => console.error(`  - ${error}`));
+      console.error('Please check your environment variables and try again.');
+      console.error('Create a GitHub Personal Access Token at: https://github.com/settings/tokens');
+      console.error('Required scopes: repo, workflow, user, notifications');
+      
       // Don't exit in test environment
-      if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
-        console.error('ERROR: Environment configuration validation failed:');
-        envValidation.errors.forEach(error => console.error(`  - ${error}`));
-        console.error('Please check your environment variables and try again.');
-        console.error('Create a GitHub Personal Access Token at: https://github.com/settings/tokens');
-        console.error('Required scopes: repo, workflow, user, notifications');
+      if (!testMode && process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
         process.exit(1);
+      } else if (testMode) {
+        throw new Error('Environment validation failed: ' + envValidation.errors.join(', '));
       }
     }
 
@@ -661,19 +663,5 @@ export class GitHubMCPServer {
   }
 }
 
-// Export for testing
+// Export for testing and external usage
 export { GitHubMCPServer };
-
-// Main execution
-(async () => {
-  try {
-    const server = new GitHubMCPServer();
-    await server.start();
-  } catch (error) {
-    logger.error('Failed to start GitHub MCP server', { error });
-    // Error already logged via logger above
-    if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
-      process.exit(1);
-    }
-  }
-})();

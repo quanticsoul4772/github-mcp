@@ -49,7 +49,7 @@ describe('Error Classes', () => {
       );
 
       const json = error.toJSON();
-      expect(json).toEqual({
+      expect(json).toMatchObject({
         name: 'GitHubMCPError',
         message: 'Test error',
         code: 'TEST_CODE',
@@ -57,6 +57,8 @@ describe('Error Classes', () => {
         context: { resource: 'test' },
         isRetryable: false,
       });
+      expect(json.correlationId).toBeDefined();
+      expect(json.timestamp).toBeDefined();
     });
   });
 

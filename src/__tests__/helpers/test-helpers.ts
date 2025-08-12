@@ -237,46 +237,35 @@ export const withTimeout = <T>(
   ]);
 };
 
+/**
+ * Mock system time for testing
+ */
+export const mockSystemTime = (fixedTime?: Date | string | number) => {
+  // Use Vitest's built-in fake timers
+  vi.useFakeTimers();
+  
   const fixed = fixedTime ? new Date(fixedTime) : new Date('2024-01-01T12:00:00Z');
-  const OriginalDate = Date;
-
-  // Mock Date that supports both constructor and direct call semantics
-  const MockDate: any = function (this: any, ...args: any[]) {
-    if (!(this instanceof OriginalDate)) {
-      // called without new
-      return args.length ? new OriginalDate(args[0]) : new OriginalDate(fixed);
-    }
-    // called with new
-    return args.length ? new OriginalDate(args[0]) : new OriginalDate(fixed);
-  };
-
-  // Copy static methods
-  MockDate.now = vi.fn(() => fixed.getTime());
-  MockDate.parse = OriginalDate.parse.bind(OriginalDate);
-  MockDate.UTC = OriginalDate.UTC.bind(OriginalDate);
-  MockDate.prototype = OriginalDate.prototype;
-
-  (global as any).Date = MockDate;
-
+  vi.setSystemTime(fixed);
+  
   return {
     restore: () => {
-      (global as any).Date = OriginalDate;
+      vi.useRealTimers();
     },
     setTime: (newTime: Date | string | number) => {
       const newFixed = new Date(newTime);
-      MockDate.now.mockReturnValue(newFixed.getTime());
-      // Adjust default fixed time for no-arg construction
-      (global as any).Date = function (this: any, ...args: any[]) {
-        if (!(this instanceof OriginalDate)) {
-          return args.length ? new OriginalDate(args[0]) : new OriginalDate(newFixed);
-        }
-        return args.length ? new OriginalDate(args[0]) : new OriginalDate(newFixed);
-      } as any;
-      (global as any).Date.now = MockDate.now;
-      (global as any).Date.parse = MockDate.parse;
-      (global as any).Date.UTC = MockDate.UTC;
-      (global as any).Date.prototype = OriginalDate.prototype;
+      vi.setSystemTime(newFixed);
+    },
+    advanceTime: (ms: number) => {
+      vi.advanceTimersByTime(ms);
+    },
+    runAllTimers: () => {
+      vi.runAllTimers();
+    },
+    runOnlyPendingTimers: () => {
+      vi.runOnlyPendingTimers();
     }
+  };
+};
 /**
  * Enhanced error assertion with retry logic
  */

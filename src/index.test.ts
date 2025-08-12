@@ -157,7 +157,7 @@ describe('GitHubMCPServer', () => {
     it('should initialize with proper configuration', async () => {
       const { GitHubMCPServer } = await import('./index.js');
       
-      const server = new (GitHubMCPServer as any)();
+      const server = new (GitHubMCPServer as any)(true);
 
       expect(McpServer).toHaveBeenCalledWith({
         name: 'github-mcp',
@@ -177,7 +177,7 @@ describe('GitHubMCPServer', () => {
 
       const { GitHubMCPServer } = await import('./index.js');
 
-      expect(() => new (GitHubMCPServer as any)()).toThrow('process.exit called');
+      expect(() => new (GitHubMCPServer as any)(true)).toThrow('Environment validation failed');
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
 
@@ -188,7 +188,7 @@ describe('GitHubMCPServer', () => {
       });
 
       const { GitHubMCPServer } = await import('./index.js');
-      new (GitHubMCPServer as any)();
+      new (GitHubMCPServer as any)(true);
 
       expect(Octokit).toHaveBeenCalledWith({
         auth: 'github-token-456',
@@ -203,7 +203,7 @@ describe('GitHubMCPServer', () => {
       });
 
       const { GitHubMCPServer } = await import('./index.js');
-      const server = new (GitHubMCPServer as any)();
+      const server = new (GitHubMCPServer as any)(true);
       
       expect(server.readOnly).toBe(true);
     });
@@ -216,14 +216,14 @@ describe('GitHubMCPServer', () => {
       });
 
       const { GitHubMCPServer } = await import('./index.js');
-      const server = new (GitHubMCPServer as any)();
+      const server = new (GitHubMCPServer as any)(true);
       
       expect(server.enabledToolsets).toEqual(new Set(['repos', 'issues', 'pull_requests']));
     });
 
     it('should use all toolsets when not specified', async () => {
       const { GitHubMCPServer } = await import('./index.js');
-      const server = new (GitHubMCPServer as any)();
+      const server = new (GitHubMCPServer as any)(true);
       
       expect(server.enabledToolsets.size).toBeGreaterThan(0);
       expect(server.enabledToolsets.has('context')).toBe(true);
@@ -234,7 +234,7 @@ describe('GitHubMCPServer', () => {
   describe('convertSchemaToZod', () => {
     it('should convert JSON schema to Zod schema', async () => {
       const { GitHubMCPServer } = await import('./index.js');
-      const server = new (GitHubMCPServer as any)();
+      const server = new (GitHubMCPServer as any)(true);
 
       const jsonSchema = {
         properties: {
@@ -259,7 +259,7 @@ describe('GitHubMCPServer', () => {
 
     it('should handle empty schema', async () => {
       const { GitHubMCPServer } = await import('./index.js');
-      const server = new (GitHubMCPServer as any)();
+      const server = new (GitHubMCPServer as any)(true);
 
       const result = server.convertSchemaToZod({});
       expect(result).toEqual({});
@@ -267,7 +267,7 @@ describe('GitHubMCPServer', () => {
 
     it('should handle null schema', async () => {
       const { GitHubMCPServer } = await import('./index.js');
-      const server = new (GitHubMCPServer as any)();
+      const server = new (GitHubMCPServer as any)(true);
 
       const result = server.convertSchemaToZod(null);
       expect(result).toEqual({});
@@ -277,7 +277,7 @@ describe('GitHubMCPServer', () => {
   describe('registerToolConfig', () => {
     it('should register tool successfully', async () => {
       const { GitHubMCPServer } = await import('./index.js');
-      const server = new (GitHubMCPServer as any)();
+      const server = new (GitHubMCPServer as any)(true);
 
       const config = {
         tool: {
@@ -303,7 +303,7 @@ describe('GitHubMCPServer', () => {
 
     it('should not register duplicate tools', async () => {
       const { GitHubMCPServer } = await import('./index.js');
-      const server = new (GitHubMCPServer as any)();
+      const server = new (GitHubMCPServer as any)(true);
 
       const config = {
         tool: { name: 'duplicate-tool', description: 'Duplicate tool' },
@@ -318,7 +318,7 @@ describe('GitHubMCPServer', () => {
 
     it('should handle tool execution errors', async () => {
       const { GitHubMCPServer } = await import('./index.js');
-      const server = new (GitHubMCPServer as any)();
+      const server = new (GitHubMCPServer as any)(true);
 
       const config = {
         tool: {
@@ -343,7 +343,7 @@ describe('GitHubMCPServer', () => {
 
     it('should handle successful tool execution', async () => {
       const { GitHubMCPServer } = await import('./index.js');
-      const server = new (GitHubMCPServer as any)();
+      const server = new (GitHubMCPServer as any)(true);
 
       const config = {
         tool: {
@@ -372,7 +372,7 @@ describe('GitHubMCPServer', () => {
       mockServer.connect.mockResolvedValue(undefined);
 
       const { GitHubMCPServer } = await import('./index.js');
-      const server = new (GitHubMCPServer as any)();
+      const server = new (GitHubMCPServer as any)(true);
 
       await server.start();
 
@@ -385,7 +385,7 @@ describe('GitHubMCPServer', () => {
       mockServer.connect.mockRejectedValue(error);
 
       const { GitHubMCPServer } = await import('./index.js');
-      const server = new (GitHubMCPServer as any)();
+      const server = new (GitHubMCPServer as any)(true);
 
       await expect(server.start()).rejects.toThrow('Connection failed');
       expect(exitSpy).toHaveBeenCalledWith(1);
@@ -395,7 +395,7 @@ describe('GitHubMCPServer', () => {
   describe('tool registration', () => {
     it('should register all enabled toolsets', async () => {
       const { GitHubMCPServer } = await import('./index.js');
-      new (GitHubMCPServer as any)();
+      new (GitHubMCPServer as any)(true);
 
       // Verify tools were registered
       expect(mockServer.tool).toHaveBeenCalled();
@@ -415,7 +415,7 @@ describe('GitHubMCPServer', () => {
       });
 
       const { GitHubMCPServer } = await import('./index.js');
-      new (GitHubMCPServer as any)();
+      new (GitHubMCPServer as any)(true);
 
       const registeredTools = mockServer.tool.mock.calls.map((call: any) => call[0]);
       expect(registeredTools).toContain('test-repo-tool');
@@ -426,7 +426,7 @@ describe('GitHubMCPServer', () => {
 
     it('should avoid duplicate tool registration', async () => {
       const { GitHubMCPServer } = await import('./index.js');
-      new (GitHubMCPServer as any)();
+      new (GitHubMCPServer as any)(true);
 
       const registeredTools = mockServer.tool.mock.calls.map((call: any) => call[0]);
       const uniqueTools = [...new Set(registeredTools)];
