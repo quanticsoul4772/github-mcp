@@ -117,13 +117,42 @@ jobs:
       - name: Analyze code complexity
         run: npm run quality:complexity
 
-      # HARD FAIL: Check for unused dependencies
+      # HARD FAIL: Check for unused dependencies with proper exit codes
       - name: Check for unused dependencies
-        run: npm run quality:dependencies
+        run: |
+          npx depcheck --json > depcheck-report.json || true
+          echo "Depcheck report:"
+          cat depcheck-report.json
+          if [ -f depcheck-report.json ]; then
+            UNUSED=$(jq '.dependencies | length + .devDependencies | length' depcheck-report.json)
+            MISSING=$(jq '.missing | length' depcheck-report.json)
+            if [ "$UNUSED" -gt 0 ] || [ "$MISSING" -gt 0 ]; then
+              echo "❌ Unused or missing dependencies detected (unused: $UNUSED, missing: $MISSING)"
+              exit 1
+            fi
+            echo "✅ No unused or missing dependencies found"
+          fi
+        shell: bash
 
-      # HARD FAIL: License compliance check
+      # HARD FAIL: License compliance check with proper validation
       - name: License compliance check
-        run: npm run quality:licenses
+        run: |
+          npx license-checker --production --json > licenses.json
+          echo "Checking licenses against allowlist..."
+          # Define allowed licenses
+          ALLOWED_LICENSES="MIT|Apache-2.0|BSD-2-Clause|BSD-3-Clause|ISC|0BSD|CC0-1.0|CC-BY-3.0|CC-BY-4.0|Unlicense"
+          
+          # Check for disallowed licenses
+          DISALLOWED=$(jq -r --arg allowed "$ALLOWED_LICENSES" \
+            'to_entries[] | select(.value.licenses | test($allowed) | not) | "\(.key): \(.value.licenses)"' licenses.json || echo "")
+          
+          if [ -n "$DISALLOWED" ]; then
+            echo "❌ Disallowed licenses found:"
+            echo "$DISALLOWED"
+            exit 1
+          fi
+          echo "✅ All licenses are compliant"
+        shell: bash
 
       # Upload complexity report
       - name: Upload complexity report
@@ -155,8 +184,7 @@ jobs:
 
       # HARD FAIL: Check for known vulnerabilities  
       - name: Check for known vulnerabilities
-        run: |
-          npx better-npm-audit audit --level moderate
+        run: npm run security:audit
 
       # Run secret scanning if configured
       - name: Run secret detection
