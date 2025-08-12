@@ -7,7 +7,7 @@ import { MCPServer } from './src/index.js';
 import { withParameterValidation, getToolHelp } from './src/validation/parameter-validation.js';
 
 console.log('Phase 5: Real-World Testing\n');
-console.log('=' . repeat(50));
+console.log('='.repeat(50));
 
 async function testRealWorldScenarios() {
   console.log('\n1. Testing Tool Help Discovery');
