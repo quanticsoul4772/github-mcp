@@ -356,55 +356,46 @@ export class GraphQLCache {
       'add_discussion_comment': [/discussion.*comments?/i, /get_discussion/i],
       'update_discussion': [/discussion/i],
       'delete_discussion': [/discussion/i],
-      'create_issue': [/issue/i, /repository/i],
-      'update_issue': [/issue/i],
-      'create_pull_request': [/pull.*request/i, /repository/i],
-      'update_pull_request': [/pull.*request/i],
-    };
-    
-    // Get patterns for this mutation
-    const patterns = invalidationPatterns[mutationName] || [];
-    
-    // Also invalidate based on variables (e.g., specific repository)
-    if (variables.owner && variables.repo) {
-      patterns.push(new RegExp(`${variables.owner}.*${variables.repo}`, 'i'));
-    }
-    
-    // Apply invalidation patterns
-    for (const key of this.cache.keys()) {
-      let shouldInvalidate = false;
-      
-      for (const pattern of patterns) {
-        if (pattern.test(key)) {
-          shouldInvalidate = true;
-          break;
+        let count = 0;
+        const op = this.extractQueryName(mutation)?.toLowerCase() || '';
+        const affectedOps: Record<string, true> = {};
+        // Map common mutations to affected query operation prefixes
+        const opMap: Record<string, string[]> = {
+          create_discussion: ['list_discussions', 'get_discussion', 'discussion', 'discussion_comments'],
+          add_discussion_comment: ['get_discussion', 'discussion_comments'],
+          update_discussion: ['get_discussion', 'discussion', 'discussion_comments'],
+          delete_discussion: ['list_discussions', 'get_discussion', 'discussion'],
+          create_issue: ['issues', 'repository'],
+          update_issue: ['issues'],
+          create_pull_request: ['pull', 'repository'],
+          update_pull_request: ['pull'],
+        };
+        (opMap[op] || []).forEach(name => (affectedOps[name] = true));
+        const repoPattern = variables.owner && variables.repo
+          ? new RegExp(`${variables.owner}\\W+${variables.repo}`, 'i')
+          : null;
+
+        for (const key of this.cache.keys()) {
+          // key format: gql:${queryName}:${hash}:${sortedVariables}
+          const parts = key.split(':');
+          const keyOp = parts[1]?.toLowerCase();
+          let invalidate = false;
+          if (keyOp && affectedOps[keyOp]) {
+            invalidate = true;
+          } else if (repoPattern && repoPattern.test(key)) {
+            invalidate = true;
+          }
+          if (invalidate) {
+            this.cache.delete(key);
+            const idx = this.accessOrder.indexOf(key);
+            if (idx > -1) this.accessOrder.splice(idx, 1);
+            count++;
+          }
         }
-      }
-      
-      if (shouldInvalidate) {
-        this.cache.delete(key);
-        const index = this.accessOrder.indexOf(key);
-        if (index > -1) {
-          this.accessOrder.splice(index, 1);
+        if (this.enableMetrics) {
+          this.metrics.size = this.cache.size;
         }
-        count++;
-      }
-    }
-
-    if (this.enableMetrics) {
-      this.metrics.size = this.cache.size;
-    }
-
-    return count;
-  }
-
-  /**
-   * Invalidate cache entries matching a pattern
-   */
-  invalidate(pattern: string | RegExp): number {
-    let count = 0;
-    const regex = typeof pattern === 'string' ? new RegExp(pattern, 'i') : pattern;
-    
+        return count;
     for (const key of this.cache.keys()) {
       if (regex.test(key)) {
         this.cache.delete(key);
