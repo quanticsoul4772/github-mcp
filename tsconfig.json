@@ -1,11 +1,22 @@
 {
   "compilerOptions": {
+    "noEmitOnError": false,
     "target": "ES2022",
     "module": "node16",
     "lib": ["ES2022"],
     "outDir": "./build",
     "rootDir": "./src",
     "strict": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
@@ -16,5 +27,5 @@
     "moduleResolution": "node16"
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "build"]
+  "exclude": ["node_modules", "build", "src/index-refactored-example.ts"]
 }

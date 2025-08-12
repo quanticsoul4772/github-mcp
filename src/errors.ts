@@ -3,16 +3,19 @@
  * Provides consistent error types and handling patterns
  */
 
+import { logger, LogContext } from './logger.js';
+import { metrics } from './metrics.js';
+
 /**
  * Base error class for all GitHub MCP errors
  */
 export class GitHubMCPError extends Error {
   public readonly code: string;
-  public readonly statusCode?: number;
-  public readonly context?: Record<string, any>;
+  public readonly statusCode?: number | undefined;
+  public readonly context?: Record<string, any> | undefined;
   public readonly isRetryable: boolean;
-  public readonly originalError?: Error;
-  public readonly correlationId?: string;
+  public readonly originalError?: Error | undefined;
+  public readonly correlationId?: string | undefined;
   public readonly timestamp: Date;
 
   constructor(
@@ -99,9 +102,9 @@ export class NotFoundError extends GitHubMCPError {
  * Rate limit error
  */
 export class RateLimitError extends GitHubMCPError {
-  public readonly resetTime?: Date;
-  public readonly limit?: number;
-  public readonly remaining?: number;
+  public readonly resetTime?: Date | undefined;
+  public readonly limit?: number | undefined;
+  public readonly remaining?: number | undefined;
 
   constructor(
     message: string,
@@ -154,17 +157,66 @@ export class ConfigurationError extends GitHubMCPError {
 }
 
 /**
- * Error handler wrapper for consistent error handling
+ * Generic API error for user-facing responses
+ */
+export class APIError extends GitHubMCPError {
+  constructor(message: string, statusCode: number = 500, context?: Record<string, any>) {
+    super(message, 'API_ERROR', statusCode, context);
+    this.name = 'APIError';
+  }
+}
+
+/**
+ * Error handler wrapper for consistent error handling with observability
  */
 export async function withErrorHandling<T>(
   operation: string,
   fn: () => Promise<T>,
   context?: Record<string, any>
 ): Promise<T> {
+  const startTime = Date.now();
+  const correlationId = logger.generateCorrelationId();
+  const operationLogger = logger.child({
+    correlationId,
+    operation,
+    ...context
+  });
+
+  operationLogger.debug('Operation started', { context });
+
   try {
-    return await fn();
+    const result = await fn();
+    const duration = Date.now() - startTime;
+    
+    operationLogger.info('Operation completed successfully', {
+      duration,
+      success: true
+    });
+
+    return result;
   } catch (error) {
-    throw normalizeError(error, operation, context);
+    const duration = Date.now() - startTime;
+    const normalizedError = normalizeError(error, operation, context);
+    
+    // Record error metrics
+    metrics.recordError({
+      tool: context?.tool || 'unknown',
+      operation,
+      errorType: normalizedError.name,
+      message: normalizedError.message,
+      timestamp: Date.now()
+    });
+
+    operationLogger.error('Operation failed', {
+      duration,
+      success: false,
+      errorType: normalizedError.name,
+      errorCode: normalizedError.code,
+      statusCode: normalizedError.statusCode,
+      isRetryable: normalizedError.isRetryable
+    }, normalizedError);
+
+    throw normalizedError;
   }
 }
 
@@ -195,8 +247,8 @@ export function normalizeError(
       if (error.response?.headers?.['x-ratelimit-remaining'] === '0') {
         return new RateLimitError(
           'GitHub API rate limit exceeded',
-          parseInt(error.response.headers['x-ratelimit-reset'], 10),
-          parseInt(error.response.headers['x-ratelimit-limit'], 10),
+          parseInt(error.response.headers['x-ratelimit-reset'], 10) || undefined,
+          parseInt(error.response.headers['x-ratelimit-limit'], 10) || undefined,
           0
         );
       }
@@ -208,9 +260,9 @@ export function normalizeError(
     if (statusCode === 429) {
       return new RateLimitError(
         message,
-        parseInt(error.response?.headers?.['x-ratelimit-reset'], 10),
-        parseInt(error.response?.headers?.['x-ratelimit-limit'], 10),
-        parseInt(error.response?.headers?.['x-ratelimit-remaining'], 10)
+        parseInt(error.response?.headers?.['x-ratelimit-reset'], 10) || undefined,
+        parseInt(error.response?.headers?.['x-ratelimit-limit'], 10) || undefined,
+        parseInt(error.response?.headers?.['x-ratelimit-remaining'], 10) || undefined
       );
     }
 
@@ -247,7 +299,7 @@ export function normalizeError(
 }
 
 /**
- * Retry logic for retryable errors
+ * Retry logic for retryable errors with observability
  */
 export async function withRetry<T>(
   fn: () => Promise<T>,
@@ -255,6 +307,8 @@ export async function withRetry<T>(
     maxAttempts?: number;
     backoffMs?: number;
     maxBackoffMs?: number;
+    operation?: string;
+    context?: LogContext;
     onRetry?: (attempt: number, error: Error) => void;
   } = {}
 ): Promise<T> {
@@ -262,28 +316,66 @@ export async function withRetry<T>(
     maxAttempts = 3,
     backoffMs = 1000,
     maxBackoffMs = 10000,
+    operation = 'unknown_operation',
+    context = {},
     onRetry,
   } = options;
+
+  const retryLogger = logger.child({ 
+    ...context, 
+    operation,
+    maxAttempts 
+  });
 
   let lastError: Error | undefined;
   
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
+      if (attempt > 1) {
+        retryLogger.info('Retrying operation', { attempt, maxAttempts });
+      }
+      
       return await fn();
     } catch (error) {
       lastError = error as Error;
       
       const normalizedError = error instanceof GitHubMCPError 
         ? error 
-        : normalizeError(error);
+        : normalizeError(error, operation, context);
+      
+      // Log retry attempt
+      retryLogger.warn('Operation failed, checking retry eligibility', {
+        attempt,
+        maxAttempts,
+        errorType: normalizedError.name,
+        isRetryable: normalizedError.isRetryable
+      });
       
       // Don't retry if not retryable or last attempt
       if (!normalizedError.isRetryable || attempt === maxAttempts) {
+        retryLogger.error('Operation failed permanently', {
+          attempt,
+          maxAttempts,
+          reason: !normalizedError.isRetryable ? 'not_retryable' : 'max_attempts_reached'
+        });
+        
+        // Record retry failure metric
+        metrics.incrementCounter(`retry_failures_total{operation="${operation}",reason="${!normalizedError.isRetryable ? 'not_retryable' : 'max_attempts'}"}`); 
+        
         throw normalizedError;
       }
 
       // Calculate backoff with exponential increase
       const delay = Math.min(backoffMs * Math.pow(2, attempt - 1), maxBackoffMs);
+      
+      retryLogger.info('Will retry operation', {
+        attempt,
+        nextAttempt: attempt + 1,
+        delayMs: delay
+      });
+      
+      // Record retry attempt metric
+      metrics.incrementCounter(`retry_attempts_total{operation="${operation}"}`);
       
       // Call retry callback if provided
       if (onRetry) {

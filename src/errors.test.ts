@@ -255,7 +255,7 @@ describe('Error Handling Utilities', () => {
         },
       };
       
-      const normalized = normalizeError(apiError);
+      const normalized = normalizeError(apiError) as RateLimitError;
       
       expect(normalized).toBeInstanceOf(RateLimitError);
       expect(normalized.limit).toBe(5000);

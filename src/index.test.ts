@@ -332,7 +332,7 @@ describe('GitHubMCPServer', () => {
       server.registerToolConfig(config);
 
       // Get the registered handler function
-      const toolCall = mockServer.tool.mock.calls.find(call => call[0] === 'error-tool');
+      const toolCall = mockServer.tool.mock.calls.find((call: any) => call[0] === 'error-tool');
       const handler = toolCall[3];
 
       const result = await handler({});
@@ -357,7 +357,7 @@ describe('GitHubMCPServer', () => {
       server.registerToolConfig(config);
 
       // Get the registered handler function
-      const toolCall = mockServer.tool.mock.calls.find(call => call[0] === 'success-tool');
+      const toolCall = mockServer.tool.mock.calls.find((call: any) => call[0] === 'success-tool');
       const handler = toolCall[3];
 
       const result = await handler({});
@@ -401,7 +401,7 @@ describe('GitHubMCPServer', () => {
       expect(mockServer.tool).toHaveBeenCalled();
       
       // Check that tools from different modules were registered
-      const registeredTools = mockServer.tool.mock.calls.map(call => call[0]);
+      const registeredTools = mockServer.tool.mock.calls.map((call: any) => call[0]);
       expect(registeredTools).toContain('get_me');
       expect(registeredTools).toContain('test-repo-tool');
       expect(registeredTools).toContain('test-search-tool');
@@ -417,7 +417,7 @@ describe('GitHubMCPServer', () => {
       const { GitHubMCPServer } = await import('./index.js');
       new (GitHubMCPServer as any)(true);
 
-      const registeredTools = mockServer.tool.mock.calls.map(call => call[0]);
+      const registeredTools = mockServer.tool.mock.calls.map((call: any) => call[0]);
       expect(registeredTools).toContain('test-repo-tool');
       expect(registeredTools).toContain('test-issue-tool');
       expect(registeredTools).toContain('test-search-tool'); // Always enabled
@@ -428,7 +428,7 @@ describe('GitHubMCPServer', () => {
       const { GitHubMCPServer } = await import('./index.js');
       new (GitHubMCPServer as any)(true);
 
-      const registeredTools = mockServer.tool.mock.calls.map(call => call[0]);
+      const registeredTools = mockServer.tool.mock.calls.map((call: any) => call[0]);
       const uniqueTools = [...new Set(registeredTools)];
       
       expect(registeredTools).toHaveLength(uniqueTools.length);

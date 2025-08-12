@@ -169,8 +169,8 @@ describe('Repository Tools', () => {
         repo: 'test-repo',
       });
 
-      expect(result).toContain('test-repo');
-      expect(result).toContain('Test repository');
+      expect(result.name).toBe('test-repo');
+      expect(result.description).toBe('Test repository');
     });
 
     it('should validate input parameters', async () => {
@@ -246,7 +246,7 @@ describe('Repository Tools', () => {
         repo: 'test-repo',
         path: 'existing-file.txt',
         message: 'Update file',
-        content: Buffer.from('Updated content').toString('base64'),
+        content: Buffer.from('Updated content', 'utf8').toString('base64'),
         sha: 'existing-sha',
         branch: undefined,
       });
