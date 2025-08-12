@@ -1,20 +1,115 @@
 /**
  * Test fixtures and data factories
- * Enhanced with dynamic data generation to prevent test flakiness
+ * Enhanced with deterministic data generation for stable tests
  */
 
-// Utility functions for dynamic data generation
-const generateId = () => Math.floor(Math.random() * 1000000) + 1000;
+// Seeded random number generator for deterministic tests
+class SeededRandom {
+  private seed: number;
+
+  constructor(seed: number = 12345) {
+    this.seed = seed;
+  }
+
+  // Linear congruential generator for deterministic random numbers
+  next(): number {
+    this.seed = (this.seed * 1103515245 + 12345) % 2147483648;
+    return this.seed / 2147483648;
+  }
+
+  nextInt(min: number, max: number): number {
+    return Math.floor(this.next() * (max - min + 1)) + min;
+  }
+
+  nextString(prefix: string, length = 8): string {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let result = prefix + '-';
+    for (let i = 0; i < length; i++) {
+      result += chars[Math.floor(this.next() * chars.length)];
+    }
+    return result;
+  }
+
+  nextSha(): string {
+    const chars = '0123456789abcdef';
+    let result = '';
+    for (let i = 0; i < 40; i++) {
+      result += chars[Math.floor(this.next() * chars.length)];
+    }
+    return result;
+  }
+
+  nextBoolean(): boolean {
+    return this.next() > 0.5;
+  }
+
+  nextFromArray<T>(array: T[]): T {
+    return array[Math.floor(this.next() * array.length)];
+  }
+}
+
+// Factory configuration for deterministic vs random data
+export interface FactoryConfig {
+  seed?: number;
+  deterministic?: boolean;
+}
+
+// Global configuration for test data generation
+let globalConfig: FactoryConfig = {
+  deterministic: true,
+  seed: 12345,
+};
+
+export const setFactoryConfig = (config: FactoryConfig) => {
+  globalConfig = { ...globalConfig, ...config };
+};
+
+export const resetFactoryConfig = () => {
+  globalConfig = {
+    deterministic: true,
+    seed: 12345,
+  };
+};
+
+// Utility functions for data generation (deterministic by default)
+const getRandom = (seed?: number): SeededRandom | null => {
+  if (globalConfig.deterministic) {
+    return new SeededRandom(seed ?? globalConfig.seed);
+  }
+  return null; // Use Math.random() fallback
+};
+
+const generateId = (seed?: number) => {
+  const random = getRandom(seed);
+  return random 
+    ? random.nextInt(1000, 999999)
+    : Math.floor(Math.random() * 999000) + 1000;
+};
+
 const generateTimestamp = (offsetDays = 0) => {
-  const date = new Date();
+  const date = new Date('2024-01-01T12:00:00Z'); // Fixed base date for tests
   date.setDate(date.getDate() + offsetDays);
   return date.toISOString();
 };
-const generateString = (prefix: string, length = 8) => `${prefix}-${Math.random().toString(36).substring(2, length + 2)}`;
-const generateSha = () => Math.random().toString(36).substring(2, 42);
+
+const generateString = (prefix: string, length = 8, seed?: number) => {
+  const random = getRandom(seed);
+  if (random) {
+    return random.nextString(prefix, length);
+  }
+  return `${prefix}-${Math.random().toString(36).substring(2, length + 2)}`;
+};
+
+const generateSha = (seed?: number) => {
+  const random = getRandom(seed);
+  if (random) {
+    return random.nextSha();
+  }
+  return Math.random().toString(36).substring(2, 42).padEnd(40, '0');
+};
 
 export const testFixtures = {
-  // Repository fixtures
+  // Repository fixtures (static for consistent testing)
   repositories: {
     public: {
       id: 1,
@@ -54,7 +149,7 @@ export const testFixtures = {
     },
   },
 
-  // User fixtures
+  // User fixtures (static for consistent testing)
   users: {
     authenticated: {
       id: 1,
@@ -85,7 +180,7 @@ export const testFixtures = {
     },
   },
 
-  // Issue fixtures
+  // Issue fixtures (static for consistent testing)
   issues: {
     open: {
       id: 1,
@@ -122,7 +217,7 @@ export const testFixtures = {
     },
   },
 
-  // Pull Request fixtures
+  // Pull Request fixtures (static for consistent testing)
   pullRequests: {
     open: {
       id: 1,
@@ -133,12 +228,12 @@ export const testFixtures = {
       user: { login: 'test-user', id: 1 },
       head: {
         ref: 'feature-branch',
-        sha: 'abc123def456',
+        sha: 'abc123def456789012345678901234567890abcd',
         repo: { name: 'public-repo', owner: { login: 'test-owner' } },
       },
       base: {
         ref: 'main',
-        sha: 'def456abc123',
+        sha: 'def456abc123789012345678901234567890efgh',
         repo: { name: 'public-repo', owner: { login: 'test-owner' } },
       },
       mergeable: true,
@@ -158,12 +253,12 @@ export const testFixtures = {
       user: { login: 'other-user', id: 2 },
       head: {
         ref: 'bugfix-branch',
-        sha: 'xyz789uvw123',
+        sha: 'xyz789uvw123456789012345678901234567890ijkl',
         repo: { name: 'public-repo', owner: { login: 'test-owner' } },
       },
       base: {
         ref: 'main',
-        sha: 'uvw123xyz789',
+        sha: 'uvw123xyz789012345678901234567890mnop',
         repo: { name: 'public-repo', owner: { login: 'test-owner' } },
       },
       mergeable: null,
@@ -176,7 +271,7 @@ export const testFixtures = {
     },
   },
 
-  // Workflow fixtures
+  // Workflow fixtures (static for consistent testing)
   workflows: {
     active: {
       id: 1,
@@ -202,10 +297,10 @@ export const testFixtures = {
     },
   },
 
-  // Commit fixtures
+  // Commit fixtures (static for consistent testing)
   commits: {
     recent: {
-      sha: 'abc123def456',
+      sha: 'abc123def456789012345678901234567890abcd',
       commit: {
         message: 'Add new feature implementation',
         author: {
@@ -221,16 +316,16 @@ export const testFixtures = {
       },
       author: { login: 'test-user', id: 1 },
       committer: { login: 'test-user', id: 1 },
-      parents: [{ sha: 'def456abc123' }],
+      parents: [{ sha: 'def456abc123789012345678901234567890efgh' }],
     },
   },
 
-  // File content fixtures
+  // File content fixtures (static for consistent testing)
   files: {
     readme: {
       name: 'README.md',
       path: 'README.md',
-      sha: 'file123',
+      sha: 'file123sha456789012345678901234567890abc',
       size: 1024,
       content: Buffer.from('# Test Repository\n\nThis is a test repository.').toString('base64'),
       encoding: 'base64',
@@ -239,7 +334,7 @@ export const testFixtures = {
     packageJson: {
       name: 'package.json',
       path: 'package.json',
-      sha: 'file456',
+      sha: 'file456sha789012345678901234567890def',
       size: 512,
       content: Buffer.from('{"name": "test-package", "version": "1.0.0"}').toString('base64'),
       encoding: 'base64',
@@ -248,211 +343,176 @@ export const testFixtures = {
   },
 };
 
-// Enhanced data factories for generating dynamic test data
-export const createRepository = (overrides = {}) => {
-  const id = generateId();
-  const name = generateString('repo');
-  const owner = generateString('user');
+// Enhanced data factories with deterministic generation
+export const createRepository = (overrides: any = {}, seed?: number) => {
+  const random = getRandom(seed);
+  const id = overrides.id ?? generateId(seed);
+  const name = overrides.name ?? generateString('repo', 8, seed);
+  const owner = overrides.owner?.login ?? generateString('user', 6, seed);
   
   return {
     id,
     name,
     full_name: `${owner}/${name}`,
-    owner: { login: owner, id: generateId() },
-    private: Math.random() > 0.5,
-    description: `Test repository ${name}`,
-    default_branch: 'main',
-    created_at: generateTimestamp(-30),
-    updated_at: generateTimestamp(-1),
-    pushed_at: generateTimestamp(-1),
-    stargazers_count: Math.floor(Math.random() * 100),
-    watchers_count: Math.floor(Math.random() * 50),
-    forks_count: Math.floor(Math.random() * 20),
-    open_issues_count: Math.floor(Math.random() * 10),
-    language: ['TypeScript', 'JavaScript', 'Python', 'Go'][Math.floor(Math.random() * 4)],
-    topics: [`mcp`, `github`, `api`, `test-${generateId()}`],
+    owner: { 
+      login: owner, 
+      id: overrides.owner?.id ?? generateId((seed ?? 0) + 1) 
+    },
+    private: overrides.private ?? (random ? random.nextBoolean() : false),
+    description: overrides.description ?? `Test repository ${name}`,
+    default_branch: overrides.default_branch ?? 'main',
+    created_at: overrides.created_at ?? generateTimestamp(-30),
+    updated_at: overrides.updated_at ?? generateTimestamp(-1),
+    pushed_at: overrides.pushed_at ?? generateTimestamp(-1),
+    stargazers_count: overrides.stargazers_count ?? (random ? random.nextInt(0, 100) : 10),
+    watchers_count: overrides.watchers_count ?? (random ? random.nextInt(0, 50) : 5),
+    forks_count: overrides.forks_count ?? (random ? random.nextInt(0, 20) : 2),
+    open_issues_count: overrides.open_issues_count ?? (random ? random.nextInt(0, 10) : 3),
+    language: overrides.language ?? (random ? random.nextFromArray(['TypeScript', 'JavaScript', 'Python', 'Go']) : 'TypeScript'),
+    topics: overrides.topics ?? [`mcp`, `github`, `api`, `test-${id}`],
     ...overrides,
   };
 };
 
-export const createUser = (overrides = {}) => {
-  const login = generateString('user');
+export const createUser = (overrides: any = {}, seed?: number) => {
+  const random = getRandom(seed);
+  const login = overrides.login ?? generateString('user', 8, seed);
+  const id = overrides.id ?? generateId(seed);
+  
   return {
-    id: generateId(),
+    id,
     login,
-    name: `Test User ${login}`,
-    email: `${login}@example.com`,
-    bio: `Test user for GitHub MCP - ${login}`,
-    location: 'Test City',
-    company: 'Test Company',
-    blog: `https://${login}.example.com`,
-    public_repos: Math.floor(Math.random() * 100),
-    public_gists: Math.floor(Math.random() * 50),
-    followers: Math.floor(Math.random() * 1000),
-    following: Math.floor(Math.random() * 500),
-    created_at: generateTimestamp(-365),
-    updated_at: generateTimestamp(-1),
+    name: overrides.name ?? `Test User ${login}`,
+    email: overrides.email ?? `${login}@example.com`,
+    bio: overrides.bio ?? `Test user for GitHub MCP - ${login}`,
+    location: overrides.location ?? 'Test City',
+    company: overrides.company ?? 'Test Company',
+    blog: overrides.blog ?? `https://${login}.example.com`,
+    public_repos: overrides.public_repos ?? (random ? random.nextInt(0, 100) : 10),
+    public_gists: overrides.public_gists ?? (random ? random.nextInt(0, 50) : 5),
+    followers: overrides.followers ?? (random ? random.nextInt(0, 1000) : 100),
+    following: overrides.following ?? (random ? random.nextInt(0, 500) : 50),
+    created_at: overrides.created_at ?? generateTimestamp(-365),
+    updated_at: overrides.updated_at ?? generateTimestamp(-1),
     ...overrides,
   };
 };
 
-export const createIssue = (overrides = {}) => {
-  const id = generateId();
-  const number = Math.floor(Math.random() * 1000) + 1;
-  const user = createUser();
+export const createIssue = (overrides: any = {}, seed?: number) => {
+  const random = getRandom(seed);
+  const id = overrides.id ?? generateId(seed);
+  const number = overrides.number ?? (random ? random.nextInt(1, 1000) : id);
+  const title = overrides.title ?? generateString('issue', 12, seed);
   
   return {
     id,
     number,
-    title: `Test Issue ${number}`,
-    body: `This is a test issue for testing purposes - ${generateId()}`,
-    state: Math.random() > 0.7 ? 'closed' : 'open',
-    user: { login: user.login, id: user.id },
-    labels: [
-      { name: 'bug', color: 'ff0000' },
-      { name: `priority-${['low', 'medium', 'high'][Math.floor(Math.random() * 3)]}`, color: 'ff6600' },
-    ].slice(0, Math.floor(Math.random() * 3)),
-    assignees: Math.random() > 0.5 ? [{ login: user.login, id: user.id }] : [],
-    milestone: Math.random() > 0.7 ? { title: `v${Math.floor(Math.random() * 5) + 1}.0.0`, number: 1 } : null,
-    created_at: generateTimestamp(-7),
-    updated_at: generateTimestamp(-1),
-    closed_at: Math.random() > 0.7 ? generateTimestamp(-1) : null,
-    comments: Math.floor(Math.random() * 10),
+    title,
+    body: overrides.body ?? `This is test issue ${title} for testing purposes.`,
+    state: overrides.state ?? (random ? random.nextFromArray(['open', 'closed']) : 'open'),
+    user: overrides.user ?? { login: 'test-user', id: 1 },
+    labels: overrides.labels ?? [{ name: 'test', color: '0000ff' }],
+    assignees: overrides.assignees ?? [],
+    milestone: overrides.milestone ?? null,
+    created_at: overrides.created_at ?? generateTimestamp(-10),
+    updated_at: overrides.updated_at ?? generateTimestamp(-1),
+    closed_at: overrides.closed_at ?? null,
+    comments: overrides.comments ?? (random ? random.nextInt(0, 20) : 0),
     ...overrides,
   };
 };
 
-export const createPullRequest = (overrides = {}) => {
-  const id = generateId();
-  const number = Math.floor(Math.random() * 1000) + 1;
-  const user = createUser();
-  const repo = createRepository();
-  const state = ['open', 'closed'][Math.floor(Math.random() * 2)];
-  const merged = state === 'closed' && Math.random() > 0.3;
+export const createPullRequest = (overrides: any = {}, seed?: number) => {
+  const random = getRandom(seed);
+  const id = overrides.id ?? generateId(seed);
+  const number = overrides.number ?? (random ? random.nextInt(1, 1000) : id);
+  const title = overrides.title ?? generateString('pr', 12, seed);
   
   return {
     id,
     number,
-    title: `${['Add', 'Fix', 'Update', 'Remove'][Math.floor(Math.random() * 4)]} feature ${number}`,
-    body: `This PR implements feature ${number} - ${generateId()}`,
-    state,
-    user: { login: user.login, id: user.id },
-    head: {
-      ref: `feature-${generateString('branch')}`,
-      sha: generateSha(),
-      repo: { name: repo.name, owner: { login: repo.owner.login } },
+    title,
+    body: overrides.body ?? `This PR ${title} implements new functionality.`,
+    state: overrides.state ?? (random ? random.nextFromArray(['open', 'closed']) : 'open'),
+    user: overrides.user ?? { login: 'test-user', id: 1 },
+    head: overrides.head ?? {
+      ref: 'feature-branch',
+      sha: generateSha(seed),
+      repo: { name: 'test-repo', owner: { login: 'test-owner' } },
     },
-    base: {
+    base: overrides.base ?? {
       ref: 'main',
-      sha: generateSha(),
-      repo: { name: repo.name, owner: { login: repo.owner.login } },
+      sha: generateSha((seed ?? 0) + 1),
+      repo: { name: 'test-repo', owner: { login: 'test-owner' } },
     },
-    mergeable: Math.random() > 0.1,
-    merged,
-    draft: Math.random() > 0.8,
-    created_at: generateTimestamp(-7),
-    updated_at: generateTimestamp(-1),
-    closed_at: state === 'closed' ? generateTimestamp(-1) : null,
-    merged_at: merged ? generateTimestamp(-1) : null,
+    mergeable: overrides.mergeable ?? true,
+    merged: overrides.merged ?? false,
+    draft: overrides.draft ?? false,
+    created_at: overrides.created_at ?? generateTimestamp(-5),
+    updated_at: overrides.updated_at ?? generateTimestamp(-1),
+    closed_at: overrides.closed_at ?? null,
+    merged_at: overrides.merged_at ?? null,
     ...overrides,
   };
 };
 
-export const createWorkflow = (overrides = {}) => {
-  const id = generateId();
-  const name = generateString('workflow');
+export const createWorkflow = (overrides: any = {}, seed?: number) => {
+  const id = overrides.id ?? generateId(seed);
+  const name = overrides.name ?? generateString('workflow', 8, seed);
   
   return {
     id,
-    name: name.charAt(0).toUpperCase() + name.slice(1),
-    path: `.github/workflows/${name}.yml`,
-    state: ['active', 'disabled_manually'][Math.floor(Math.random() * 2)],
-    created_at: generateTimestamp(-30),
-    updated_at: generateTimestamp(-1),
-    url: `https://api.github.com/repos/test-owner/test-repo/workflows/${id}`,
-    html_url: `https://github.com/test-owner/test-repo/actions/workflows/${name}.yml`,
-    badge_url: `https://github.com/test-owner/test-repo/workflows/${name}/badge.svg`,
+    name,
+    path: overrides.path ?? `.github/workflows/${name}.yml`,
+    state: overrides.state ?? 'active',
+    created_at: overrides.created_at ?? generateTimestamp(-30),
+    updated_at: overrides.updated_at ?? generateTimestamp(-1),
+    url: overrides.url ?? `https://api.github.com/repos/test-owner/test-repo/workflows/${id}`,
+    html_url: overrides.html_url ?? `https://github.com/test-owner/test-repo/actions/workflows/${name}.yml`,
+    badge_url: overrides.badge_url ?? `https://github.com/test-owner/test-repo/workflows/${name}/badge.svg`,
     ...overrides,
   };
 };
 
-export const createCommit = (overrides = {}) => {
-  const sha = generateSha();
-  const user = createUser();
+export const createCommit = (overrides: any = {}, seed?: number) => {
+  const sha = overrides.sha ?? generateSha(seed);
+  const message = overrides.message ?? generateString('commit', 20, seed);
   
   return {
     sha,
     commit: {
-      message: `${['Add', 'Fix', 'Update', 'Remove'][Math.floor(Math.random() * 4)]} implementation - ${generateId()}`,
-      author: {
-        name: user.name,
-        email: user.email,
+      message,
+      author: overrides.commit?.author ?? {
+        name: 'Test User',
+        email: 'test@example.com',
         date: generateTimestamp(-1),
       },
-      committer: {
-        name: user.name,
-        email: user.email,
+      committer: overrides.commit?.committer ?? {
+        name: 'Test User',
+        email: 'test@example.com',
         date: generateTimestamp(-1),
       },
     },
-    author: { login: user.login, id: user.id },
-    committer: { login: user.login, id: user.id },
-    parents: [{ sha: generateSha() }],
+    author: overrides.author ?? { login: 'test-user', id: 1 },
+    committer: overrides.committer ?? { login: 'test-user', id: 1 },
+    parents: overrides.parents ?? [{ sha: generateSha((seed ?? 0) + 1) }],
     ...overrides,
   };
 };
 
-export const createFile = (overrides = {}) => {
-  const name = `${generateString('file')}.${['md', 'ts', 'js', 'json', 'yml'][Math.floor(Math.random() * 5)]}`;
-  const content = `# ${name}\n\nThis is test content for ${name} - ${generateId()}`;
+export const createFile = (overrides: any = {}, seed?: number) => {
+  const name = overrides.name ?? generateString('file', 8, seed) + '.txt';
+  const path = overrides.path ?? name;
+  const content = overrides.content ?? `Test content for ${name}`;
   
   return {
     name,
-    path: name,
-    sha: generateSha(),
-    size: content.length,
+    path,
+    sha: overrides.sha ?? generateSha(seed),
+    size: overrides.size ?? content.length,
     content: Buffer.from(content).toString('base64'),
     encoding: 'base64',
     type: 'file',
     ...overrides,
-  };
-};
-
-// Random data generators for specific use cases
-export const generateRandomApiError = () => {
-  const codes = [400, 401, 403, 404, 422, 429, 500, 502, 503, 504];
-  const statusCode = codes[Math.floor(Math.random() * codes.length)];
-  
-  return {
-    response: {
-      status: statusCode,
-      data: {
-        message: `API Error ${statusCode} - ${generateId()}`,
-        errors: [
-          {
-            field: 'test_field',
-            code: 'invalid',
-            message: `Field validation failed - ${generateId()}`
-          }
-        ]
-      },
-      headers: statusCode === 429 ? {
-        'x-ratelimit-limit': '5000',
-        'x-ratelimit-remaining': '0',
-        'x-ratelimit-reset': Math.floor(Date.now() / 1000) + 3600,
-      } : {}
-    }
-  };
-};
-
-export const generateNetworkError = () => {
-  const codes = ['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNRESET'];
-  const code = codes[Math.floor(Math.random() * codes.length)];
-  
-  return {
-    code,
-    message: `Network error: ${code} - ${generateId()}`,
-    errno: -Math.floor(Math.random() * 100),
-    syscall: 'connect',
   };
 };

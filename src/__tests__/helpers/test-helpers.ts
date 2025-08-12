@@ -218,57 +218,54 @@ export const waitFor = async (
 };
 
 /**
- * Create a timeout wrapper for async operations
+ * Create a timeout wrapper for async operations with proper cleanup
  */
 export const withTimeout = <T>(
   promise: Promise<T>,
   timeoutMs: number,
   message = `Operation timed out after ${timeoutMs}ms`
 ): Promise<T> => {
+  let timeoutId: NodeJS.Timeout;
+  
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  
   return Promise.race([
-    promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(message)), timeoutMs)
-    ),
+    promise.finally(() => clearTimeout(timeoutId)),
+    timeoutPromise,
   ]);
 };
 
 /**
- * Mock system time for consistent date testing
+ * Mock system time for consistent date testing using Vitest's built-in fake timers
  */
 export const mockSystemTime = (fixedTime?: Date | string | number) => {
   const fixed = fixedTime ? new Date(fixedTime) : new Date('2024-01-01T12:00:00Z');
-  const originalDate = Date;
   
-  // Mock Date constructor
-  const mockDate = vi.fn((date?: any) => {
-    if (date !== undefined) {
-      return new originalDate(date);
-    }
-    return new originalDate(fixed);
-  });
-  
-  // Mock static methods
-  mockDate.now = vi.fn(() => fixed.getTime());
-  mockDate.parse = originalDate.parse;
-  mockDate.UTC = originalDate.UTC;
-  mockDate.prototype = originalDate.prototype;
-  
-  (global as any).Date = mockDate;
+  // Use Vitest's built-in fake timers for robust time mocking
+  vi.useFakeTimers();
+  vi.setSystemTime(fixed);
   
   return {
     restore: () => {
-      (global as any).Date = originalDate;
+      vi.useRealTimers();
     },
     setTime: (newTime: Date | string | number) => {
       const newFixed = new Date(newTime);
-      mockDate.mockImplementation((date?: any) => {
-        if (date !== undefined) {
-          return new originalDate(date);
-        }
-        return new originalDate(newFixed);
-      });
-      mockDate.now.mockReturnValue(newFixed.getTime());
+      vi.setSystemTime(newFixed);
+    },
+    advanceTime: (ms: number) => {
+      vi.advanceTimersByTime(ms);
+    },
+    runAllTimers: () => {
+      vi.runAllTimers();
+    },
+    runOnlyPendingTimers: () => {
+      vi.runOnlyPendingTimers();
+    },
+    getCurrentTime: () => {
+      return new Date();
     }
   };
 };
