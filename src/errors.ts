@@ -245,10 +245,12 @@ export function normalizeError(
     if (statusCode === 403) {
       // Check if it's a rate limit error
       if (error.response?.headers?.['x-ratelimit-remaining'] === '0') {
+        const reset = parseInt(error.response?.headers?.['x-ratelimit-reset'] ?? '', 10);
+        const limit = parseInt(error.response?.headers?.['x-ratelimit-limit'] ?? '', 10);
         return new RateLimitError(
           'GitHub API rate limit exceeded',
-          parseInt(error.response.headers['x-ratelimit-reset'], 10) || undefined,
-          parseInt(error.response.headers['x-ratelimit-limit'], 10) || undefined,
+          Number.isFinite(reset) ? reset : undefined,
+          Number.isFinite(limit) ? limit : undefined,
           0
         );
       }
@@ -258,11 +260,14 @@ export function normalizeError(
       return new NotFoundError(operation || 'Unknown resource', context);
     }
     if (statusCode === 429) {
+      const reset = parseInt(error.response?.headers?.['x-ratelimit-reset'] ?? '', 10);
+      const limit = parseInt(error.response?.headers?.['x-ratelimit-limit'] ?? '', 10);
+      const remaining = parseInt(error.response?.headers?.['x-ratelimit-remaining'] ?? '', 10);
       return new RateLimitError(
         message,
-        parseInt(error.response?.headers?.['x-ratelimit-reset'], 10) || undefined,
-        parseInt(error.response?.headers?.['x-ratelimit-limit'], 10) || undefined,
-        parseInt(error.response?.headers?.['x-ratelimit-remaining'], 10) || undefined
+        Number.isFinite(reset) ? reset : undefined,
+        Number.isFinite(limit) ? limit : undefined,
+        Number.isFinite(remaining) ? remaining : undefined
       );
     }
 

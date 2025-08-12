@@ -663,20 +663,5 @@ export class GitHubMCPServer {
   }
 }
 
-// Export for testing
+// Export for testing and external usage
 export { GitHubMCPServer };
-
-// Main execution
-(async () => {
-  try {
-    const server = new GitHubMCPServer();
-    await server.start();
-  } catch (error) {
-    logger.error('Failed to start GitHub MCP server', { error });
-    console.error('Fatal error:', error);
-    // Error already logged via logger above
-    if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
-      process.exit(1);
-    }
-  }
-})();

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "GitHub MCP Server - AI-powered GitHub integration",
   "type": "module",
-  "main": "build/index.js",
+  "main": "build/main.js",
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=8.0.0"
@@ -18,8 +18,8 @@
   "homepage": "https://github.com/quanticsoul4772/github-mcp#readme",
   "scripts": {
     "build": "tsc",
-    "dev": "tsx src/index.ts",
-    "start": "node build/index.js",
+    "dev": "tsx src/main.ts",
+    "start": "node build/main.js",
     "clean": "rm -rf build",
     "prepare": "husky && npm run build",
     "test": "vitest",
