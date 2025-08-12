@@ -659,7 +659,12 @@ export class GraphQLPaginationHandler {
       queryBuilder: GraphQLQueryBuilder,
       options: GraphQLPaginationOptions = {}
     ): Promise<GraphQLPaginationResponse<T>> => {
-      const cacheKey = JSON.stringify({ query: queryBuilder.query, variables: queryBuilder.variables, options });
+      const { onProgress, ...serializableOptions } = options;
+      const cacheKey = JSON.stringify({
+        query: queryBuilder.query,
+        variables: queryBuilder.variables,
+        options: serializableOptions,
+      });
       const cached = cache.get(cacheKey);
       
       if (cached && Date.now() - cached.timestamp < ttl) {
