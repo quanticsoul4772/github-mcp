@@ -112,6 +112,50 @@ interface DeleteWorkflowRunLogsParams {
 export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
 
+  // Get workflow tool
+  tools.push({
+    tool: {
+      name: 'get_workflow',
+      description: 'Get a specific workflow by ID or filename',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          owner: {
+            type: 'string',
+            description: 'Repository owner',
+          },
+          repo: {
+            type: 'string',
+            description: 'Repository name',
+          },
+          workflow_id: {
+            type: 'string',
+            description: 'The workflow ID or workflow file name',
+          },
+        },
+        required: ['owner', 'repo', 'workflow_id'],
+      },
+    },
+    handler: async (args: GetWorkflowParams) => {
+      const { data } = await octokit.actions.getWorkflow({
+        owner: args.owner,
+        repo: args.repo,
+        workflow_id: args.workflow_id,
+      });
+
+      return {
+        id: data.id,
+        name: data.name,
+        path: data.path,
+        state: data.state,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        html_url: data.html_url,
+        badge_url: data.badge_url,
+      };
+    },
+  });
+
   // List workflows tool
   tools.push({
     tool: {
@@ -307,10 +351,10 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
     },
   });
 
-  // List workflow jobs tool
+  // List workflow run jobs tool
   tools.push({
     tool: {
-      name: 'list_workflow_jobs',
+      name: 'list_workflow_run_jobs',
       description: 'List jobs for a workflow run',
       inputSchema: {
         type: 'object',
@@ -458,10 +502,11 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
               logs: args.return_content ? logContent : response.url,
             });
           } catch (error) {
+            console.error('Failed to get logs for job:', job.id, error); // Log for debugging
             results.push({
               job_id: job.id,
               job_name: job.name,
-              error: error instanceof Error ? error.message : 'Failed to get logs',
+              error: 'Failed to retrieve logs for this job',
             });
           }
         }
@@ -489,10 +534,10 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
     },
   });
 
-  // Get workflow run logs tool
+  // Download workflow run logs tool
   tools.push({
     tool: {
-      name: 'get_workflow_run_logs',
+      name: 'download_workflow_run_logs',
       description: 'Get logs for a workflow run',
       inputSchema: {
         type: 'object',

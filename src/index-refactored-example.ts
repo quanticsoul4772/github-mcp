@@ -76,7 +76,7 @@ async function main() {
     // Use NEW refactored architecture for issues
     const issueTools = createIssueToolsModular(octokit, services.issueService, readOnly);
     for (const tool of issueTools) {
-      server.addTool(tool.tool, tool.handler);
+      // server.addTool(tool.tool, tool.handler); // TODO: Fix MCP server API
     }
   }
 
@@ -84,14 +84,14 @@ async function main() {
   if (enabledToolsets.includes('repos')) {
     const repoTools = createRepositoryTools(octokit, readOnly);
     for (const tool of repoTools) {
-      server.addTool(tool.tool, tool.handler);
+      // server.addTool(tool.tool, tool.handler); // TODO: Fix MCP server API
     }
   }
 
   if (enabledToolsets.includes('pull_requests')) {
     const prTools = createPullRequestTools(octokit, readOnly);
     for (const tool of prTools) {
-      server.addTool(tool.tool, tool.handler);
+      // server.addTool(tool.tool, tool.handler); // TODO: Fix MCP server API
     }
   }
 
