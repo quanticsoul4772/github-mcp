@@ -44,7 +44,7 @@
     "security:pre-commit": "pre-commit run --all-files",
     "coverage:check": "npx nyc check-coverage --lines 80 --functions 80 --branches 80 --statements 80",
     "quality:check": "npm run lint && npm run typecheck && npm run coverage:check",
-    "quality:complexity": "npx complexity-report src/**/*.ts --format html -o complexity-report.html",
+    "quality:complexity": "eslint src --ext .ts,.tsx --rule 'complexity: [error, 10]'",
     "quality:dependencies": "npx depcheck",
     "quality:licenses": "npx license-checker --production --summary",
     "ci:test": "vitest run --coverage",

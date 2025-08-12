@@ -154,12 +154,8 @@ jobs:
           echo "✅ All licenses are compliant"
         shell: bash
 
-      # Upload complexity report
-      - name: Upload complexity report
-        uses: actions/upload-artifact@v4
-        with:
-          name: complexity-report
-          path: complexity-report.html
+      # Complexity check is now integrated into ESLint
+      # No separate report artifact needed
 
   security-check:
     runs-on: ubuntu-latest
