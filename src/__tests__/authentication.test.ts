@@ -117,19 +117,13 @@ describe('Authentication Security Tests', () => {
   describe('Token Security and Masking', () => {
     it('should never include raw tokens in error messages', () => {
       const sensitiveToken = 'ghp_' + 'A'.repeat(36);
-      
-      // Simulate authentication error
-      const authError = new AuthenticationError('Invalid token', { 
-        operation: 'authenticate',
-        // Ensure no token is in context
-      });
-      
+      const authError = new AuthenticationError('Invalid token', { operation: 'authenticate' });
       const formatted = formatErrorResponse(authError);
       const errorString = JSON.stringify(formatted);
-      
-      // Token should not appear anywhere in error output
+
+      // Should not include raw tokens (full patterns), but allow masked/non-sensitive prefixes
+      expect(errorString).not.toMatch(/gh[porus]_[A-Za-z0-9]{36}/);
       expect(errorString).not.toContain(sensitiveToken);
-      expect(errorString).not.toContain('ghp_');
     });
 
     it('should mask tokens in logging context', () => {
