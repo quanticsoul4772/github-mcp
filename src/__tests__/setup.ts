@@ -19,8 +19,8 @@ beforeEach(() => {
     }
   });
   
-  // Set consistent test environment variables
-  process.env.GITHUB_PERSONAL_ACCESS_TOKEN = `test-token-${Math.random().toString(36).substring(7)}`;
+  // Set consistent test environment variables with deterministic values
+  process.env.GITHUB_PERSONAL_ACCESS_TOKEN = 'test-token-fixed-12345';
   process.env.GITHUB_READ_ONLY = 'false';
   process.env.GITHUB_TOOLSETS = 'all';
   process.env.NODE_ENV = 'test';

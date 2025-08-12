@@ -31,7 +31,7 @@ describe('Error Scenarios', () => {
 
     it('should handle timeout errors with retry', async () => {
       let callCount = 0;
-      mockOctokit.repos.getContent.mockImplementation(async () => {
+      mockOctokit.rest.repos.getContent.mockImplementation(async () => {
         callCount++;
         if (callCount < 3) {
           throw { code: 'ETIMEDOUT', message: 'Request timeout' };
