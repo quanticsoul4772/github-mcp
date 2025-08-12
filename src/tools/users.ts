@@ -1,6 +1,63 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
 
+interface GetUserParams {
+  username: string;
+}
+
+interface SearchUsersParams {
+  query: string;
+  sort?: string;
+  order?: string;
+  page?: number;
+  perPage?: number;
+}
+
+interface ListUserReposParams {
+  username?: string;
+  type?: string;
+  sort?: string;
+  direction?: string;
+  page?: number;
+  perPage?: number;
+}
+
+interface ListFollowersParams {
+  username?: string;
+  page?: number;
+  perPage?: number;
+}
+
+interface ListFollowingParams {
+  username?: string;
+  page?: number;
+  perPage?: number;
+}
+
+interface CheckFollowingParams {
+  username?: string;
+  target_user: string;
+}
+
+interface FollowUserParams {
+  username: string;
+}
+
+interface UnfollowUserParams {
+  username: string;
+}
+
+interface UpdateMeParams {
+  name?: string;
+  email?: string;
+  blog?: string;
+  company?: string;
+  location?: string;
+  hireable?: boolean;
+  bio?: string;
+  twitter_username?: string;
+}
+
 export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
 
@@ -67,7 +124,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         required: ['username'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetUserParams) => {
       const { data } = await octokit.users.getByUsername({
         username: args.username,
       });
@@ -136,7 +193,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         required: ['query'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: SearchUsersParams) => {
       const { data } = await octokit.search.users({
         q: args.query,
         sort: args.sort,
@@ -148,7 +205,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
       return {
         total_count: data.total_count,
         incomplete_results: data.incomplete_results,
-        items: data.items.map((user: any) => ({
+        items: data.items.map((user) => ({
           login: user.login,
           id: user.id,
           node_id: user.node_id,
@@ -205,7 +262,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         },
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: ListUserReposParams) => {
       let data;
       
       if (args.username) {
@@ -229,7 +286,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         data = response.data;
       }
 
-      return data.map((repo: any) => ({
+      return data.map((repo) => ({
         id: repo.id,
         name: repo.name,
         full_name: repo.full_name,
@@ -283,7 +340,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         },
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: ListFollowersParams) => {
       let data;
       
       if (args.username) {
@@ -301,7 +358,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         data = response.data;
       }
 
-      return data.map((user: any) => ({
+      return data.map((user) => ({
         login: user.login,
         id: user.id,
         node_id: user.node_id,
@@ -341,7 +398,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         },
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: ListFollowingParams) => {
       let data;
       
       if (args.username) {
@@ -359,7 +416,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         data = response.data;
       }
 
-      return data.map((user: any) => ({
+      return data.map((user) => ({
         login: user.login,
         id: user.id,
         node_id: user.node_id,
@@ -393,7 +450,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         required: ['target_user'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: CheckFollowingParams) => {
       try {
         if (args.username) {
           await octokit.users.checkFollowingForUser({
@@ -444,7 +501,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
           required: ['username'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: FollowUserParams) => {
         await octokit.users.follow({
           username: args.username,
         });
@@ -472,7 +529,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
           required: ['username'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: UnfollowUserParams) => {
         await octokit.users.unfollow({
           username: args.username,
         });
@@ -527,7 +584,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
           },
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: UpdateMeParams) => {
         const { data } = await octokit.users.updateAuthenticated({
           name: args.name,
           email: args.email,
