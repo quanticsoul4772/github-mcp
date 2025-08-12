@@ -10,6 +10,26 @@ import {
 } from '../graphql-validation.js';
 import { withErrorHandling } from '../errors.js';
 
+/**
+ * Creates GitHub Projects V2 management tools using GraphQL API.
+ * 
+ * GitHub Projects V2 is a powerful project management system that is only
+ * accessible through GraphQL. These tools provide comprehensive project
+ * management capabilities including board management, item tracking, and
+ * custom field operations.
+ * 
+ * @param octokit - Configured Octokit instance with GraphQL support
+ * @param readOnly - Whether to exclude write operations (create, update, delete)
+ * @returns Array of project management tool configurations
+ * 
+ * @example
+ * ```typescript
+ * const tools = createProjectManagementTools(octokit, false);
+ * // Returns tools: get_project_boards, get_project_items, etc.
+ * ```
+ * 
+ * @see https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-api-to-manage-projects
+ */
 export function createProjectManagementTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
 

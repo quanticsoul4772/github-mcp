@@ -10,6 +10,25 @@ import {
 } from '../graphql-validation.js';
 import { withErrorHandling } from '../errors.js';
 
+/**
+ * Creates repository insights tools using GraphQL API for advanced analytics.
+ * 
+ * These tools leverage GraphQL's powerful querying capabilities to provide
+ * comprehensive repository analytics, contributor insights, and statistical
+ * data that would require multiple REST API calls to assemble.
+ * 
+ * @param octokit - Configured Octokit instance with GraphQL support
+ * @param readOnly - Whether to exclude write operations (currently all tools are read-only)
+ * @returns Array of repository insights tool configurations
+ * 
+ * @example
+ * ```typescript
+ * const tools = createRepositoryInsightsTools(octokit, true);
+ * // Returns tools: get_repository_insights, get_contributor_insights, etc.
+ * ```
+ * 
+ * @see https://docs.github.com/en/graphql/reference/objects#repository
+ */
 export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
 

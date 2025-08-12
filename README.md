@@ -49,6 +49,11 @@ This MCP server provides tools for:
 - Create and participate in discussions
 - Manage discussion comments
 
+### GraphQL-Powered Features
+- **GitHub Discussions**: Full discussion management with GraphQL
+- **Projects V2**: Advanced project management and tracking
+- **Repository Insights**: Comprehensive repository analytics and statistics
+- **Advanced Search**: Enhanced search with nested data and relationships
 ## Deployment
 
 The GitHub MCP Server supports multiple deployment options:
@@ -81,11 +86,11 @@ kubectl create secret generic github-mcp-secrets \
 
 ### Available Deployment Options
 
-- **🐳 Docker**: Production-ready containerized deployment
-- **☸️ Kubernetes**: Scalable orchestrated deployment with auto-scaling
-- **☁️ Cloud Platforms**: AWS EKS, Google GKE, Azure AKS
-- **🚀 CI/CD**: GitHub Actions for automated deployments
-- **📊 Monitoring**: Prometheus metrics and health checks
+- ** Docker**: Production-ready containerized deployment
+- **☸ Kubernetes**: Scalable orchestrated deployment with auto-scaling
+- **☁ Cloud Platforms**: AWS EKS, Google GKE, Azure AKS
+- ** CI/CD**: GitHub Actions for automated deployments
+- ** Monitoring**: Prometheus metrics and health checks
 
 For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
@@ -164,9 +169,12 @@ You can enable specific toolsets using the `GITHUB_TOOLSETS` environment variabl
 - `users` - User management tools
 - `orgs` - Organization tools
 - `notifications` - Notification management
-- `discussions` - Discussion tools
+- `discussions` - Discussion tools (GraphQL-powered)
 - `dependabot` - Dependabot alerts and settings
 - `secret_protection` - Secret scanning tools
+- `graphql_insights` - Advanced repository insights via GraphQL
+- `project_management` - GitHub Projects V2 management via GraphQL
+- `advanced_search` - Enhanced search capabilities via GraphQL
 
 Example: `GITHUB_TOOLSETS="repos,issues,pull_requests"`
 
@@ -179,6 +187,46 @@ To run the server in read-only mode (prevents any write operations):
 ```bash
 GITHUB_READ_ONLY=1 npm start
 ```
+
+## GraphQL Tools
+
+This server includes powerful GraphQL-based tools that provide advanced functionality beyond REST APIs:
+
+### When to Use GraphQL vs REST
+
+**Use GraphQL Tools For:**
+- GitHub Discussions (only available via GraphQL)
+- GitHub Projects V2 (GraphQL-only feature)
+- Complex repository insights and analytics
+- Advanced search with nested relationships
+- Efficient data fetching with custom field selection
+
+**Use REST Tools For:**
+- Simple CRUD operations on issues, PRs, and files
+- GitHub Actions workflow management
+- Basic repository operations
+- When REST endpoints provide sufficient functionality
+
+### GraphQL Performance Benefits
+
+- **Reduced API Calls**: Fetch related data in single requests
+- **Bandwidth Efficiency**: Query only the fields you need
+- **Advanced Features**: Access to GraphQL-exclusive GitHub features
+- **Real-time Capabilities**: Better support for live data and subscriptions
+
+### GraphQL-Specific Configuration
+
+```bash
+# GraphQL toolsets
+GITHUB_TOOLSETS="discussions,graphql_insights,project_management,advanced_search"
+
+# GraphQL performance settings
+GITHUB_ENABLE_GRAPHQL_CACHE=true
+GITHUB_GRAPHQL_TIMEOUT=30000
+GITHUB_GRAPHQL_MAX_COMPLEXITY=1000
+```
+
+For detailed GraphQL tools documentation, see [docs/graphql-tools.md](docs/graphql-tools.md).
 
 ## Creating a GitHub Personal Access Token
 
@@ -249,6 +297,14 @@ Once configured, the GitHub MCP server will be available in Claude Desktop. You 
 - "Show me open Dependabot alerts"
 - "List discussions in the repository"
 
+### GraphQL-Powered Examples
+
+- "Get comprehensive repository insights and contributor statistics"
+- "Search for discussions across all my repositories"
+- "Show me Projects V2 boards and their items"
+- "Find code with advanced search including author and file context"
+- "Get detailed analytics on issue resolution patterns"
+
 ## Development
 
 ### Running in Development Mode
@@ -310,9 +366,12 @@ The server includes helpful prompts for common workflows:
    - Verify organization access
    - Some features require admin rights
 
-4. **GraphQL Errors (Discussions)**
-   - Discussions require repository to have discussions enabled
-   - Some GraphQL features need specific permissions
+4. **GraphQL Errors**
+   - **Query Complexity**: Reduce query complexity or add pagination
+   - **Discussions**: Repository must have discussions enabled
+   - **Projects V2**: Requires `project` scope and project access
+   - **Rate Limits**: GraphQL has different rate limiting (5,000 points/hour)
+   - **Permissions**: Some GraphQL features need specific scopes
 
 ## License
 

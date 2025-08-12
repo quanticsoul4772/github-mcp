@@ -60,6 +60,23 @@ interface DeleteDiscussionParams {
   discussionId: string;
 }
 
+/**
+ * Creates GitHub Discussion tools using GraphQL API.
+ * 
+ * GitHub Discussions are only available through GraphQL and provide community
+ * conversation features around repositories. These tools offer comprehensive
+ * discussion management including creation, querying, and moderation.
+ * 
+ * @param octokit - Configured Octokit instance with GraphQL support
+ * @param readOnly - Whether to exclude write operations (create, update, delete)
+ * @returns Array of discussion tool configurations
+ * 
+ * @example
+ * ```typescript
+ * const tools = createDiscussionTools(octokit, false);
+ * // Returns tools: list_discussions, get_discussion, search_discussions, etc.
+ * ```
+ */
 export function createDiscussionTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
 
