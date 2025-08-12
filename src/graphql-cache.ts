@@ -131,20 +131,11 @@ export class GraphQLCache {
    * Extract query name from GraphQL query string
    */
   private extractQueryName(query: string): string | null {
-    // Match query/mutation name patterns
-    const patterns = [
-      /(?:query|mutation)\s+(\w+)/i,
-      /(\w+)\s*\(/,
-      /{\s*(\w+)/
-    ];
-    
-    for (const pattern of patterns) {
-      const match = query.match(pattern);
-      if (match && match[1]) {
-        return match[1];
-      }
+    // Only extract explicit operation names: "query Name" or "mutation Name"
+    const opMatch = query.match(/^\s*(?:query|mutation)\s+([A-Za-z_][A-Za-z0-9_]*)/i);
+    if (opMatch && opMatch[1]) {
+      return opMatch[1];
     }
-    
     return null;
   }
 
