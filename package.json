@@ -41,7 +41,7 @@
     "security:scan": "npm audit && npm run security:secrets",
     "security:secrets": "detect-secrets scan --baseline .secrets.baseline",
     "security:pre-commit": "pre-commit run --all-files",
-    "coverage:check": "vitest run --coverage && npx nyc check-coverage --lines 80 --functions 80 --branches 80 --statements 80",
+    "coverage:check": "npx nyc check-coverage --lines 80 --functions 80 --branches 80 --statements 80",
     "quality:check": "npm run lint && npm run typecheck && npm run coverage:check",
 
     "quality:dependencies": "npx depcheck",

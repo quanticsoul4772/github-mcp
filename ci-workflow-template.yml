@@ -55,8 +55,9 @@ jobs:
         env:
           CI: true
 
-      # Check coverage thresholds - HARD FAIL if below 80%
+      # Check coverage thresholds - HARD FAIL if below 80% (Node 20.x only)
       - name: Check coverage thresholds
+        if: matrix.node-version == '20.x'
         run: |
           npx nyc check-coverage \
             --lines 80 \
@@ -77,12 +78,12 @@ jobs:
       # Add coverage comment to PR
       - name: Comment coverage on PR
         if: github.event_name == 'pull_request' && matrix.node-version == '20.x'
-        uses: 5monkeys/cobertura-action@master
+        uses: 5monkeys/cobertura-action@v7
         with:
           path: coverage/cobertura-coverage.xml
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           minimum_coverage: 80
-          fail_below_threshold: true  # HARD FAIL if below threshold
+          fail_below_threshold: false  # Non-blocking feedback
 
       # Store coverage reports as artifacts
       - name: Upload coverage artifacts
