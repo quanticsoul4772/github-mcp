@@ -72,6 +72,23 @@ interface DeleteDiscussionParams {
   discussionId: string;
 }
 
+/**
+ * Creates GitHub Discussion tools using GraphQL API.
+ * 
+ * GitHub Discussions are only available through GraphQL and provide community
+ * conversation features around repositories. These tools offer comprehensive
+ * discussion management including creation, querying, and moderation.
+ * 
+ * @param octokit - Configured Octokit instance with GraphQL support
+ * @param readOnly - Whether to exclude write operations (create, update, delete)
+ * @returns Array of discussion tool configurations
+ * 
+ * @example
+ * ```typescript
+ * const tools = createDiscussionTools(octokit, false);
+ * // Returns tools: list_discussions, get_discussion, search_discussions, etc.
+ * ```
+ */
 export function createDiscussionTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
 
@@ -149,6 +166,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
       `;
 
       const result = await typedGraphQL<ListDiscussionsResponse>(octokit, query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
         first: args.perPage || 25,
@@ -234,6 +252,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
       `;
 
       const result = await typedGraphQL<GetDiscussionResponse>(octokit, query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
         number: args.discussionNumber,
@@ -321,7 +340,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
         number: args.discussionNumber,
@@ -379,7 +398,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
       });
@@ -455,7 +474,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         searchQuery,
         first: args.first || 25,
       });
@@ -511,7 +530,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           }
         `;
 
-        const repoResult: any = await octokit.graphql(repoQuery, {
+        const repoResult: any = await (octokit as any).graphqlWithComplexity(repoQuery, {
           owner: args.owner,
           repo: args.repo,
         });
@@ -542,7 +561,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           }
         `;
 
-        const result: any = await octokit.graphql(mutation, {
+        const result: any = await (octokit as any).graphqlWithComplexity(mutation, {
           repositoryId: repoResult.repository.id,
           title: args.title,
           body: args.body,
@@ -597,7 +616,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           }
         `;
 
-        const result: any = await octokit.graphql(mutation, {
+        const result: any = await (octokit as any).graphqlWithComplexity(mutation, {
           discussionId: args.discussionId,
           body: args.body,
           replyToId: args.replyToId,
@@ -658,7 +677,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           }
         `;
 
-        const result: any = await octokit.graphql(mutation, {
+        const result: any = await (octokit as any).graphqlWithComplexity(mutation, {
           discussionId: args.discussionId,
           title: args.title,
           body: args.body,
@@ -696,7 +715,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           }
         `;
 
-        await octokit.graphql(mutation, {
+        await (octokit as any).graphqlWithComplexity(mutation, {
           discussionId: args.discussionId,
         });
 

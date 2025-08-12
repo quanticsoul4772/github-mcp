@@ -74,6 +74,75 @@ export interface PushFilesParams {
   }>;
 }
 
+export interface ListUserRepositoriesParams {
+  visibility?: 'all' | 'public' | 'private';
+  affiliation?: string;
+  type?: string;
+  sort?: string;
+  direction?: string;
+  page?: number;
+  perPage?: number;
+}
+
+export interface GetRepositoryParams {
+  owner: string;
+  repo: string;
+}
+
+export interface CreateBranchParams {
+  owner: string;
+  repo: string;
+  branch: string;
+  from_branch?: string;
+}
+
+export interface ForkRepositoryParams {
+  owner: string;
+  repo: string;
+  organization?: string;
+}
+
+// Optimized Repository Tools Parameters
+export interface OptimizedGetFileContentsParams {
+  owner: string;
+  repo: string;
+  path?: string;
+  ref?: string;
+  skipCache?: boolean;
+}
+
+export interface OptimizedGetRepositoryParams {
+  owner: string;
+  repo: string;
+  skipCache?: boolean;
+}
+
+export interface OptimizedListBranchesParams {
+  owner: string;
+  repo: string;
+  maxPages?: number;
+}
+
+export interface OptimizedListIssuesParams {
+  owner: string;
+  repo: string;
+  state?: 'open' | 'closed' | 'all';
+  labels?: string;
+  since?: string;
+  maxPages?: number;
+  perPage?: number;
+}
+
+export interface OptimizedListPullRequestsParams {
+  owner: string;
+  repo: string;
+  state?: 'open' | 'closed' | 'all';
+  sort?: string;
+  direction?: 'asc' | 'desc';
+  maxPages?: number;
+  perPage?: number;
+}
+
 // Issue Tools Parameters
 export interface ListIssuesParams {
   owner: string;
@@ -111,6 +180,46 @@ export interface CreateIssueCommentParams {
   repo: string;
   issue_number: number;
   body: string;
+}
+
+export interface UpdateIssueCommentParams {
+  owner: string;
+  repo: string;
+  comment_id: number;
+  body: string;
+}
+
+export interface DeleteIssueCommentParams {
+  owner: string;
+  repo: string;
+  comment_id: number;
+}
+
+export interface AddLabelsToIssueParams {
+  owner: string;
+  repo: string;
+  issue_number: number;
+  labels: string[];
+}
+
+export interface RemoveLabelFromIssueParams {
+  owner: string;
+  repo: string;
+  issue_number: number;
+  name: string;
+}
+
+export interface LockIssueParams {
+  owner: string;
+  repo: string;
+  issue_number: number;
+  lock_reason?: 'off-topic' | 'too heated' | 'resolved' | 'spam';
+}
+
+export interface UnlockIssueParams {
+  owner: string;
+  repo: string;
+  issue_number: number;
 }
 
 // Pull Request Tools Parameters
@@ -156,6 +265,25 @@ export interface GetPullRequestDiffParams {
   owner: string;
   repo: string;
   pullNumber: number;
+}
+
+export interface DismissPullRequestReviewParams {
+  owner: string;
+  repo: string;
+  pullNumber: number;
+  review_id: number;
+  message: string;
+}
+
+export interface CreatePullRequestReviewCommentParams {
+  owner: string;
+  repo: string;
+  pullNumber: number;
+  body: string;
+  commit_id: string;
+  path: string;
+  line: number;
+  side?: 'LEFT' | 'RIGHT';
 }
 
 // Actions Tools Parameters
@@ -341,6 +469,119 @@ export interface SearchUsersParams {
   perPage?: number;
 }
 
+// Repository Insights Parameters
+export interface GetRepositoryInsightsParams {
+  owner: string;
+  repo: string;
+  since?: string;
+}
+
+export interface GetRepositoryContributorsParams {
+  owner: string;
+  repo: string;
+  first?: number;
+}
+
+export interface GetCodeMetricsParams {
+  owner: string;
+  repo: string;
+  branch?: string;
+  since?: string;
+  until?: string;
+}
+
+// Advanced Search Parameters  
+export interface AdvancedCodeSearchParams {
+  query: string;
+  language?: string;
+  filename?: string;
+  extension?: string;
+  path?: string;
+  size?: string;
+  sort?: string;
+  order?: 'asc' | 'desc';
+  page?: number;
+  per_page?: number;
+}
+
+export interface AdvancedIssueSearchParams {
+  query: string;
+  repository?: string;
+  state?: 'open' | 'closed';
+  author?: string;
+  assignee?: string;
+  labels?: string;
+  sort?: string;
+  order?: 'asc' | 'desc';
+  page?: number;
+  per_page?: number;
+}
+
+export interface AdvancedPullRequestSearchParams {
+  query: string;
+  repository?: string;
+  state?: 'open' | 'closed' | 'merged';
+  author?: string;
+  assignee?: string;
+  sort?: string;
+  order?: 'asc' | 'desc';
+  page?: number;
+  per_page?: number;
+}
+
+// Project Management Parameters
+export interface GetProjectInsightsParams {
+  owner: string;
+  repo: string;
+  project_number: number;
+  time_period?: 'week' | 'month' | 'quarter';
+}
+
+export interface BulkUpdateIssuesParams {
+  owner: string;
+  repo: string;
+  issue_numbers: number[];
+  updates: {
+    state?: 'open' | 'closed';
+    assignees?: string[];
+    labels?: string[];
+    milestone?: number | null;
+  };
+}
+
+export interface ProjectBoardAnalyticsParams {
+  owner: string;
+  repo: string;
+  project_number?: number;
+  start_date?: string;
+  end_date?: string;
+}
+
+// Batch Operations Parameters
+export interface BatchProcessRepositoriesParams {
+  repositories: Array<{
+    owner: string;
+    repo: string;
+  }>;
+  operation: 'sync' | 'analyze' | 'update';
+  options?: Record<string, any>;
+}
+
+export interface BulkUpdatePullRequestsParams {
+  owner: string;
+  repo: string;
+  pull_numbers: number[];
+  updates: {
+    state?: 'open' | 'closed';
+    assignees?: string[];
+    labels?: string[];
+  };
+}
+
+export interface BatchOperationStatusParams {
+  operation_id: string;
+}
+
 // Type guards
 export function isGetFileContentsParams(params: unknown): params is GetFileContentsParams {
   return (
@@ -392,15 +633,32 @@ export type ToolParams =
   | CreateOrUpdateFileParams
   | DeleteFileParams
   | PushFilesParams
+  | ListUserRepositoriesParams
+  | GetRepositoryParams
+  | CreateBranchParams
+  | ForkRepositoryParams
+  | OptimizedGetFileContentsParams
+  | OptimizedGetRepositoryParams
+  | OptimizedListBranchesParams
+  | OptimizedListIssuesParams
+  | OptimizedListPullRequestsParams
   | ListIssuesParams
   | CreateIssueParams
   | UpdateIssueParams
   | CreateIssueCommentParams
+  | UpdateIssueCommentParams
+  | DeleteIssueCommentParams
+  | AddLabelsToIssueParams
+  | RemoveLabelFromIssueParams
+  | LockIssueParams
+  | UnlockIssueParams
   | ListPullRequestsParams
   | CreatePullRequestParams
   | UpdatePullRequestParams
   | MergePullRequestParams
   | GetPullRequestDiffParams
+  | DismissPullRequestReviewParams
+  | CreatePullRequestReviewCommentParams
   | ListWorkflowsParams
   | GetWorkflowParams
   | ListWorkflowRunsParams
@@ -425,4 +683,16 @@ export type ToolParams =
   | SearchCodeParams
   | SearchReposParams
   | SearchIssuesParams
-  | SearchUsersParams;
+  | SearchUsersParams
+  | GetRepositoryInsightsParams
+  | GetRepositoryContributorsParams
+  | GetCodeMetricsParams
+  | AdvancedCodeSearchParams
+  | AdvancedIssueSearchParams
+  | AdvancedPullRequestSearchParams
+  | GetProjectInsightsParams
+  | BulkUpdateIssuesParams
+  | ProjectBoardAnalyticsParams
+  | BatchProcessRepositoriesParams
+  | BulkUpdatePullRequestsParams
+  | BatchOperationStatusParams;
