@@ -606,24 +606,30 @@ export function createRateLimitedOctokit(token: string): {
         // For GraphQL requests, extract query from body for complexity analysis
         if (resource === 'graphql' && options.body) {
           let query = '';
-          let variables = {};
-          
+          let variables: Record<string, any> = {};
+  
           try {
             const body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
-            query = body.query || '';
-            variables = body.variables || {};
+            query = body?.query || '';
+            variables = body?.variables || {};
           } catch (e) {
-            // Fallback for parsing issues
             console.warn('Could not parse GraphQL request body for complexity analysis');
           }
 
+          // If we have a query, use complexity-aware wrapper; otherwise still wrap with conservative handling
           if (query) {
-            // Use GraphQL-specific rate limiting
             return await rateLimiter.wrapGraphQLRequest(
               () => request(options),
               query,
               variables,
-              1 // Default priority
+              1
+            );
+          } else {
+            return await rateLimiter.wrapGraphQLRequest(
+              () => request(options),
+              'unknown', // placeholder to track history
+              {},
+              1
             );
           }
         }
