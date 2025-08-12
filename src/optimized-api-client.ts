@@ -8,7 +8,12 @@ import { GitHubAPICache, CACHE_CONFIG } from './cache.js';
 import { GraphQLCache } from './graphql-cache.js';
 import { RequestDeduplicator } from './request-deduplication.js';
 import { PerformanceMonitor } from './performance-monitor.js';
+import { GitHubAPICache, CACHE_CONFIG, type CacheMetrics } from './cache.js';
+import { RequestDeduplicator, type DeduplicationMetrics } from './request-deduplication.js';
+import { PerformanceMonitor, type AggregatedMetrics, type SystemMetrics } from './performance-monitor.js';
 import { PaginationHandler } from './pagination-handler.js';
+
+export type { CacheMetrics, DeduplicationMetrics, AggregatedMetrics, SystemMetrics };
 
 interface OptimizedClientOptions {
   octokit: Octokit;
@@ -468,7 +473,7 @@ export class OptimizedAPIClient {
   /**
    * Get performance metrics
    */
-  getMetrics() {
+  getMetrics(): any {
     return {
       cache: this.cache?.getMetrics(),
       graphqlCache: this.graphqlCache?.getMetrics(),

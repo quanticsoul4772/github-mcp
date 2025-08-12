@@ -2,6 +2,18 @@ import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
 import { OptimizedAPIClient } from '../optimized-api-client.js';
 import { cachedGraphQL, smartGraphQL, GraphQLTTL } from '../graphql-utils.js';
+import { typedGraphQL, createTypedHandler } from '../graphql-utils.js';
+import {
+  ListDiscussionsResponse,
+  GetDiscussionResponse,
+  GetDiscussionCommentsResponse,
+  ListDiscussionCategoriesResponse,
+  SearchDiscussionsResponse,
+  CreateDiscussionResponse,
+  AddDiscussionCommentResponse,
+  UpdateDiscussionResponse,
+  SimpleRepositoryResponse
+} from '../graphql-types.js';
 
 interface ListDiscussionsParams {
   owner: string;
@@ -66,6 +78,24 @@ export function createDiscussionTools(
   client: Octokit | OptimizedAPIClient, 
   readOnly: boolean
 ): ToolConfig[] {
+/**
+ * Creates GitHub Discussion tools using GraphQL API.
+ * 
+ * GitHub Discussions are only available through GraphQL and provide community
+ * conversation features around repositories. These tools offer comprehensive
+ * discussion management including creation, querying, and moderation.
+ * 
+ * @param octokit - Configured Octokit instance with GraphQL support
+ * @param readOnly - Whether to exclude write operations (create, update, delete)
+ * @returns Array of discussion tool configurations
+ * 
+ * @example
+ * ```typescript
+ * const tools = createDiscussionTools(octokit, false);
+ * // Returns tools: list_discussions, get_discussion, search_discussions, etc.
+ * ```
+ */
+export function createDiscussionTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
 
   // Note: GitHub Discussions are accessed through GraphQL API
@@ -105,7 +135,7 @@ export function createDiscussionTools(
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: ListDiscussionsParams) => {
+    handler: createTypedHandler<ListDiscussionsParams, any>(async (args: ListDiscussionsParams) => {
       const query = `
         query($owner: String!, $repo: String!, $first: Int!, $after: String, $categoryId: ID) {
           repository(owner: $owner, name: $repo) {
@@ -142,6 +172,8 @@ export function createDiscussionTools(
       `;
 
       const result: any = await cachedGraphQL(client, query, {
+      const result = await typedGraphQL<ListDiscussionsResponse>(octokit, query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
         first: args.perPage || 25,
@@ -158,7 +190,7 @@ export function createDiscussionTools(
         end_cursor: result.repository.discussions.pageInfo.endCursor,
         discussions: result.repository.discussions.nodes,
       };
-    },
+    }),
   });
 
   // Get discussion tool
@@ -185,7 +217,7 @@ export function createDiscussionTools(
         required: ['owner', 'repo', 'discussionNumber'],
       },
     },
-    handler: async (args: GetDiscussionParams) => {
+    handler: createTypedHandler<GetDiscussionParams, any>(async (args: GetDiscussionParams) => {
       const query = `
         query($owner: String!, $repo: String!, $number: Int!) {
           repository(owner: $owner, name: $repo) {
@@ -230,6 +262,8 @@ export function createDiscussionTools(
       `;
 
       const result: any = await cachedGraphQL(client, query, {
+      const result = await typedGraphQL<GetDiscussionResponse>(octokit, query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
         number: args.discussionNumber,
@@ -239,7 +273,7 @@ export function createDiscussionTools(
       });
 
       return result.repository.discussion;
-    },
+    }),
   });
 
   // Get discussion comments tool
@@ -321,6 +355,7 @@ export function createDiscussionTools(
       `;
 
       const result: any = await cachedGraphQL(client, query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
         number: args.discussionNumber,
@@ -382,6 +417,7 @@ export function createDiscussionTools(
       `;
 
       const result: any = await cachedGraphQL(client, query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
       }, {
@@ -461,6 +497,7 @@ export function createDiscussionTools(
       `;
 
       const result: any = await cachedGraphQL(client, query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         searchQuery,
         first: args.first || 25,
       }, {
@@ -520,6 +557,7 @@ export function createDiscussionTools(
         `;
 
         const repoResult: any = await cachedGraphQL(client, repoQuery, {
+        const repoResult: any = await (octokit as any).graphqlWithComplexity(repoQuery, {
           owner: args.owner,
           repo: args.repo,
         }, {
@@ -554,6 +592,7 @@ export function createDiscussionTools(
         `;
 
         const result: any = await smartGraphQL(client, mutation, {
+        const result: any = await (octokit as any).graphqlWithComplexity(mutation, {
           repositoryId: repoResult.repository.id,
           title: args.title,
           body: args.body,
@@ -612,6 +651,7 @@ export function createDiscussionTools(
         `;
 
         const result: any = await smartGraphQL(client, mutation, {
+        const result: any = await (octokit as any).graphqlWithComplexity(mutation, {
           discussionId: args.discussionId,
           body: args.body,
           replyToId: args.replyToId,
@@ -676,6 +716,7 @@ export function createDiscussionTools(
         `;
 
         const result: any = await smartGraphQL(client, mutation, {
+        const result: any = await (octokit as any).graphqlWithComplexity(mutation, {
           discussionId: args.discussionId,
           title: args.title,
           body: args.body,
@@ -717,6 +758,7 @@ export function createDiscussionTools(
         `;
 
         await smartGraphQL(client, mutation, {
+        await (octokit as any).graphqlWithComplexity(mutation, {
           discussionId: args.discussionId,
         }, {
           isMutation: true,

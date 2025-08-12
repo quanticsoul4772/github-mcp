@@ -11,11 +11,11 @@ import { metrics } from './metrics.js';
  */
 export class GitHubMCPError extends Error {
   public readonly code: string;
-  public readonly statusCode?: number;
-  public readonly context?: Record<string, any>;
+  public readonly statusCode?: number | undefined;
+  public readonly context?: Record<string, any> | undefined;
   public readonly isRetryable: boolean;
-  public readonly originalError?: Error;
-  public readonly correlationId?: string;
+  public readonly originalError?: Error | undefined;
+  public readonly correlationId?: string | undefined;
   public readonly timestamp: Date;
 
   constructor(
@@ -102,9 +102,9 @@ export class NotFoundError extends GitHubMCPError {
  * Rate limit error
  */
 export class RateLimitError extends GitHubMCPError {
-  public readonly resetTime?: Date;
-  public readonly limit?: number;
-  public readonly remaining?: number;
+  public readonly resetTime?: Date | undefined;
+  public readonly limit?: number | undefined;
+  public readonly remaining?: number | undefined;
 
   constructor(
     message: string,
@@ -153,6 +153,16 @@ export class ConfigurationError extends GitHubMCPError {
   constructor(message: string, missingConfig?: string[]) {
     super(message, 'CONFIGURATION_ERROR', undefined, { missingConfig });
     this.name = 'ConfigurationError';
+  }
+}
+
+/**
+ * Generic API error for user-facing responses
+ */
+export class APIError extends GitHubMCPError {
+  constructor(message: string, statusCode: number = 500, context?: Record<string, any>) {
+    super(message, 'API_ERROR', statusCode, context);
+    this.name = 'APIError';
   }
 }
 
@@ -235,10 +245,12 @@ export function normalizeError(
     if (statusCode === 403) {
       // Check if it's a rate limit error
       if (error.response?.headers?.['x-ratelimit-remaining'] === '0') {
+        const reset = parseInt(error.response?.headers?.['x-ratelimit-reset'] ?? '', 10);
+        const limit = parseInt(error.response?.headers?.['x-ratelimit-limit'] ?? '', 10);
         return new RateLimitError(
           'GitHub API rate limit exceeded',
-          error.response.headers['x-ratelimit-reset'],
-          error.response.headers['x-ratelimit-limit'],
+          Number.isFinite(reset) ? reset : undefined,
+          Number.isFinite(limit) ? limit : undefined,
           0
         );
       }
@@ -248,11 +260,14 @@ export function normalizeError(
       return new NotFoundError(operation || 'Unknown resource', context);
     }
     if (statusCode === 429) {
+      const reset = parseInt(error.response?.headers?.['x-ratelimit-reset'] ?? '', 10);
+      const limit = parseInt(error.response?.headers?.['x-ratelimit-limit'] ?? '', 10);
+      const remaining = parseInt(error.response?.headers?.['x-ratelimit-remaining'] ?? '', 10);
       return new RateLimitError(
         message,
-        error.response?.headers?.['x-ratelimit-reset'],
-        error.response?.headers?.['x-ratelimit-limit'],
-        error.response?.headers?.['x-ratelimit-remaining']
+        Number.isFinite(reset) ? reset : undefined,
+        Number.isFinite(limit) ? limit : undefined,
+        Number.isFinite(remaining) ? remaining : undefined
       );
     }
 

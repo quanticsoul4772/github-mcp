@@ -7,6 +7,38 @@ export function createRepositoryInsightsTools(
   client: Octokit | OptimizedAPIClient, 
   readOnly: boolean
 ): ToolConfig[] {
+import { typedGraphQL, createTypedHandler } from '../graphql-utils.js';
+import { RepositoryInsightsResponse, ContributionStatsResponse, CommitActivityResponse } from '../graphql-types.js';
+import {
+  validateGraphQLInput,
+  validateGraphQLVariableValue,
+  RepositoryInsightsSchema,
+  ContributionStatsSchema,
+  CommitActivitySchema,
+  GraphQLValidationError
+} from '../graphql-validation.js';
+import { withErrorHandling } from '../errors.js';
+
+/**
+ * Creates repository insights tools using GraphQL API for advanced analytics.
+ * 
+ * These tools leverage GraphQL's powerful querying capabilities to provide
+ * comprehensive repository analytics, contributor insights, and statistical
+ * data that would require multiple REST API calls to assemble.
+ * 
+ * @param octokit - Configured Octokit instance with GraphQL support
+ * @param readOnly - Whether to exclude write operations (currently all tools are read-only)
+ * @returns Array of repository insights tool configurations
+ * 
+ * @example
+ * ```typescript
+ * const tools = createRepositoryInsightsTools(octokit, true);
+ * // Returns tools: get_repository_insights, get_contributor_insights, etc.
+ * ```
+ * 
+ * @see https://docs.github.com/en/graphql/reference/objects#repository
+ */
+export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
 
   // Get repository statistics tool
@@ -33,7 +65,11 @@ export function createRepositoryInsightsTools(
         required: ['owner', 'repo'],
       },
     },
+    handler: createTypedHandler<{owner: string, repo: string, since?: string}, any>(async (args: {owner: string, repo: string, since?: string}) => {
     handler: async (args: any) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(RepositoryInsightsSchema, args, 'get_repository_insights');
+      
       const query = `
         query($owner: String!, $repo: String!) {
           repository(owner: $owner, name: $repo) {
@@ -59,78 +95,127 @@ export function createRepositoryInsightsTools(
                 node {
                   name
                   color
+      return withErrorHandling(
+        'get_repository_insights',
+        async () => {
+          const query = `
+            query($owner: String!, $repo: String!) {
+              repository(owner: $owner, name: $repo) {
+                name
+                description
+                stargazerCount
+                forkCount
+                watchers {
+                  totalCount
                 }
-              }
-            }
-            collaborators {
-              totalCount
-            }
-            repositoryTopics(first: 20) {
-              nodes {
-                topic {
+                issues {
+                  totalCount
+                }
+                pullRequests {
+                  totalCount
+                }
+                releases {
+                  totalCount
+                }
+                languages(first: 10, orderBy: {field: SIZE, direction: DESC}) {
+                  edges {
+                    size
+                    node {
+                      name
+                      color
+                    }
+                  }
+                }
+                collaborators {
+                  totalCount
+                }
+                repositoryTopics(first: 20) {
+                  nodes {
+                    topic {
+                      name
+                    }
+                  }
+                }
+                licenseInfo {
                   name
+                  spdxId
                 }
+                createdAt
+                updatedAt
+                pushedAt
+                diskUsage
+                isArchived
+                isDisabled
+                isFork
+                isTemplate
+                visibility
               }
             }
-            licenseInfo {
-              name
-              spdxId
-            }
-            createdAt
-            updatedAt
-            pushedAt
-            diskUsage
-            isArchived
-            isDisabled
-            isFork
-            isTemplate
-            visibility
-          }
-        }
-      `;
+          `;
 
       const result: any = await cachedGraphQL(client, query, {
+      const result = await typedGraphQL<RepositoryInsightsResponse>(octokit, query, {
+      // Validate GraphQL variables before execution
+      const variables = {
+        owner: validateGraphQLVariableValue(validatedArgs.owner, 'owner'),
+        repo: validateGraphQLVariableValue(validatedArgs.repo, 'repo'),
+      };
+      
+      const result: any = await octokit.graphql(query, variables);
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
       }, {
         ttl: GraphQLTTL.REPOSITORY_INSIGHTS,
         operation: 'get_repository_insights'
       });
+          const result: any = await octokit.graphql(query, {
+            owner: args.owner,
+            repo: args.repo,
+          });
 
-      const repository = result.repository;
+          const repository = result.repository;
+          if (!repository) {
+            throw new Error(`Repository ${args.owner}/${args.repo} not found`);
+          }
 
-      return {
-        name: repository.name,
-        description: repository.description,
-        statistics: {
-          stars: repository.stargazerCount,
-          forks: repository.forkCount,
-          watchers: repository.watchers.totalCount,
-          issues: repository.issues.totalCount,
-          pullRequests: repository.pullRequests.totalCount,
-          releases: repository.releases.totalCount,
-          collaborators: repository.collaborators.totalCount,
-          diskUsage: repository.diskUsage,
-        },
-        languages: repository.languages.edges.map((edge: any) => ({
-          name: edge.node.name,
-          color: edge.node.color,
-          size: edge.size,
-          percentage: Math.round((edge.size / repository.languages.edges.reduce((sum: number, e: any) => sum + e.size, 0)) * 100 * 100) / 100,
-        })),
-        topics: repository.repositoryTopics.nodes.map((node: any) => node.topic.name),
-        license: repository.licenseInfo,
-        metadata: {
-          createdAt: repository.createdAt,
-          updatedAt: repository.updatedAt,
-          pushedAt: repository.pushedAt,
-          isArchived: repository.isArchived,
-          isDisabled: repository.isDisabled,
-          isFork: repository.isFork,
-          isTemplate: repository.isTemplate,
-          visibility: repository.visibility,
+          return {
+            name: repository.name,
+            description: repository.description,
+            statistics: {
+              stars: repository.stargazerCount,
+              forks: repository.forkCount,
+              watchers: repository.watchers.totalCount,
+              issues: repository.issues.totalCount,
+              pullRequests: repository.pullRequests.totalCount,
+              releases: repository.releases.totalCount,
+              collaborators: repository.collaborators.totalCount,
+              diskUsage: repository.diskUsage,
+            },
+            languages: repository.languages.edges.map((edge: any) => ({
+              name: edge.node.name,
+              color: edge.node.color,
+              size: edge.size,
+              percentage: Math.round((edge.size / repository.languages.edges.reduce((sum: number, e: any) => sum + e.size, 0)) * 100 * 100) / 100,
+            })),
+            topics: repository.repositoryTopics.nodes.map((node: any) => node.topic.name),
+            license: repository.licenseInfo,
+            metadata: {
+              createdAt: repository.createdAt,
+              updatedAt: repository.updatedAt,
+              pushedAt: repository.pushedAt,
+              isArchived: repository.isArchived,
+              isDisabled: repository.isDisabled,
+              isFork: repository.isFork,
+              isTemplate: repository.isTemplate,
+              visibility: repository.visibility,
+            },
+          };
         },
       };
+    }),
+        { tool: 'get_repository_insights', owner: args.owner, repo: args.repo }
+      );
     },
   });
 
@@ -161,6 +246,9 @@ export function createRepositoryInsightsTools(
       },
     },
     handler: async (args: any) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(ContributionStatsSchema, args, 'get_contribution_stats');
+      
       const query = `
         query($owner: String!, $repo: String!, $first: Int!) {
           repository(owner: $owner, name: $repo) {
@@ -180,33 +268,70 @@ export function createRepositoryInsightsTools(
                   totalIssueContributions
                   totalPullRequestContributions
                   totalPullRequestReviewContributions
+      return withErrorHandling(
+        'get_contribution_stats',
+        async () => {
+          const query = `
+            query($owner: String!, $repo: String!, $first: Int!) {
+              repository(owner: $owner, name: $repo) {
+                collaborators(first: $first, affiliation: ALL) {
+                  totalCount
+                  nodes {
+                    login
+                    name
+                    email
+                    avatarUrl
+                    url
+                    company
+                    location
+                    bio
+                    contributionsCollection {
+                      totalCommitContributions
+                      totalIssueContributions
+                      totalPullRequestContributions
+                      totalPullRequestReviewContributions
+                    }
+                  }
                 }
-              }
-            }
-            defaultBranchRef {
-              target {
-                ... on Commit {
-                  history(first: 100) {
-                    totalCount
-                    nodes {
-                      author {
-                        user {
-                          login
+                defaultBranchRef {
+                  target {
+                    ... on Commit {
+                      history(first: 100) {
+                        totalCount
+                        nodes {
+                          author {
+                            user {
+                              login
+                            }
+                          }
+                          committedDate
+                          additions
+                          deletions
                         }
                       }
-                      committedDate
-                      additions
-                      deletions
                     }
                   }
                 }
               }
             }
-          }
-        }
-      `;
+          `;
+
+          const result: any = await octokit.graphql(query, {
+            owner: args.owner,
+            repo: args.repo,
+            first: args.first || 25,
+          });
 
       const result: any = await cachedGraphQL(client, query, {
+      // Validate GraphQL variables before execution
+      const variables = {
+        owner: validateGraphQLVariableValue(validatedArgs.owner, 'owner'),
+        repo: validateGraphQLVariableValue(validatedArgs.repo, 'repo'),
+        first: validateGraphQLVariableValue(validatedArgs.first || 25, 'first'),
+      };
+      
+      const result: any = await octokit.graphql(query, variables);
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
         first: args.first || 25,
@@ -214,46 +339,52 @@ export function createRepositoryInsightsTools(
         ttl: GraphQLTTL.CONTRIBUTORS,
         operation: 'get_contribution_stats'
       });
-
-      const repository = result.repository;
-      const commitHistory = repository.defaultBranchRef?.target?.history?.nodes || [];
-
-      // Aggregate commit statistics by user
-      const commitStats: { [login: string]: { commits: number; additions: number; deletions: number; } } = {};
-      
-      for (const commit of commitHistory) {
-        const login = commit.author?.user?.login;
-        if (login) {
-          if (!commitStats[login]) {
-            commitStats[login] = { commits: 0, additions: 0, deletions: 0 };
+          const repository = result.repository;
+          if (!repository) {
+            throw new Error(`Repository ${args.owner}/${args.repo} not found`);
           }
-          commitStats[login].commits++;
-          commitStats[login].additions += commit.additions || 0;
-          commitStats[login].deletions += commit.deletions || 0;
-        }
-      }
 
-      return {
-        totalContributors: repository.collaborators.totalCount,
-        totalCommits: repository.defaultBranchRef?.target?.history?.totalCount || 0,
-        contributors: repository.collaborators.nodes.map((contributor: any) => ({
-          login: contributor.login,
-          name: contributor.name,
-          email: contributor.email,
-          avatarUrl: contributor.avatarUrl,
-          url: contributor.url,
-          company: contributor.company,
-          location: contributor.location,
-          bio: contributor.bio,
-          contributions: {
-            commits: contributor.contributionsCollection.totalCommitContributions,
-            issues: contributor.contributionsCollection.totalIssueContributions,
-            pullRequests: contributor.contributionsCollection.totalPullRequestContributions,
-            reviews: contributor.contributionsCollection.totalPullRequestReviewContributions,
-          },
-          commitStats: commitStats[contributor.login] || { commits: 0, additions: 0, deletions: 0 },
-        })),
-      };
+          const commitHistory = repository.defaultBranchRef?.target?.history?.nodes || [];
+
+          // Aggregate commit statistics by user
+          const commitStats: { [login: string]: { commits: number; additions: number; deletions: number; } } = {};
+          
+          for (const commit of commitHistory) {
+            const login = commit.author?.user?.login;
+            if (login) {
+              if (!commitStats[login]) {
+                commitStats[login] = { commits: 0, additions: 0, deletions: 0 };
+              }
+              commitStats[login].commits++;
+              commitStats[login].additions += commit.additions || 0;
+              commitStats[login].deletions += commit.deletions || 0;
+            }
+          }
+
+          return {
+            totalContributors: repository.collaborators.totalCount,
+            totalCommits: repository.defaultBranchRef?.target?.history?.totalCount || 0,
+            contributors: repository.collaborators.nodes.map((contributor: any) => ({
+              login: contributor.login,
+              name: contributor.name,
+              email: contributor.email,
+              avatarUrl: contributor.avatarUrl,
+              url: contributor.url,
+              company: contributor.company,
+              location: contributor.location,
+              bio: contributor.bio,
+              contributions: {
+                commits: contributor.contributionsCollection.totalCommitContributions,
+                issues: contributor.contributionsCollection.totalIssueContributions,
+                pullRequests: contributor.contributionsCollection.totalPullRequestContributions,
+                reviews: contributor.contributionsCollection.totalPullRequestReviewContributions,
+              },
+              commitStats: commitStats[contributor.login] || { commits: 0, additions: 0, deletions: 0 },
+            })),
+          };
+        },
+        { tool: 'get_contribution_stats', owner: args.owner, repo: args.repo, first: args.first }
+      );
     },
   });
 
@@ -290,6 +421,9 @@ export function createRepositoryInsightsTools(
       },
     },
     handler: async (args: any) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(CommitActivitySchema, args, 'get_commit_activity');
+      
       const query = `
         query($owner: String!, $repo: String!, $branch: String, $since: GitTimestamp, $until: GitTimestamp) {
           repository(owner: $owner, name: $repo) {
@@ -303,46 +437,73 @@ export function createRepositoryInsightsTools(
                       author {
                         user {
                           login
+      return withErrorHandling(
+        'get_commit_activity',
+        async () => {
+          const query = `
+            query($owner: String!, $repo: String!, $branch: String, $since: GitTimestamp, $until: GitTimestamp) {
+              repository(owner: $owner, name: $repo) {
+                ref(qualifiedName: $branch) {
+                  target {
+                    ... on Commit {
+                      history(first: 100, since: $since, until: $until) {
+                        totalCount
+                        nodes {
+                          committedDate
+                          author {
+                            user {
+                              login
+                            }
+                            date
+                          }
+                          additions
+                          deletions
+                          changedFiles
+                          messageHeadline
                         }
-                        date
                       }
-                      additions
-                      deletions
-                      changedFiles
-                      messageHeadline
+                    }
+                  }
+                }
+                defaultBranchRef {
+                  name
+                  target {
+                    ... on Commit {
+                      history(first: 100, since: $since, until: $until) {
+                        totalCount
+                        nodes {
+                          committedDate
+                          author {
+                            user {
+                              login
+                            }
+                            date
+                          }
+                          additions
+                          deletions
+                          changedFiles
+                          messageHeadline
+                        }
+                      }
                     }
                   }
                 }
               }
             }
-            defaultBranchRef {
-              name
-              target {
-                ... on Commit {
-                  history(first: 100, since: $since, until: $until) {
-                    totalCount
-                    nodes {
-                      committedDate
-                      author {
-                        user {
-                          login
-                        }
-                        date
-                      }
-                      additions
-                      deletions
-                      changedFiles
-                      messageHeadline
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      `;
+          `;
 
       const result: any = await cachedGraphQL(client, query, {
+      // Validate GraphQL variables before execution
+      const variables = {
+        owner: validateGraphQLVariableValue(validatedArgs.owner, 'owner'),
+        repo: validateGraphQLVariableValue(validatedArgs.repo, 'repo'),
+        branch: validatedArgs.branch ? validateGraphQLVariableValue(validatedArgs.branch, 'branch') : undefined,
+        since: validatedArgs.since ? validateGraphQLVariableValue(validatedArgs.since, 'since') : undefined,
+        until: validatedArgs.until ? validateGraphQLVariableValue(validatedArgs.until, 'until') : undefined,
+      };
+      
+      const result: any = await octokit.graphql(query, variables);
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
         branch: args.branch,
@@ -352,74 +513,88 @@ export function createRepositoryInsightsTools(
         ttl: GraphQLTTL.COMMIT_ACTIVITY,
         operation: 'get_commit_activity'
       });
+          const result: any = await octokit.graphql(query, {
+            owner: args.owner,
+            repo: args.repo,
+            branch: args.branch,
+            since: args.since,
+            until: args.until,
+          });
 
-      const repository = result.repository;
-      const history = args.branch 
-        ? repository.ref?.target?.history
-        : repository.defaultBranchRef?.target?.history;
+          const repository = result.repository;
+          if (!repository) {
+            throw new Error(`Repository ${args.owner}/${args.repo} not found`);
+          }
 
-      if (!history) {
-        throw new Error('Unable to fetch commit history for the specified branch');
-      }
+          const history = args.branch 
+            ? repository.ref?.target?.history
+            : repository.defaultBranchRef?.target?.history;
 
-      const commits = history.nodes;
+          if (!history) {
+            throw new Error('Unable to fetch commit history for the specified branch');
+          }
 
-      // Analyze patterns
-      const hourlyActivity: { [hour: string]: number } = {};
-      const dailyActivity: { [day: string]: number } = {};
-      const authorActivity: { [author: string]: number } = {};
-      
-      let totalAdditions = 0;
-      let totalDeletions = 0;
-      let totalFilesChanged = 0;
+          const commits = history.nodes;
 
-      for (const commit of commits) {
-        const date = new Date(commit.committedDate);
-        const hour = date.getUTCHours().toString();
-        const day = date.toISOString().split('T')[0];
-        const author = commit.author?.user?.login || 'unknown';
+          // Analyze patterns
+          const hourlyActivity: { [hour: string]: number } = {};
+          const dailyActivity: { [day: string]: number } = {};
+          const authorActivity: { [author: string]: number } = {};
+          
+          let totalAdditions = 0;
+          let totalDeletions = 0;
+          let totalFilesChanged = 0;
 
-        hourlyActivity[hour] = (hourlyActivity[hour] || 0) + 1;
-        dailyActivity[day] = (dailyActivity[day] || 0) + 1;
-        authorActivity[author] = (authorActivity[author] || 0) + 1;
+          for (const commit of commits) {
+            const date = new Date(commit.committedDate);
+            const hour = date.getUTCHours().toString();
+            const day = date.toISOString().split('T')[0];
+            const author = commit.author?.user?.login || 'unknown';
 
-        totalAdditions += commit.additions || 0;
-        totalDeletions += commit.deletions || 0;
-        totalFilesChanged += commit.changedFiles || 0;
-      }
+            hourlyActivity[hour] = (hourlyActivity[hour] || 0) + 1;
+            dailyActivity[day] = (dailyActivity[day] || 0) + 1;
+            authorActivity[author] = (authorActivity[author] || 0) + 1;
 
-      return {
-        totalCommits: history.totalCount,
-        analyzedCommits: commits.length,
-        summary: {
-          totalAdditions,
-          totalDeletions,
-          totalFilesChanged,
-          averageAdditionsPerCommit: Math.round(totalAdditions / commits.length),
-          averageDeletionsPerCommit: Math.round(totalDeletions / commits.length),
-          averageFilesPerCommit: Math.round(totalFilesChanged / commits.length),
+            totalAdditions += commit.additions || 0;
+            totalDeletions += commit.deletions || 0;
+            totalFilesChanged += commit.changedFiles || 0;
+          }
+
+          return {
+            totalCommits: history.totalCount,
+            analyzedCommits: commits.length,
+            summary: {
+              totalAdditions,
+              totalDeletions,
+              totalFilesChanged,
+              averageAdditionsPerCommit: Math.round(totalAdditions / commits.length),
+              averageDeletionsPerCommit: Math.round(totalDeletions / commits.length),
+              averageFilesPerCommit: Math.round(totalFilesChanged / commits.length),
+            },
+            patterns: {
+              hourlyActivity: Object.entries(hourlyActivity)
+                .map(([hour, count]) => ({ hour: parseInt(hour), commits: count }))
+                .sort((a, b) => a.hour - b.hour),
+              dailyActivity: Object.entries(dailyActivity)
+                .map(([day, count]) => ({ date: day, commits: count }))
+                .sort((a, b) => a.date.localeCompare(b.date)),
+              topAuthors: Object.entries(authorActivity)
+                .map(([author, count]) => ({ author, commits: count }))
+                .sort((a, b) => b.commits - a.commits)
+                .slice(0, 10),
+            },
+            recentCommits: commits.slice(0, 10).map((commit: any) => ({
+              date: commit.committedDate,
+              author: commit.author?.user?.login,
+              message: commit.messageHeadline,
+              additions: commit.additions,
+              deletions: commit.deletions,
+              filesChanged: commit.changedFiles,
+            })),
+          };
         },
-        patterns: {
-          hourlyActivity: Object.entries(hourlyActivity)
-            .map(([hour, count]) => ({ hour: parseInt(hour), commits: count }))
-            .sort((a, b) => a.hour - b.hour),
-          dailyActivity: Object.entries(dailyActivity)
-            .map(([day, count]) => ({ date: day, commits: count }))
-            .sort((a, b) => a.date.localeCompare(b.date)),
-          topAuthors: Object.entries(authorActivity)
-            .map(([author, count]) => ({ author, commits: count }))
-            .sort((a, b) => b.commits - a.commits)
-            .slice(0, 10),
-        },
-        recentCommits: commits.slice(0, 10).map((commit: any) => ({
-          date: commit.committedDate,
-          author: commit.author?.user?.login,
-          message: commit.messageHeadline,
-          additions: commit.additions,
-          deletions: commit.deletions,
-          filesChanged: commit.changedFiles,
-        })),
-      };
+        { tool: 'get_commit_activity', owner: args.owner, repo: args.repo, branch: args.branch }
+      );
     },
   });
 
