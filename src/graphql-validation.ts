@@ -24,7 +24,7 @@ export const OwnerRepoSchema = z.object({
  * Validates ISO 8601 date strings
  */
 export const ISO8601DateSchema = z.string()
-  .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/, 'Date must be in ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)')
+  .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/, 'Date must be in ISO 8601 UTC format (YYYY-MM-DDTHH:mm:ss.sssZ)')
   .refine((date) => {
     try {
       const parsed = new Date(date);
