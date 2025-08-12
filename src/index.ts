@@ -7,6 +7,10 @@ import { z } from 'zod';
 import { JSONSchema, JSONSchemaProperty, ToolConfig } from './types.js';
 import { createRateLimitedOctokit, GitHubRateLimiter, ResponseSizeLimiter } from './rate-limiter.js';
 
+// Environment configuration
+import { env, getGitHubToken, getEnabledToolsets, displayConfig } from './env.js';
+import { validateEnvironmentConfiguration } from './validation.js';
+
 // Tool modules
 import { createRepositoryTools } from './tools/repositories.js';
 import { createIssueTools } from './tools/issues.js';
@@ -25,7 +29,6 @@ import { createAdvancedSearchTools } from './tools/advanced-search.js';
 import { createProjectManagementTools } from './tools/project-management.js';
 import { createBatchOperationsTools } from './tools/batch-operations.js';
 import { createOptimizedRepositoryTools } from './tools/optimized-repositories.js';
-import { validateEnvironmentConfiguration } from './validation.js';
 
 // Performance optimizations
 import { OptimizedAPIClient } from './optimized-api-client.js';
@@ -45,34 +48,10 @@ import { formatErrorResponse } from './errors.js';
 // Monitoring and observability
 import { metrics } from './metrics.js';
 import { logger } from './logger.js';
-import { createHealthEndpoints } from './health-endpoints.js';
-import { HealthMonitor } from './health.js';
-import { createMonitoringTools } from './tools/monitoring.js';
 
 // Server configuration
 const SERVER_NAME = 'github-mcp';
 const SERVER_VERSION = '1.0.0';
-
-// Tool categories configuration
-const DEFAULT_TOOLSETS = [
-  'context',
-  'repos', 
-  'issues',
-  'pull_requests',
-  'actions',
-  'code_security',
-  'users',
-  'orgs',
-  'notifications',
-  'discussions',
-  'dependabot',
-  'secret_protection',
-  'graphql_insights',
-  'advanced_search',
-  'project_management',
-  'batch_operations',
-  'monitoring',
-];
 
 /**
  * GitHub MCP Server - Provides GitHub API integration for the Model Context Protocol
@@ -80,7 +59,7 @@ const DEFAULT_TOOLSETS = [
  * This server enables AI assistants to interact with GitHub repositories, issues,
  * pull requests, actions, and more through a comprehensive set of tools.
  */
-class GitHubMCPServer {
+export class GitHubMCPServer {
   /** The MCP server instance */
   private server: McpServer;
   /** GitHub API client (Octokit) */
@@ -101,8 +80,6 @@ class GitHubMCPServer {
   private reliabilityManager: ReliabilityManager;
   /** Health manager for system monitoring */
   private healthManager: HealthManager;
-  /** Health monitor for observability */
-  private healthMonitor: HealthMonitor;
 
   /**
    * Initialize the GitHub MCP Server
@@ -110,14 +87,13 @@ class GitHubMCPServer {
    * Sets up the MCP server, configures GitHub authentication,
    * parses environment variables, and registers tools.
    */
-  constructor() {
+  constructor(testMode: boolean = false) {
     // Initialize monitoring first
     logger.info('Starting GitHub MCP Server', { 
       version: SERVER_VERSION,
       node: process.version,
       platform: process.platform
     });
-
     // Initialize MCP server
     this.server = new McpServer({
       name: SERVER_NAME,
@@ -131,20 +107,42 @@ class GitHubMCPServer {
       logger.error('Environment configuration validation failed', { 
         errors: envValidation.errors 
       });
+      
       console.error('ERROR: Environment configuration validation failed:');
       envValidation.errors.forEach(error => console.error(`  - ${error}`));
       console.error('Please check your environment variables and try again.');
       console.error('Create a GitHub Personal Access Token at: https://github.com/settings/tokens');
       console.error('Required scopes: repo, workflow, user, notifications');
-      process.exit(1);
+      
+      // Don't exit in test environment
+      if (!testMode && process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+        process.exit(1);
+      } else if (testMode) {
+ claude/issue-38-20250810-0103
+        // In test mode, avoid throwing in constructor to prevent side effects.
+        // Consumers can inspect `envValidation.errors` or `server` state, or throw during start().
+        logger.warn('Environment validation failed (test mode): ' + envValidation.errors.join(', '));
+
+        throw new Error('Environment validation failed: ' + envValidation.errors.join(', '));
+ main
+      }
     }
 
-    // Initialize Octokit with validated token
-    const token = envValidation.sanitizedValues.GITHUB_TOKEN;
+    // Get token from environment configuration
+    const token = getGitHubToken() || envValidation.sanitizedValues.GITHUB_TOKEN;
+    
     // Create rate-limited Octokit instance with logging
     const rateLimitedSetup = createRateLimitedOctokit(token);
     this.octokit = rateLimitedSetup.octokit;
     this.rateLimiter = rateLimitedSetup.rateLimiter;
+    
+    // Configure base URL if using GitHub Enterprise
+    if (env.GITHUB_HOST) {
+      this.octokit = new Octokit({
+        auth: token,
+        baseUrl: env.GITHUB_HOST,
+      });
+    }
     
     // Add logging to Octokit
     this.octokit.hook.before('request', async (options) => {
@@ -172,8 +170,7 @@ class GitHubMCPServer {
     });
 
     // Initialize health monitor
-    this.healthMonitor = HealthMonitor.getInstance();
-    this.healthMonitor.setOctokit(this.octokit);
+    this.healthManager = new HealthManager();
 
     // Initialize optimized API client
     this.optimizedClient = new OptimizedAPIClient({
@@ -183,16 +180,9 @@ class GitHubMCPServer {
       enablePerformanceMonitoring: process.env.GITHUB_ENABLE_MONITORING !== 'false',
     });
 
-    // Parse configuration
-    this.readOnly = process.env.GITHUB_READ_ONLY === '1' || process.env.GITHUB_READ_ONLY === 'true';
-
-    // Parse enabled toolsets
-    const toolsetsConfig = process.env.GITHUB_TOOLSETS;
-    if (toolsetsConfig === 'all' || !toolsetsConfig) {
-      this.enabledToolsets = new Set(DEFAULT_TOOLSETS);
-    } else {
-      this.enabledToolsets = new Set(toolsetsConfig.split(',').map(t => t.trim()));
-    }
+    // Parse configuration from validated environment
+    this.readOnly = env.GITHUB_READ_ONLY;
+    this.enabledToolsets = new Set(getEnabledToolsets());
 
     // Initialize reliability infrastructure
     const enableVerboseTelemetry = process.env.GITHUB_TELEMETRY_VERBOSE === 'true';
@@ -379,13 +369,26 @@ class GitHubMCPServer {
             args
           });
           
-          // Return standardized error response with both approaches
-          const errorMessage = formatErrorResponse(error);
+          // Return standardized error response with proper formatting
+          const errorResponse = formatErrorResponse(error);
+          const errorMessage = errorResponse.error.message;
+          const errorCode = errorResponse.error.code;
+          const errorDetails = errorResponse.error.details;
+          
+          // Build a helpful error message
+          let errorText = `Error: ${errorMessage}`;
+          if (errorCode && errorCode !== 'UNKNOWN_ERROR') {
+            errorText += `\nCode: ${errorCode}`;
+          }
+          if (errorDetails?.statusCode) {
+            errorText += `\nStatus: ${errorDetails.statusCode}`;
+          }
+          
           return {
             content: [
               {
                 type: 'text' as const,
-                text: `Error: ${errorMessage}`,
+                text: errorText,
               },
             ],
             isError: true,
@@ -406,14 +409,7 @@ class GitHubMCPServer {
    * and read-only mode configuration.
    */
   private registerTools() {
-    console.log('\n====================================');
-    console.log('  GitHub MCP Server Initialization');
-    console.log('====================================\n');
-    
-    console.log('Configuration:');
-    console.log(`  Read-only mode: ${this.readOnly}`);
-    console.log(`  Enabled toolsets: ${Array.from(this.enabledToolsets).join(', ')}`);
-    console.log('\nRegistering tools...\n');
+    // Register tools silently - no console output to avoid breaking MCP protocol
 
     // Add rate limit status tool (always enabled)
     this.registerTool({
@@ -452,7 +448,7 @@ class GitHubMCPServer {
         };
       },
     });
-    console.log(`  ✓ Rate limit status tool (1)`);
+    // Rate limit status tool registered
 
     // Register context tools
     if (this.enabledToolsets.has('context')) {
@@ -467,18 +463,16 @@ class GitHubMCPServer {
             }
           },
           handler: async () => {
-            const reliableCall = this.reliabilityManager.wrapApiCall(
-              () => this.octokit.users.getAuthenticated(),
+            const { data } = await this.reliabilityManager.executeWithReliability(
               'users.getAuthenticated',
-              { skipRateLimit: false }
+              () => this.octokit.users.getAuthenticated()
             );
-            const { data } = await reliableCall();
             return data;
           }
         }
       ];
       contextTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Context tools (${contextTools.length})`);
+      // Context tools registered
     }
 
     // Register repository tools
@@ -486,7 +480,7 @@ class GitHubMCPServer {
       // Standard repository tools
       const repoTools = createRepositoryTools(this.octokit, this.readOnly);
       repoTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Repository tools (${repoTools.length})`);
+      // Repository tools registered
 
       // Optimized repository tools
       const optimizedRepoTools = createOptimizedRepositoryTools(
@@ -494,127 +488,123 @@ class GitHubMCPServer {
         this.readOnly
       );
       optimizedRepoTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Optimized repository tools (${optimizedRepoTools.length})`);
+      // Optimized repository tools registered
     }
 
     // Register issue tools
     if (this.enabledToolsets.has('issues')) {
       const issueTools = createIssueTools(this.octokit, this.readOnly);
       issueTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Issue tools (${issueTools.length})`);
+      // Issue tools registered
     }
 
     // Register pull request tools
     if (this.enabledToolsets.has('pull_requests')) {
       const prTools = createPullRequestTools(this.octokit, this.readOnly);
       prTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Pull Request tools (${prTools.length})`);
+      // Pull Request tools registered
     }
 
     // Register GitHub Actions tools
     if (this.enabledToolsets.has('actions')) {
       const actionTools = createActionTools(this.octokit, this.readOnly);
       actionTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ GitHub Actions tools (${actionTools.length})`);
+      // GitHub Actions tools registered
     }
 
     // Register code security tools
     if (this.enabledToolsets.has('code_security')) {
       const codeSecurityTools = createCodeSecurityTools(this.octokit, this.readOnly);
       codeSecurityTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Code Security tools (${codeSecurityTools.length})`);
+      // Code Security tools registered
     }
 
     // Register search tools
     const searchTools = createSearchTools(this.octokit);
     searchTools.forEach(tool => this.registerTool(tool));
-    console.log(`  ✓ Search tools (${searchTools.length})`);
+    // Search tools registered
 
     // Register user tools
     if (this.enabledToolsets.has('users')) {
       const userTools = createUserTools(this.octokit, this.readOnly);
       userTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ User tools (${userTools.length})`);
+      // User tools registered
     }
 
     // Register organization tools
     if (this.enabledToolsets.has('orgs')) {
       const orgTools = createOrganizationTools(this.octokit, this.readOnly);
       orgTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Organization tools (${orgTools.length})`);
+      // Organization tools registered
     }
 
     // Register notification tools
     if (this.enabledToolsets.has('notifications')) {
       const notificationTools = createNotificationTools(this.octokit, this.readOnly);
       notificationTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Notification tools (${notificationTools.length})`);
+      // Notification tools registered
     }
 
     // Register discussion tools
     if (this.enabledToolsets.has('discussions')) {
       const discussionTools = createDiscussionTools(this.octokit, this.readOnly);
       discussionTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Discussion tools (${discussionTools.length})`);
+      // Discussion tools registered
     }
 
     // Register Dependabot tools
     if (this.enabledToolsets.has('dependabot')) {
       const dependabotTools = createDependabotTools(this.octokit, this.readOnly);
       dependabotTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Dependabot tools (${dependabotTools.length})`);
+      // Dependabot tools registered
     }
 
     // Register secret scanning tools
     if (this.enabledToolsets.has('secret_protection')) {
       const secretScanningTools = createSecretScanningTools(this.octokit, this.readOnly);
       secretScanningTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Secret Scanning tools (${secretScanningTools.length})`);
+      // Secret Scanning tools registered
     }
 
     // GraphQL repository insights tools
     if (this.enabledToolsets.has('graphql_insights')) {
       const insightsTools = createRepositoryInsightsTools(this.octokit, this.readOnly);
       insightsTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Repository Insights tools (${insightsTools.length})`);
+      // Repository Insights tools registered
     }
 
     // Advanced search tools
     if (this.enabledToolsets.has('advanced_search')) {
       const advancedSearchTools = createAdvancedSearchTools(this.octokit, this.readOnly);
       advancedSearchTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Advanced Search tools (${advancedSearchTools.length})`);
+      // Advanced Search tools registered
     }
 
     // Project management tools
     if (this.enabledToolsets.has('project_management')) {
       const projectTools = createProjectManagementTools(this.octokit, this.readOnly);
       projectTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Project Management tools (${projectTools.length})`);
+      // Project Management tools registered
     }
 
     // Batch operations tools
     if (this.enabledToolsets.has('batch_operations')) {
       const batchTools = createBatchOperationsTools(this.octokit, this.readOnly);
       batchTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Batch Operations tools (${batchTools.length})`);
+      // Batch Operations tools registered
     }
 
     // Register health monitoring tools
     const healthTools = createHealthTools(this.healthManager);
     healthTools.forEach(tool => this.registerTool(tool));
-    console.log(`  ✓ Health monitoring tools (${healthTools.length})`);
+    // Health monitoring tools registered
 
     // Register monitoring and observability tools
     if (this.enabledToolsets.has('monitoring')) {
-      const monitoringTools = createMonitoringTools(this.healthMonitor, metrics);
-      monitoringTools.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Monitoring tools (${monitoringTools.length})`);
-
-      // Register health endpoints
-      const healthEndpoints = createHealthEndpoints(this.healthMonitor);
-      healthEndpoints.forEach(tool => this.registerTool(tool));
-      console.log(`  ✓ Health endpoints (${healthEndpoints.length})`);
+      // Register health tools
+      const healthTools = createHealthTools(this.healthManager);
+      healthTools.forEach((tool: any) => this.registerTool(tool));
+      // Health tools registered
     }
 
     // Register performance monitoring tools
@@ -657,10 +647,9 @@ class GitHubMCPServer {
       }
     ];
     perfTools.forEach(tool => this.registerTool(tool));
-    console.log(`  ✓ Performance monitoring tools (${perfTools.length})`);
+    // Performance monitoring tools registered
 
-    console.log(`\nTotal tools registered: ${this.toolCount}`);
-    console.log('\n====================================\n');
+    // Total tools registered successfully
   }
 
   /**
@@ -668,28 +657,28 @@ class GitHubMCPServer {
    * 
    * Establishes a stdio connection for communication with the MCP client
    */
-  async start() {
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
-    
-    logger.info('GitHub MCP server started', {
-      version: SERVER_VERSION,
-      transport: 'stdio'
-    });
-    
-    console.log(`GitHub MCP server (v${SERVER_VERSION}) is running`);
-    console.log('Ready to accept MCP requests via stdio\n');
+  public async start() {
+    try {
+      const transport = new StdioServerTransport();
+      await this.server.connect(transport);
+      
+      logger.info('GitHub MCP server started', {
+        version: SERVER_VERSION,
+        transport: 'stdio'
+      });
+      
+      // Server started successfully - avoid console output to not break MCP protocol
+      // displayConfig(); // Disabled to avoid console output
+    } catch (error) {
+      logger.error('Failed to start GitHub MCP server', { error });
+      // Failed to start server - logged via logger above
+      if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+        process.exit(1);
+      }
+      throw error;
+    }
   }
 }
 
-// Main execution
-(async () => {
-  try {
-    const server = new GitHubMCPServer();
-    await server.start();
-  } catch (error) {
-    logger.error('Failed to start GitHub MCP server', { error });
-    console.error('Failed to start GitHub MCP server:', error);
-    process.exit(1);
-  }
-})();
+// Export for testing and external usage
+export { GitHubMCPServer };

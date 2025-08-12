@@ -153,7 +153,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
         first: args.perPage || 25,
@@ -238,7 +238,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
         number: args.discussionNumber,
@@ -326,7 +326,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
         number: args.discussionNumber,
@@ -384,7 +384,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
       });
@@ -460,7 +460,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         searchQuery,
         first: args.first || 25,
       });
@@ -516,7 +516,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           }
         `;
 
-        const repoResult: any = await octokit.graphql(repoQuery, {
+        const repoResult: any = await (octokit as any).graphqlWithComplexity(repoQuery, {
           owner: args.owner,
           repo: args.repo,
         });
@@ -547,7 +547,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           }
         `;
 
-        const result: any = await octokit.graphql(mutation, {
+        const result: any = await (octokit as any).graphqlWithComplexity(mutation, {
           repositoryId: repoResult.repository.id,
           title: args.title,
           body: args.body,
@@ -602,7 +602,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           }
         `;
 
-        const result: any = await octokit.graphql(mutation, {
+        const result: any = await (octokit as any).graphqlWithComplexity(mutation, {
           discussionId: args.discussionId,
           body: args.body,
           replyToId: args.replyToId,
@@ -663,7 +663,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           }
         `;
 
-        const result: any = await octokit.graphql(mutation, {
+        const result: any = await (octokit as any).graphqlWithComplexity(mutation, {
           discussionId: args.discussionId,
           title: args.title,
           body: args.body,
@@ -701,7 +701,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           }
         `;
 
-        await octokit.graphql(mutation, {
+        await (octokit as any).graphqlWithComplexity(mutation, {
           discussionId: args.discussionId,
         });
 

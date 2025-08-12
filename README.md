@@ -54,6 +54,45 @@ This MCP server provides tools for:
 - **Projects V2**: Advanced project management and tracking
 - **Repository Insights**: Comprehensive repository analytics and statistics
 - **Advanced Search**: Enhanced search with nested data and relationships
+## Deployment
+
+The GitHub MCP Server supports multiple deployment options:
+
+### Quick Start with Docker
+
+```bash
+# Clone the repository
+git clone https://github.com/quanticsoul4772/github-mcp.git
+cd github-mcp
+
+# Set up environment
+echo "GITHUB_PERSONAL_ACCESS_TOKEN=your_token_here" > .env
+
+# Run with Docker Compose
+docker-compose up -d
+```
+
+### Kubernetes Deployment
+
+```bash
+# Deploy to Kubernetes
+kubectl apply -f k8s/
+
+# Configure secrets
+kubectl create secret generic github-mcp-secrets \
+  --from-literal=GITHUB_PERSONAL_ACCESS_TOKEN=your_token_here \
+  -n github-mcp
+```
+
+### Available Deployment Options
+
+- ** Docker**: Production-ready containerized deployment
+- **☸ Kubernetes**: Scalable orchestrated deployment with auto-scaling
+- **☁ Cloud Platforms**: AWS EKS, Google GKE, Azure AKS
+- ** CI/CD**: GitHub Actions for automated deployments
+- ** Monitoring**: Prometheus metrics and health checks
+
+For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Installation
 
@@ -207,6 +246,42 @@ For detailed GraphQL tools documentation, see [docs/graphql-tools.md](docs/graph
    - `write:discussion` - Write discussions
    - `project` - Full control of projects
    - `delete_repo` - Delete repositories
+
+
+## Tool Reference
+
+For detailed information about all available tools and their parameters, see:
+- [Tool Reference](docs/tool-reference.md) - Complete list of tools with examples
+- [Migration Guide](docs/migration-guide.md) - Upgrading from previous versions
+- [User Preferences](docs/user-preferences.yaml) - Configuration for Claude Desktop
+
+### Quick Examples
+
+```javascript
+// Get an issue
+{
+  "owner": "quanticsoul4772",
+  "repo": "github-mcp",
+  "issue_number": 42
+}
+
+// Search repositories
+{
+  "q": "language:typescript mcp",
+  "sort": "stars",
+  "order": "desc"
+}
+
+// Create a pull request
+{
+  "owner": "quanticsoul4772",
+  "repo": "github-mcp",
+  "title": "Feature: Add new functionality",
+  "head": "feature-branch",
+  "base": "main",
+  "body": "Description of changes"
+}
+```
 
 ## Usage
 

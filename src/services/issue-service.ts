@@ -134,13 +134,13 @@ export class IssueService implements IIssueService {
     }
 
     if (data.assignees && Array.isArray(data.assignees)) {
-      processed.assignees = data.assignees.filter(assignee => 
+      processed.assignees = data.assignees.filter((assignee: any) => 
         typeof assignee === 'string' && assignee.trim().length > 0
       );
     }
 
     if (data.labels && Array.isArray(data.labels)) {
-      processed.labels = data.labels.filter(label => 
+      processed.labels = data.labels.filter((label: any) => 
         typeof label === 'string' && label.trim().length > 0
       );
     }
