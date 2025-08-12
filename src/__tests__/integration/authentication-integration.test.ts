@@ -10,8 +10,8 @@ import { Octokit } from '@octokit/rest';
 import { AuthenticationError, AuthorizationError, RateLimitError, normalizeError } from '../../errors.js';
 import { validateGitHubToken } from '../../validation.js';
 
-// Skip integration tests if no test token is provided
-const shouldSkipIntegrationTests = !process.env.GITHUB_TEST_TOKEN && !process.env.CI;
+// Skip integration tests unless an explicit test token is provided (CI alone is not sufficient)
+const shouldSkipIntegrationTests = !process.env.GITHUB_TEST_TOKEN;
 
 describe('Authentication Integration Tests', () => {
   let testToken: string | undefined;
