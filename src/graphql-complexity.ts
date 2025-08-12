@@ -198,29 +198,27 @@ export class GraphQLComplexityCalculator {
    */
   private extractConnections(query: string, variables: Record<string, any>): Array<{field: string, first?: number}> {
     const connections: Array<{field: string, first?: number}> = [];
-    
-    // Look for fields with 'first' parameter
+  
     const connectionRegex = /(\w+)\s*\([^)]*first:\s*(?:\$(\w+)|(\d+))[^)]*\)/g;
     let match;
-    
+  
     while ((match = connectionRegex.exec(query)) !== null) {
       const fieldName = match[1];
       const variableName = match[2];
       const literalValue = match[3];
-      
       if (!fieldName) continue;
-      
+    
       let firstValue: number | undefined;
-      if (variableName && variables[variableName]) {
-        firstValue = parseInt(variables[variableName]);
+      if (variableName && Object.prototype.hasOwnProperty.call(variables, variableName)) {
+        const raw = (variables as any)[variableName];
+        const num = typeof raw === 'number' ? raw : parseInt(String(raw), 10);
+        if (Number.isFinite(num)) firstValue = num;
       } else if (literalValue) {
-        firstValue = parseInt(literalValue);
+        const num = parseInt(literalValue, 10);
+        if (Number.isFinite(num)) firstValue = num;
       }
-      
-      connections.push({
-        field: fieldName,
-        first: firstValue,
-      });
+    
+      connections.push({ field: fieldName, first: firstValue });
     }
     
     return connections;
