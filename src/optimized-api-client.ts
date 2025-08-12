@@ -378,20 +378,16 @@ export class OptimizedAPIClient {
       skipCache?: boolean;
       skipDeduplication?: boolean;
       operation?: string;
-    } = {}
-  ): Promise<T> {
-    const operation = options.operation || 'graphql';
-
-    // Create the fetcher function for GraphQL execution
     const fetcher = async (): Promise<T> => {
-      // Apply request deduplication if enabled
+      const sortedVars = Object.keys(variables || {})
+        .sort()
+        .reduce((acc, k) => { acc[k] = (variables as any)[k]; return acc; }, {} as Record<string, any>);
+      const dedupeKey = `graphql:${this.hashQuery(query)}:${JSON.stringify(sortedVars)}`;
       if (this.enableDeduplication && !options.skipDeduplication && this.deduplicator) {
-        const deduplicatedCall = async () => {
-          return this.octokit.graphql(query, variables) as Promise<T>;
-        };
-        return this.deduplicator.deduplicate(
-          `graphql:${this.hashQuery(query)}:${JSON.stringify(variables)}`,
-          variables,
+        const deduplicatedCall = async () => this.octokit.graphql(query, variables) as Promise<T>;
+        return this.deduplicator.deduplicate(dedupeKey, sortedVars, deduplicatedCall);
+      }
+      return this.octokit.graphql(query, variables) as Promise<T>;
           deduplicatedCall
         );
       }
