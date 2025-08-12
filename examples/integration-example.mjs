@@ -3,7 +3,7 @@
  * This shows how to wrap existing tool handlers with our validation
  */
 
-import { withParameterValidation } from '../src/validation/parameter-validation.js';
+import { withParameterValidation } from '../build/validation/parameter-validation.js';
 
 // Example of wrapping the existing get_issue handler
 export function wrapIssueTools(originalTools) {
