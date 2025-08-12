@@ -7,17 +7,20 @@ export default defineConfig({
     setupFiles: ['./src/__tests__/setup.ts'],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      reporter: ['text', 'json', 'html', 'lcov', 'cobertura'],
       exclude: [
         'node_modules/',
         'build/',
         '*.config.ts',
         'src/__tests__/**', // Test utilities and fixtures
         'src/**/*.test.ts', // Test files themselves
+        'src/index-refactored-example.ts', // Example file
+        'test-reliability.js', // Test script
       ],
       include: [
         'src/**/*.ts',
       ],
+      // Fail CI on coverage below threshold
       thresholds: {
         global: {
           branches: 80,
@@ -26,6 +29,8 @@ export default defineConfig({
           statements: 80,
         },
       },
+      reportOnFailure: true,
+      skipFull: false,
     },
     testTimeout: 10000,
     hookTimeout: 10000,
