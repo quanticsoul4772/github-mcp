@@ -520,6 +520,26 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
         },
         { tool: 'batch_graphql_query', totalQueries: args.queries.length }
       );
+
+      try {
+        const result: any = await octokit.graphql(fullQuery, allVariables);
+        
+        return {
+          successful: true,
+          totalQueries: args.queries.length,
+          results: result,
+          executedQuery: fullQuery,
+          variables: allVariables,
+        };
+      } catch (error: any) {
+        console.error('Batch GraphQL operation failed:', error); // Log for debugging
+        return {
+          successful: false,
+          error: 'Batch operation failed',
+          executedQuery: fullQuery,
+          variables: allVariables,
+        };
+      }
     },
   });
 
