@@ -172,7 +172,7 @@ export const createMockOctokit = () => {
       before: vi.fn(),
       after: vi.fn(),
       error: vi.fn(),
-    },
+    }
   };
 };
 

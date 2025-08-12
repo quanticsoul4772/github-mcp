@@ -661,6 +661,9 @@ export class GitHubMCPServer {
   }
 }
 
+// Export for testing
+export { GitHubMCPServer };
+
 // Main execution
 (async () => {
   try {

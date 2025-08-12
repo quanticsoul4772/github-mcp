@@ -103,8 +103,7 @@ export class CircuitBreaker {
             failures: this.failures,
             lastFailTime: this.lastFailTime,
             resetTime: this.getResetTime()
-          },
-          false
+          }
         );
       }
     }

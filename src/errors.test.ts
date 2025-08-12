@@ -256,8 +256,8 @@ describe('Error Handling Utilities', () => {
       const normalized = normalizeError(apiError);
       
       expect(normalized).toBeInstanceOf(RateLimitError);
-      expect(normalized.limit).toBe('5000');
-      expect(normalized.remaining).toBe('0');
+      expect((normalized as RateLimitError).limit).toBe(5000);
+      expect((normalized as RateLimitError).remaining).toBe(0);
     });
 
     it('should normalize network errors', () => {
