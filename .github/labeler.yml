@@ -4,40 +4,40 @@
 
 documentation:
   - changed-files:
-      - any-glob-to-any-file: ['**/*.md', 'docs/**/*', 'LICENSE', '.github/**/*.md']
+    - any-glob-to-any-file: ['**/*.md', 'docs/**/*', 'LICENSE', '.github/**/*.md']
 
 github-actions:
   - changed-files:
-      - any-glob-to-any-file: ['.github/workflows/**/*', '.github/actions/**/*']
+    - any-glob-to-any-file: ['.github/workflows/**/*', '.github/actions/**/*']
 
 dependencies:
   - changed-files:
-      - any-glob-to-any-file: ['package.json', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml']
+    - any-glob-to-any-file: ['package.json', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml']
 
 typescript:
   - changed-files:
-      - any-glob-to-any-file: ['**/*.ts', '**/*.tsx', 'tsconfig.json', 'tsconfig.*.json']
+    - any-glob-to-any-file: ['**/*.ts', '**/*.tsx', 'tsconfig.json', 'tsconfig.*.json']
 
 testing:
   - changed-files:
-      - any-glob-to-any-file: ['**/*.test.ts', '**/*.test.tsx', '**/*.test.js', '**/*.spec.ts', '**/*.spec.tsx', '**/*.spec.js', '__tests__/**/*', 'test/**/*', 'tests/**/*', 'jest.config.*', 'vitest.config.*']
+    - any-glob-to-any-file: ['**/*.test.ts', '**/*.test.tsx', '**/*.test.js', '**/*.spec.ts', '**/*.spec.tsx', '**/*.spec.js', '__tests__/**/*', 'test/**/*', 'tests/**/*', 'jest.config.*', 'vitest.config.*']
 
 security:
   - changed-files:
-      - any-glob-to-any-file: ['.github/workflows/security.yml', '.github/dependabot.yml', 'src/validation.ts', 'src/auth/**/*', '**/*security*', '**/*auth*', '**/*token*']
+    - any-glob-to-any-file: ['.github/workflows/security.yml', '.github/dependabot.yml', 'src/validation.ts', 'src/auth/**/*', '**/*security*', '**/*auth*', '**/*token*']
 
 api:
   - changed-files:
-      - any-glob-to-any-file: ['src/handlers/**/*', 'src/services/**/*', 'src/api/**/*', '**/*api*']
+    - any-glob-to-any-file: ['src/handlers/**/*', 'src/services/**/*', 'src/api/**/*', '**/*api*']
 
 configuration:
   - changed-files:
-      - any-glob-to-any-file: ['.eslintrc*', '.prettierrc*', '.gitignore', '.editorconfig', '.env.example', 'config/**/*', 'eslint.config.js']
+    - any-glob-to-any-file: ['.eslintrc*', '.prettierrc*', '.gitignore', '.editorconfig', '.env.example', 'config/**/*', 'eslint.config.js']
 
 docker:
   - changed-files:
-      - any-glob-to-any-file: ['Dockerfile', 'docker-compose.yml', '.dockerignore']
+    - any-glob-to-any-file: ['Dockerfile', 'docker-compose.yml', '.dockerignore']
 
 infrastructure:
   - changed-files:
-      - any-glob-to-any-file: ['terraform/**/*', 'k8s/**/*', 'helm/**/*', '.github/workflows/release.yml', '.github/workflows/deploy.yml']
+    - any-glob-to-any-file: ['terraform/**/*', 'k8s/**/*', 'helm/**/*', '.github/workflows/release.yml', '.github/workflows/deploy.yml']
