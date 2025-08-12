@@ -575,10 +575,13 @@ export function createAgentTools(): ToolConfig<unknown, unknown>[] {
           agent.configure(args.config);
           logger.info('Agent configured', { agent: args.agent, config: args.config });
 
+          const prevConfig = agent.getConfig();
+          agent.configure(args.config);
+          logger.info('Agent configured', { agent: args.agent, config: args.config });
           return {
             agent: args.agent,
-            previousConfig: agent.getConfig(),
-            newConfig: args.config,
+            previousConfig: prevConfig,
+            newConfig: agent.getConfig(),
             success: true
           };
 
