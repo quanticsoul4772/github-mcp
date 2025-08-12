@@ -26,6 +26,10 @@ interface GetIssueCommentsParams {
   issue_number: number;
   page?: number;
   perPage?: number;
+  query: string;
+  sort?: "created" | "updated" | "comments";
+  direction?: "asc" | "desc";
+  since?: string;
 }
 
 interface SearchIssuesWithRepoParams extends SearchIssuesParams {
@@ -60,11 +64,12 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
         required: ['owner', 'repo', 'issue_number'],
       },
     },
-    handler: async (args: GetIssueParams) => {
+    handler: async (args: unknown) => {
+      const params = args as GetIssueParams;
       const { data } = await octokit.issues.get({
-        owner: args.owner,
-        repo: args.repo,
-        issue_number: args.issue_number,
+        owner: params.owner,
+        repo: params.repo,
+        issue_number: params.issue_number,
       });
 
       return {
@@ -152,17 +157,18 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: ListIssuesParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListIssuesParams;
       const { data } = await octokit.issues.listForRepo({
-        owner: args.owner,
-        repo: args.repo,
-        state: args.state,
-        labels: args.labels?.join(','),
-        sort: args.sort,
-        direction: args.direction,
-        since: args.since,
-        page: args.page,
-        per_page: args.perPage,
+        owner: params.owner,
+        repo: params.repo,
+        state: params.state as any,
+        labels: Array.isArray(params.labels) ? params.labels : (params.labels ? [params.labels] : undefined)?.join(','),
+        sort: params.sort as any,
+        direction: params.direction as any,
+        since: params.since,
+        page: params.page,
+        per_page: params.perPage,
       });
 
       return data.map((issue) => ({
@@ -223,13 +229,14 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
         required: ['owner', 'repo', 'issue_number'],
       },
     },
-    handler: async (args: GetIssueCommentsParams) => {
+    handler: async (args: unknown) => {
+      const params = args as GetIssueCommentsParams;
       const { data } = await octokit.issues.listComments({
-        owner: args.owner,
-        repo: args.repo,
-        issue_number: args.issue_number,
-        page: args.page,
-        per_page: args.perPage,
+        owner: params.owner,
+        repo: params.repo,
+        issue_number: params.issue_number,
+        page: params.page,
+        per_page: params.perPage,
       });
 
       return data.map((comment) => ({
@@ -291,20 +298,21 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
         required: ['query'],
       },
     },
-    handler: async (args: SearchIssuesWithRepoParams) => {
-      let query = args.query;
+    handler: async (args: unknown) => {
+      const params = args as SearchIssuesWithRepoParams;
+      let query = params.query;
       
       // Add repo filter if provided
-      if (args.owner && args.repo) {
-        query = `repo:${args.owner}/${args.repo} ${query}`;
+      if (params.owner && params.repo) {
+        query = `repo:${params.owner}/${params.repo} ${query}`;
       }
 
       const { data } = await octokit.search.issuesAndPullRequests({
         q: query,
-        sort: args.sort,
-        order: args.order,
-        page: args.page,
-        per_page: args.perPage,
+        sort: params.sort as any,
+        order: params.order as any,
+        page: params.page,
+        per_page: params.perPage,
       });
 
       return {
@@ -376,15 +384,16 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           required: ['owner', 'repo', 'title'],
         },
       },
-      handler: async (args: CreateIssueParams) => {
+      handler: async (args: unknown) => {
+      const params = args as CreateIssueParams;
         const { data } = await octokit.issues.create({
-          owner: args.owner,
-          repo: args.repo,
-          title: args.title,
-          body: args.body,
-          assignees: args.assignees,
-          milestone: args.milestone,
-          labels: args.labels,
+          owner: params.owner,
+          repo: params.repo,
+          title: params.title,
+          body: params.body,
+          assignees: params.assignees,
+          milestone: params.milestone,
+          labels: Array.isArray(params.labels) ? params.labels : (params.labels ? [params.labels] : undefined),
         });
 
         return {
@@ -452,17 +461,18 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           required: ['owner', 'repo', 'issue_number'],
         },
       },
-      handler: async (args: UpdateIssueParams) => {
+      handler: async (args: unknown) => {
+      const params = args as UpdateIssueParams;
         const { data } = await octokit.issues.update({
-          owner: args.owner,
-          repo: args.repo,
-          issue_number: args.issue_number,
-          title: args.title,
-          body: args.body,
-          state: args.state,
-          labels: args.labels,
-          assignees: args.assignees,
-          milestone: args.milestone,
+          owner: params.owner,
+          repo: params.repo,
+          issue_number: params.issue_number,
+          title: params.title,
+          body: params.body,
+          state: params.state as any,
+          labels: Array.isArray(params.labels) ? params.labels : (params.labels ? [params.labels] : undefined),
+          assignees: params.assignees,
+          milestone: params.milestone,
         });
 
         return {
@@ -504,12 +514,13 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           required: ['owner', 'repo', 'issue_number', 'body'],
         },
       },
-      handler: async (args: CreateIssueCommentParams) => {
+      handler: async (args: unknown) => {
+      const params = args as CreateIssueCommentParams;
         const { data } = await octokit.issues.createComment({
-          owner: args.owner,
-          repo: args.repo,
-          issue_number: args.issue_number,
-          body: args.body,
+          owner: params.owner,
+          repo: params.repo,
+          issue_number: params.issue_number,
+          body: params.body,
         });
 
         return {
@@ -552,12 +563,13 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           required: ['owner', 'repo', 'comment_id', 'body'],
         },
       },
-      handler: async (args: UpdateIssueCommentParams) => {
+      handler: async (args: unknown) => {
+      const params = args as UpdateIssueCommentParams;
         const { data } = await octokit.issues.updateComment({
-          owner: args.owner,
-          repo: args.repo,
-          comment_id: args.comment_id,
-          body: args.body,
+          owner: params.owner,
+          repo: params.repo,
+          comment_id: params.comment_id,
+          body: params.body,
         });
 
         return {
@@ -596,16 +608,17 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           required: ['owner', 'repo', 'comment_id'],
         },
       },
-      handler: async (args: DeleteIssueCommentParams) => {
+      handler: async (args: unknown) => {
+      const params = args as DeleteIssueCommentParams;
         await octokit.issues.deleteComment({
-          owner: args.owner,
-          repo: args.repo,
-          comment_id: args.comment_id,
+          owner: params.owner,
+          repo: params.repo,
+          comment_id: params.comment_id,
         });
 
         return {
           success: true,
-          message: `Comment ${args.comment_id} deleted successfully`,
+          message: `Comment ${params.comment_id} deleted successfully`,
         };
       },
     });
@@ -639,12 +652,13 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           required: ['owner', 'repo', 'issue_number', 'labels'],
         },
       },
-      handler: async (args: AddLabelsToIssueParams) => {
+      handler: async (args: unknown) => {
+      const params = args as AddLabelsToIssueParams;
         const { data } = await octokit.issues.addLabels({
-          owner: args.owner,
-          repo: args.repo,
-          issue_number: args.issue_number,
-          labels: args.labels,
+          owner: params.owner,
+          repo: params.repo,
+          issue_number: params.issue_number,
+          labels: Array.isArray(params.labels) ? params.labels : (params.labels ? [params.labels] : undefined),
         });
 
         return data.map((label) => ({
@@ -683,17 +697,18 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           required: ['owner', 'repo', 'issue_number', 'name'],
         },
       },
-      handler: async (args: RemoveLabelFromIssueParams) => {
+      handler: async (args: unknown) => {
+      const params = args as RemoveLabelFromIssueParams;
         await octokit.issues.removeLabel({
-          owner: args.owner,
-          repo: args.repo,
-          issue_number: args.issue_number,
-          name: args.name,
+          owner: params.owner,
+          repo: params.repo,
+          issue_number: params.issue_number,
+          name: params.name,
         });
 
         return {
           success: true,
-          message: `Label '${args.name}' removed from issue ${args.issue_number}`,
+          message: `Label '${params.name}' removed from issue ${params.issue_number}`,
         };
       },
     });
@@ -727,17 +742,18 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           required: ['owner', 'repo', 'issue_number'],
         },
       },
-      handler: async (args: LockIssueParams) => {
+      handler: async (args: unknown) => {
+      const params = args as LockIssueParams;
         await octokit.issues.lock({
-          owner: args.owner,
-          repo: args.repo,
-          issue_number: args.issue_number,
-          lock_reason: args.lock_reason,
+          owner: params.owner,
+          repo: params.repo,
+          issue_number: params.issue_number,
+          lock_reason: params.lock_reason,
         });
 
         return {
           success: true,
-          message: `Issue ${args.issue_number} locked successfully`,
+          message: `Issue ${params.issue_number} locked successfully`,
         };
       },
     });
@@ -766,16 +782,17 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           required: ['owner', 'repo', 'issue_number'],
         },
       },
-      handler: async (args: UnlockIssueParams) => {
+      handler: async (args: unknown) => {
+      const params = args as UnlockIssueParams;
         await octokit.issues.unlock({
-          owner: args.owner,
-          repo: args.repo,
-          issue_number: args.issue_number,
+          owner: params.owner,
+          repo: params.repo,
+          issue_number: params.issue_number,
         });
 
         return {
           success: true,
-          message: `Issue ${args.issue_number} unlocked successfully`,
+          message: `Issue ${params.issue_number} unlocked successfully`,
         };
       },
     });

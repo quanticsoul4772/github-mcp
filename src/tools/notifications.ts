@@ -92,29 +92,30 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
         },
       },
     },
-    handler: async (args: ListNotificationsParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListNotificationsParams;
       let data;
       
-      if (args.owner && args.repo) {
+      if (params.owner && params.repo) {
         const response = await octokit.activity.listRepoNotificationsForAuthenticatedUser({
-          owner: args.owner,
-          repo: args.repo,
-          all: args.filter === 'all',
-          participating: args.filter === 'participating',
-          since: args.since,
-          before: args.before,
-          page: args.page,
-          per_page: args.perPage,
+          owner: params.owner,
+          repo: params.repo,
+          all: params.filter === 'all',
+          participating: params.filter === 'participating',
+          since: params.since,
+          before: params.before,
+          page: params.page,
+          per_page: params.perPage,
         });
         data = response.data;
       } else {
         const response = await octokit.activity.listNotificationsForAuthenticatedUser({
-          all: args.filter === 'all',
-          participating: args.filter === 'participating',
-          since: args.since,
-          before: args.before,
-          page: args.page,
-          per_page: args.perPage,
+          all: params.filter === 'all',
+          participating: params.filter === 'participating',
+          since: params.since,
+          before: params.before,
+          page: params.page,
+          per_page: params.perPage,
         });
         data = response.data;
       }
@@ -163,9 +164,10 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
         required: ['notificationID'],
       },
     },
-    handler: async (args: GetNotificationDetailsParams) => {
+    handler: async (args: unknown) => {
+      const params = args as GetNotificationDetailsParams;
       const { data } = await octokit.activity.getThread({
-        thread_id: parseInt(args.notificationID),
+        thread_id: parseInt(params.notificationID),
       });
 
       return {
@@ -212,10 +214,11 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
         required: ['notificationID'],
       },
     },
-    handler: async (args: GetThreadSubscriptionParams) => {
+    handler: async (args: unknown) => {
+      const params = args as GetThreadSubscriptionParams;
       try {
         const { data } = await octokit.activity.getThreadSubscriptionForAuthenticatedUser({
-          thread_id: parseInt(args.notificationID),
+          thread_id: parseInt(params.notificationID),
         });
 
         return {
@@ -258,11 +261,12 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: GetRepoSubscriptionParams) => {
+    handler: async (args: unknown) => {
+      const params = args as GetRepoSubscriptionParams;
       try {
         const { data } = await octokit.activity.getRepoSubscription({
-          owner: args.owner,
-          repo: args.repo,
+          owner: params.owner,
+          repo: params.repo,
         });
 
         return {
@@ -308,21 +312,22 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
           required: ['threadID'],
         },
       },
-      handler: async (args: DismissNotificationParams) => {
+      handler: async (args: unknown) => {
+      const params = args as DismissNotificationParams;
         await octokit.activity.markThreadAsRead({
-          thread_id: parseInt(args.threadID),
+          thread_id: parseInt(params.threadID),
         });
 
         // If state is 'done', also mark as done
-        if (args.state === 'done') {
+        if (params.state === 'done') {
           await octokit.activity.markThreadAsDone({
-            thread_id: parseInt(args.threadID),
+            thread_id: parseInt(params.threadID),
           });
         }
 
         return {
           success: true,
-          message: `Notification ${args.threadID} marked as ${args.state || 'read'}`,
+          message: `Notification ${params.threadID} marked as ${params.state || 'read'}`,
         };
       },
     });
@@ -350,21 +355,22 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
           },
         },
       },
-      handler: async (args: MarkAllNotificationsReadParams) => {
-        if (args.owner && args.repo) {
+      handler: async (args: unknown) => {
+      const params = args as MarkAllNotificationsReadParams;
+        if (params.owner && params.repo) {
           await octokit.activity.markRepoNotificationsAsRead({
-            owner: args.owner,
-            repo: args.repo,
-            last_read_at: args.lastReadAt,
+            owner: params.owner,
+            repo: params.repo,
+            last_read_at: params.lastReadAt,
           });
 
           return {
             success: true,
-            message: `All notifications for ${args.owner}/${args.repo} marked as read`,
+            message: `All notifications for ${params.owner}/${params.repo} marked as read`,
           };
         } else {
           await octokit.activity.markNotificationsAsRead({
-            last_read_at: args.lastReadAt,
+            last_read_at: params.lastReadAt,
           });
 
           return {
@@ -396,22 +402,23 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
           required: ['notificationID', 'action'],
         },
       },
-      handler: async (args: ManageNotificationSubscriptionParams) => {
-        const threadId = parseInt(args.notificationID);
+      handler: async (args: unknown) => {
+      const params = args as ManageNotificationSubscriptionParams;
+        const threadId = parseInt(params.notificationID);
 
-        if (args.action === 'delete') {
+        if (params.action === 'delete') {
           await octokit.activity.deleteThreadSubscription({
             thread_id: threadId,
           });
 
           return {
             success: true,
-            message: `Unsubscribed from notification thread ${args.notificationID}`,
+            message: `Unsubscribed from notification thread ${params.notificationID}`,
           };
         } else {
           const { data } = await octokit.activity.setThreadSubscription({
             thread_id: threadId,
-            ignored: args.action === 'ignore',
+            ignored: params.action === 'ignore',
           });
 
           return {
@@ -420,7 +427,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
             reason: data.reason,
             created_at: data.created_at,
             url: data.url,
-            message: `Notification thread ${args.notificationID} ${args.action === 'ignore' ? 'ignored' : 'watched'}`,
+            message: `Notification thread ${params.notificationID} ${params.action === 'ignore' ? 'ignored' : 'watched'}`,
           };
         }
       },
@@ -451,23 +458,24 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
           required: ['owner', 'repo', 'action'],
         },
       },
-      handler: async (args: ManageRepositoryNotificationSubscriptionParams) => {
-        if (args.action === 'delete') {
+      handler: async (args: unknown) => {
+      const params = args as ManageRepositoryNotificationSubscriptionParams;
+        if (params.action === 'delete') {
           await octokit.activity.deleteRepoSubscription({
-            owner: args.owner,
-            repo: args.repo,
+            owner: params.owner,
+            repo: params.repo,
           });
 
           return {
             success: true,
-            message: `Unsubscribed from repository ${args.owner}/${args.repo}`,
+            message: `Unsubscribed from repository ${params.owner}/${params.repo}`,
           };
         } else {
           const { data } = await octokit.activity.setRepoSubscription({
-            owner: args.owner,
-            repo: args.repo,
-            subscribed: args.action === 'watch',
-            ignored: args.action === 'ignore',
+            owner: params.owner,
+            repo: params.repo,
+            subscribed: params.action === 'watch',
+            ignored: params.action === 'ignore',
           });
 
           return {
@@ -476,7 +484,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
             reason: data.reason,
             created_at: data.created_at,
             url: data.url,
-            message: `Repository ${args.owner}/${args.repo} ${args.action === 'ignore' ? 'ignored' : 'watched'}`,
+            message: `Repository ${params.owner}/${params.repo} ${params.action === 'ignore' ? 'ignored' : 'watched'}`,
           };
         }
       },

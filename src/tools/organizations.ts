@@ -99,13 +99,14 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         required: ['query'],
       },
     },
-    handler: async (args: SearchOrgsParams) => {
+    handler: async (args: unknown) => {
+      const params = args as SearchOrgsParams;
       const { data } = await octokit.search.users({
-        q: `${args.query} type:org`,
-        sort: args.sort,
-        order: args.order,
-        page: args.page,
-        per_page: args.perPage,
+        q: `${params.query} type:org`,
+        sort: params.sort as any as any,
+        order: params.order as any as any,
+        page: params.page,
+        per_page: params.perPage,
       });
 
       return {
@@ -143,9 +144,10 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         required: ['org'],
       },
     },
-    handler: async (args: GetOrgParams) => {
+    handler: async (args: unknown) => {
+      const params = args as GetOrgParams;
       const { data } = await octokit.orgs.get({
-        org: args.org,
+        org: params.org,
       });
 
       return {
@@ -225,13 +227,14 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         required: ['org'],
       },
     },
-    handler: async (args: ListOrgMembersParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListOrgMembersParams;
       const { data } = await octokit.orgs.listMembers({
-        org: args.org,
-        filter: args.filter,
-        role: args.role,
-        page: args.page,
-        per_page: args.perPage,
+        org: params.org,
+        filter: params.filter as any as any,
+        role: params.role as any,
+        page: params.page,
+        per_page: params.perPage,
       });
 
       return data.map((member) => ({
@@ -290,14 +293,15 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         required: ['org'],
       },
     },
-    handler: async (args: ListOrgReposParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListOrgReposParams;
       const { data } = await octokit.repos.listForOrg({
-        org: args.org,
-        type: args.type,
-        sort: args.sort,
-        direction: args.direction,
-        page: args.page,
-        per_page: args.perPage,
+        org: params.org,
+        type: params.type as any,
+        sort: params.sort as any as any,
+        direction: params.direction as any as any,
+        page: params.page,
+        per_page: params.perPage,
       });
 
       return data.map((repo) => ({
@@ -355,11 +359,12 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         required: ['org'],
       },
     },
-    handler: async (args: ListOrgTeamsParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListOrgTeamsParams;
       const { data } = await octokit.teams.list({
-        org: args.org,
-        page: args.page,
-        per_page: args.perPage,
+        org: params.org,
+        page: params.page,
+        per_page: params.perPage,
       });
 
       return data.map((team) => ({
@@ -399,22 +404,23 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         required: ['org', 'username'],
       },
     },
-    handler: async (args: CheckOrgMembershipParams) => {
+    handler: async (args: unknown) => {
+      const params = args as CheckOrgMembershipParams;
       try {
         await octokit.orgs.checkMembershipForUser({
-          org: args.org,
-          username: args.username,
+          org: params.org,
+          username: params.username,
         });
 
         return {
           is_member: true,
-          message: `${args.username} is a member of ${args.org}`,
+          message: `${params.username} is a member of ${params.org}`,
         };
       } catch (error: any) {
         if (error.status === 404) {
           return {
             is_member: false,
-            message: `${args.username} is not a member of ${args.org}`,
+            message: `${params.username} is not a member of ${params.org}`,
           };
         }
         throw error;
@@ -448,20 +454,21 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         },
       },
     },
-    handler: async (args: ListUserOrgsParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListUserOrgsParams;
       let data;
       
-      if (args.username) {
+      if (params.username) {
         const response = await octokit.orgs.listForUser({
-          username: args.username,
-          page: args.page,
-          per_page: args.perPage,
+          username: params.username,
+          page: params.page,
+          per_page: params.perPage,
         });
         data = response.data;
       } else {
         const response = await octokit.orgs.listForAuthenticatedUser({
-          page: args.page,
-          per_page: args.perPage,
+          page: params.page,
+          per_page: params.perPage,
         });
         data = response.data;
       }
@@ -527,17 +534,18 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
           required: ['org'],
         },
       },
-      handler: async (args: UpdateOrgParams) => {
+      handler: async (args: unknown) => {
+      const params = args as UpdateOrgParams;
         const { data } = await octokit.orgs.update({
-          org: args.org,
-          billing_email: args.billing_email,
-          company: args.company,
-          email: args.email,
-          twitter_username: args.twitter_username,
-          location: args.location,
-          name: args.name,
-          description: args.description,
-          blog: args.blog,
+          org: params.org,
+          billing_email: params.billing_email,
+          company: params.company,
+          email: params.email,
+          twitter_username: params.twitter_username,
+          location: params.location,
+          name: params.name,
+          description: params.description,
+          blog: params.blog,
         });
 
         return {

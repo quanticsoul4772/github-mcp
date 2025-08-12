@@ -101,15 +101,16 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
         },
       },
     },
-    handler: async (args: ListUserRepositoriesParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListUserRepositoriesParams;
       const { data } = await octokit.rest.repos.listForAuthenticatedUser({
-        visibility: args.visibility || 'all',
-        affiliation: args.affiliation,
-        type: args.type,
-        sort: args.sort || 'updated',
-        direction: args.direction || 'desc',
-        page: args.page || 1,
-        per_page: args.perPage || 30,
+        visibility: params.visibility as any || 'all',
+        affiliation: params.affiliation as any,
+        type: params.type as any,
+        sort: params.sort as any || 'updated',
+        direction: params.direction as any || 'desc',
+        page: params.page || 1,
+        per_page: params.perPage || 30,
       });
 
       return data.map((repo) => ({
@@ -117,8 +118,8 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
         name: repo.name,
         full_name: repo.full_name,
         owner: {
-          login: repo.owner.login,
-          type: repo.owner.type,
+          login: repo.owner?.login || "",
+          type: repo.owner?.type || "",
         },
         description: repo.description,
         private: repo.private,
@@ -153,18 +154,19 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: GetRepositoryParams) => {
+    handler: async (args: unknown) => {
+      const params = args as GetRepositoryParams;
       // Validate inputs
-      if (!validateOwnerName(args.owner)) {
+      if (!validateOwnerName(params.owner)) {
         throw new ValidationError('owner', 'Invalid repository owner name');
       }
-      if (!validateRepoName(args.repo)) {
+      if (!validateRepoName(params.repo)) {
         throw new ValidationError('repo', 'Invalid repository name');
       }
       
       const { data } = await octokit.rest.repos.get({
-        owner: args.owner,
-        repo: args.repo,
+        owner: params.owner,
+        repo: params.repo,
       });
 
       return {
@@ -233,19 +235,20 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: GetFileContentsParams) => {
+    handler: async (args: unknown) => {
+      const params = args as GetFileContentsParams;
       // Validate inputs
-      if (!validateOwnerName(args.owner)) {
+      if (!validateOwnerName(params.owner)) {
         throw new ValidationError('owner', 'Invalid repository owner name');
       }
-      if (!validateRepoName(args.repo)) {
+      if (!validateRepoName(params.repo)) {
         throw new ValidationError('repo', 'Invalid repository name');
       }
       
       // Validate and sanitize path if provided
       let safePath = '';
-      if (args.path) {
-        const validated = validateFilePath(args.path);
+      if (params.path) {
+        const validated = validateFilePath(params.path);
         if (validated === null) {
           throw new ValidationError('path', 'Invalid file path');
         }
@@ -253,15 +256,15 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
       }
       
       // Validate ref if provided
-      if (args.ref && !validateRef(args.ref)) {
+      if (params.ref && !validateRef(params.ref)) {
         throw new ValidationError('ref', 'Invalid Git ref');
       }
       
       const { data } = await octokit.rest.repos.getContent({
-        owner: args.owner,
-        repo: args.repo,
+        owner: params.owner,
+        repo: params.repo,
         path: safePath,
-        ref: args.ref,
+        ref: params.ref,
       });
 
       if (Array.isArray(data)) {
@@ -320,12 +323,13 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: ListBranchesParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListBranchesParams;
       const { data } = await octokit.rest.repos.listBranches({
-        owner: args.owner,
-        repo: args.repo,
-        page: args.page || 1,
-        per_page: args.perPage || 30,
+        owner: params.owner,
+        repo: params.repo,
+        page: params.page || 1,
+        per_page: params.perPage || 30,
       });
 
       return data.map((branch) => ({
@@ -378,14 +382,15 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: ListCommitsParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListCommitsParams;
       const { data } = await octokit.rest.repos.listCommits({
-        owner: args.owner,
-        repo: args.repo,
-        sha: args.sha,
-        author: args.author,
-        page: args.page,
-        per_page: args.perPage,
+        owner: params.owner,
+        repo: params.repo,
+        sha: params.sha,
+        author: params.author,
+        page: params.page,
+        per_page: params.perPage,
       });
 
       return data.map((commit) => ({
@@ -430,11 +435,12 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
         required: ['owner', 'repo', 'sha'],
       },
     },
-    handler: async (args: GetCommitParams) => {
+    handler: async (args: unknown) => {
+      const params = args as GetCommitParams;
       const { data } = await octokit.rest.repos.getCommit({
-        owner: args.owner,
-        repo: args.repo,
-        ref: args.sha,
+        owner: params.owner,
+        repo: params.repo,
+        ref: params.sha,
       });
 
       return {
@@ -487,12 +493,13 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: ListTagsParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListTagsParams;
       const { data } = await octokit.rest.repos.listTags({
-        owner: args.owner,
-        repo: args.repo,
-        page: args.page,
-        per_page: args.perPage,
+        owner: params.owner,
+        repo: params.repo,
+        page: params.page,
+        per_page: params.perPage,
       });
 
       return data.map((tag) => ({
@@ -534,11 +541,12 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
         required: ['query'],
       },
     },
-    handler: async (args: SearchRepositoriesParams) => {
+    handler: async (args: unknown) => {
+      const params = args as SearchRepositoriesParams;
       const { data } = await octokit.rest.search.repos({
-        q: args.query,
-        page: args.page,
-        per_page: args.perPage,
+        q: params.query,
+        page: params.page,
+        per_page: params.perPage,
       });
 
       return {
@@ -548,8 +556,8 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
           name: repo.name,
           full_name: repo.full_name,
           owner: {
-            login: repo.owner.login,
-            type: repo.owner.type,
+            login: repo.owner?.login || "",
+            type: repo.owner?.type || "",
           },
           description: repo.description,
           private: repo.private,
@@ -594,12 +602,13 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
           required: ['name'],
         },
       },
-      handler: async (args: CreateRepoParams) => {
+      handler: async (args: unknown) => {
+      const params = args as CreateRepoParams;
         const { data } = await octokit.rest.repos.createForAuthenticatedUser({
-          name: args.name,
-          description: args.description,
-          private: args.private,
-          auto_init: args.autoInit,
+          name: params.name,
+          description: params.description,
+          private: params.private,
+          auto_init: params.autoInit,
         });
 
         return {
@@ -654,36 +663,37 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
           required: ['owner', 'repo', 'path', 'message', 'content', 'branch'],
         },
       },
-      handler: async (args: CreateOrUpdateFileParams) => {
+      handler: async (args: unknown) => {
+      const params = args as CreateOrUpdateFileParams;
         // Validate inputs
-        if (!validateOwnerName(args.owner)) {
+        if (!validateOwnerName(params.owner)) {
           throw new ValidationError('owner', 'Invalid repository owner name');
         }
-        if (!validateRepoName(args.repo)) {
+        if (!validateRepoName(params.repo)) {
           throw new ValidationError('repo', 'Invalid repository name');
         }
         
         // Validate and sanitize path
-        const safePath = validateFilePath(args.path);
+        const safePath = validateFilePath(params.path);
         if (safePath === null) {
           throw new ValidationError('path', 'Invalid file path');
         }
         
         // Validate branch name if provided
-        if (args.branch && !validateRef(args.branch)) {
+        if (params.branch && !validateRef(params.branch)) {
           throw new ValidationError('branch', 'Invalid branch name');
         }
         
-        const content = Buffer.from(args.content).toString('base64');
+        const content = Buffer.from(params.content).toString('base64');
         
         const { data } = await octokit.rest.repos.createOrUpdateFileContents({
-          owner: args.owner,
-          repo: args.repo,
+          owner: params.owner,
+          repo: params.repo,
           path: safePath,
-          message: args.message,
+          message: params.message,
           content: content,
-          branch: args.branch,
-          sha: args.sha,
+          branch: params.branch,
+          sha: params.sha,
         });
 
         return {
@@ -736,27 +746,28 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
           required: ['owner', 'repo', 'path', 'message', 'branch'],
         },
       },
-      handler: async (args: DeleteFileParams) => {
+      handler: async (args: unknown) => {
+      const params = args as DeleteFileParams;
         // Validate inputs first
-        if (!validateOwnerName(args.owner)) {
+        if (!validateOwnerName(params.owner)) {
           throw new ValidationError('owner', 'Invalid repository owner name');
         }
-        if (!validateRepoName(args.repo)) {
+        if (!validateRepoName(params.repo)) {
           throw new ValidationError('repo', 'Invalid repository name');
         }
         
         // Validate and sanitize path
-        const safePath = validateFilePath(args.path);
+        const safePath = validateFilePath(params.path);
         if (safePath === null) {
           throw new ValidationError('path', 'Invalid file path');
         }
         
         // First get the file to get its SHA
         const { data: file } = await octokit.rest.repos.getContent({
-          owner: args.owner,
-          repo: args.repo,
+          owner: params.owner,
+          repo: params.repo,
           path: safePath,
-          ref: args.branch,
+          ref: params.branch,
         });
 
         if (Array.isArray(file) || file.type !== 'file') {
@@ -764,12 +775,12 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
         }
 
         const { data } = await octokit.rest.repos.deleteFile({
-          owner: args.owner,
-          repo: args.repo,
+          owner: params.owner,
+          repo: params.repo,
           path: safePath,
-          message: args.message,
+          message: params.message,
           sha: file.sha,
-          branch: args.branch,
+          branch: params.branch,
         });
 
         return {
@@ -810,25 +821,26 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
           required: ['owner', 'repo', 'branch'],
         },
       },
-      handler: async (args: CreateBranchParams) => {
+      handler: async (args: unknown) => {
+      const params = args as CreateBranchParams;
         // Get the SHA of the source branch
         let sha: string;
-        if (args.from_branch) {
+        if (params.from_branch) {
           const { data: ref } = await octokit.rest.git.getRef({
-            owner: args.owner,
-            repo: args.repo,
-            ref: `heads/${args.from_branch}`,
+            owner: params.owner,
+            repo: params.repo,
+            ref: `heads/${params.from_branch}`,
           });
           sha = ref.object.sha;
         } else {
           // Get default branch
           const { data: repo } = await octokit.rest.repos.get({
-            owner: args.owner,
-            repo: args.repo,
+            owner: params.owner,
+            repo: params.repo,
           });
           const { data: ref } = await octokit.rest.git.getRef({
-            owner: args.owner,
-            repo: args.repo,
+            owner: params.owner,
+            repo: params.repo,
             ref: `heads/${repo.default_branch}`,
           });
           sha = ref.object.sha;
@@ -836,9 +848,9 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
 
         // Create the new branch
         const { data } = await octokit.rest.git.createRef({
-          owner: args.owner,
-          repo: args.repo,
-          ref: `refs/heads/${args.branch}`,
+          owner: params.owner,
+          repo: params.repo,
+          ref: `refs/heads/${params.branch}`,
           sha: sha,
         });
 
@@ -879,11 +891,12 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
           required: ['owner', 'repo'],
         },
       },
-      handler: async (args: ForkRepositoryParams) => {
+      handler: async (args: unknown) => {
+      const params = args as ForkRepositoryParams;
         const { data } = await octokit.rest.repos.createFork({
-          owner: args.owner,
-          repo: args.repo,
-          organization: args.organization,
+          owner: params.owner,
+          repo: params.repo,
+          organization: params.organization,
         });
 
         return {
@@ -954,12 +967,13 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
           required: ['owner', 'repo', 'branch', 'message', 'files'],
         },
       },
-      handler: async (args: PushFilesParams) => {
+      handler: async (args: unknown) => {
+      const params = args as PushFilesParams;
         // This is a simplified implementation
         // In production, you'd want to use the Git Data API to create a tree and commit
         const results = [];
         
-        for (const file of args.files) {
+        for (const file of params.files) {
           const content = Buffer.from(file.content).toString('base64');
           
           try {
@@ -967,10 +981,10 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
             let sha: string | undefined;
             try {
               const { data: existingFile } = await octokit.rest.repos.getContent({
-                owner: args.owner,
-                repo: args.repo,
+                owner: params.owner,
+                repo: params.repo,
                 path: file.path,
-                ref: args.branch,
+                ref: params.branch,
               });
               if (!Array.isArray(existingFile) && existingFile.type === 'file') {
                 sha = existingFile.sha;
@@ -980,12 +994,12 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
             }
 
             const { data } = await octokit.rest.repos.createOrUpdateFileContents({
-              owner: args.owner,
-              repo: args.repo,
+              owner: params.owner,
+              repo: params.repo,
               path: file.path,
-              message: args.message,
+              message: params.message,
               content: content,
-              branch: args.branch,
+              branch: params.branch,
               sha: sha,
             });
 

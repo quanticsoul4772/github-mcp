@@ -172,9 +172,9 @@ export class AgentCoordinator {
     if (request.agents && request.agents.length > 0) {
       return request.agents
         .map(name => this.registry.get(name))
-        .filter((agent): agent is CodeAnalysisAgent => {
+        .filter((agent, index): agent is CodeAnalysisAgent => {
           if (!agent) {
-            logger.warn(`Requested agent not found: ${name}`);
+            logger.warn(`Requested agent not found: ${request.agents![index]}`);
             return false;
           }
           return agent.canAnalyze(request.target);

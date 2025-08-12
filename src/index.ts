@@ -165,7 +165,7 @@ export class GitHubMCPServer {
     });
 
     // Initialize health monitor
-    this.healthManager = new HealthManager();
+    this.healthManager = new HealthManager(this.octokit);
 
     // Initialize optimized API client
     this.optimizedClient = new OptimizedAPIClient({
@@ -411,10 +411,7 @@ export class GitHubMCPServer {
       tool: {
         name: 'get_rate_limit_status',
         description: 'Get current GitHub API rate limit status',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-        },
+        inputSchema: { type: "object" as const, properties: {} }
       },
       handler: async () => {
         const status = this.rateLimiter.getStatus();
@@ -452,10 +449,7 @@ export class GitHubMCPServer {
           tool: {
             name: 'get_me',
             description: 'Get my GitHub user profile',
-            inputSchema: {
-              type: 'object',
-              properties: {}
-            }
+            inputSchema: { type: "object" as const, properties: {} }
           },
           handler: async () => {
             const { data } = await this.reliabilityManager.executeWithReliability(
@@ -608,10 +602,7 @@ export class GitHubMCPServer {
         tool: {
           name: 'get_performance_metrics',
           description: 'Get current performance metrics and statistics',
-          inputSchema: {
-            type: 'object',
-            properties: {}
-          }
+          inputSchema: { type: "object" as const, properties: {} }
         },
         handler: async () => globalPerformanceMonitor.getMetrics()
       },
@@ -619,10 +610,7 @@ export class GitHubMCPServer {
         tool: {
           name: 'get_performance_report',
           description: 'Generate a comprehensive performance report',
-          inputSchema: {
-            type: 'object',
-            properties: {}
-          }
+          inputSchema: { type: "object" as const, properties: {} }
         },
         handler: async () => globalPerformanceMonitor.generateReport()
       },
@@ -630,10 +618,7 @@ export class GitHubMCPServer {
         tool: {
           name: 'clear_api_cache',
           description: 'Clear all API response caches',
-          inputSchema: {
-            type: 'object',
-            properties: {}
-          }
+          inputSchema: { type: "object" as const, properties: {} }
         },
         handler: async () => {
           this.optimizedClient.clearCache();
@@ -681,4 +666,4 @@ export class GitHubMCPServer {
 }
 
 // Export for testing and external usage
-export { GitHubMCPServer };
+// GitHubMCPServer is already exported above

@@ -47,13 +47,14 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
         required: ['q'],
       },
     },
-    handler: async (args: SearchCodeParams) => {
+    handler: async (args: unknown) => {
+      const params = args as SearchCodeParams;
       const { data } = await octokit.search.code({
-        q: args.q,
-        sort: args.sort,
-        order: args.order,
-        page: args.page,
-        per_page: args.perPage,
+        q: params.q,
+        sort: params.sort as any as any,
+        order: params.order as any as any,
+        page: params.page,
+        per_page: params.perPage,
       });
 
       return {
@@ -119,13 +120,14 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
         required: ['q'],
       },
     },
-    handler: async (args: SearchCodeParams) => {
+    handler: async (args: unknown) => {
+      const params = args as SearchCodeParams;
       const { data } = await octokit.search.commits({
-        q: args.q,
-        sort: args.sort,
-        order: args.order,
-        page: args.page,
-        per_page: args.perPage,
+        q: params.q,
+        sort: params.sort as any as any,
+        order: params.order as any as any,
+        page: params.page,
+        per_page: params.perPage,
       });
 
       return {
@@ -136,14 +138,14 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
           commit: {
             message: item.commit.message,
             author: {
-              name: item.commit.author.name,
-              email: item.commit.author.email,
-              date: item.commit.author.date,
-            },
+        name: item.commit.author?.name || "",
+        email: item.commit.author?.email || "",
+        date: item.commit.author?.date || "",
+      },
             committer: {
-              name: item.commit.committer.name,
-              email: item.commit.committer.email,
-              date: item.commit.committer.date,
+              name: item.commit.committer?.name || "",
+              email: item.commit.committer?.email || "",
+              date: item.commit.committer?.date || "",
             },
             comment_count: item.commit.comment_count,
           },
@@ -198,11 +200,12 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
         required: ['q'],
       },
     },
-    handler: async (args: SearchCodeParams) => {
+    handler: async (args: unknown) => {
+      const params = args as SearchCodeParams;
       const { data } = await octokit.search.topics({
-        q: args.q,
-        page: args.page,
-        per_page: args.perPage,
+        q: params.q,
+        page: params.page,
+        per_page: params.perPage,
       });
 
       return {
@@ -266,14 +269,15 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
         required: ['repository_id', 'q'],
       },
     },
-    handler: async (args: SearchCodeParams) => {
+    handler: async (args: unknown) => {
+      const params = args as SearchCodeParams;
       const { data } = await octokit.search.labels({
-        repository_id: args.repository_id,
-        q: args.q,
-        sort: args.sort,
-        order: args.order,
-        page: args.page,
-        per_page: args.perPage,
+        repository_id: params.repository_id,
+        q: params.q,
+        sort: params.sort as any as any,
+        order: params.order as any as any,
+        page: params.page,
+        per_page: params.perPage,
       });
 
       return {

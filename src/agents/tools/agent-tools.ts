@@ -480,11 +480,9 @@ export function createAgentTools(): ToolConfig<unknown, unknown>[] {
               break;
             case 'performance':
               agents = ['static-analysis'];
-              config.includeCategories = [FindingCategory.PERFORMANCE_ISSUE];
               break;
             case 'style':
               agents = ['static-analysis'];
-              config.includeCategories = [FindingCategory.CODE_SMELL, FindingCategory.BEST_PRACTICE];
               break;
             default:
               agents = []; // Use all agents

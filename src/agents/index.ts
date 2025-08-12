@@ -1,30 +1,38 @@
 /**
- * Main exports for the code analysis agent system
+ * Main entry point for the agent system
+ * Exports all agents, types, and utilities
  */
 
-// Core types and interfaces
+// Export types
 export * from './types.js';
 
-// Base classes
-export { BaseAgent, DEFAULT_AGENT_CONFIG } from './base/agent-base.js';
+// Export base classes
+export * from './base/agent-base.js';
 export { AgentCoordinator, DefaultAgentRegistry } from './base/coordinator.js';
 
-// Analysis agents
+// Export analysis agents
 export { StaticAnalysisAgent } from './analysis/static-analysis.js';
 export { ErrorDetectionAgent } from './analysis/error-detection.js';
 
-// Testing agents
+// Export testing agents
 export { TestGenerationAgent } from './testing/test-generation.js';
 
-// Reporting
+// Export reporting
 export { ReportGenerator } from './reporting/report-generator.js';
-export type { ReportOptions, ReportSummary } from './reporting/report-generator.js';
 
-// MCP Tools
+// Export tools
 export { createAgentTools } from './tools/agent-tools.js';
 
-// Examples
+// Export examples
 export * from './examples/basic-usage.js';
+
+// Import classes for the factory function
+import { AgentCoordinator } from './base/coordinator.js';
+import { StaticAnalysisAgent } from './analysis/static-analysis.js';
+import { ErrorDetectionAgent } from './analysis/error-detection.js';
+import { TestGenerationAgent } from './testing/test-generation.js';
+import { ReportGenerator } from './reporting/report-generator.js';
+import { createAgentTools } from './tools/agent-tools.js';
 
 /**
  * Convenience function to create a fully configured agent system

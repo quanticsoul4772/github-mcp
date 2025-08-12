@@ -100,7 +100,8 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: ListDiscussionsParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListDiscussionsParams;
       const query = `
         query($owner: String!, $repo: String!, $first: Int!, $after: String, $categoryId: ID) {
           repository(owner: $owner, name: $repo) {
@@ -137,11 +138,11 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
       `;
 
       const result: any = await octokit.graphql(query, {
-        owner: args.owner,
-        repo: args.repo,
-        first: args.perPage || 25,
-        after: args.after,
-        categoryId: args.category,
+        owner: params.owner,
+        repo: params.repo,
+        first: params.perPage || 25,
+        after: params.after,
+        categoryId: params.category,
       });
 
       return {
@@ -177,7 +178,8 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         required: ['owner', 'repo', 'discussionNumber'],
       },
     },
-    handler: async (args: GetDiscussionParams) => {
+    handler: async (args: unknown) => {
+      const params = args as GetDiscussionParams;
       const query = `
         query($owner: String!, $repo: String!, $number: Int!) {
           repository(owner: $owner, name: $repo) {
@@ -222,9 +224,9 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
       `;
 
       const result: any = await octokit.graphql(query, {
-        owner: args.owner,
-        repo: args.repo,
-        number: args.discussionNumber,
+        owner: params.owner,
+        repo: params.repo,
+        number: params.discussionNumber,
       });
 
       return result.repository.discussion;
@@ -265,7 +267,8 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         required: ['owner', 'repo', 'discussionNumber'],
       },
     },
-    handler: async (args: GetDiscussionCommentsParams) => {
+    handler: async (args: unknown) => {
+      const params = args as GetDiscussionCommentsParams;
       const query = `
         query($owner: String!, $repo: String!, $number: Int!, $first: Int!, $after: String) {
           repository(owner: $owner, name: $repo) {
@@ -310,11 +313,11 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
       `;
 
       const result: any = await octokit.graphql(query, {
-        owner: args.owner,
-        repo: args.repo,
-        number: args.discussionNumber,
-        first: args.perPage || 25,
-        after: args.after,
+        owner: params.owner,
+        repo: params.repo,
+        number: params.discussionNumber,
+        first: params.perPage || 25,
+        after: params.after,
       });
 
       return {
@@ -346,7 +349,8 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: ListDiscussionCategoriesParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListDiscussionCategoriesParams;
       const query = `
         query($owner: String!, $repo: String!) {
           repository(owner: $owner, name: $repo) {
@@ -368,8 +372,8 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
       `;
 
       const result: any = await octokit.graphql(query, {
-        owner: args.owner,
-        repo: args.repo,
+        owner: params.owner,
+        repo: params.repo,
       });
 
       return {
@@ -409,10 +413,11 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         required: ['query'],
       },
     },
-    handler: async (args: SearchDiscussionsParams) => {
-      let searchQuery = args.query;
-      if (args.owner && args.repo) {
-        searchQuery = `repo:${args.owner}/${args.repo} ${searchQuery}`;
+    handler: async (args: unknown) => {
+      const params = args as SearchDiscussionsParams;
+      let searchQuery = params.query;
+      if (params.owner && params.repo) {
+        searchQuery = `repo:${params.owner}/${params.repo} ${searchQuery}`;
       }
 
       const query = `
@@ -445,7 +450,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
 
       const result: any = await octokit.graphql(query, {
         searchQuery,
-        first: args.first || 25,
+        first: params.first || 25,
       });
 
       return {
@@ -489,7 +494,8 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           required: ['owner', 'repo', 'title', 'body', 'categoryId'],
         },
       },
-      handler: async (args: CreateDiscussionParams) => {
+      handler: async (args: unknown) => {
+      const params = args as CreateDiscussionParams;
         // First get the repository ID
         const repoQuery = `
           query($owner: String!, $repo: String!) {
@@ -500,8 +506,8 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         `;
 
         const repoResult: any = await octokit.graphql(repoQuery, {
-          owner: args.owner,
-          repo: args.repo,
+          owner: params.owner,
+          repo: params.repo,
         });
 
         const mutation = `
@@ -532,9 +538,9 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
 
         const result: any = await octokit.graphql(mutation, {
           repositoryId: repoResult.repository.id,
-          title: args.title,
-          body: args.body,
-          categoryId: args.categoryId,
+          title: params.title,
+          body: params.body,
+          categoryId: params.categoryId,
         });
 
         return result.createDiscussion.discussion;
@@ -565,7 +571,8 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           required: ['discussionId', 'body'],
         },
       },
-      handler: async (args: AddDiscussionCommentParams) => {
+      handler: async (args: unknown) => {
+      const params = args as AddDiscussionCommentParams;
         const mutation = `
           mutation($discussionId: ID!, $body: String!, $replyToId: ID) {
             addDiscussionComment(input: {
@@ -586,9 +593,9 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         `;
 
         const result: any = await octokit.graphql(mutation, {
-          discussionId: args.discussionId,
-          body: args.body,
-          replyToId: args.replyToId,
+          discussionId: params.discussionId,
+          body: params.body,
+          replyToId: params.replyToId,
         });
 
         return result.addDiscussionComment.comment;
@@ -623,7 +630,8 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           required: ['discussionId'],
         },
       },
-      handler: async (args: UpdateDiscussionParams) => {
+      handler: async (args: unknown) => {
+      const params = args as UpdateDiscussionParams;
         const mutation = `
           mutation($discussionId: ID!, $title: String, $body: String, $categoryId: ID) {
             updateDiscussion(input: {
@@ -647,10 +655,10 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         `;
 
         const result: any = await octokit.graphql(mutation, {
-          discussionId: args.discussionId,
-          title: args.title,
-          body: args.body,
-          categoryId: args.categoryId,
+          discussionId: params.discussionId,
+          title: params.title,
+          body: params.body,
+          categoryId: params.categoryId,
         });
 
         return result.updateDiscussion.discussion;
@@ -673,7 +681,8 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           required: ['discussionId'],
         },
       },
-      handler: async (args: DeleteDiscussionParams) => {
+      handler: async (args: unknown) => {
+      const params = args as DeleteDiscussionParams;
         const mutation = `
           mutation($discussionId: ID!) {
             deleteDiscussion(input: {
@@ -685,7 +694,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         `;
 
         await octokit.graphql(mutation, {
-          discussionId: args.discussionId,
+          discussionId: params.discussionId,
         });
 
         return {

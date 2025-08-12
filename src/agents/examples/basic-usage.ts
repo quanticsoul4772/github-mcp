@@ -385,11 +385,4 @@ export async function runExamples() {
 }
 
 // Export all examples for individual use
-export {
-  analyzeFile,
-  analyzeProject,
-  generateTestsForFile,
-  generateAnalysisReport,
-  quickSecurityScan,
-  monitorAgentHealth
-};
+// (exports are already declared above with the function definitions)
