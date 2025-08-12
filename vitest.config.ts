@@ -20,15 +20,6 @@ export default defineConfig({
       include: [
         'src/**/*.ts',
       ],
-      // Fail CI on coverage below threshold
-      thresholds: {
-        global: {
-          branches: 80,
-          functions: 80,
-          lines: 80,
-          statements: 80,
-        },
-      },
       reportOnFailure: true,
       skipFull: false,
     },

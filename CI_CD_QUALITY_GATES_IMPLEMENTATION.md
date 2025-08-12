@@ -29,11 +29,10 @@ This document summarizes all the changes made to implement proper CI/CD quality 
 
 ```json
 {
-  "@typescript-eslint/eslint-plugin": "^6.21.0",
-  "@typescript-eslint/parser": "^6.21.0", 
-  "complexity-report": "^2.0.0",
+  "@typescript-eslint/eslint-plugin": "^8.17.0",
+  "@typescript-eslint/parser": "^8.17.0",
   "depcheck": "^1.4.7",
-  "eslint": "^8.57.0",
+  "eslint": "^9.17.0",
   "license-checker": "^25.0.1",
   "nyc": "^17.1.0"
 }
