@@ -86,11 +86,11 @@ kubectl create secret generic github-mcp-secrets \
 
 ### Available Deployment Options
 
-- ** Docker**: Production-ready containerized deployment
-- ** Kubernetes**: Scalable orchestrated deployment with auto-scaling
-- ** Cloud Platforms**: AWS EKS, Google GKE, Azure AKS
-- ** CI/CD**: GitHub Actions for automated deployments
-- ** Monitoring**: Prometheus metrics and health checks
+- Docker: Production-ready containerized deployment
+- Kubernetes: Scalable orchestrated deployment with auto-scaling
+- Cloud Platforms: AWS EKS, Google GKE, Azure AKS
+- CI/CD: GitHub Actions for automated deployments
+- Monitoring: Prometheus metrics and health checks
 
 For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
