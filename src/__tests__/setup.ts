@@ -36,8 +36,9 @@ beforeEach(() => {
     debug: vi.fn(),
   };
 
-  // Mock system time for consistency
-  mockSystemTime('2024-01-01T12:00:00Z');
+  // Note: mockSystemTime() is not called globally anymore to avoid
+  // interfering with async operations. Tests that need deterministic
+  // dates should call mockSystemTime() explicitly.
   
   // Clear all module imports to prevent cross-test contamination
   vi.resetModules();
@@ -53,6 +54,9 @@ afterEach(() => {
   
   // Restore Date
   (global as any).Date = originalDate;
+  
+  // Restore real timers if fake timers were used
+  vi.useRealTimers();
   
   // Clear all mocks
   vi.clearAllMocks();

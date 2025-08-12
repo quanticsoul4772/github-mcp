@@ -516,3 +516,90 @@ export const createFile = (overrides: any = {}, seed?: number) => {
     ...overrides,
   };
 };
+
+// Error generator functions for testing error scenarios
+export const generateNetworkError = (overrides: any = {}) => {
+  const errorTypes = [
+    { code: 'ECONNREFUSED', message: 'Connection refused', errno: -61 },
+    { code: 'ETIMEDOUT', message: 'Request timeout', errno: -60 },
+    { code: 'ENOTFOUND', message: 'DNS lookup failed', errno: -3008 },
+    { code: 'ENETUNREACH', message: 'Network unreachable', errno: -51 },
+    { code: 'ECONNRESET', message: 'Connection reset by peer', errno: -54 },
+  ];
+  
+  const random = getRandom();
+  const errorType = random 
+    ? errorTypes[random.nextInt(0, errorTypes.length - 1)]
+    : errorTypes[0];
+  
+  return {
+    code: overrides.code ?? errorType.code,
+    message: overrides.message ?? errorType.message,
+    errno: overrides.errno ?? errorType.errno,
+    syscall: overrides.syscall ?? 'connect',
+    hostname: overrides.hostname ?? 'api.github.com',
+    port: overrides.port ?? 443,
+    ...overrides,
+  };
+};
+
+export const generateRandomApiError = (overrides: any = {}, seed?: number) => {
+  const random = getRandom(seed);
+  const statusCodes = [400, 401, 403, 404, 409, 422, 429, 500, 502, 503];
+  const status = overrides.status ?? (random 
+    ? statusCodes[random.nextInt(0, statusCodes.length - 1)]
+    : 404);
+  
+  const errorMessages: Record<number, string> = {
+    400: 'Bad Request',
+    401: 'Requires authentication',
+    403: 'Forbidden',
+    404: 'Not Found',
+    409: 'Conflict',
+    422: 'Validation Failed',
+    429: 'Too Many Requests',
+    500: 'Internal Server Error',
+    502: 'Bad Gateway',
+    503: 'Service Unavailable',
+  };
+  
+  const message = overrides.message ?? errorMessages[status] ?? 'Unknown Error';
+  
+  return {
+    name: 'HttpError',
+    status,
+    message,
+    response: {
+      status,
+      headers: overrides.headers ?? {
+        'x-ratelimit-limit': '5000',
+        'x-ratelimit-remaining': status === 429 ? '0' : '4999',
+        'x-ratelimit-reset': String(Math.floor(Date.now() / 1000) + 3600),
+      },
+      data: {
+        message,
+        documentation_url: `https://docs.github.com/rest/reference/${status}`,
+        ...(status === 422 && {
+          errors: [
+            {
+              resource: 'Issue',
+              field: 'title',
+              code: 'missing_field',
+            },
+          ],
+        }),
+        ...(status === 429 && {
+          message: 'API rate limit exceeded',
+        }),
+      },
+    },
+    request: {
+      method: overrides.method ?? 'GET',
+      url: overrides.url ?? 'https://api.github.com/repos/test-owner/test-repo',
+      headers: {
+        authorization: 'token test-token-fixed-12345',
+      },
+    },
+    ...overrides,
+  };
+};
