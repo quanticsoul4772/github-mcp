@@ -78,10 +78,17 @@ async function projectsAutomation(mcpClient, orgName) {
   console.log('\n🔍 Finding issues to add to project...');
   
   // This would typically search for issues with specific labels
-  const newIssues = await mcpClient.callTool('search_issues_advanced', {
-    query: `org:${orgName} is:open label:"needs-triage" -project:"${devProject.title}"`,
-    first: 5
-  });
+    // Prefer reliable filtering: fetch and filter client-side against current project items
+    const newIssues = await mcpClient.callTool('search_issues_advanced', {
+      query: `org:${orgName} is:open label:"needs-triage"`,
+      first: 5
+    });
+    const existingItemContentIds = new Set(
+      projectItems.items
+        .map(i => i.content?.node_id)
+        .filter(Boolean)
+    );
+    const candidateIssues = newIssues.issues.filter(i => !existingItemContentIds.has(i.node_id));
 
   console.log(`Found ${newIssues.total_count} issues to add:`);
   
