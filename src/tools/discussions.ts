@@ -1,6 +1,20 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
 import { GraphQLPaginationHandler, GraphQLPaginationOptions, GraphQLPaginationUtils } from '../graphql-pagination-handler.js';
+import { OptimizedAPIClient } from '../optimized-api-client.js';
+import { cachedGraphQL, smartGraphQL, GraphQLTTL } from '../graphql-utils.js';
+import { typedGraphQL, createTypedHandler } from '../graphql-utils.js';
+import {
+  ListDiscussionsResponse,
+  GetDiscussionResponse,
+  GetDiscussionCommentsResponse,
+  ListDiscussionCategoriesResponse,
+  SearchDiscussionsResponse,
+  CreateDiscussionResponse,
+  AddDiscussionCommentResponse,
+  UpdateDiscussionResponse,
+  SimpleRepositoryResponse
+} from '../graphql-types.js';
 
 interface ListDiscussionsParams {
   owner: string;
@@ -67,6 +81,27 @@ interface DeleteDiscussionParams {
   discussionId: string;
 }
 
+export function createDiscussionTools(
+  client: Octokit | OptimizedAPIClient, 
+  readOnly: boolean
+): ToolConfig[] {
+/**
+ * Creates GitHub Discussion tools using GraphQL API.
+ * 
+ * GitHub Discussions are only available through GraphQL and provide community
+ * conversation features around repositories. These tools offer comprehensive
+ * discussion management including creation, querying, and moderation.
+ * 
+ * @param octokit - Configured Octokit instance with GraphQL support
+ * @param readOnly - Whether to exclude write operations (create, update, delete)
+ * @returns Array of discussion tool configurations
+ * 
+ * @example
+ * ```typescript
+ * const tools = createDiscussionTools(octokit, false);
+ * // Returns tools: list_discussions, get_discussion, search_discussions, etc.
+ * ```
+ */
 export function createDiscussionTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
   const paginationHandler = new GraphQLPaginationHandler(octokit);
@@ -144,6 +179,54 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
       };
 
       const result = await paginationHandler.paginate(queryBuilder, paginationOptions);
+    handler: createTypedHandler<ListDiscussionsParams, any>(async (args: ListDiscussionsParams) => {
+      const query = `
+        query($owner: String!, $repo: String!, $first: Int!, $after: String, $categoryId: ID) {
+          repository(owner: $owner, name: $repo) {
+            discussions(first: $first, after: $after, categoryId: $categoryId) {
+              totalCount
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+              nodes {
+                id
+                number
+                title
+                body
+                createdAt
+                updatedAt
+                author {
+                  login
+                }
+                category {
+                  id
+                  name
+                  slug
+                }
+                comments {
+                  totalCount
+                }
+                upvoteCount
+                url
+              }
+            }
+          }
+        }
+      `;
+
+      const result: any = await cachedGraphQL(client, query, {
+      const result = await typedGraphQL<ListDiscussionsResponse>(octokit, query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
+        owner: args.owner,
+        repo: args.repo,
+        first: args.perPage || 25,
+        after: args.after,
+        categoryId: args.category,
+      }, {
+        ttl: GraphQLTTL.DISCUSSIONS_LIST,
+        operation: 'list_discussions'
+      });
 
       return {
         total_count: result.totalCount,
@@ -152,7 +235,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         page_info: result.pageInfo,
         discussions: result.data,
       };
-    },
+    }),
   });
 
   // Get discussion tool
@@ -179,7 +262,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         required: ['owner', 'repo', 'discussionNumber'],
       },
     },
-    handler: async (args: GetDiscussionParams) => {
+    handler: createTypedHandler<GetDiscussionParams, any>(async (args: GetDiscussionParams) => {
       const query = `
         query($owner: String!, $repo: String!, $number: Int!) {
           repository(owner: $owner, name: $repo) {
@@ -223,14 +306,19 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await cachedGraphQL(client, query, {
+      const result = await typedGraphQL<GetDiscussionResponse>(octokit, query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
         number: args.discussionNumber,
+      }, {
+        ttl: GraphQLTTL.DISCUSSION_DETAIL,
+        operation: 'get_discussion'
       });
 
       return result.repository.discussion;
-    },
+    }),
   });
 
   // Get discussion comments tool
@@ -303,6 +391,17 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
       };
 
       const result = await paginationHandler.paginate(queryBuilder, paginationOptions);
+      const result: any = await cachedGraphQL(client, query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
+        owner: args.owner,
+        repo: args.repo,
+        number: args.discussionNumber,
+        first: args.perPage || 25,
+        after: args.after,
+      }, {
+        ttl: GraphQLTTL.DISCUSSION_COMMENTS,
+        operation: 'get_discussion_comments'
+      });
 
       return {
         total_count: result.totalCount,
@@ -355,9 +454,13 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await cachedGraphQL(client, query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
+      }, {
+        ttl: GraphQLTTL.DISCUSSION_CATEGORIES,
+        operation: 'list_discussion_categories'
       });
 
       return {
@@ -431,9 +534,13 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         }
       `;
 
-      const result: any = await octokit.graphql(query, {
+      const result: any = await cachedGraphQL(client, query, {
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
         searchQuery,
         first: args.first || 25,
+      }, {
+        ttl: GraphQLTTL.SEARCH_RESULTS,
+        operation: 'search_discussions'
       });
 
       return {
@@ -487,9 +594,13 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           }
         `;
 
-        const repoResult: any = await octokit.graphql(repoQuery, {
+        const repoResult: any = await cachedGraphQL(client, repoQuery, {
+        const repoResult: any = await (octokit as any).graphqlWithComplexity(repoQuery, {
           owner: args.owner,
           repo: args.repo,
+        }, {
+          ttl: GraphQLTTL.REPOSITORY_INFO,
+          operation: 'get_repository_id'
         });
 
         const mutation = `
@@ -518,11 +629,15 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           }
         `;
 
-        const result: any = await octokit.graphql(mutation, {
+        const result: any = await smartGraphQL(client, mutation, {
+        const result: any = await (octokit as any).graphqlWithComplexity(mutation, {
           repositoryId: repoResult.repository.id,
           title: args.title,
           body: args.body,
           categoryId: args.categoryId,
+        }, {
+          isMutation: true,
+          operation: 'create_discussion'
         });
 
         return result.createDiscussion.discussion;
@@ -573,10 +688,14 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           }
         `;
 
-        const result: any = await octokit.graphql(mutation, {
+        const result: any = await smartGraphQL(client, mutation, {
+        const result: any = await (octokit as any).graphqlWithComplexity(mutation, {
           discussionId: args.discussionId,
           body: args.body,
           replyToId: args.replyToId,
+        }, {
+          isMutation: true,
+          operation: 'add_discussion_comment'
         });
 
         return result.addDiscussionComment.comment;
@@ -634,11 +753,15 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           }
         `;
 
-        const result: any = await octokit.graphql(mutation, {
+        const result: any = await smartGraphQL(client, mutation, {
+        const result: any = await (octokit as any).graphqlWithComplexity(mutation, {
           discussionId: args.discussionId,
           title: args.title,
           body: args.body,
           categoryId: args.categoryId,
+        }, {
+          isMutation: true,
+          operation: 'update_discussion'
         });
 
         return result.updateDiscussion.discussion;
@@ -672,8 +795,12 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
           }
         `;
 
-        await octokit.graphql(mutation, {
+        await smartGraphQL(client, mutation, {
+        await (octokit as any).graphqlWithComplexity(mutation, {
           discussionId: args.discussionId,
+        }, {
+          isMutation: true,
+          operation: 'delete_discussion'
         });
 
         return {

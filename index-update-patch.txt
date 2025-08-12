@@ -1,0 +1,20 @@
+/**
+ * Patch to add help tools to GitHub MCP
+ * Apply this to src/index.ts
+ */
+
+// Add to imports section (around line 16):
+import { createHelpTools } from './tools/help.js';
+
+// Change the issues import (line 16) to use enhanced version:
+import { createIssueTools } from './tools/issues-enhanced.js';
+
+// Add help tools registration (add after line 450 or before other tools):
+// In the constructor or initialization section where tools are registered:
+
+    // Register help tools (always enabled)
+    const helpTools = createHelpTools();
+    helpTools.forEach(tool => this.registerTool(tool));
+    console.log(`Registered ${helpTools.length} help tools`);
+
+// The help tools should be registered before other tools so they're always available

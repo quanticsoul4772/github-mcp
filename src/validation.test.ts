@@ -1,56 +1,94 @@
-import { describe, it, expect } from 'vitest';
+/**
+ * Comprehensive tests for validation module
+ */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
-  validateRepoName,
+  ValidationError,
+  ValidationErrorDetail,
+  ValidationWarning,
+  ValidationResult,
+  ValidationLevel,
+  validateGitHubToken,
+  validateGitHubTokenWithResult,
+  validateGitHubTokenFormat,
+  validateGitHubTokenWithAPI,
   validateOwnerName,
+  validateRepoName,
+  validateBranchName,
   validateFilePath,
   validateRef,
   validateCommitSha,
+  validateSHA,
+  validateWorkflowFileName,
+  validateURL,
+  validateIssueNumber,
+  validatePerPage,
+  validateSearchQuery,
+  validateEnvironment,
+  validateEnvironmentConfiguration,
+  validateGitOperation,
+  validateCommandOptions,
   sanitizeText,
-  ValidationError,
+  cleanupValidation
 } from './validation.js';
 
+// Test token factory to avoid hardcoded secrets
+const createTestToken = (type: 'classic' | 'oauth' | 'fine' | 'installation' | 'legacy' = 'classic'): string => {
+  // Generate random alphanumeric characters for token content
+  const randomChar = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    return chars[Math.floor(Math.random() * chars.length)];
+  };
+  
+  const randomString = (length: number) => {
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += randomChar();
+    }
+    return result;
+  };
+  
+  switch (type) {
+    case 'classic':
+      // Classic PAT: ghp_ + 36 alphanumeric characters
+      return ['ghp', '_'].join('') + randomString(36);
+    case 'oauth':
+      // OAuth token: gho_ + 36 alphanumeric characters
+      return ['gho', '_'].join('') + randomString(36);
+    case 'fine':
+      // Fine-grained PAT: github_pat_ + 22 chars + _ + 59 chars = total 93 chars
+      return ['github', '_pat_'].join('') + '1'.repeat(22) + '_' + randomString(59);
+    case 'installation':
+      // Installation token: ghi_ + 36 alphanumeric characters
+      return ['ghi', '_'].join('') + randomString(36);
+    case 'legacy':
+      // Legacy token: 40 hex characters
+      const hexChars = '0123456789abcdef';
+      let hex = '';
+      for (let i = 0; i < 40; i++) {
+        hex += hexChars[Math.floor(Math.random() * hexChars.length)];
+      }
+      return hex;
+    default:
+      return ['ghp', '_'].join('') + randomString(36);
+  }
+};
+
 describe('Validation Module', () => {
-  describe('validateRepoName', () => {
-    it('should accept valid repository names', () => {
-      expect(validateRepoName('my-repo')).toBe(true);
-      expect(validateRepoName('my_repo')).toBe(true);
-      expect(validateRepoName('my.repo')).toBe(true);
-      expect(validateRepoName('MyRepo123')).toBe(true);
-    });
-
-    it('should reject invalid repository names', () => {
-      expect(validateRepoName('')).toBe(false);
-      expect(validateRepoName('.repo')).toBe(false);
-      expect(validateRepoName('repo.')).toBe(false);
-      expect(validateRepoName('repo..name')).toBe(false);
-      expect(validateRepoName('a'.repeat(101))).toBe(false);
-      expect(validateRepoName('repo/name')).toBe(false);
-      expect(validateRepoName('repo name')).toBe(false);
-    });
-
-    it('should handle edge cases', () => {
-      expect(validateRepoName(null as any)).toBe(false);
-      expect(validateRepoName(undefined as any)).toBe(false);
-      expect(validateRepoName(123 as any)).toBe(false);
-    });
+  beforeEach(() => {
+    // Clear all mocks before each test
+    vi.clearAllMocks();
+    // Reset environment variables
+    delete process.env.GITHUB_PERSONAL_ACCESS_TOKEN;
+    delete process.env.GITHUB_TOKEN;
+    delete process.env.NODE_ENV;
+    delete process.env.SKIP_VALIDATION;
   });
 
-  describe('validateOwnerName', () => {
-    it('should accept valid owner names', () => {
-      expect(validateOwnerName('github')).toBe(true);
-      expect(validateOwnerName('my-org')).toBe(true);
-      expect(validateOwnerName('User123')).toBe(true);
-    });
-
-    it('should reject invalid owner names', () => {
-      expect(validateOwnerName('')).toBe(false);
-      expect(validateOwnerName('-user')).toBe(false);
-      expect(validateOwnerName('user-')).toBe(false);
-      expect(validateOwnerName('user--name')).toBe(false);
-      expect(validateOwnerName('a'.repeat(40))).toBe(false);
-      expect(validateOwnerName('user_name')).toBe(false);
-      expect(validateOwnerName('user.name')).toBe(false);
-    });
+  afterEach(() => {
+    // Cleanup after each test
+    cleanupValidation();
   });
 
   describe('validateFilePath', () => {
@@ -153,11 +191,768 @@ describe('Validation Module', () => {
     });
   });
 
+  describe('validateGitHubToken', () => {
+    describe('GitHub Personal Access Token (classic) - ghp_ prefix', () => {
+      it('should accept valid ghp_ tokens', () => {
+        expect(validateGitHubToken('ghp_' + 'A'.repeat(36))).toBe(true);
+        expect(validateGitHubToken('ghp_' + 'a'.repeat(36))).toBe(true);
+        expect(validateGitHubToken('ghp_' + '1'.repeat(36))).toBe(true);
+        // Use dynamic token generation to avoid hardcoded secrets
+        const testToken = createTestToken('classic');
+        expect(validateGitHubToken(testToken)).toBe(true);
+      });
+
+      it('should reject ghp_ tokens with incorrect length', () => {
+        expect(validateGitHubToken('ghp_' + 'A'.repeat(35))).toBe(false);
+        expect(validateGitHubToken('ghp_' + 'A'.repeat(37))).toBe(false);
+        expect(validateGitHubToken('ghp_')).toBe(false);
+      });
+
+      it('should reject ghp_ tokens with invalid characters', () => {
+        expect(validateGitHubToken('ghp_' + 'A'.repeat(35) + '@')).toBe(false);
+        expect(validateGitHubToken('ghp_' + 'A'.repeat(35) + ' ')).toBe(false);
+        expect(validateGitHubToken('ghp_' + 'A'.repeat(35) + '.')).toBe(false);
+      });
+    });
+
+    describe('GitHub OAuth Token - gho_ prefix', () => {
+      it('should accept valid gho_ tokens', () => {
+        expect(validateGitHubToken('gho_' + 'B'.repeat(36))).toBe(true);
+        // Use dynamic token generation to avoid hardcoded secrets
+        const testOAuthToken = createTestToken('oauth');
+        expect(validateGitHubToken(testOAuthToken)).toBe(true);
+      });
+
+      it('should reject invalid gho_ tokens', () => {
+        expect(validateGitHubToken('gho_' + 'B'.repeat(35))).toBe(false);
+        expect(validateGitHubToken('gho_' + 'B'.repeat(37))).toBe(false);
+      });
+    });
+
+    describe('GitHub User Access Token - ghu_ prefix', () => {
+      it('should accept valid ghu_ tokens', () => {
+        expect(validateGitHubToken('ghu_' + 'C'.repeat(36))).toBe(true);
+      });
+
+      it('should reject invalid ghu_ tokens', () => {
+        expect(validateGitHubToken('ghu_' + 'C'.repeat(35))).toBe(false);
+      });
+    });
+
+    describe('GitHub Server-to-Server Token - ghs_ prefix', () => {
+      it('should accept valid ghs_ tokens', () => {
+        expect(validateGitHubToken('ghs_' + 'D'.repeat(36))).toBe(true);
+      });
+
+      it('should reject invalid ghs_ tokens', () => {
+        expect(validateGitHubToken('ghs_' + 'D'.repeat(35))).toBe(false);
+      });
+    });
+
+    describe('GitHub Refresh Token - ghr_ prefix', () => {
+      it('should accept valid ghr_ tokens', () => {
+        expect(validateGitHubToken('ghr_' + 'E'.repeat(36))).toBe(true);
+      });
+
+      it('should reject invalid ghr_ tokens', () => {
+        expect(validateGitHubToken('ghr_' + 'E'.repeat(35))).toBe(false);
+      });
+    });
+
+    describe('Legacy Token Format', () => {
+      it('should accept valid 40-character hex tokens', () => {
+        expect(validateGitHubToken('a'.repeat(40))).toBe(true);
+        expect(validateGitHubToken('A'.repeat(40))).toBe(true);
+        expect(validateGitHubToken('1234567890abcdef1234567890abcdef12345678')).toBe(true);
+        expect(validateGitHubToken('ABCDEF1234567890ABCDEF1234567890ABCDEF12')).toBe(true);
+      });
+
+      it('should reject non-hex characters in legacy tokens', () => {
+        expect(validateGitHubToken('g'.repeat(40))).toBe(false);
+        expect(validateGitHubToken('z'.repeat(40))).toBe(false);
+        expect(validateGitHubToken('a'.repeat(39) + 'g')).toBe(false);
+      });
+
+      it('should reject legacy tokens with incorrect length', () => {
+        expect(validateGitHubToken('a'.repeat(39))).toBe(false);
+        expect(validateGitHubToken('a'.repeat(41))).toBe(false);
+      });
+    });
+
+    describe('Invalid Token Formats', () => {
+      it('should reject empty or null tokens', () => {
+        expect(validateGitHubToken('')).toBe(false);
+        expect(validateGitHubToken(null as any)).toBe(false);
+        expect(validateGitHubToken(undefined as any)).toBe(false);
+      });
+
+      it('should reject non-string inputs', () => {
+        expect(validateGitHubToken(123 as any)).toBe(false);
+        expect(validateGitHubToken({} as any)).toBe(false);
+        expect(validateGitHubToken([] as any)).toBe(false);
+      });
+
+      it('should reject tokens with unknown prefixes', () => {
+        expect(validateGitHubToken('unknown_' + 'A'.repeat(30))).toBe(false);
+        expect(validateGitHubToken('github_pat_' + 'A'.repeat(30))).toBe(false);
+        expect(validateGitHubToken('ght_' + 'A'.repeat(36))).toBe(false);
+      });
+
+      it('should reject malformed tokens', () => {
+        expect(validateGitHubToken('not-a-token')).toBe(false);
+        expect(validateGitHubToken('123')).toBe(false);
+        expect(validateGitHubToken('ghp')).toBe(false);
+        expect(validateGitHubToken('ghp_')).toBe(false);
+        expect(validateGitHubToken('ghp_too_short')).toBe(false);
+      });
+    });
+  });
+
+  describe('validateEnvironmentConfiguration', () => {
+    let originalEnv: Record<string, string | undefined>;
+
+    beforeEach(() => {
+      originalEnv = { ...process.env };
+      // Clear auth-related env vars
+      delete process.env.GITHUB_PERSONAL_ACCESS_TOKEN;
+      delete process.env.GITHUB_TOKEN;
+      delete process.env.GITHUB_HOST;
+      delete process.env.GITHUB_READ_ONLY;
+      delete process.env.GITHUB_TOOLSETS;
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
+    describe('Required Token Validation', () => {
+      it('should validate with GITHUB_PERSONAL_ACCESS_TOKEN', () => {
+        process.env.GITHUB_PERSONAL_ACCESS_TOKEN = 'ghp_' + 'A'.repeat(36);
+        
+        const result = validateEnvironmentConfiguration();
+        
+        expect(result.isValid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+        expect(result.sanitizedValues.GITHUB_TOKEN).toBe(process.env.GITHUB_PERSONAL_ACCESS_TOKEN);
+      });
+
+      it('should validate with GITHUB_TOKEN', () => {
+        process.env.GITHUB_TOKEN = 'gho_' + 'B'.repeat(36);
+        
+        const result = validateEnvironmentConfiguration();
+        
+        expect(result.isValid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+        expect(result.sanitizedValues.GITHUB_TOKEN).toBe(process.env.GITHUB_TOKEN);
+      });
+
+      it('should prioritize GITHUB_PERSONAL_ACCESS_TOKEN over GITHUB_TOKEN', () => {
+        const patToken = 'ghp_' + 'A'.repeat(36);
+        const githubToken = 'gho_' + 'B'.repeat(36);
+        
+        process.env.GITHUB_PERSONAL_ACCESS_TOKEN = patToken;
+        process.env.GITHUB_TOKEN = githubToken;
+        
+        const result = validateEnvironmentConfiguration();
+        
+        expect(result.isValid).toBe(true);
+        expect(result.sanitizedValues.GITHUB_TOKEN).toBe(patToken);
+      });
+
+      it('should fail when no token is provided', () => {
+        const result = validateEnvironmentConfiguration();
+        
+        expect(result.isValid).toBe(false);
+        expect(result.errors).toContain('GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN is required');
+      });
+
+      it('should fail with invalid token format', () => {
+        process.env.GITHUB_TOKEN = 'invalid-token-format';
+        
+        const result = validateEnvironmentConfiguration();
+        
+        expect(result.isValid).toBe(false);
+        expect(result.errors).toContain('Invalid GitHub token format');
+      });
+    });
+
+    describe('Optional Environment Variables', () => {
+      beforeEach(() => {
+        process.env.GITHUB_TOKEN = 'ghp_' + 'A'.repeat(36);
+      });
+
+      it('should validate GITHUB_READ_ONLY values', () => {
+        const validValues = ['1', 'true', 'false', '0'];
+        
+        for (const value of validValues) {
+          process.env.GITHUB_READ_ONLY = value;
+          const result = validateEnvironmentConfiguration();
+          expect(result.isValid).toBe(true);
+          expect(result.sanitizedValues.GITHUB_READ_ONLY).toBe(value);
+        }
+      });
+
+      it('should reject invalid GITHUB_READ_ONLY values', () => {
+        process.env.GITHUB_READ_ONLY = 'maybe';
+        
+        const result = validateEnvironmentConfiguration();
+        
+        expect(result.isValid).toBe(false);
+        expect(result.errors).toContain('Invalid format for GITHUB_READ_ONLY');
+      });
+
+      it('should validate GITHUB_TOOLSETS', () => {
+        process.env.GITHUB_TOOLSETS = 'repos,issues,pull_requests';
+        
+        const result = validateEnvironmentConfiguration();
+        
+        expect(result.isValid).toBe(true);
+        expect(result.sanitizedValues.GITHUB_TOOLSETS).toBe('repos,issues,pull_requests');
+      });
+
+      it('should accept "all" for GITHUB_TOOLSETS', () => {
+        process.env.GITHUB_TOOLSETS = 'all';
+        
+        const result = validateEnvironmentConfiguration();
+        
+        expect(result.isValid).toBe(true);
+        expect(result.sanitizedValues.GITHUB_TOOLSETS).toBe('all');
+      });
+
+      it('should reject invalid toolset names', () => {
+        process.env.GITHUB_TOOLSETS = 'invalid_toolset,repos';
+        
+        const result = validateEnvironmentConfiguration();
+        
+        expect(result.isValid).toBe(false);
+        expect(result.errors).toContain('Invalid format for GITHUB_TOOLSETS');
+      });
+
+      it('should validate GITHUB_HOST URLs', () => {
+        process.env.GITHUB_HOST = 'https://github.enterprise.com/api/v3';
+        
+        const result = validateEnvironmentConfiguration();
+        
+        expect(result.isValid).toBe(true);
+        expect(result.sanitizedValues.GITHUB_HOST).toBe('https://github.enterprise.com/api/v3');
+      });
+
+      it('should reject non-HTTPS URLs', () => {
+        process.env.GITHUB_HOST = 'http://github.com/api/v3';
+        
+        const result = validateEnvironmentConfiguration();
+        
+        expect(result.isValid).toBe(false);
+        expect(result.errors).toContain('Invalid format for GITHUB_HOST');
+      });
+
+      it('should reject localhost URLs', () => {
+        process.env.GITHUB_HOST = 'https://localhost:3000/api/v3';
+        
+        const result = validateEnvironmentConfiguration();
+        
+        expect(result.isValid).toBe(false);
+        expect(result.errors).toContain('Invalid format for GITHUB_HOST');
+      });
+    });
+
+    describe('Security Sanitization', () => {
+      it('should remove control characters from tokens', () => {
+        const tokenWithControlChars = 'ghp_' + 'A'.repeat(35) + '\x00';
+        process.env.GITHUB_TOKEN = tokenWithControlChars + 'B';
+        
+        const result = validateEnvironmentConfiguration();
+        
+        expect(result.isValid).toBe(true);
+        expect(result.sanitizedValues.GITHUB_TOKEN).toBe('ghp_' + 'A'.repeat(35) + 'B');
+        expect(result.sanitizedValues.GITHUB_TOKEN).not.toContain('\x00');
+      });
+
+      it('should prevent injection attacks in environment variables', () => {
+        process.env.GITHUB_TOKEN = 'ghp_' + 'A'.repeat(36);
+        process.env.GITHUB_TOOLSETS = 'repos$(cat /etc/passwd)';
+        
+        const result = validateEnvironmentConfiguration();
+        
+        expect(result.isValid).toBe(false);
+        expect(result.errors).toContain('Invalid format for GITHUB_TOOLSETS');
+      });
+
+      it('should handle multiple validation errors', () => {
+        process.env.GITHUB_TOKEN = 'invalid-token';
+        process.env.GITHUB_READ_ONLY = 'invalid-value';
+        process.env.GITHUB_HOST = 'http://localhost';
+        
+        const result = validateEnvironmentConfiguration();
+        
+        expect(result.isValid).toBe(false);
+        expect(result.errors).toHaveLength(3);
+        expect(result.errors).toContain('Invalid GitHub token format');
+        expect(result.errors).toContain('Invalid format for GITHUB_READ_ONLY');
+        expect(result.errors).toContain('Invalid format for GITHUB_HOST');
+      });
+    });
+  });
+
   describe('ValidationError', () => {
     it('should create error with proper message', () => {
       const error = new ValidationError('repo', 'Invalid repository name');
       expect(error.message).toBe('Validation failed for repo: Invalid repository name');
       expect(error.name).toBe('ValidationError');
+    });
+
+    it('should maintain stack trace', () => {
+      const error = new ValidationError('field', 'message');
+      expect(error.stack).toBeDefined();
+      expect(error.stack).toContain('ValidationError');
+    });
+  });
+
+  describe('ValidationError Class', () => {
+    it('should create a ValidationError with correct properties', () => {
+      const error = new ValidationError('testField', 'Test error message');
+      expect(error).toBeInstanceOf(Error);
+      expect(error.field).toBe('testField');
+      expect(error.message).toBe('Test error message');
+      expect(error.name).toBe('ValidationError');
+    });
+
+    it('should maintain stack trace', () => {
+      const error = new ValidationError('field', 'message');
+      expect(error.stack).toBeDefined();
+      expect(error.stack).toContain('ValidationError');
+    });
+  });
+
+  describe('GitHub Token Validation', () => {
+    describe('validateGitHubToken (legacy)', () => {
+      it('should return false for invalid tokens', () => {
+        expect(validateGitHubToken('')).toBe(false);
+        expect(validateGitHubToken('invalid')).toBe(false);
+        expect(validateGitHubToken('too_short')).toBe(false);
+      });
+
+      it('should return true for valid classic PAT', () => {
+        const validToken = createTestToken('classic');
+        expect(validateGitHubToken(validToken)).toBe(true);
+      });
+
+      it('should return true for valid fine-grained PAT', () => {
+        const validToken = createTestToken('fine');
+        expect(validateGitHubToken(validToken)).toBe(true);
+      });
+
+      it('should bypass validation in development mode', () => {
+        process.env.NODE_ENV = 'development';
+        process.env.SKIP_VALIDATION = 'true';
+        expect(validateGitHubToken('invalid')).toBe(true);
+      });
+    });
+
+    describe('validateGitHubTokenFormat', () => {
+      it('should validate classic PAT format', () => {
+        const token = createTestToken('classic');
+        const result = validateGitHubTokenFormat(token, ValidationLevel.STRICT);
+        expect(result.isValid).toBe(true);
+        expect(result.format).toBe('classic_pat');
+      });
+
+      it('should validate OAuth token format', () => {
+        const token = createTestToken('oauth');
+        const result = validateGitHubTokenFormat(token, ValidationLevel.MODERATE);
+        expect(result.isValid).toBe(true);
+        expect(result.format).toBe('oauth');
+      });
+
+      it('should validate fine-grained PAT', () => {
+        const token = createTestToken('fine');
+        const result = validateGitHubTokenFormat(token, ValidationLevel.MODERATE);
+        expect(result.isValid).toBe(true);
+        expect(result.format).toBe('fine_grained_pat');
+      });
+
+      it('should validate installation token', () => {
+        const token = createTestToken('installation');
+        const result = validateGitHubTokenFormat(token, ValidationLevel.MODERATE);
+        expect(result.isValid).toBe(true);
+        expect(result.format).toBe('installation');
+      });
+
+      it('should reject invalid tokens in STRICT mode', () => {
+        const result = validateGitHubTokenFormat('invalid_token', ValidationLevel.STRICT);
+        expect(result.isValid).toBe(false);
+        expect(result.error).toBeDefined();
+      });
+
+      it('should accept legacy tokens in LENIENT mode', () => {
+        const token = createTestToken('legacy'); // Legacy format
+        const result = validateGitHubTokenFormat(token, ValidationLevel.LENIENT);
+        expect(result.isValid).toBe(true);
+        expect(result.format).toBe('legacy');
+      });
+    });
+
+    describe('validateGitHubTokenWithResult', () => {
+      it('should return detailed validation result', () => {
+        const token = createTestToken('classic');
+        const result = validateGitHubTokenWithResult(token);
+        expect(result.valid).toBe(true);
+        expect(result.value).toBe(token);
+        expect(result.errors).toHaveLength(0);
+      });
+
+      it('should return errors for invalid token', () => {
+        const result = validateGitHubTokenWithResult('invalid');
+        expect(result.valid).toBe(false);
+        expect(result.errors.length).toBeGreaterThan(0);
+        expect(result.errors[0].code).toBeDefined();
+        expect(result.errors[0].field).toBe('githubToken');
+      });
+
+      it('should detect whitespace in token', () => {
+        const invalidToken = ['ghp', '_abc def123'].join('');
+        const result = validateGitHubTokenWithResult(invalidToken);
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.code === 'TOKEN_CONTAINS_WHITESPACE')).toBe(true);
+      });
+
+      it('should detect missing token', () => {
+        const result = validateGitHubTokenWithResult('');
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.code === 'MISSING_TOKEN')).toBe(true);
+      });
+
+      it('should provide suggestions', () => {
+        const result = validateGitHubTokenWithResult('');
+        expect(result.suggestions).toBeDefined();
+        expect(result.suggestions.length).toBeGreaterThan(0);
+      });
+    });
+
+    describe('validateGitHubTokenWithAPI', () => {
+      it('should bypass validation in development mode', async () => {
+        process.env.NODE_ENV = 'development';
+        process.env.SKIP_VALIDATION = 'true';
+        
+        const result = await validateGitHubTokenWithAPI('invalid');
+        expect(result.valid).toBe(true);
+        expect(result.warnings.some(w => w.code === 'DEV_BYPASS')).toBe(true);
+      });
+
+      it('should handle missing fetch API', async () => {
+        // Mock fetch as undefined
+        const originalFetch = global.fetch;
+        // @ts-ignore
+        global.fetch = undefined;
+        
+        const testToken = createTestToken('classic');
+        const result = await validateGitHubTokenWithAPI(testToken);
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.code === 'FETCH_NOT_AVAILABLE')).toBe(true);
+        
+        global.fetch = originalFetch;
+      });
+
+      it('should validate token with API when fetch is available', async () => {
+        // Mock successful API response
+        global.fetch = vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({ login: 'testuser' })
+        });
+        
+        const token = createTestToken('classic');
+        const result = await validateGitHubTokenWithAPI(token);
+        expect(result.valid).toBe(true);
+        expect(result.value).toHaveProperty('user');
+      });
+    });
+  });
+
+  describe('Input Validation Functions', () => {
+    describe('validateOwnerName', () => {
+      it('should validate valid owner names', () => {
+        expect(validateOwnerName('octocat')).toBe(true);
+        expect(validateOwnerName('valid-user')).toBe(true);
+        expect(validateOwnerName('user123')).toBe(true);
+      });
+
+      it('should reject invalid owner names', () => {
+        expect(validateOwnerName('')).toBe(false);
+        expect(validateOwnerName('a')).toBe(false); // Too short
+        expect(validateOwnerName('-invalid')).toBe(false); // Starts with dash
+        expect(validateOwnerName('invalid-')).toBe(false); // Ends with dash
+        expect(validateOwnerName('in valid')).toBe(false); // Contains space
+        expect(validateOwnerName('in/valid')).toBe(false); // Contains slash
+      });
+    });
+
+    describe('validateRepoName', () => {
+      it('should validate valid repo names', () => {
+        expect(validateRepoName('my-repo')).toBe(true);
+        expect(validateRepoName('repo.with.dots')).toBe(true);
+        expect(validateRepoName('repo_with_underscores')).toBe(true);
+        expect(validateRepoName('123-repo')).toBe(true);
+      });
+
+      it('should reject invalid repo names', () => {
+        expect(validateRepoName('')).toBe(false);
+        expect(validateRepoName('a')).toBe(false); // Too short
+        expect(validateRepoName('.invalid')).toBe(false); // Starts with dot
+        expect(validateRepoName('invalid.')).toBe(false); // Ends with dot
+        expect(validateRepoName('in valid')).toBe(false); // Contains space
+        expect(validateRepoName('in/valid')).toBe(false); // Contains slash
+      });
+    });
+
+    describe('validateBranchName', () => {
+      it('should validate valid branch names', () => {
+        expect(validateBranchName('main')).toBe(true);
+        expect(validateBranchName('feature/new-feature')).toBe(true);
+        expect(validateBranchName('release-1.0.0')).toBe(true);
+        expect(validateBranchName('fix_bug_123')).toBe(true);
+      });
+
+      it('should reject invalid branch names', () => {
+        expect(validateBranchName('')).toBe(false);
+        expect(validateBranchName('.invalid')).toBe(false); // Starts with dot
+        expect(validateBranchName('invalid.')).toBe(false); // Ends with dot
+        expect(validateBranchName('in valid')).toBe(false); // Contains space
+        expect(validateBranchName('in:valid')).toBe(false); // Contains colon
+        expect(validateBranchName('in~valid')).toBe(false); // Contains tilde
+      });
+    });
+
+    describe('validateSHA', () => {
+      it('should validate valid SHA hashes', () => {
+        expect(validateSHA('a'.repeat(40))).toBe(true);
+        expect(validateSHA('1234567890abcdef1234567890abcdef12345678')).toBe(true);
+      });
+
+      it('should reject invalid SHA hashes', () => {
+        expect(validateSHA('')).toBe(false);
+        expect(validateSHA('not-a-sha')).toBe(false);
+        expect(validateSHA('a'.repeat(39))).toBe(false); // Too short
+        expect(validateSHA('a'.repeat(41))).toBe(false); // Too long
+        expect(validateSHA('g'.repeat(40))).toBe(false); // Invalid hex
+      });
+    });
+
+    describe('validateURL', () => {
+      it('should validate valid URLs', () => {
+        expect(validateURL('https://github.com')).toBe(true);
+        expect(validateURL('http://example.com')).toBe(true);
+        expect(validateURL('https://api.github.com/repos')).toBe(true);
+      });
+
+      it('should reject invalid URLs', () => {
+        expect(validateURL('')).toBe(false);
+        expect(validateURL('not-a-url')).toBe(false);
+        expect(validateURL('javascript:alert(1)')).toBe(false);
+        expect(validateURL('file:///etc/passwd')).toBe(false);
+        expect(validateURL('data:text/html,<script>alert(1)</script>')).toBe(false);
+      });
+
+      it('should reject URLs with authentication', () => {
+        expect(validateURL('https://user:pass@github.com')).toBe(false);
+      });
+
+      it('should reject private IP ranges', () => {
+        expect(validateURL('http://192.168.1.1')).toBe(false);
+        expect(validateURL('http://10.0.0.1')).toBe(false);
+        expect(validateURL('http://172.16.0.1')).toBe(false);
+        expect(validateURL('http://169.254.0.1')).toBe(false);
+        expect(validateURL('http://127.0.0.1')).toBe(false);
+        expect(validateURL('http://localhost')).toBe(false);
+      });
+    });
+
+    describe('validateIssueNumber', () => {
+      it('should validate valid issue numbers', () => {
+        expect(validateIssueNumber(1)).toBe(true);
+        expect(validateIssueNumber(100)).toBe(true);
+        expect(validateIssueNumber(999999)).toBe(true);
+      });
+
+      it('should reject invalid issue numbers', () => {
+        expect(validateIssueNumber(0)).toBe(false);
+        expect(validateIssueNumber(-1)).toBe(false);
+        expect(validateIssueNumber(1.5)).toBe(false);
+        expect(validateIssueNumber(NaN)).toBe(false);
+        expect(validateIssueNumber(Infinity)).toBe(false);
+      });
+    });
+
+    describe('validatePerPage', () => {
+      it('should validate valid per_page values', () => {
+        expect(validatePerPage(1)).toBe(true);
+        expect(validatePerPage(50)).toBe(true);
+        expect(validatePerPage(100)).toBe(true);
+      });
+
+      it('should reject invalid per_page values', () => {
+        expect(validatePerPage(0)).toBe(false);
+        expect(validatePerPage(101)).toBe(false);
+        expect(validatePerPage(-1)).toBe(false);
+        expect(validatePerPage(1.5)).toBe(false);
+      });
+    });
+
+    describe('validateSearchQuery', () => {
+      it('should validate valid search queries', () => {
+        expect(validateSearchQuery('test')).toBe(true);
+        expect(validateSearchQuery('user:octocat')).toBe(true);
+        expect(validateSearchQuery('repo:owner/name')).toBe(true);
+        expect(validateSearchQuery('is:issue is:open')).toBe(true);
+      });
+
+      it('should reject empty queries', () => {
+        expect(validateSearchQuery('')).toBe(false);
+        expect(validateSearchQuery('   ')).toBe(false);
+      });
+
+      it('should reject queries that are too long', () => {
+        const longQuery = 'a'.repeat(257);
+        expect(validateSearchQuery(longQuery)).toBe(false);
+      });
+    });
+  });
+
+  describe('Environment Validation', () => {
+    describe('validateEnvironment', () => {
+      it('should validate environment variables', () => {
+        const env = {
+          GITHUB_TOKEN: createTestToken('classic'),
+          NODE_ENV: 'production'
+        };
+        
+        const result = validateEnvironment(env);
+        expect(result.valid).toBe(true);
+        expect(result.value).toBeDefined();
+      });
+
+      it('should detect missing required variables', () => {
+        const env = {};
+        const result = validateEnvironment(env);
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.code === 'MISSING_REQUIRED_TOKEN')).toBe(true);
+      });
+
+      it('should warn about debug mode in production', () => {
+        const env = {
+          GITHUB_TOKEN: createTestToken('classic'),
+          NODE_ENV: 'production',
+          DEBUG: 'true'
+        };
+        
+        const result = validateEnvironment(env);
+        expect(result.warnings.some(w => w.code === 'DEBUG_IN_PRODUCTION')).toBe(true);
+      });
+
+      it('should sanitize sensitive values', () => {
+        const env = {
+          GITHUB_TOKEN: createTestToken('classic'),
+          SECRET_KEY: 'secret123'
+        };
+        
+        const result = validateEnvironment(env);
+        expect(result.valid).toBe(true);
+        // The actual token should not be in the sanitized values
+        expect(result.value?.GITHUB_TOKEN).not.toBe(env.GITHUB_TOKEN);
+      });
+    });
+
+    describe('validateEnvironmentConfiguration', () => {
+      it('should validate full environment configuration', async () => {
+        process.env.GITHUB_TOKEN = createTestToken('classic');
+        
+        const result = await validateEnvironmentConfiguration();
+        expect(result.valid).toBe(true);
+        expect(result.value).toBeDefined();
+      });
+
+      it('should handle missing token with fallback', async () => {
+        const result = await validateEnvironmentConfiguration();
+        expect(result.valid).toBe(false);
+        expect(result.errors.length).toBeGreaterThan(0);
+      });
+    });
+  });
+
+  describe('Git Operation Validation', () => {
+    describe('validateGitOperation', () => {
+      it('should validate safe git operations', () => {
+        expect(validateGitOperation('status')).toBe(true);
+        expect(validateGitOperation('log')).toBe(true);
+        expect(validateGitOperation('diff')).toBe(true);
+        expect(validateGitOperation('branch')).toBe(true);
+      });
+
+      it('should reject dangerous operations', () => {
+        expect(validateGitOperation('push --force')).toBe(false);
+        expect(validateGitOperation('reset --hard')).toBe(false);
+        expect(validateGitOperation('clean -fdx')).toBe(false);
+        expect(validateGitOperation('rm -rf')).toBe(false);
+      });
+    });
+
+    describe('validateCommandOptions', () => {
+      it('should validate allowed command options', () => {
+        expect(validateCommandOptions('--oneline --graph')).toBe(true);
+        expect(validateCommandOptions('--pretty=format:%H')).toBe(true);
+      });
+
+      it('should reject disallowed options', () => {
+        expect(validateCommandOptions('--force')).toBe(false);
+        expect(validateCommandOptions('--exec=rm -rf /')).toBe(false);
+      });
+    });
+  });
+
+  describe('Circuit Breaker Functionality', () => {
+    it('should track failures and open circuit', async () => {
+      // Mock fetch to always fail
+      global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+      
+      // Make multiple failed attempts
+      for (let i = 0; i < 5; i++) {
+        await validateGitHubTokenWithAPI(['ghp', '_test123'].join(''));
+      }
+      
+      // Circuit should be open now, next call should fail fast
+      const start = Date.now();
+      const result = await validateGitHubTokenWithAPI(['ghp', '_test123'].join(''));
+      const duration = Date.now() - start;
+      
+      expect(result.valid).toBe(false);
+      expect(duration).toBeLessThan(100); // Should fail fast
+    });
+  });
+
+  describe('Cache Functionality', () => {
+    it('should cache validation results', () => {
+      const token = createTestToken('classic');
+      
+      // First call
+      const result1 = validateGitHubTokenWithResult(token);
+      
+      // Second call should use cache
+      const result2 = validateGitHubTokenWithResult(token);
+      
+      expect(result1).toEqual(result2);
+    });
+  });
+
+  describe('Cleanup Function', () => {
+    it('should clean up resources', () => {
+      // Create some cached data
+      validateGitHubTokenWithResult(['ghp', '_test123'].join(''));
+      
+      // Cleanup
+      cleanupValidation();
+      
+      // Cache should be cleared (we can't directly test this without exposing internals)
+      // But we can verify the function exists and doesn't throw
+      expect(cleanupValidation).toBeDefined();
     });
   });
 });

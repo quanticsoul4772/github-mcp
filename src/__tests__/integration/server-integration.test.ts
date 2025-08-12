@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { createMockOctokit, mockResponses } from '../mocks/octokit.js';
+import { createMockOctokit, staticMockResponses } from '../mocks/octokit.js';
 import { mockEnvVars, mockProcessExit, restoreProcessExit } from '../helpers/test-helpers.js';
 
 // Mock external dependencies
@@ -66,7 +66,7 @@ describe('GitHub MCP Server Integration', () => {
   describe('Server Initialization', () => {
     it('should initialize server with all tools registered', async () => {
       const { GitHubMCPServer } = await import('../../index.js');
-      new (GitHubMCPServer as any)();
+      new (GitHubMCPServer as any)(true);
 
       // Verify MCP server was created correctly
       expect(McpServer).toHaveBeenCalledWith({
@@ -89,7 +89,7 @@ describe('GitHub MCP Server Integration', () => {
 
     it('should start server and connect transport', async () => {
       const { GitHubMCPServer } = await import('../../index.js');
-      const server = new (GitHubMCPServer as any)();
+      const server = new (GitHubMCPServer as any)(true);
 
       await server.start();
 
@@ -103,13 +103,13 @@ describe('GitHub MCP Server Integration', () => {
 
     beforeEach(async () => {
       const { GitHubMCPServer } = await import('../../index.js');
-      server = new (GitHubMCPServer as any)();
+      server = new (GitHubMCPServer as any)(true);
     });
 
     it('should execute get_me tool successfully', async () => {
       // Setup mock response
       mockOctokit.rest.users.getAuthenticated.mockResolvedValue({
-        data: mockResponses.user,
+        data: staticMockResponses.user,
       });
 
       // Get the registered handler
@@ -120,13 +120,13 @@ describe('GitHub MCP Server Integration', () => {
 
       expect(result.content).toBeDefined();
       expect(result.content[0].type).toBe('text');
-      expect(result.content[0].text).toContain('test-user');
+      expect(result.content[0].text).toContain('Test User');
     });
 
     it('should execute get_file_contents tool successfully', async () => {
       // Setup mock response
       mockOctokit.rest.repos.getContent.mockResolvedValue({
-        data: mockResponses.fileContent,
+        data: staticMockResponses.fileContent,
       });
 
       // Get the registered handler
@@ -152,7 +152,7 @@ describe('GitHub MCP Server Integration', () => {
     it('should execute list_repositories tool successfully', async () => {
       // Setup mock response
       mockOctokit.rest.repos.listForAuthenticatedUser.mockResolvedValue({
-        data: [mockResponses.repo],
+        data: [staticMockResponses.repo],
       });
 
       // Get the registered handler
@@ -215,7 +215,7 @@ describe('GitHub MCP Server Integration', () => {
 
     it('should not register write tools in read-only mode', async () => {
       const { GitHubMCPServer } = await import('../../index.js');
-      new (GitHubMCPServer as any)();
+      new (GitHubMCPServer as any)(true);
 
       // Write tools should not be registered
       expect(registeredTools.has('create_or_update_file')).toBe(false);
@@ -244,7 +244,7 @@ describe('GitHub MCP Server Integration', () => {
 
     it('should only register tools from enabled toolsets', async () => {
       const { GitHubMCPServer } = await import('../../index.js');
-      new (GitHubMCPServer as any)();
+      new (GitHubMCPServer as any)(true);
 
       // Enabled toolsets should have their tools registered
       expect(registeredTools.has('get_file_contents')).toBe(true);
@@ -270,7 +270,7 @@ describe('GitHub MCP Server Integration', () => {
 
       const { GitHubMCPServer } = await import('../../index.js');
 
-      expect(() => new (GitHubMCPServer as any)()).toThrow('process.exit called');
+      expect(() => new (GitHubMCPServer as any)(true)).toThrow('Environment validation failed');
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
 
@@ -278,7 +278,7 @@ describe('GitHub MCP Server Integration', () => {
       mockServer.connect.mockRejectedValue(new Error('Connection failed'));
 
       const { GitHubMCPServer } = await import('../../index.js');
-      const server = new (GitHubMCPServer as any)();
+      const server = new (GitHubMCPServer as any)(true);
 
       await expect(server.start()).rejects.toThrow('Connection failed');
       expect(exitSpy).toHaveBeenCalledWith(1);
@@ -288,7 +288,7 @@ describe('GitHub MCP Server Integration', () => {
   describe('Tool Schema Conversion', () => {
     it('should convert JSON schemas to Zod schemas correctly', async () => {
       const { GitHubMCPServer } = await import('../../index.js');
-      const server = new (GitHubMCPServer as any)();
+      const server = new (GitHubMCPServer as any)(true);
 
       // Test the schema conversion with a sample schema
       const jsonSchema = {
@@ -320,16 +320,16 @@ describe('GitHub MCP Server Integration', () => {
 
     beforeEach(async () => {
       const { GitHubMCPServer } = await import('../../index.js');
-      server = new (GitHubMCPServer as any)();
+      server = new (GitHubMCPServer as any)(true);
     });
 
     it('should handle concurrent tool executions', async () => {
       // Setup mock responses
       mockOctokit.rest.users.getAuthenticated.mockResolvedValue({
-        data: mockResponses.user,
+        data: staticMockResponses.user,
       });
       mockOctokit.rest.repos.listForAuthenticatedUser.mockResolvedValue({
-        data: [mockResponses.repo],
+        data: [staticMockResponses.repo],
       });
 
       // Execute multiple tools concurrently
@@ -344,14 +344,14 @@ describe('GitHub MCP Server Integration', () => {
       const results = await Promise.all(promises);
 
       expect(results).toHaveLength(2);
-      expect(results[0].content[0].text).toContain('test-user');
+      expect(results[0].content[0].text).toContain('Test User');
       expect(results[1].content[0].text).toContain('test-repo');
     });
 
     it('should handle mixed success and error scenarios', async () => {
       // Setup mixed responses
       mockOctokit.rest.users.getAuthenticated.mockResolvedValue({
-        data: mockResponses.user,
+        data: staticMockResponses.user,
       });
       mockOctokit.rest.repos.get.mockRejectedValue(
         new Error('Repository not found')
@@ -367,7 +367,7 @@ describe('GitHub MCP Server Integration', () => {
       ]);
 
       expect(successResult.isError).toBeUndefined();
-      expect(successResult.content[0].text).toContain('test-user');
+      expect(successResult.content[0].text).toContain('Test User');
 
       expect(errorResult.isError).toBe(true);
       expect(errorResult.content[0].text).toContain('Repository not found');

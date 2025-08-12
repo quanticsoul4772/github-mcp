@@ -30,8 +30,8 @@ export interface LogEntry {
   error?: {
     name: string;
     message: string;
-    stack?: string;
-  };
+    stack?: string | undefined;
+  } | undefined;
 }
 
 /**
@@ -114,9 +114,8 @@ export class Logger {
       };
     }
 
-    // Output to stderr for non-info logs, stdout for info
-    const output = level === LogLevel.INFO ? console.log : console.error;
-    output(JSON.stringify(entry));
+    // Always output to stderr to avoid interfering with MCP protocol on stdout
+    console.error(JSON.stringify(entry));
   }
 
   /**
