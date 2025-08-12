@@ -31,6 +31,48 @@ import {
   cleanupValidation
 } from './validation.js';
 
+// Test token factory to avoid hardcoded secrets
+const createTestToken = (type: 'classic' | 'oauth' | 'fine' | 'installation' | 'legacy' = 'classic'): string => {
+  // Generate random alphanumeric characters for token content
+  const randomChar = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    return chars[Math.floor(Math.random() * chars.length)];
+  };
+  
+  const randomString = (length: number) => {
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += randomChar();
+    }
+    return result;
+  };
+  
+  switch (type) {
+    case 'classic':
+      // Classic PAT: ghp_ + 36 alphanumeric characters
+      return ['ghp', '_'].join('') + randomString(36);
+    case 'oauth':
+      // OAuth token: gho_ + 36 alphanumeric characters
+      return ['gho', '_'].join('') + randomString(36);
+    case 'fine':
+      // Fine-grained PAT: github_pat_ + 22 chars + _ + 59 chars = total 93 chars
+      return ['github', '_pat_'].join('') + '1'.repeat(22) + '_' + randomString(59);
+    case 'installation':
+      // Installation token: ghi_ + 36 alphanumeric characters
+      return ['ghi', '_'].join('') + randomString(36);
+    case 'legacy':
+      // Legacy token: 40 hex characters
+      const hexChars = '0123456789abcdef';
+      let hex = '';
+      for (let i = 0; i < 40; i++) {
+        hex += hexChars[Math.floor(Math.random() * hexChars.length)];
+      }
+      return hex;
+    default:
+      return ['ghp', '_'].join('') + randomString(36);
+  }
+};
+
 describe('Validation Module', () => {
   beforeEach(() => {
     // Clear all mocks before each test
@@ -72,12 +114,12 @@ describe('Validation Module', () => {
       });
 
       it('should return true for valid classic PAT', () => {
-        const validToken = ['ghp', '_'].join('') + 'a'.repeat(36);
+        const validToken = createTestToken('classic');
         expect(validateGitHubToken(validToken)).toBe(true);
       });
 
       it('should return true for valid fine-grained PAT', () => {
-        const validToken = ['github', '_pat_'].join('') + 'a'.repeat(82);
+        const validToken = createTestToken('fine');
         expect(validateGitHubToken(validToken)).toBe(true);
       });
 
@@ -90,28 +132,28 @@ describe('Validation Module', () => {
 
     describe('validateGitHubTokenFormat', () => {
       it('should validate classic PAT format', () => {
-        const token = ['ghp', '_'].join('') + 'a'.repeat(36);
+        const token = createTestToken('classic');
         const result = validateGitHubTokenFormat(token, ValidationLevel.STRICT);
         expect(result.isValid).toBe(true);
         expect(result.format).toBe('classic_pat');
       });
 
       it('should validate OAuth token format', () => {
-        const token = ['gho', '_'].join('') + 'a'.repeat(36);
+        const token = createTestToken('oauth');
         const result = validateGitHubTokenFormat(token, ValidationLevel.MODERATE);
         expect(result.isValid).toBe(true);
         expect(result.format).toBe('oauth');
       });
 
       it('should validate fine-grained PAT', () => {
-        const token = ['github', '_pat_'].join('') + '1'.repeat(22) + '_' + 'a'.repeat(59);
+        const token = createTestToken('fine');
         const result = validateGitHubTokenFormat(token, ValidationLevel.MODERATE);
         expect(result.isValid).toBe(true);
         expect(result.format).toBe('fine_grained_pat');
       });
 
       it('should validate installation token', () => {
-        const token = ['ghi', '_'].join('') + 'a'.repeat(36);
+        const token = createTestToken('installation');
         const result = validateGitHubTokenFormat(token, ValidationLevel.MODERATE);
         expect(result.isValid).toBe(true);
         expect(result.format).toBe('installation');
@@ -124,7 +166,7 @@ describe('Validation Module', () => {
       });
 
       it('should accept legacy tokens in LENIENT mode', () => {
-        const token = 'a'.repeat(40); // Legacy format
+        const token = createTestToken('legacy'); // Legacy format
         const result = validateGitHubTokenFormat(token, ValidationLevel.LENIENT);
         expect(result.isValid).toBe(true);
         expect(result.format).toBe('legacy');
@@ -133,7 +175,7 @@ describe('Validation Module', () => {
 
     describe('validateGitHubTokenWithResult', () => {
       it('should return detailed validation result', () => {
-        const token = ['ghp', '_'].join('') + 'a'.repeat(36);
+        const token = createTestToken('classic');
         const result = validateGitHubTokenWithResult(token);
         expect(result.valid).toBe(true);
         expect(result.value).toBe(token);
@@ -149,7 +191,8 @@ describe('Validation Module', () => {
       });
 
       it('should detect whitespace in token', () => {
-        const result = validateGitHubTokenWithResult(['ghp', '_abc def123'].join(''));
+        const invalidToken = ['ghp', '_abc def123'].join('');
+        const result = validateGitHubTokenWithResult(invalidToken);
         expect(result.valid).toBe(false);
         expect(result.errors.some(e => e.code === 'TOKEN_CONTAINS_WHITESPACE')).toBe(true);
       });
@@ -183,7 +226,8 @@ describe('Validation Module', () => {
         // @ts-ignore
         global.fetch = undefined;
         
-        const result = await validateGitHubTokenWithAPI(['ghp', '_valid123'].join(''));
+        const testToken = createTestToken('classic');
+        const result = await validateGitHubTokenWithAPI(testToken);
         expect(result.valid).toBe(false);
         expect(result.errors.some(e => e.code === 'FETCH_NOT_AVAILABLE')).toBe(true);
         
@@ -197,7 +241,7 @@ describe('Validation Module', () => {
           json: async () => ({ login: 'testuser' })
         });
         
-        const token = ['ghp', '_'].join('') + 'a'.repeat(36);
+        const token = createTestToken('classic');
         const result = await validateGitHubTokenWithAPI(token);
         expect(result.valid).toBe(true);
         expect(result.value).toHaveProperty('user');
@@ -400,7 +444,7 @@ describe('Validation Module', () => {
     describe('validateEnvironment', () => {
       it('should validate environment variables', () => {
         const env = {
-          GITHUB_TOKEN: ['ghp', '_'].join('') + 'a'.repeat(36),
+          GITHUB_TOKEN: createTestToken('classic'),
           NODE_ENV: 'production'
         };
         
@@ -418,7 +462,7 @@ describe('Validation Module', () => {
 
       it('should warn about debug mode in production', () => {
         const env = {
-          GITHUB_TOKEN: ['ghp', '_'].join('') + 'a'.repeat(36),
+          GITHUB_TOKEN: createTestToken('classic'),
           NODE_ENV: 'production',
           DEBUG: 'true'
         };
@@ -429,7 +473,7 @@ describe('Validation Module', () => {
 
       it('should sanitize sensitive values', () => {
         const env = {
-          GITHUB_TOKEN: ['ghp', '_'].join('') + 'a'.repeat(36),
+          GITHUB_TOKEN: createTestToken('classic'),
           SECRET_KEY: 'secret123'
         };
         
@@ -442,7 +486,7 @@ describe('Validation Module', () => {
 
     describe('validateEnvironmentConfiguration', () => {
       it('should validate full environment configuration', async () => {
-        process.env.GITHUB_TOKEN = ['ghp', '_'].join('') + 'a'.repeat(36);
+        process.env.GITHUB_TOKEN = createTestToken('classic');
         
         const result = await validateEnvironmentConfiguration();
         expect(result.valid).toBe(true);
@@ -509,7 +553,7 @@ describe('Validation Module', () => {
 
   describe('Cache Functionality', () => {
     it('should cache validation results', () => {
-      const token = ['ghp', '_'].join('') + 'a'.repeat(36);
+      const token = createTestToken('classic');
       
       // First call
       const result1 = validateGitHubTokenWithResult(token);
