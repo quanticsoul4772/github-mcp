@@ -261,17 +261,6 @@ GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxxx  # with repo, discussions, project scopes
 
 ### Code Search with Context
 
-```javascript
-// Using the advanced_code_search tool
-{
-  "tool": "search_across_repos",
-  "arguments": {
-    "query": "GraphQL mutation language:TypeScript",
-    "type": "CODE",
-    "first": 15
-  }
-}
-```
 
 **Expected Response:**
 ```json
