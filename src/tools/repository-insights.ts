@@ -1,5 +1,7 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import { typedGraphQL, createTypedHandler } from '../graphql-utils.js';
+import { RepositoryInsightsResponse, ContributionStatsResponse, CommitActivityResponse } from '../graphql-types.js';
 import {
   validateGraphQLInput,
   validateGraphQLVariableValue,
@@ -56,6 +58,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
         required: ['owner', 'repo'],
       },
     },
+    handler: createTypedHandler<{owner: string, repo: string, since?: string}, any>(async (args: {owner: string, repo: string, since?: string}) => {
     handler: async (args: any) => {
       // Validate and sanitize input parameters
       const validatedArgs = validateGraphQLInput(RepositoryInsightsSchema, args, 'get_repository_insights');
@@ -143,6 +146,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
             }
           `;
 
+      const result = await typedGraphQL<RepositoryInsightsResponse>(octokit, query, {
       // Validate GraphQL variables before execution
       const variables = {
         owner: validateGraphQLVariableValue(validatedArgs.owner, 'owner'),
@@ -197,6 +201,8 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
             },
           };
         },
+      };
+    }),
         { tool: 'get_repository_insights', owner: args.owner, repo: args.repo }
       );
     },

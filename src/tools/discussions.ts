@@ -1,5 +1,17 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import { typedGraphQL, createTypedHandler } from '../graphql-utils.js';
+import {
+  ListDiscussionsResponse,
+  GetDiscussionResponse,
+  GetDiscussionCommentsResponse,
+  ListDiscussionCategoriesResponse,
+  SearchDiscussionsResponse,
+  CreateDiscussionResponse,
+  AddDiscussionCommentResponse,
+  UpdateDiscussionResponse,
+  SimpleRepositoryResponse
+} from '../graphql-types.js';
 
 interface ListDiscussionsParams {
   owner: string;
@@ -117,7 +129,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: ListDiscussionsParams) => {
+    handler: createTypedHandler<ListDiscussionsParams, any>(async (args: ListDiscussionsParams) => {
       const query = `
         query($owner: String!, $repo: String!, $first: Int!, $after: String, $categoryId: ID) {
           repository(owner: $owner, name: $repo) {
@@ -153,6 +165,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         }
       `;
 
+      const result = await typedGraphQL<ListDiscussionsResponse>(octokit, query, {
       const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
@@ -167,7 +180,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         end_cursor: result.repository.discussions.pageInfo.endCursor,
         discussions: result.repository.discussions.nodes,
       };
-    },
+    }),
   });
 
   // Get discussion tool
@@ -194,7 +207,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         required: ['owner', 'repo', 'discussionNumber'],
       },
     },
-    handler: async (args: GetDiscussionParams) => {
+    handler: createTypedHandler<GetDiscussionParams, any>(async (args: GetDiscussionParams) => {
       const query = `
         query($owner: String!, $repo: String!, $number: Int!) {
           repository(owner: $owner, name: $repo) {
@@ -238,6 +251,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         }
       `;
 
+      const result = await typedGraphQL<GetDiscussionResponse>(octokit, query, {
       const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
@@ -245,7 +259,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
       });
 
       return result.repository.discussion;
-    },
+    }),
   });
 
   // Get discussion comments tool
