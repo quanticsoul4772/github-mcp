@@ -43,7 +43,7 @@ jobs:
 
       # HARD FAIL: Linting must pass
       - name: Run linter
-        run: npm run lint
+        run: npm run lint -- --max-warnings=0
 
       # HARD FAIL: Type checking must pass  
       - name: Run type checking
