@@ -191,6 +191,7 @@ async function runDemo() {
     const { coordinator, reportGenerator } = createAgentSystem();
     
     console.log(`🤖 Available agents: ${coordinator.getAgents().map((a: any) => a.name).join(', ')}`);
+    console.log(`🤖 Available agents: ${coordinator.getAgents().map(a => a.name).join(', ')}`);
     
     // Run coordinated analysis
     const result = await coordinator.coordinate({

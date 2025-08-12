@@ -152,6 +152,15 @@ export function createAgentTools(): ToolConfig<unknown, unknown>[] {
           return {
             summary: result.summary,
             findings: result.consolidatedFindings,
+          const MAX_FINDINGS = 200;
+          const totalFindings = result.consolidatedFindings.length;
+          const findings = totalFindings > MAX_FINDINGS
+            ? result.consolidatedFindings.slice(0, MAX_FINDINGS)
+            : result.consolidatedFindings;
+          return {
+            summary: { ...result.summary, totalFindings },
+            findings,
+            truncated: totalFindings > MAX_FINDINGS,
             reports: result.reports.map(r => ({
               agent: r.agentName,
               duration: r.duration,
@@ -483,6 +492,11 @@ export function createAgentTools(): ToolConfig<unknown, unknown>[] {
               break;
             case 'style':
               agents = ['static-analysis'];
+              config.includeCategories = [FindingCategory.PERFORMANCE_ISSUE];
+              break;
+            case 'style':
+              agents = ['static-analysis'];
+              config.includeCategories = [FindingCategory.CODE_SMELL, FindingCategory.BEST_PRACTICE];
               break;
             default:
               agents = []; // Use all agents
@@ -577,6 +591,13 @@ export function createAgentTools(): ToolConfig<unknown, unknown>[] {
             agent: args.agent,
             previousConfig: agent.getConfig(),
             newConfig: args.config,
+          const prevConfig = agent.getConfig();
+          agent.configure(args.config);
+          logger.info('Agent configured', { agent: args.agent, config: args.config });
+          return {
+            agent: args.agent,
+            previousConfig: prevConfig,
+            newConfig: agent.getConfig(),
             success: true
           };
 

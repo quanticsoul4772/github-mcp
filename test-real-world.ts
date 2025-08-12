@@ -8,6 +8,7 @@ import { withParameterValidation, getToolHelp } from './src/validation/parameter
 
 console.log('Phase 5: Real-World Testing\n');
 console.log('=' . repeat(50));
+console.log('='.repeat(50));
 
 async function testRealWorldScenarios() {
   console.log('\n1. Testing Tool Help Discovery');

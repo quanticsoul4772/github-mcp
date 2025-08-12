@@ -228,6 +228,9 @@ export class ReportGenerator {
     const severityOrder = [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW, Severity.INFO];
 
     return findings.sort((a, b) => {
+    const list = findings.slice();
+
+    return list.sort((a, b) => {
       switch (sortBy) {
         case 'severity':
           return severityOrder.indexOf(a.severity) - severityOrder.indexOf(b.severity);
@@ -724,6 +727,13 @@ export class ReportGenerator {
     const div = { innerHTML: '' } as any;
     div.textContent = text;
     return div.innerHTML;
+    const s = String(text);
+    return s
+      .replace(/&/g, '&')
+      .replace(/</g, '<')
+      .replace(/>/g, '>')
+      .replace(/"/g, '"')
+      .replace(/'/g, ''');
   }
 
   private escapeCsv(text: string): string {

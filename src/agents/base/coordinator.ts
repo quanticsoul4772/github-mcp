@@ -179,6 +179,15 @@ export class AgentCoordinator {
           }
           return agent.canAnalyze(request.target);
         });
+        .map(n => ({ name: n, agent: this.registry.get(n) }))
+        .filter(({ name, agent }) => {
+          if (!agent) {
+            logger.warn(`Requested agent not found: ${name}`);
+            return false;
+          }
+          return agent.canAnalyze(request.target);
+        })
+        .map(({ agent }) => agent as CodeAnalysisAgent);
     }
 
     // Otherwise, use all agents that can analyze the target

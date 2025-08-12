@@ -30,6 +30,8 @@ import { createProjectManagementTools } from './tools/project-management.js';
 import { createBatchOperationsTools } from './tools/batch-operations.js';
 import { createOptimizedRepositoryTools } from './tools/optimized-repositories.js';
 import { createAgentTools } from './agents/tools/agent-tools.js';
+import { createCacheManagementTools } from './tools/cache-management.js';
+import { validateEnvironmentConfiguration } from './validation.js';
 
 // Performance optimizations
 import { OptimizedAPIClient } from './optimized-api-client.js';
@@ -120,6 +122,11 @@ export class GitHubMCPServer {
         process.exit(1);
       } else if (testMode) {
         throw new Error('Environment validation failed: ' + envValidation.errors.join(', '));
+        // In test mode, avoid throwing in constructor to prevent side effects.
+        // Consumers can inspect `envValidation.errors` or `server` state, or throw during start().
+        logger.warn('Environment validation failed (test mode): ' + envValidation.errors.join(', '));
+
+        throw new Error('Environment validation failed: ' + envValidation.errors.join(', '));
       }
     }
 
@@ -171,6 +178,7 @@ export class GitHubMCPServer {
     this.optimizedClient = new OptimizedAPIClient({
       octokit: this.octokit,
       enableCache: process.env.GITHUB_ENABLE_CACHE !== 'false',
+      enableGraphQLCache: process.env.GITHUB_ENABLE_GRAPHQL_CACHE !== 'false',
       enableDeduplication: process.env.GITHUB_ENABLE_DEDUPLICATION !== 'false',
       enablePerformanceMonitoring: process.env.GITHUB_ENABLE_MONITORING !== 'false',
     });
@@ -536,7 +544,7 @@ export class GitHubMCPServer {
 
     // Register discussion tools
     if (this.enabledToolsets.has('discussions')) {
-      const discussionTools = createDiscussionTools(this.octokit, this.readOnly);
+      const discussionTools = createDiscussionTools(this.optimizedClient, this.readOnly);
       discussionTools.forEach(tool => this.registerTool(tool));
       // Discussion tools registered
     }
@@ -557,7 +565,7 @@ export class GitHubMCPServer {
 
     // GraphQL repository insights tools
     if (this.enabledToolsets.has('graphql_insights')) {
-      const insightsTools = createRepositoryInsightsTools(this.octokit, this.readOnly);
+      const insightsTools = createRepositoryInsightsTools(this.optimizedClient, this.readOnly);
       insightsTools.forEach(tool => this.registerTool(tool));
       // Repository Insights tools registered
     }
@@ -587,6 +595,11 @@ export class GitHubMCPServer {
     const healthTools = createHealthTools(this.healthManager);
     healthTools.forEach(tool => this.registerTool(tool));
     // Health monitoring tools registered
+
+    // Register cache management tools
+    const cacheManagementTools = createCacheManagementTools(this.optimizedClient);
+    cacheManagementTools.forEach(tool => this.registerTool(tool));
+    console.log(`  ✓ Cache management tools (${cacheManagementTools.length})`);
 
     // Register monitoring and observability tools
     if (this.enabledToolsets.has('monitoring')) {
@@ -667,3 +680,4 @@ export class GitHubMCPServer {
 
 // Export for testing and external usage
 // GitHubMCPServer is already exported above
+export { GitHubMCPServer };
