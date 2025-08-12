@@ -1,5 +1,72 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import {
+  ListPullRequestsParams,
+  CreatePullRequestParams,
+  UpdatePullRequestParams,
+  MergePullRequestParams,
+  GetPullRequestDiffParams,
+  DismissPullRequestReviewParams,
+  CreatePullRequestReviewCommentParams
+} from '../tool-types.js';
+
+interface GetPullRequestParams {
+  owner: string;
+  repo: string;
+  pullNumber: number;
+}
+
+interface GetPullRequestCommitsParams {
+  owner: string;
+  repo: string;
+  pullNumber: number;
+  page?: number;
+  perPage?: number;
+}
+
+interface GetPullRequestFilesParams {
+  owner: string;
+  repo: string;
+  pullNumber: number;
+  page?: number;
+  perPage?: number;
+}
+
+interface GetPullRequestReviewsParams {
+  owner: string;
+  repo: string;
+  pullNumber: number;
+  page?: number;
+  perPage?: number;
+}
+
+interface CreatePullRequestReviewParams {
+  owner: string;
+  repo: string;
+  pullNumber: number;
+  event?: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT';
+  body?: string;
+  comments?: Array<{
+    path: string;
+    position: number;
+    body: string;
+  }>;
+}
+
+interface AddPullRequestCommentParams {
+  owner: string;
+  repo: string;
+  pullNumber: number;
+  body: string;
+}
+
+interface RequestPullRequestReviewersParams {
+  owner: string;
+  repo: string;
+  pullNumber: number;
+  reviewers?: string[];
+  team_reviewers?: string[];
+}
 
 export function createPullRequestTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
@@ -28,7 +95,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         required: ['owner', 'repo', 'pullNumber'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetPullRequestParams) => {
       const { data } = await octokit.pulls.get({
         owner: args.owner,
         repo: args.repo,
@@ -131,7 +198,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: ListPullRequestsParams) => {
       const { data } = await octokit.pulls.list({
         owner: args.owner,
         repo: args.repo,
@@ -144,7 +211,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         per_page: args.perPage,
       });
 
-      return data.map((pr: any) => ({
+      return data.map((pr) => ({
         number: pr.number,
         title: pr.title,
         state: pr.state,
@@ -167,10 +234,10 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
     },
   });
 
-  // Get pull request files tool
+  // List pull request files tool
   tools.push({
     tool: {
-      name: 'get_pull_request_files',
+      name: 'list_pull_request_files',
       description: 'Get files changed in a pull request',
       inputSchema: {
         type: 'object',
@@ -202,7 +269,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         required: ['owner', 'repo', 'pullNumber'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetPullRequestFilesParams) => {
       const { data } = await octokit.pulls.listFiles({
         owner: args.owner,
         repo: args.repo,
@@ -211,7 +278,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         per_page: args.perPage,
       });
 
-      return data.map((file: any) => ({
+      return data.map((file) => ({
         filename: file.filename,
         status: file.status,
         additions: file.additions,
@@ -250,7 +317,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         required: ['owner', 'repo', 'pullNumber'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetPullRequestDiffParams) => {
       const response = await octokit.pulls.get({
         owner: args.owner,
         repo: args.repo,
@@ -266,10 +333,10 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
     },
   });
 
-  // Get pull request comments tool
+  // List pull request comments tool
   tools.push({
     tool: {
-      name: 'get_pull_request_comments',
+      name: 'list_pull_request_comments',
       description: 'Get review comments on a pull request',
       inputSchema: {
         type: 'object',
@@ -290,14 +357,14 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         required: ['owner', 'repo', 'pullNumber'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetPullRequestParams) => {
       const { data } = await octokit.pulls.listReviewComments({
         owner: args.owner,
         repo: args.repo,
         pull_number: args.pullNumber,
       });
 
-      return data.map((comment: any) => ({
+      return data.map((comment) => ({
         id: comment.id,
         body: comment.body,
         path: comment.path,
@@ -315,10 +382,10 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
     },
   });
 
-  // Get pull request reviews tool
+  // List pull request reviews tool
   tools.push({
     tool: {
-      name: 'get_pull_request_reviews',
+      name: 'list_pull_request_reviews',
       description: 'Get reviews on a pull request',
       inputSchema: {
         type: 'object',
@@ -339,14 +406,14 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         required: ['owner', 'repo', 'pullNumber'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetPullRequestReviewsParams) => {
       const { data } = await octokit.pulls.listReviews({
         owner: args.owner,
         repo: args.repo,
         pull_number: args.pullNumber,
       });
 
-      return data.map((review: any) => ({
+      return data.map((review) => ({
         id: review.id,
         user: {
           login: review.user?.login,
@@ -383,7 +450,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         required: ['owner', 'repo', 'pullNumber'],
       },
     },
-    handler: async (args: any) => {
+    handler: async (args: GetPullRequestParams) => {
       // First get the PR to get the head SHA
       const { data: pr } = await octokit.pulls.get({
         owner: args.owner,
@@ -400,7 +467,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
 
       return {
         state: status.state,
-        statuses: status.statuses.map((s: any) => ({
+        statuses: status.statuses.map((s) => ({
           state: s.state,
           description: s.description,
           context: s.context,
@@ -478,7 +545,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
       return {
         total_count: data.total_count,
         incomplete_results: data.incomplete_results,
-        items: data.items.map((item: any) => ({
+        items: data.items.map((item) => ({
           number: item.number,
           title: item.title,
           state: item.state,
@@ -540,7 +607,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
           required: ['owner', 'repo', 'title', 'head', 'base'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: CreatePullRequestParams) => {
         const { data } = await octokit.pulls.create({
           owner: args.owner,
           repo: args.repo,
@@ -615,7 +682,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
           required: ['owner', 'repo', 'pullNumber'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: UpdatePullRequestParams) => {
         const { data } = await octokit.pulls.update({
           owner: args.owner,
           repo: args.repo,
@@ -675,7 +742,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
           required: ['owner', 'repo', 'pullNumber'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: MergePullRequestParams) => {
         const { data } = await octokit.pulls.merge({
           owner: args.owner,
           repo: args.repo,
@@ -696,7 +763,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
     // Create pull request review tool
     tools.push({
       tool: {
-        name: 'create_and_submit_pull_request_review',
+        name: 'create_pull_request_review',
         description: 'Create and submit a pull request review',
         inputSchema: {
           type: 'object',
@@ -730,7 +797,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
           required: ['owner', 'repo', 'pullNumber', 'body', 'event'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: CreatePullRequestReviewParams) => {
         const { data } = await octokit.pulls.createReview({
           owner: args.owner,
           repo: args.repo,
@@ -781,7 +848,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
           required: ['owner', 'repo', 'pullNumber'],
         },
       },
-      handler: async (args: any) => {
+      handler: async (args: GetPullRequestParams) => {
         const { data } = await octokit.pulls.updateBranch({
           owner: args.owner,
           repo: args.repo,
@@ -792,6 +859,132 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         return {
           message: data.message,
           url: data.url,
+        };
+      },
+    });
+
+    // Dismiss pull request review tool
+    tools.push({
+      tool: {
+        name: 'dismiss_pull_request_review',
+        description: 'Dismiss a pull request review',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            owner: {
+              type: 'string',
+              description: 'Repository owner',
+            },
+            repo: {
+              type: 'string',
+              description: 'Repository name',
+            },
+            pullNumber: {
+              type: 'number',
+              description: 'Pull request number',
+            },
+            review_id: {
+              type: 'number',
+              description: 'Review ID to dismiss',
+            },
+            message: {
+              type: 'string',
+              description: 'Dismissal message',
+            },
+          },
+          required: ['owner', 'repo', 'pullNumber', 'review_id', 'message'],
+        },
+      },
+      handler: async (args: DismissPullRequestReviewParams) => {
+        const { data } = await octokit.pulls.dismissReview({
+          owner: args.owner,
+          repo: args.repo,
+          pull_number: args.pullNumber,
+          review_id: args.review_id,
+          message: args.message,
+        });
+
+        return {
+          id: data.id,
+          state: data.state,
+          user: {
+            login: data.user?.login,
+          },
+          body: data.body,
+          submitted_at: data.submitted_at,
+          html_url: data.html_url,
+        };
+      },
+    });
+
+    // Create pull request review comment tool
+    tools.push({
+      tool: {
+        name: 'create_pull_request_review_comment',
+        description: 'Create a review comment on a pull request',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            owner: {
+              type: 'string',
+              description: 'Repository owner',
+            },
+            repo: {
+              type: 'string',
+              description: 'Repository name',
+            },
+            pullNumber: {
+              type: 'number',
+              description: 'Pull request number',
+            },
+            body: {
+              type: 'string',
+              description: 'Comment body',
+            },
+            commit_id: {
+              type: 'string',
+              description: 'SHA of the commit to comment on',
+            },
+            path: {
+              type: 'string',
+              description: 'Relative path of the file to comment on',
+            },
+            line: {
+              type: 'number',
+              description: 'Line number in the diff to comment on',
+            },
+            side: {
+              type: 'string',
+              description: 'Side of the diff',
+              enum: ['LEFT', 'RIGHT'],
+            },
+          },
+          required: ['owner', 'repo', 'pullNumber', 'body', 'commit_id', 'path', 'line'],
+        },
+      },
+      handler: async (args: CreatePullRequestReviewCommentParams) => {
+        const { data } = await octokit.pulls.createReviewComment({
+          owner: args.owner,
+          repo: args.repo,
+          pull_number: args.pullNumber,
+          body: args.body,
+          commit_id: args.commit_id,
+          path: args.path,
+          line: args.line,
+          side: args.side,
+        });
+
+        return {
+          id: data.id,
+          body: data.body,
+          path: data.path,
+          line: data.line,
+          side: data.side,
+          user: {
+            login: data.user?.login,
+          },
+          created_at: data.created_at,
+          html_url: data.html_url,
         };
       },
     });

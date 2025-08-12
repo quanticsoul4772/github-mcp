@@ -18,8 +18,26 @@ updates:
       prefix-development: "chore"
       include: "scope"
     groups:
-      development-dependencies:
+      dev-dependencies:
+        patterns:
+          - "@types/*"
+          - "@typescript-eslint/*"
+          - "@vitest/*"
+          - "eslint*"
+          - "prettier*"
+          - "husky"
+          - "lint-staged"
+          - "commitlint*"
         dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+      testing-dependencies:
+        patterns:
+          - "*testing*"
+          - "vitest"
+          - "msw"
+          - "supertest"
         update-types:
           - "minor"
           - "patch"
