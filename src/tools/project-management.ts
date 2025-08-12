@@ -1,5 +1,13 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import {
+  validateGraphQLInput,
+  validateGraphQLVariableValue,
+  ProjectBoardsSchema,
+  MilestonesWithIssuesSchema,
+  CrossRepoProjectViewSchema,
+  GraphQLValidationError
+} from '../graphql-validation.js';
 import { withErrorHandling } from '../errors.js';
 
 export function createProjectManagementTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
@@ -32,6 +40,32 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
       },
     },
     handler: async (args: any) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(ProjectBoardsSchema, args, 'get_project_boards');
+      
+      const query = validatedArgs.repo ? `
+        query($owner: String!, $repo: String!, $first: Int!) {
+          repository(owner: $owner, name: $repo) {
+            projectsV2(first: $first) {
+              totalCount
+              nodes {
+                id
+                number
+                title
+                shortDescription
+                readme
+                url
+                createdAt
+                updatedAt
+                closed
+                public
+                owner {
+                  login
+                }
+                creator {
+                  login
+                }
+                items(first: 20) {
       return withErrorHandling(
         'get_project_boards',
         async () => {
@@ -244,6 +278,26 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
             }
           `;
 
+      // Validate GraphQL variables before execution
+      const variables = {
+        owner: validateGraphQLVariableValue(validatedArgs.owner, 'owner'),
+        repo: validatedArgs.repo ? validateGraphQLVariableValue(validatedArgs.repo, 'repo') : undefined,
+        first: validateGraphQLVariableValue(validatedArgs.first || 25, 'first'),
+      };
+      
+      const result: any = await octokit.graphql(query, variables);
+
+      let projects;
+      if (validatedArgs.repo) {
+        projects = result.repository?.projectsV2;
+      } else {
+        // Try user first, then organization
+        projects = result.user?.projectsV2 || result.organization?.projectsV2;
+      }
+
+      if (!projects) {
+        throw new Error(`No projects found for ${validatedArgs.owner}`);
+      }
       const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
@@ -312,6 +366,30 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
       },
     },
     handler: async (args: any) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(MilestonesWithIssuesSchema, args, 'get_milestones_with_issues');
+      
+      const query = `
+        query($owner: String!, $repo: String!, $first: Int!, $state: MilestoneState) {
+          repository(owner: $owner, name: $repo) {
+            milestones(first: $first, states: [$state], orderBy: {field: CREATED_AT, direction: DESC}) {
+              totalCount
+              nodes {
+                id
+                number
+                title
+                description
+                state
+                url
+                createdAt
+                updatedAt
+                dueOn
+                closedAt
+                creator {
+                  login
+                  avatarUrl
+                }
+                issues(first: 50) {
       return withErrorHandling(
         'get_milestones_with_issues',
         async () => {
@@ -393,6 +471,15 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
             }
           `;
 
+      // Validate GraphQL variables before execution
+      const variables = {
+        owner: validateGraphQLVariableValue(validatedArgs.owner, 'owner'),
+        repo: validateGraphQLVariableValue(validatedArgs.repo, 'repo'),
+        first: validateGraphQLVariableValue(validatedArgs.first || 10, 'first'),
+        state: validatedArgs.state ? validateGraphQLVariableValue(validatedArgs.state, 'state') : undefined,
+      };
+      
+      const result: any = await octokit.graphql(query, variables);
       const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
@@ -498,6 +585,11 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
       },
     },
     handler: async (args: any) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(CrossRepoProjectViewSchema, args, 'get_cross_repo_project_view');
+      
+      const repositories = validatedArgs.repositories;
+      const results = [];
       return withErrorHandling(
         'get_cross_repo_project_view',
         async () => {
@@ -634,6 +726,14 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
             }
           }
 
+        // Validate GraphQL variables before execution
+        const variables = {
+          owner: validateGraphQLVariableValue(repoInfo.owner, 'owner'),
+          repo: validateGraphQLVariableValue(repoInfo.repo, 'repo'),
+          states: validatedArgs.state ? [validateGraphQLVariableValue(validatedArgs.state, 'state')] : ['OPEN'],
+        };
+        
+        const result: any = await octokit.graphql(query, variables);
         const result: any = await (octokit as any).graphqlWithComplexity(query, {
           owner: repoInfo.owner,
           repo: repoInfo.repo,
@@ -666,6 +766,39 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
               );
             }
 
+        // Filter by labels
+        if (validatedArgs.labels && validatedArgs.labels.length > 0) {
+          filteredIssues = filteredIssues.filter((issue: any) =>
+            validatedArgs.labels.some((label: string) =>
+              issue.labels.nodes.some((issueLabel: any) => issueLabel.name === label)
+            )
+          );
+          filteredPRs = filteredPRs.filter((pr: any) =>
+            validatedArgs.labels.some((label: string) =>
+              pr.labels.nodes.some((prLabel: any) => prLabel.name === label)
+            )
+          );
+        }
+
+        // Filter by assignee
+        if (validatedArgs.assignee) {
+          filteredIssues = filteredIssues.filter((issue: any) =>
+            issue.assignees.nodes.some((assignee: any) => assignee.login === validatedArgs.assignee)
+          );
+          filteredPRs = filteredPRs.filter((pr: any) =>
+            pr.assignees.nodes.some((assignee: any) => assignee.login === validatedArgs.assignee)
+          );
+        }
+
+        // Filter by milestone
+        if (validatedArgs.milestone) {
+          filteredIssues = filteredIssues.filter((issue: any) => 
+            issue.milestone?.title === validatedArgs.milestone
+          );
+          filteredPRs = filteredPRs.filter((pr: any) => 
+            pr.milestone?.title === validatedArgs.milestone
+          );
+        }
             // Filter by assignee
             if (args.assignee) {
               filteredIssues = filteredIssues.filter((issue: any) =>

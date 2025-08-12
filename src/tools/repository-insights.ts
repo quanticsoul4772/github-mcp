@@ -1,5 +1,13 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import {
+  validateGraphQLInput,
+  validateGraphQLVariableValue,
+  RepositoryInsightsSchema,
+  ContributionStatsSchema,
+  CommitActivitySchema,
+  GraphQLValidationError
+} from '../graphql-validation.js';
 import { withErrorHandling } from '../errors.js';
 
 export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
@@ -30,6 +38,34 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
       },
     },
     handler: async (args: any) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(RepositoryInsightsSchema, args, 'get_repository_insights');
+      
+      const query = `
+        query($owner: String!, $repo: String!) {
+          repository(owner: $owner, name: $repo) {
+            name
+            description
+            stargazerCount
+            forkCount
+            watchers {
+              totalCount
+            }
+            issues {
+              totalCount
+            }
+            pullRequests {
+              totalCount
+            }
+            releases {
+              totalCount
+            }
+            languages(first: 10, orderBy: {field: SIZE, direction: DESC}) {
+              edges {
+                size
+                node {
+                  name
+                  color
       return withErrorHandling(
         'get_repository_insights',
         async () => {
@@ -88,6 +124,13 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
             }
           `;
 
+      // Validate GraphQL variables before execution
+      const variables = {
+        owner: validateGraphQLVariableValue(validatedArgs.owner, 'owner'),
+        repo: validateGraphQLVariableValue(validatedArgs.repo, 'repo'),
+      };
+      
+      const result: any = await octokit.graphql(query, variables);
       const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
@@ -167,6 +210,28 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
       },
     },
     handler: async (args: any) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(ContributionStatsSchema, args, 'get_contribution_stats');
+      
+      const query = `
+        query($owner: String!, $repo: String!, $first: Int!) {
+          repository(owner: $owner, name: $repo) {
+            collaborators(first: $first, affiliation: ALL) {
+              totalCount
+              nodes {
+                login
+                name
+                email
+                avatarUrl
+                url
+                company
+                location
+                bio
+                contributionsCollection {
+                  totalCommitContributions
+                  totalIssueContributions
+                  totalPullRequestContributions
+                  totalPullRequestReviewContributions
       return withErrorHandling(
         'get_contribution_stats',
         async () => {
@@ -221,6 +286,14 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
             first: args.first || 25,
           });
 
+      // Validate GraphQL variables before execution
+      const variables = {
+        owner: validateGraphQLVariableValue(validatedArgs.owner, 'owner'),
+        repo: validateGraphQLVariableValue(validatedArgs.repo, 'repo'),
+        first: validateGraphQLVariableValue(validatedArgs.first || 25, 'first'),
+      };
+      
+      const result: any = await octokit.graphql(query, variables);
       const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
@@ -308,6 +381,22 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
       },
     },
     handler: async (args: any) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(CommitActivitySchema, args, 'get_commit_activity');
+      
+      const query = `
+        query($owner: String!, $repo: String!, $branch: String, $since: GitTimestamp, $until: GitTimestamp) {
+          repository(owner: $owner, name: $repo) {
+            ref(qualifiedName: $branch) {
+              target {
+                ... on Commit {
+                  history(first: 100, since: $since, until: $until) {
+                    totalCount
+                    nodes {
+                      committedDate
+                      author {
+                        user {
+                          login
       return withErrorHandling(
         'get_commit_activity',
         async () => {
@@ -363,6 +452,16 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
             }
           `;
 
+      // Validate GraphQL variables before execution
+      const variables = {
+        owner: validateGraphQLVariableValue(validatedArgs.owner, 'owner'),
+        repo: validateGraphQLVariableValue(validatedArgs.repo, 'repo'),
+        branch: validatedArgs.branch ? validateGraphQLVariableValue(validatedArgs.branch, 'branch') : undefined,
+        since: validatedArgs.since ? validateGraphQLVariableValue(validatedArgs.since, 'since') : undefined,
+        until: validatedArgs.until ? validateGraphQLVariableValue(validatedArgs.until, 'until') : undefined,
+      };
+      
+      const result: any = await octokit.graphql(query, variables);
       const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,

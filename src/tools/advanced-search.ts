@@ -1,5 +1,13 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import {
+  validateGraphQLInput,
+  validateGraphQLVariableValue,
+  CrossRepoSearchSchema,
+  AdvancedRepoSearchSchema,
+  SearchWithRelationshipsSchema,
+  GraphQLValidationError
+} from '../graphql-validation.js';
 import { withErrorHandling } from '../errors.js';
 
 export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
@@ -37,6 +45,42 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
       },
     },
     handler: async (args: any) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(CrossRepoSearchSchema, args, 'search_across_repos');
+      
+      const query = `
+        query($searchQuery: String!, $type: SearchType!, $first: Int!, $after: String) {
+          search(query: $searchQuery, type: $type, first: $first, after: $after) {
+            repositoryCount
+            issueCount
+            userCount
+            discussionCount
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+            nodes {
+              ... on Repository {
+                id
+                name
+                nameWithOwner
+                description
+                url
+                stargazerCount
+                forkCount
+                createdAt
+                updatedAt
+                primaryLanguage {
+                  name
+                  color
+                }
+                owner {
+                  login
+                  avatarUrl
+                }
+                licenseInfo {
+                  name
+                  spdxId
       return withErrorHandling(
         'search_across_repos',
         async () => {
@@ -164,6 +208,15 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
             after: args.after,
           });
 
+      // Validate GraphQL variables before execution
+      const variables = {
+        searchQuery: validateGraphQLVariableValue(validatedArgs.query, 'searchQuery'),
+        type: validateGraphQLVariableValue(validatedArgs.type, 'type'),
+        first: validateGraphQLVariableValue(validatedArgs.first || 25, 'first'),
+        after: validatedArgs.after ? validateGraphQLVariableValue(validatedArgs.after, 'after') : undefined,
+      };
+      
+      const result: any = await octokit.graphql(query, variables);
       const result: any = await (octokit as any).graphqlWithComplexity(query, {
         searchQuery: args.query,
         type: args.type,
@@ -250,6 +303,32 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
       },
     },
     handler: async (args: any) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(AdvancedRepoSearchSchema, args, 'search_repositories_advanced');
+      
+      // Build search query with filters
+      let searchQuery = validatedArgs.query;
+      
+      if (validatedArgs.language) searchQuery += ` language:${validatedArgs.language}`;
+      if (validatedArgs.stars) searchQuery += ` stars:${validatedArgs.stars}`;
+      if (validatedArgs.forks) searchQuery += ` forks:${validatedArgs.forks}`;
+      if (validatedArgs.size) searchQuery += ` size:${validatedArgs.size}`;
+      if (validatedArgs.created) searchQuery += ` created:${validatedArgs.created}`;
+      if (validatedArgs.pushed) searchQuery += ` pushed:${validatedArgs.pushed}`;
+      if (validatedArgs.license) searchQuery += ` license:${validatedArgs.license}`;
+      if (validatedArgs.topics) {
+        for (const topic of validatedArgs.topics) {
+          searchQuery += ` topic:${topic}`;
+        }
+      }
+
+      const baseQuery = `
+        query($searchQuery: String!, $first: Int!) {
+          search(query: $searchQuery, type: REPOSITORY, first: $first) {
+            repositoryCount
+            pageInfo {
+              hasNextPage
+              endCursor
       return withErrorHandling(
         'search_repositories_advanced',
         async () => {
@@ -322,6 +401,27 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                       name
                       spdxId
                     }
+                  }
+                }
+                ${validatedArgs.includeMetrics ? `
+                issues {
+                  totalCount
+                }
+                pullRequests {
+                  totalCount
+                }
+                releases {
+                  totalCount
+                }
+                collaborators {
+                  totalCount
+                }
+                ` : ''}
+                defaultBranchRef {
+                  name
+                  target {
+                    ... on Commit {
+                      committedDate
                     repositoryTopics(first: 20) {
                       nodes {
                         topic {
@@ -357,6 +457,54 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
             }
           `;
 
+      // Validate GraphQL variables before execution
+      const variables = {
+        searchQuery: validateGraphQLVariableValue(searchQuery, 'searchQuery'),
+        first: validateGraphQLVariableValue(validatedArgs.first || 25, 'first'),
+      };
+      
+      const result: any = await octokit.graphql(baseQuery, variables);
+
+      return {
+        query: searchQuery,
+        totalCount: result.search.repositoryCount,
+        pageInfo: result.search.pageInfo,
+        repositories: result.search.nodes.map((repo: any) => ({
+          id: repo.id,
+          name: repo.name,
+          fullName: repo.nameWithOwner,
+          description: repo.description,
+          url: repo.url,
+          statistics: {
+            stars: repo.stargazerCount,
+            forks: repo.forkCount,
+            watchers: repo.watchers.totalCount,
+            size: repo.diskUsage,
+            ...(validatedArgs.includeMetrics && {
+              issues: repo.issues?.totalCount,
+              pullRequests: repo.pullRequests?.totalCount,
+              releases: repo.releases?.totalCount,
+              collaborators: repo.collaborators?.totalCount,
+            }),
+          },
+          languages: repo.languages.edges.map((edge: any) => ({
+            name: edge.node.name,
+            color: edge.node.color,
+            size: edge.size,
+          })),
+          primaryLanguage: repo.primaryLanguage,
+          owner: repo.owner,
+          license: repo.licenseInfo,
+          topics: repo.repositoryTopics.nodes.map((node: any) => node.topic.name),
+          dates: {
+            created: repo.createdAt,
+            updated: repo.updatedAt,
+            pushed: repo.pushedAt,
+            lastCommit: repo.defaultBranchRef?.target?.committedDate,
+          },
+          defaultBranch: repo.defaultBranchRef?.name,
+        })),
+      };
       const result: any = await (octokit as any).graphqlWithComplexity(baseQuery, {
         searchQuery,
         first: args.first || 25,
@@ -462,6 +610,53 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
       },
     },
     handler: async (args: any) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(SearchWithRelationshipsSchema, args, 'search_with_relationships');
+      
+      const query = `
+        query($searchQuery: String!, $entityType: SearchType!, $first: Int!, $repoLimit: Int!) {
+          search(query: $searchQuery, type: $entityType, first: $first) {
+            userCount
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+            nodes {
+              ... on User {
+                id
+                login
+                name
+                email
+                bio
+                company
+                location
+                url
+                avatarUrl
+                createdAt
+                updatedAt
+                ${validatedArgs.includeRepositories ? `
+                repositories(first: $repoLimit, orderBy: {field: STARGAZERS, direction: DESC}) {
+                  totalCount
+                  nodes {
+                    name
+                    nameWithOwner
+                    description
+                    url
+                    stargazerCount
+                    forkCount
+                    primaryLanguage {
+                      name
+                      color
+                    }
+                    createdAt
+                    updatedAt
+                  }
+                }
+                ` : ''}
+                ${validatedArgs.includeGists ? `
+                gists(first: 10) {
+                  totalCount
+                  nodes {
       return withErrorHandling(
         'search_with_relationships',
         async () => {
@@ -526,6 +721,32 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                     }
                     ` : ''}
                   }
+                }
+                ` : ''}
+                ${validatedArgs.includeFollowers ? `
+                followers {
+                  totalCount
+                }
+                following {
+                  totalCount
+                }
+                ` : ''}
+              }
+              ... on Organization {
+                id
+                login
+                name
+                email
+                description
+                location
+                url
+                avatarUrl
+                createdAt
+                updatedAt
+                ${validatedArgs.includeRepositories ? `
+                repositories(first: $repoLimit, orderBy: {field: STARGAZERS, direction: DESC}) {
+                  totalCount
+                  nodes {
                   ... on Organization {
                     id
                     login
@@ -572,6 +793,15 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
             repoLimit: args.repositoryLimit || 10,
           });
 
+      // Validate GraphQL variables before execution
+      const variables = {
+        searchQuery: validateGraphQLVariableValue(validatedArgs.query, 'searchQuery'),
+        entityType: validateGraphQLVariableValue(validatedArgs.entityType, 'entityType'),
+        first: validateGraphQLVariableValue(validatedArgs.first || 10, 'first'),
+        repoLimit: validateGraphQLVariableValue(validatedArgs.repositoryLimit || 10, 'repoLimit'),
+      };
+      
+      const result: any = await octokit.graphql(query, variables);
       const result: any = await (octokit as any).graphqlWithComplexity(query, {
         searchQuery: args.query,
         entityType: args.entityType,
