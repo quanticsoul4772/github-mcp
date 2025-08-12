@@ -66,9 +66,10 @@ jobs:
 
       # Upload coverage reports
       - name: Upload coverage to Codecov
-        if: matrix.node-version == '20.x'
+        if: matrix.node-version == '20.x' && env.CODECOV_TOKEN != ''
         uses: codecov/codecov-action@v5
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/lcov.info,./coverage/cobertura-coverage.xml
           flags: unittests
           name: codecov-umbrella
