@@ -88,6 +88,10 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
             }
           `;
 
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
+        owner: args.owner,
+        repo: args.repo,
+      });
           const result: any = await octokit.graphql(query, {
             owner: args.owner,
             repo: args.repo,
@@ -217,6 +221,11 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
             first: args.first || 25,
           });
 
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
+        owner: args.owner,
+        repo: args.repo,
+        first: args.first || 25,
+      });
           const repository = result.repository;
           if (!repository) {
             throw new Error(`Repository ${args.owner}/${args.repo} not found`);
@@ -354,6 +363,13 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
             }
           `;
 
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
+        owner: args.owner,
+        repo: args.repo,
+        branch: args.branch,
+        since: args.since,
+        until: args.until,
+      });
           const result: any = await octokit.graphql(query, {
             owner: args.owner,
             repo: args.repo,

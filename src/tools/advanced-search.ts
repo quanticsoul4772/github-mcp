@@ -164,6 +164,12 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
             after: args.after,
           });
 
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
+        searchQuery: args.query,
+        type: args.type,
+        first: args.first || 25,
+        after: args.after,
+      });
           if (!result.search) {
             throw new Error('Search query returned no results');
           }
@@ -351,6 +357,10 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
             }
           `;
 
+      const result: any = await (octokit as any).graphqlWithComplexity(baseQuery, {
+        searchQuery,
+        first: args.first || 25,
+      });
           const result: any = await octokit.graphql(baseQuery, {
             searchQuery,
             first: args.first || 25,
@@ -562,6 +572,12 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
             repoLimit: args.repositoryLimit || 10,
           });
 
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
+        searchQuery: args.query,
+        entityType: args.entityType,
+        first: args.first || 10,
+        repoLimit: args.repositoryLimit || 10,
+      });
           if (!result.search) {
             throw new Error('Entity search with relationships returned no results');
           }

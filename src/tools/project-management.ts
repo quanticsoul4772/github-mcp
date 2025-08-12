@@ -244,6 +244,11 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
             }
           `;
 
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
+        owner: args.owner,
+        repo: args.repo,
+        first: args.first || 25,
+      });
           const result: any = await octokit.graphql(query, {
             owner: args.owner,
             repo: args.repo,
@@ -388,6 +393,12 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
             }
           `;
 
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
+        owner: args.owner,
+        repo: args.repo,
+        first: args.first || 10,
+        state: args.state,
+      });
           const result: any = await octokit.graphql(query, {
             owner: args.owner,
             repo: args.repo,
@@ -623,6 +634,11 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
             }
           }
 
+        const result: any = await (octokit as any).graphqlWithComplexity(query, {
+          owner: repoInfo.owner,
+          repo: repoInfo.repo,
+          states: args.state ? [args.state] : ['OPEN'],
+        });
           // Apply filters
           let allIssues: any[] = [];
           let allPullRequests: any[] = [];

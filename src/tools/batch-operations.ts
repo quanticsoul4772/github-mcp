@@ -165,6 +165,7 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
             const repo = result[key];
             if (!repo) return null;
 
+      const result: any = await (octokit as any).graphqlWithComplexity(query);
             const processed: any = {
               id: repo.id,
               name: repo.name,
@@ -380,6 +381,7 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
             }
           `;
 
+      const result: any = await (octokit as any).graphqlWithComplexity(query);
           const result: any = await octokit.graphql(query);
           if (!result) {
             throw new Error('Batch user query returned no results');
@@ -522,7 +524,7 @@ export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean):
       );
 
       try {
-        const result: any = await octokit.graphql(fullQuery, allVariables);
+        const result: any = await (octokit as any).graphqlWithComplexity(fullQuery, allVariables);
         
         return {
           successful: true,
