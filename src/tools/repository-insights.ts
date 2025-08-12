@@ -1,5 +1,12 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import { OptimizedAPIClient } from '../optimized-api-client.js';
+import { cachedGraphQL, GraphQLTTL } from '../graphql-utils.js';
+
+export function createRepositoryInsightsTools(
+  client: Octokit | OptimizedAPIClient, 
+  readOnly: boolean
+): ToolConfig[] {
 import { typedGraphQL, createTypedHandler } from '../graphql-utils.js';
 import { RepositoryInsightsResponse, ContributionStatsResponse, CommitActivityResponse } from '../graphql-types.js';
 import {
@@ -146,6 +153,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
             }
           `;
 
+      const result: any = await cachedGraphQL(client, query, {
       const result = await typedGraphQL<RepositoryInsightsResponse>(octokit, query, {
       // Validate GraphQL variables before execution
       const variables = {
@@ -157,6 +165,9 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
       const result: any = await (octokit as any).graphqlWithComplexity(query, {
         owner: args.owner,
         repo: args.repo,
+      }, {
+        ttl: GraphQLTTL.REPOSITORY_INSIGHTS,
+        operation: 'get_repository_insights'
       });
           const result: any = await octokit.graphql(query, {
             owner: args.owner,
@@ -311,6 +322,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
             first: args.first || 25,
           });
 
+      const result: any = await cachedGraphQL(client, query, {
       // Validate GraphQL variables before execution
       const variables = {
         owner: validateGraphQLVariableValue(validatedArgs.owner, 'owner'),
@@ -323,6 +335,9 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
         owner: args.owner,
         repo: args.repo,
         first: args.first || 25,
+      }, {
+        ttl: GraphQLTTL.CONTRIBUTORS,
+        operation: 'get_contribution_stats'
       });
           const repository = result.repository;
           if (!repository) {
@@ -477,6 +492,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
             }
           `;
 
+      const result: any = await cachedGraphQL(client, query, {
       // Validate GraphQL variables before execution
       const variables = {
         owner: validateGraphQLVariableValue(validatedArgs.owner, 'owner'),
@@ -493,6 +509,9 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
         branch: args.branch,
         since: args.since,
         until: args.until,
+      }, {
+        ttl: GraphQLTTL.COMMIT_ACTIVITY,
+        operation: 'get_commit_activity'
       });
           const result: any = await octokit.graphql(query, {
             owner: args.owner,
