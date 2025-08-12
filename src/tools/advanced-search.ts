@@ -8,6 +8,7 @@ import {
   SearchWithRelationshipsSchema,
   GraphQLValidationError
 } from '../graphql-validation.js';
+import { withErrorHandling } from '../errors.js';
 
 export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
@@ -80,89 +81,132 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                 licenseInfo {
                   name
                   spdxId
+      return withErrorHandling(
+        'search_across_repos',
+        async () => {
+          const query = `
+            query($searchQuery: String!, $type: SearchType!, $first: Int!, $after: String) {
+              search(query: $searchQuery, type: $type, first: $first, after: $after) {
+                repositoryCount
+                issueCount
+                userCount
+                discussionCount
+                pageInfo {
+                  hasNextPage
+                  endCursor
                 }
-                repositoryTopics(first: 10) {
-                  nodes {
-                    topic {
+                nodes {
+                  ... on Repository {
+                    id
+                    name
+                    nameWithOwner
+                    description
+                    url
+                    stargazerCount
+                    forkCount
+                    createdAt
+                    updatedAt
+                    primaryLanguage {
                       name
+                      color
+                    }
+                    owner {
+                      login
+                      avatarUrl
+                    }
+                    licenseInfo {
+                      name
+                      spdxId
+                    }
+                    repositoryTopics(first: 10) {
+                      nodes {
+                        topic {
+                          name
+                        }
+                      }
                     }
                   }
-                }
-              }
-              ... on Issue {
-                id
-                number
-                title
-                body
-                url
-                state
-                createdAt
-                updatedAt
-                author {
-                  login
-                  avatarUrl
-                }
-                repository {
-                  name
-                  nameWithOwner
-                }
-                labels(first: 10) {
-                  nodes {
+                  ... on Issue {
+                    id
+                    number
+                    title
+                    body
+                    url
+                    state
+                    createdAt
+                    updatedAt
+                    author {
+                      login
+                      avatarUrl
+                    }
+                    repository {
+                      name
+                      nameWithOwner
+                    }
+                    labels(first: 10) {
+                      nodes {
+                        name
+                        color
+                      }
+                    }
+                    comments {
+                      totalCount
+                    }
+                  }
+                  ... on User {
+                    id
+                    login
                     name
-                    color
+                    email
+                    bio
+                    company
+                    location
+                    url
+                    avatarUrl
+                    createdAt
+                    followers {
+                      totalCount
+                    }
+                    following {
+                      totalCount
+                    }
+                    repositories {
+                      totalCount
+                    }
+                  }
+                  ... on Discussion {
+                    id
+                    number
+                    title
+                    body
+                    url
+                    createdAt
+                    updatedAt
+                    author {
+                      login
+                      avatarUrl
+                    }
+                    repository {
+                      name
+                      nameWithOwner
+                    }
+                    category {
+                      name
+                      slug
+                    }
+                    upvoteCount
                   }
                 }
-                comments {
-                  totalCount
-                }
-              }
-              ... on User {
-                id
-                login
-                name
-                email
-                bio
-                company
-                location
-                url
-                avatarUrl
-                createdAt
-                followers {
-                  totalCount
-                }
-                following {
-                  totalCount
-                }
-                repositories {
-                  totalCount
-                }
-              }
-              ... on Discussion {
-                id
-                number
-                title
-                body
-                url
-                createdAt
-                updatedAt
-                author {
-                  login
-                  avatarUrl
-                }
-                repository {
-                  name
-                  nameWithOwner
-                }
-                category {
-                  name
-                  slug
-                }
-                upvoteCount
               }
             }
-          }
-        }
-      `;
+          `;
+
+          const result: any = await octokit.graphql(query, {
+            searchQuery: args.query,
+            type: args.type,
+            first: args.first || 25,
+            after: args.after,
+          });
 
       // Validate GraphQL variables before execution
       const variables = {
@@ -173,17 +217,29 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
       };
       
       const result: any = await octokit.graphql(query, variables);
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
+        searchQuery: args.query,
+        type: args.type,
+        first: args.first || 25,
+        after: args.after,
+      });
+          if (!result.search) {
+            throw new Error('Search query returned no results');
+          }
 
-      return {
-        totalCount: {
-          repositories: result.search.repositoryCount,
-          issues: result.search.issueCount,
-          users: result.search.userCount,
-          discussions: result.search.discussionCount,
+          return {
+            totalCount: {
+              repositories: result.search.repositoryCount,
+              issues: result.search.issueCount,
+              users: result.search.userCount,
+              discussions: result.search.discussionCount,
+            },
+            pageInfo: result.search.pageInfo,
+            results: result.search.nodes,
+          };
         },
-        pageInfo: result.search.pageInfo,
-        results: result.search.nodes,
-      };
+        { tool: 'search_across_repos', query: args.query, type: args.type }
+      );
     },
   });
 
@@ -273,56 +329,77 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
             pageInfo {
               hasNextPage
               endCursor
+      return withErrorHandling(
+        'search_repositories_advanced',
+        async () => {
+          // Build search query with filters
+          let searchQuery = args.query;
+          
+          if (args.language) searchQuery += ` language:${args.language}`;
+          if (args.stars) searchQuery += ` stars:${args.stars}`;
+          if (args.forks) searchQuery += ` forks:${args.forks}`;
+          if (args.size) searchQuery += ` size:${args.size}`;
+          if (args.created) searchQuery += ` created:${args.created}`;
+          if (args.pushed) searchQuery += ` pushed:${args.pushed}`;
+          if (args.license) searchQuery += ` license:${args.license}`;
+          if (args.topics) {
+            for (const topic of args.topics) {
+              searchQuery += ` topic:${topic}`;
             }
-            nodes {
-              ... on Repository {
-                id
-                name
-                nameWithOwner
-                description
-                url
-                stargazerCount
-                forkCount
-                watchers {
-                  totalCount
+          }
+
+          const baseQuery = `
+            query($searchQuery: String!, $first: Int!) {
+              search(query: $searchQuery, type: REPOSITORY, first: $first) {
+                repositoryCount
+                pageInfo {
+                  hasNextPage
+                  endCursor
                 }
-                createdAt
-                updatedAt
-                pushedAt
-                diskUsage
-                primaryLanguage {
-                  name
-                  color
-                }
-                languages(first: 10, orderBy: {field: SIZE, direction: DESC}) {
-                  edges {
-                    size
-                    node {
+                nodes {
+                  ... on Repository {
+                    id
+                    name
+                    nameWithOwner
+                    description
+                    url
+                    stargazerCount
+                    forkCount
+                    watchers {
+                      totalCount
+                    }
+                    createdAt
+                    updatedAt
+                    pushedAt
+                    diskUsage
+                    primaryLanguage {
                       name
                       color
                     }
-                  }
-                }
-                owner {
-                  login
-                  avatarUrl
-                  ... on User {
-                    name
-                    company
-                  }
-                  ... on Organization {
-                    name
-                    description
-                  }
-                }
-                licenseInfo {
-                  name
-                  spdxId
-                }
-                repositoryTopics(first: 20) {
-                  nodes {
-                    topic {
+                    languages(first: 10, orderBy: {field: SIZE, direction: DESC}) {
+                      edges {
+                        size
+                        node {
+                          name
+                          color
+                        }
+                      }
+                    }
+                    owner {
+                      login
+                      avatarUrl
+                      ... on User {
+                        name
+                        company
+                      }
+                      ... on Organization {
+                        name
+                        description
+                      }
+                    }
+                    licenseInfo {
                       name
+                      spdxId
                     }
                   }
                 }
@@ -345,14 +422,40 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                   target {
                     ... on Commit {
                       committedDate
+                    repositoryTopics(first: 20) {
+                      nodes {
+                        topic {
+                          name
+                        }
+                      }
+                    }
+                    ${args.includeMetrics ? `
+                    issues {
+                      totalCount
+                    }
+                    pullRequests {
+                      totalCount
+                    }
+                    releases {
+                      totalCount
+                    }
+                    collaborators {
+                      totalCount
+                    }
+                    ` : ''}
+                    defaultBranchRef {
+                      name
+                      target {
+                        ... on Commit {
+                          committedDate
+                        }
+                      }
                     }
                   }
                 }
               }
             }
-          }
-        }
-      `;
+          `;
 
       // Validate GraphQL variables before execution
       const variables = {
@@ -402,6 +505,62 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
           defaultBranch: repo.defaultBranchRef?.name,
         })),
       };
+      const result: any = await (octokit as any).graphqlWithComplexity(baseQuery, {
+        searchQuery,
+        first: args.first || 25,
+      });
+          const result: any = await octokit.graphql(baseQuery, {
+            searchQuery,
+            first: args.first || 25,
+          });
+
+          if (!result.search) {
+            throw new Error('Advanced repository search returned no results');
+          }
+
+          return {
+            query: searchQuery,
+            totalCount: result.search.repositoryCount,
+            pageInfo: result.search.pageInfo,
+            repositories: result.search.nodes.map((repo: any) => ({
+              id: repo.id,
+              name: repo.name,
+              fullName: repo.nameWithOwner,
+              description: repo.description,
+              url: repo.url,
+              statistics: {
+                stars: repo.stargazerCount,
+                forks: repo.forkCount,
+                watchers: repo.watchers.totalCount,
+                size: repo.diskUsage,
+                ...(args.includeMetrics && {
+                  issues: repo.issues?.totalCount,
+                  pullRequests: repo.pullRequests?.totalCount,
+                  releases: repo.releases?.totalCount,
+                  collaborators: repo.collaborators?.totalCount,
+                }),
+              },
+              languages: repo.languages.edges.map((edge: any) => ({
+                name: edge.node.name,
+                color: edge.node.color,
+                size: edge.size,
+              })),
+              primaryLanguage: repo.primaryLanguage,
+              owner: repo.owner,
+              license: repo.licenseInfo,
+              topics: repo.repositoryTopics.nodes.map((node: any) => node.topic.name),
+              dates: {
+                created: repo.createdAt,
+                updated: repo.updatedAt,
+                pushed: repo.pushedAt,
+                lastCommit: repo.defaultBranchRef?.target?.committedDate,
+              },
+              defaultBranch: repo.defaultBranchRef?.name,
+            })),
+          };
+        },
+        { tool: 'search_repositories_advanced', query: args.query, filters: { language: args.language, stars: args.stars } }
+      );
     },
   });
 
@@ -498,11 +657,69 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                 gists(first: 10) {
                   totalCount
                   nodes {
+      return withErrorHandling(
+        'search_with_relationships',
+        async () => {
+          const query = `
+            query($searchQuery: String!, $entityType: SearchType!, $first: Int!, $repoLimit: Int!) {
+              search(query: $searchQuery, type: $entityType, first: $first) {
+                userCount
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
+                nodes {
+                  ... on User {
+                    id
+                    login
                     name
-                    description
+                    email
+                    bio
+                    company
+                    location
                     url
+                    avatarUrl
                     createdAt
-                    isPublic
+                    updatedAt
+                    ${args.includeRepositories ? `
+                    repositories(first: $repoLimit, orderBy: {field: STARGAZERS, direction: DESC}) {
+                      totalCount
+                      nodes {
+                        name
+                        nameWithOwner
+                        description
+                        url
+                        stargazerCount
+                        forkCount
+                        primaryLanguage {
+                          name
+                          color
+                        }
+                        createdAt
+                        updatedAt
+                      }
+                    }
+                    ` : ''}
+                    ${args.includeGists ? `
+                    gists(first: 10) {
+                      totalCount
+                      nodes {
+                        name
+                        description
+                        url
+                        createdAt
+                        isPublic
+                      }
+                    }
+                    ` : ''}
+                    ${args.includeFollowers ? `
+                    followers {
+                      totalCount
+                    }
+                    following {
+                      totalCount
+                    }
+                    ` : ''}
                   }
                 }
                 ` : ''}
@@ -530,29 +747,51 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                 repositories(first: $repoLimit, orderBy: {field: STARGAZERS, direction: DESC}) {
                   totalCount
                   nodes {
+                  ... on Organization {
+                    id
+                    login
                     name
-                    nameWithOwner
+                    email
                     description
+                    location
                     url
-                    stargazerCount
-                    forkCount
-                    primaryLanguage {
-                      name
-                      color
-                    }
+                    avatarUrl
                     createdAt
                     updatedAt
+                    ${args.includeRepositories ? `
+                    repositories(first: $repoLimit, orderBy: {field: STARGAZERS, direction: DESC}) {
+                      totalCount
+                      nodes {
+                        name
+                        nameWithOwner
+                        description
+                        url
+                        stargazerCount
+                        forkCount
+                        primaryLanguage {
+                          name
+                          color
+                        }
+                        createdAt
+                        updatedAt
+                      }
+                    }
+                    ` : ''}
+                    membersWithRole {
+                      totalCount
+                    }
                   }
-                }
-                ` : ''}
-                membersWithRole {
-                  totalCount
                 }
               }
             }
-          }
-        }
-      `;
+          `;
+
+          const result: any = await octokit.graphql(query, {
+            searchQuery: args.query,
+            entityType: args.entityType,
+            first: args.first || 10,
+            repoLimit: args.repositoryLimit || 10,
+          });
 
       // Validate GraphQL variables before execution
       const variables = {
@@ -563,12 +802,24 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
       };
       
       const result: any = await octokit.graphql(query, variables);
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
+        searchQuery: args.query,
+        entityType: args.entityType,
+        first: args.first || 10,
+        repoLimit: args.repositoryLimit || 10,
+      });
+          if (!result.search) {
+            throw new Error('Entity search with relationships returned no results');
+          }
 
-      return {
-        totalCount: result.search.userCount,
-        pageInfo: result.search.pageInfo,
-        entities: result.search.nodes,
-      };
+          return {
+            totalCount: result.search.userCount,
+            pageInfo: result.search.pageInfo,
+            entities: result.search.nodes,
+          };
+        },
+        { tool: 'search_with_relationships', entityType: args.entityType, query: args.query }
+      );
     },
   });
 
