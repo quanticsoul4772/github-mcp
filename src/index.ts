@@ -29,6 +29,7 @@ import { createAdvancedSearchTools } from './tools/advanced-search.js';
 import { createProjectManagementTools } from './tools/project-management.js';
 import { createBatchOperationsTools } from './tools/batch-operations.js';
 import { createOptimizedRepositoryTools } from './tools/optimized-repositories.js';
+import { createAgentTools } from './agents/tools/agent-tools.js';
 
 // Performance optimizations
 import { OptimizedAPIClient } from './optimized-api-client.js';
@@ -312,8 +313,8 @@ export class GitHubMCPServer {
     this.server.tool(
       config.tool.name,
       config.tool.description || 'GitHub API operation',
-      z.object(zodSchema),
-      async (args: Record<string, unknown>) => {
+      zodSchema,
+      async (args: Record<string, unknown>, extra: unknown) => {
         const startTime = Date.now();
         const toolName = config.tool.name;
         try {
@@ -642,6 +643,11 @@ export class GitHubMCPServer {
     ];
     perfTools.forEach(tool => this.registerTool(tool));
     // Performance monitoring tools registered
+
+    // Register code analysis agent tools
+    const agentTools = createAgentTools();
+    agentTools.forEach(tool => this.registerTool(tool));
+    // Code analysis agent tools registered
 
     // Total tools registered successfully
   }

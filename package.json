@@ -48,13 +48,25 @@
     "quality:dependencies": "npx depcheck",
     "quality:licenses": "npx license-checker --production --summary",
     "ci:test": "vitest run --coverage",
-    "ci:quality": "npm run quality:check && npm run quality:dependencies && npm run security:scan"
+    "ci:quality": "npm run quality:check && npm run quality:dependencies && npm run security:scan",
+    "agents:demo": "tsx src/agents/demo.ts",
+    "agents:analyze": "npm run build && node -e \"import('./build/agents/examples/basic-usage.js').then(m => m.runExamples())\"",
+    "agents:quick-scan": "npm run build && node -e \"import('./build/agents/index.js').then(m => m.quickAnalyze('src/', {type: 'directory', format: 'console'}).then(r => console.log(r.report)))\"",
+    "agents:security-scan": "npm run build && node -e \"import('./build/agents/examples/basic-usage.js').then(m => m.quickSecurityScan('src/'))\"",
+    "agents:generate-tests": "npm run build && node -e \"import('./build/agents/examples/basic-usage.js').then(m => m.generateTestsForFile(process.argv[1] || 'src/index.ts'))\" --",
+    "agents:report": "npm run build && node -e \"import('./build/agents/examples/basic-usage.js').then(m => m.generateAnalysisReport('src/', 'markdown', 'analysis-report.md'))\"",
+    "agents:health": "npm run build && node -e \"import('./build/agents/examples/basic-usage.js').then(m => m.monitorAgentHealth())\"",
+    "ci:agents": "npm run build && npm run agents:quick-scan"
   },
   "keywords": [
     "mcp",
     "github",
     "ai",
-    "model-context-protocol"
+    "model-context-protocol",
+    "code-analysis",
+    "static-analysis",
+    "test-generation",
+    "security-scanning"
   ],
   "author": "quanticsoul4772",
   "license": "MIT",
