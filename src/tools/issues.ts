@@ -157,7 +157,9 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
         owner: args.owner,
         repo: args.repo,
         state: args.state,
-        labels: args.labels?.join(','),
+        labels: Array.isArray(args.labels)
+          ? args.labels.join(',')
+          : (args.labels ? [args.labels].join(',') : undefined),
         sort: args.sort,
         direction: args.direction,
         since: args.since,
