@@ -101,27 +101,24 @@ export class GitHubRateLimiter {
   private updateGraphQLPoints(points: number, query: string) {
     const now = new Date();
     const graphql = this.graphql as GraphQLRateLimitInfo;
-    
-    // Add to query history
+  
     graphql.queryHistory.push({
       timestamp: now,
       points,
-      query: query.substring(0, 100) + '...' // Store truncated query for debugging
+      query: query.length > 100 ? query.substring(0, 100) + '...' : query
     });
-    
-    // Keep only last hour of history
+  
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     graphql.queryHistory = graphql.queryHistory.filter(h => h.timestamp > oneHourAgo);
-    
-    // Update points tracking
+  
     graphql.pointsUsed += points;
     graphql.estimatedPointsPerHour = graphql.queryHistory.reduce((sum, h) => sum + h.points, 0);
-    
-    // Estimate remaining points based on usage
+  
+    // Do not override server-provided remaining; compute an advisory value instead.
     const estimatedRemaining = Math.max(0, graphql.limit - graphql.estimatedPointsPerHour);
-    if (graphql.remaining > estimatedRemaining) {
-      graphql.remaining = estimatedRemaining;
-    }
+    // Optionally store as a derived property for status reporting without mutating `remaining`
+    // (cast to any to avoid changing interface footprint)
+    (graphql as any).estimatedRemaining = estimatedRemaining;
   }
 
   /**
