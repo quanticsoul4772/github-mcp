@@ -222,7 +222,7 @@ export interface RepositoryInsightsResponse {
     collaborators: { totalCount: number };
     repositoryTopics: RepositoryTopicConnection;
     licenseInfo: License | null;
-    visibility: string;
+    visibility: 'PUBLIC' | 'PRIVATE' | 'INTERNAL';
   };
 }
 
