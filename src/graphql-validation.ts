@@ -169,17 +169,19 @@ export const DateFilterSchema = z.string()
  */
 function sanitizeSearchQuery(query: string): string {
   // Remove null bytes and control characters
-  let sanitized = query.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
-  
-  // Escape potential GraphQL injection patterns
-  sanitized = sanitized.replace(/[{}]/g, ''); // Remove curly braces that could inject GraphQL
-  sanitized = sanitized.replace(/\$[a-zA-Z_][a-zA-Z0-9_]*/g, ''); // Remove variable references
-  sanitized = sanitized.replace(/(query|mutation|subscription)\s*{/gi, ''); // Remove GraphQL keywords
-  
+  let sanitized = query.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ');
+
+  // Neutralize potential GraphQL injection patterns by spacing them out
+  sanitized = sanitized.replace(/[{}]/g, ' ');
+  sanitized = sanitized.replace(/\$[a-zA-Z_][a-zA-Z0-9_]*/g, ' ');
+  sanitized = sanitized.replace(/\b(query|mutation|subscription)\b\s*{/gi, ' ');
+
   // Limit special characters that could be dangerous
-  sanitized = sanitized.replace(/[`'"\\]/g, ''); // Remove quotes and backslashes
-  
-  return sanitized.trim();
+  sanitized = sanitized.replace(/[`'"\\]/g, ' ');
+
+  // Collapse multiple spaces and trim
+  sanitized = sanitized.replace(/\s+/g, ' ').trim();
+  return sanitized;
 }
 
 /**
