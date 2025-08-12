@@ -197,7 +197,9 @@ describe('Validation Module', () => {
         expect(validateGitHubToken('ghp_' + 'A'.repeat(36))).toBe(true);
         expect(validateGitHubToken('ghp_' + 'a'.repeat(36))).toBe(true);
         expect(validateGitHubToken('ghp_' + '1'.repeat(36))).toBe(true);
-        expect(validateGitHubToken('ghp_AbCdEf1234567890aBcDeF1234567890AbCd')).toBe(true);
+        // Use dynamic token generation to avoid hardcoded secrets
+        const testToken = createTestToken('classic');
+        expect(validateGitHubToken(testToken)).toBe(true);
       });
 
       it('should reject ghp_ tokens with incorrect length', () => {
@@ -216,7 +218,9 @@ describe('Validation Module', () => {
     describe('GitHub OAuth Token - gho_ prefix', () => {
       it('should accept valid gho_ tokens', () => {
         expect(validateGitHubToken('gho_' + 'B'.repeat(36))).toBe(true);
-        expect(validateGitHubToken('gho_1234567890abcdef1234567890abcdef1234')).toBe(true);
+        // Use dynamic token generation to avoid hardcoded secrets
+        const testOAuthToken = createTestToken('oauth');
+        expect(validateGitHubToken(testOAuthToken)).toBe(true);
       });
 
       it('should reject invalid gho_ tokens', () => {
