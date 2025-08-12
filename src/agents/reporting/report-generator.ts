@@ -226,8 +226,9 @@ export class ReportGenerator {
    */
   private sortFindings(findings: Finding[], sortBy: string): Finding[] {
     const severityOrder = [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW, Severity.INFO];
+    const list = findings.slice();
 
-    return findings.sort((a, b) => {
+    return list.sort((a, b) => {
       switch (sortBy) {
         case 'severity':
           return severityOrder.indexOf(a.severity) - severityOrder.indexOf(b.severity);
