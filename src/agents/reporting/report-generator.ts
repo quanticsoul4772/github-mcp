@@ -721,9 +721,13 @@ export class ReportGenerator {
   }
 
   private escapeHtml(text: string): string {
-    const div = { innerHTML: '' } as any;
-    div.textContent = text;
-    return div.innerHTML;
+    const s = String(text);
+    return s
+      .replace(/&/g, '&')
+      .replace(/</g, '<')
+      .replace(/>/g, '>')
+      .replace(/"/g, '"')
+      .replace(/'/g, ''');
   }
 
   private escapeCsv(text: string): string {
