@@ -1,5 +1,49 @@
 import { Octokit } from '@octokit/rest';
+import { z } from 'zod';
 import { ToolConfig } from '../types.js';
+import { createTypeSafeHandler } from '../utils/type-safety.js';
+
+// Type definitions for repository insights
+interface RepositoryInsightsParams {
+  owner: string;
+  repo: string;
+  since?: string;
+}
+
+interface ContributionStatsParams {
+  owner: string;
+  repo: string;
+  first?: number;
+}
+
+interface CommitActivityParams {
+  owner: string;
+  repo: string;
+  branch?: string;
+  since?: string;
+  until?: string;
+}
+
+// Zod schemas for validation
+const RepositoryInsightsSchema = z.object({
+  owner: z.string().min(1, 'Owner is required'),
+  repo: z.string().min(1, 'Repository name is required'),
+  since: z.string().optional(),
+});
+
+const ContributionStatsSchema = z.object({
+  owner: z.string().min(1, 'Owner is required'),
+  repo: z.string().min(1, 'Repository name is required'),
+  first: z.number().int().min(1).max(100).optional(),
+});
+
+const CommitActivitySchema = z.object({
+  owner: z.string().min(1, 'Owner is required'),
+  repo: z.string().min(1, 'Repository name is required'),
+  branch: z.string().optional(),
+  since: z.string().optional(),
+  until: z.string().optional(),
+});
 
 export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
@@ -28,7 +72,9 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: any) => {
+    handler: createTypeSafeHandler(
+      RepositoryInsightsSchema,
+      async (params: RepositoryInsightsParams) => {
       const query = `
         query($owner: String!, $repo: String!) {
           repository(owner: $owner, name: $repo) {
@@ -85,8 +131,8 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
       `;
 
       const result: any = await octokit.graphql(query, {
-        owner: args.owner,
-        repo: args.repo,
+        owner: params.owner,
+        repo: params.repo,
       });
 
       const repository = result.repository;
@@ -123,7 +169,9 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
           visibility: repository.visibility,
         },
       };
-    },
+      },
+      'get_repository_insights'
+    ),
   });
 
   // Get contribution statistics tool
@@ -152,7 +200,9 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: any) => {
+    handler: createTypeSafeHandler(
+      ContributionStatsSchema,
+      async (params: ContributionStatsParams) => {
       const query = `
         query($owner: String!, $repo: String!, $first: Int!) {
           repository(owner: $owner, name: $repo) {
@@ -199,9 +249,9 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
       `;
 
       const result: any = await octokit.graphql(query, {
-        owner: args.owner,
-        repo: args.repo,
-        first: args.first || 25,
+        owner: params.owner,
+        repo: params.repo,
+        first: params.first || 25,
       });
 
       const repository = result.repository;
@@ -243,7 +293,9 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
           commitStats: commitStats[contributor.login] || { commits: 0, additions: 0, deletions: 0 },
         })),
       };
-    },
+      },
+      'get_contribution_stats'
+    ),
   });
 
   // Get commit activity patterns tool
@@ -278,7 +330,9 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: any) => {
+    handler: createTypeSafeHandler(
+      CommitActivitySchema,
+      async (params: CommitActivityParams) => {
       const query = `
         query($owner: String!, $repo: String!, $branch: String, $since: GitTimestamp, $until: GitTimestamp) {
           repository(owner: $owner, name: $repo) {
@@ -332,15 +386,15 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
       `;
 
       const result: any = await octokit.graphql(query, {
-        owner: args.owner,
-        repo: args.repo,
-        branch: args.branch,
-        since: args.since,
-        until: args.until,
+        owner: params.owner,
+        repo: params.repo,
+        branch: params.branch,
+        since: params.since,
+        until: params.until,
       });
 
       const repository = result.repository;
-      const history = args.branch 
+      const history = params.branch 
         ? repository.ref?.target?.history
         : repository.defaultBranchRef?.target?.history;
 
@@ -406,7 +460,9 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
           filesChanged: commit.changedFiles,
         })),
       };
-    },
+      },
+      'get_commit_activity'
+    ),
   });
 
   return tools;

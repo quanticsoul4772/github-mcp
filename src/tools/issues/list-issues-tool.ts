@@ -1,7 +1,9 @@
+import { z } from 'zod';
 import { ToolConfig } from '../../types.js';
 import { IIssueService } from '../../foundation/interfaces.js';
 import { BaseToolHandler } from '../../foundation/base-tool-handler.js';
 import { ErrorHandler } from '../../foundation/error-handler.js';
+import { createTypeSafeHandler } from '../../utils/type-safety.js';
 
 interface ListIssuesParams {
   owner: string;
@@ -15,6 +17,20 @@ interface ListIssuesParams {
   per_page?: number;
   page?: number;
 }
+
+// Zod schema for validation
+const ListIssuesSchema = z.object({
+  owner: z.string().min(1, 'Owner is required'),
+  repo: z.string().min(1, 'Repository name is required'),
+  state: z.enum(['open', 'closed', 'all']).optional(),
+  labels: z.array(z.string()).optional(),
+  sort: z.enum(['created', 'updated', 'comments']).optional(),
+  direction: z.enum(['asc', 'desc']).optional(),
+  assignee: z.string().optional(),
+  milestone: z.union([z.string(), z.number()]).optional(),
+  per_page: z.number().int().min(1).max(100).optional(),
+  page: z.number().int().min(1).optional(),
+});
 
 interface IssueListItem {
   number: number;
@@ -181,6 +197,10 @@ export function createListIssuesTool(octokit: any, issueService: IIssueService):
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: any) => handler.handle(args),
+    handler: createTypeSafeHandler(
+      ListIssuesSchema,
+      async (params: ListIssuesParams) => handler.handle(params),
+      'list_issues'
+    ),
   };
 }

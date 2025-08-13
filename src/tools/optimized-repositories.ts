@@ -1,5 +1,7 @@
+import { z } from 'zod';
 import { OptimizedAPIClient } from '../optimized-api-client.js';
 import { ToolConfig } from '../types.js';
+import { createTypeSafeHandler } from '../utils/type-safety.js';
 import { 
   validateOwnerName, 
   validateRepoName, 
@@ -7,6 +9,90 @@ import {
   validateRef,
   ValidationError 
 } from '../validation.js';
+
+// Type definitions for optimized repository tools
+interface GetFileContentsOptimizedParams {
+  owner: string;
+  repo: string;
+  path?: string;
+  ref?: string;
+  skipCache?: boolean;
+}
+
+interface GetRepositoryOptimizedParams {
+  owner: string;
+  repo: string;
+  skipCache?: boolean;
+}
+
+interface ListBranchesOptimizedParams {
+  owner: string;
+  repo: string;
+  maxPages?: number;
+}
+
+interface ListIssuesOptimizedParams {
+  owner: string;
+  repo: string;
+  state?: 'open' | 'closed' | 'all';
+  labels?: string;
+  assignee?: string;
+  since?: string;
+  maxPages?: number;
+  perPage?: number;
+}
+
+interface ListPullRequestsOptimizedParams {
+  owner: string;
+  repo: string;
+  state?: 'open' | 'closed' | 'all';
+  sort?: 'created' | 'updated' | 'popularity';
+  direction?: 'asc' | 'desc';
+  maxPages?: number;
+  perPage?: number;
+}
+
+// Zod schemas for validation
+const GetFileContentsOptimizedSchema = z.object({
+  owner: z.string().min(1, 'Owner is required'),
+  repo: z.string().min(1, 'Repository name is required'),
+  path: z.string().optional(),
+  ref: z.string().optional(),
+  skipCache: z.boolean().optional(),
+});
+
+const GetRepositoryOptimizedSchema = z.object({
+  owner: z.string().min(1, 'Owner is required'),
+  repo: z.string().min(1, 'Repository name is required'),
+  skipCache: z.boolean().optional(),
+});
+
+const ListBranchesOptimizedSchema = z.object({
+  owner: z.string().min(1, 'Owner is required'),
+  repo: z.string().min(1, 'Repository name is required'),
+  maxPages: z.number().int().min(1).optional(),
+});
+
+const ListIssuesOptimizedSchema = z.object({
+  owner: z.string().min(1, 'Owner is required'),
+  repo: z.string().min(1, 'Repository name is required'),
+  state: z.enum(['open', 'closed', 'all']).optional(),
+  labels: z.string().optional(),
+  assignee: z.string().optional(),
+  since: z.string().optional(),
+  maxPages: z.number().int().min(1).optional(),
+  perPage: z.number().int().min(1).max(100).optional(),
+});
+
+const ListPullRequestsOptimizedSchema = z.object({
+  owner: z.string().min(1, 'Owner is required'),
+  repo: z.string().min(1, 'Repository name is required'),
+  state: z.enum(['open', 'closed', 'all']).optional(),
+  sort: z.enum(['created', 'updated', 'popularity']).optional(),
+  direction: z.enum(['asc', 'desc']).optional(),
+  maxPages: z.number().int().min(1).optional(),
+  perPage: z.number().int().min(1).max(100).optional(),
+});
 
 export function createOptimizedRepositoryTools(optimizedClient: OptimizedAPIClient, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
@@ -43,36 +129,38 @@ export function createOptimizedRepositoryTools(optimizedClient: OptimizedAPIClie
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: any) => {
-      // Validate inputs
-      if (!validateOwnerName(args.owner)) {
-        throw new ValidationError('owner', 'Invalid repository owner name');
-      }
-      if (!validateRepoName(args.repo)) {
-        throw new ValidationError('repo', 'Invalid repository name');
-      }
-      
-      // Validate and sanitize path if provided
-      let safePath = '';
-      if (args.path) {
-        const validated = validateFilePath(args.path);
-        if (validated === null) {
-          throw new ValidationError('path', 'Invalid file path');
+    handler: createTypeSafeHandler(
+      GetFileContentsOptimizedSchema,
+      async (params: GetFileContentsOptimizedParams) => {
+        // Validate inputs
+        if (!validateOwnerName(params.owner)) {
+          throw new ValidationError('owner', 'Invalid repository owner name');
         }
-        safePath = validated;
-      }
-      
-      // Validate ref if provided
-      if (args.ref && !validateRef(args.ref)) {
-        throw new ValidationError('ref', 'Invalid Git ref');
-      }
-      
-      const data = await optimizedClient.getFileContents(
-        args.owner,
-        args.repo,
-        safePath,
-        args.ref
-      );
+        if (!validateRepoName(params.repo)) {
+          throw new ValidationError('repo', 'Invalid repository name');
+        }
+        
+        // Validate and sanitize path if provided
+        let safePath = '';
+        if (params.path) {
+          const validated = validateFilePath(params.path);
+          if (validated === null) {
+            throw new ValidationError('path', 'Invalid file path');
+          }
+          safePath = validated;
+        }
+        
+        // Validate ref if provided
+        if (params.ref && !validateRef(params.ref)) {
+          throw new ValidationError('ref', 'Invalid Git ref');
+        }
+        
+        const data = await optimizedClient.getFileContents(
+          params.owner,
+          params.repo,
+          safePath,
+          params.ref
+        );
 
       if (Array.isArray(data)) {
         // Directory listing
@@ -111,7 +199,9 @@ export function createOptimizedRepositoryTools(optimizedClient: OptimizedAPIClie
       } else {
         return data;
       }
-    },
+      },
+      'get_file_contents_optimized'
+    ),
   });
 
   // Optimized repository info tool
@@ -138,17 +228,21 @@ export function createOptimizedRepositoryTools(optimizedClient: OptimizedAPIClie
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: any) => {
-      // Validate inputs
-      if (!validateOwnerName(args.owner)) {
-        throw new ValidationError('owner', 'Invalid repository owner name');
-      }
-      if (!validateRepoName(args.repo)) {
-        throw new ValidationError('repo', 'Invalid repository name');
-      }
+    handler: createTypeSafeHandler(
+      GetRepositoryOptimizedSchema,
+      async (params: GetRepositoryOptimizedParams) => {
+        // Validate inputs
+        if (!validateOwnerName(params.owner)) {
+          throw new ValidationError('owner', 'Invalid repository owner name');
+        }
+        if (!validateRepoName(params.repo)) {
+          throw new ValidationError('repo', 'Invalid repository name');
+        }
 
-      return optimizedClient.getRepository(args.owner, args.repo);
-    },
+        return optimizedClient.getRepository(params.owner, params.repo);
+      },
+      'get_repository_optimized'
+    ),
   });
 
   // Optimized list branches tool
@@ -175,18 +269,22 @@ export function createOptimizedRepositoryTools(optimizedClient: OptimizedAPIClie
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: any) => {
-      // Validate inputs
-      if (!validateOwnerName(args.owner)) {
-        throw new ValidationError('owner', 'Invalid repository owner name');
-      }
-      if (!validateRepoName(args.repo)) {
-        throw new ValidationError('repo', 'Invalid repository name');
-      }
+    handler: createTypeSafeHandler(
+      ListBranchesOptimizedSchema,
+      async (params: ListBranchesOptimizedParams) => {
+        // Validate inputs
+        if (!validateOwnerName(params.owner)) {
+          throw new ValidationError('owner', 'Invalid repository owner name');
+        }
+        if (!validateRepoName(params.repo)) {
+          throw new ValidationError('repo', 'Invalid repository name');
+        }
 
-      const maxPages = args.maxPages || 3;
-      return optimizedClient.listBranches(args.owner, args.repo, maxPages);
-    },
+        const maxPages = params.maxPages || 3;
+        return optimizedClient.listBranches(params.owner, params.repo, maxPages);
+      },
+      'list_branches_optimized'
+    ),
   });
 
   // Optimized list issues tool
@@ -234,26 +332,30 @@ export function createOptimizedRepositoryTools(optimizedClient: OptimizedAPIClie
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: any) => {
-      // Validate inputs
-      if (!validateOwnerName(args.owner)) {
-        throw new ValidationError('owner', 'Invalid repository owner name');
-      }
-      if (!validateRepoName(args.repo)) {
-        throw new ValidationError('repo', 'Invalid repository name');
-      }
+    handler: createTypeSafeHandler(
+      ListIssuesOptimizedSchema,
+      async (params: ListIssuesOptimizedParams) => {
+        // Validate inputs
+        if (!validateOwnerName(params.owner)) {
+          throw new ValidationError('owner', 'Invalid repository owner name');
+        }
+        if (!validateRepoName(params.repo)) {
+          throw new ValidationError('repo', 'Invalid repository name');
+        }
 
-      const options = {
-        state: args.state || 'open',
-        labels: args.labels,
-        assignee: args.assignee,
-        since: args.since,
-        maxPages: args.maxPages || 5,
-        perPage: args.perPage || 100,
-      };
+        const options = {
+          state: params.state || 'open',
+          labels: params.labels,
+          assignee: params.assignee,
+          since: params.since,
+          maxPages: params.maxPages || 5,
+          perPage: params.perPage || 100,
+        };
 
-      return optimizedClient.listIssues(args.owner, args.repo, options);
-    },
+        return optimizedClient.listIssues(params.owner, params.repo, options);
+      },
+      'list_issues_optimized'
+    ),
   });
 
   // Optimized list pull requests tool
@@ -299,25 +401,29 @@ export function createOptimizedRepositoryTools(optimizedClient: OptimizedAPIClie
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: any) => {
-      // Validate inputs
-      if (!validateOwnerName(args.owner)) {
-        throw new ValidationError('owner', 'Invalid repository owner name');
-      }
-      if (!validateRepoName(args.repo)) {
-        throw new ValidationError('repo', 'Invalid repository name');
-      }
+    handler: createTypeSafeHandler(
+      ListPullRequestsOptimizedSchema,
+      async (params: ListPullRequestsOptimizedParams) => {
+        // Validate inputs
+        if (!validateOwnerName(params.owner)) {
+          throw new ValidationError('owner', 'Invalid repository owner name');
+        }
+        if (!validateRepoName(params.repo)) {
+          throw new ValidationError('repo', 'Invalid repository name');
+        }
 
-      const options = {
-        state: args.state || 'open',
-        sort: args.sort,
-        direction: args.direction,
-        maxPages: args.maxPages || 5,
-        perPage: args.perPage || 100,
-      };
+        const options = {
+          state: params.state || 'open',
+          sort: params.sort,
+          direction: params.direction,
+          maxPages: params.maxPages || 5,
+          perPage: params.perPage || 100,
+        };
 
-      return optimizedClient.listPullRequests(args.owner, args.repo, options);
-    },
+        return optimizedClient.listPullRequests(params.owner, params.repo, options);
+      },
+      'list_pull_requests_optimized'
+    ),
   });
 
   return tools;

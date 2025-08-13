@@ -1,5 +1,7 @@
 import { Octokit } from '@octokit/rest';
+import { z } from 'zod';
 import { ToolConfig } from '../types.js';
+import { createTypeSafeHandler } from '../utils/type-safety.js';
 import {
   ListPullRequestsParams,
   CreatePullRequestParams,
@@ -67,6 +69,27 @@ interface RequestPullRequestReviewersParams {
   reviewers?: string[];
   team_reviewers?: string[];
 }
+
+interface SearchPullRequestsParams {
+  query: string;
+  sort?: 'comments' | 'reactions' | 'reactions-+1' | 'reactions--1' | 'reactions-smile' | 'reactions-thinking_face' | 'reactions-heart' | 'reactions-tada' | 'interactions' | 'created' | 'updated';
+  order?: 'asc' | 'desc';
+  owner?: string;
+  repo?: string;
+  page?: number;
+  perPage?: number;
+}
+
+// Zod schema for search pull requests validation
+const SearchPullRequestsSchema = z.object({
+  query: z.string().min(1, 'Search query is required'),
+  sort: z.enum(['comments', 'reactions', 'reactions-+1', 'reactions--1', 'reactions-smile', 'reactions-thinking_face', 'reactions-heart', 'reactions-tada', 'interactions', 'created', 'updated']).optional(),
+  order: z.enum(['asc', 'desc']).optional(),
+  owner: z.string().optional(),
+  repo: z.string().optional(),
+  page: z.number().int().min(1).optional(),
+  perPage: z.number().int().min(1).max(100).optional(),
+});
 
 export function createPullRequestTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
@@ -526,39 +549,43 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         required: ['query'],
       },
     },
-    handler: async (args: any) => {
-      let query = `is:pr ${args.query}`;
-      
-      // Add repo filter if provided
-      if (args.owner && args.repo) {
-        query = `repo:${args.owner}/${args.repo} ${query}`;
-      }
+    handler: createTypeSafeHandler(
+      SearchPullRequestsSchema,
+      async (params: SearchPullRequestsParams) => {
+        let query = `is:pr ${params.query}`;
+        
+        // Add repo filter if provided
+        if (params.owner && params.repo) {
+          query = `repo:${params.owner}/${params.repo} ${query}`;
+        }
 
-      const { data } = await octokit.search.issuesAndPullRequests({
-        q: query,
-        sort: args.sort,
-        order: args.order,
-        page: args.page,
-        per_page: args.perPage,
-      });
+        const { data } = await octokit.search.issuesAndPullRequests({
+          q: query,
+          sort: params.sort,
+          order: params.order,
+          page: params.page,
+          per_page: params.perPage,
+        });
 
-      return {
-        total_count: data.total_count,
-        incomplete_results: data.incomplete_results,
-        items: data.items.map((item) => ({
-          number: item.number,
-          title: item.title,
-          state: item.state,
-          user: {
-            login: item.user?.login,
-          },
-          created_at: item.created_at,
-          updated_at: item.updated_at,
-          html_url: item.html_url,
-          repository_url: item.repository_url,
-        })),
-      };
-    },
+        return {
+          total_count: data.total_count,
+          incomplete_results: data.incomplete_results,
+          items: data.items.map((item) => ({
+            number: item.number,
+            title: item.title,
+            state: item.state,
+            user: {
+              login: item.user?.login,
+            },
+            created_at: item.created_at,
+            updated_at: item.updated_at,
+            html_url: item.html_url,
+            repository_url: item.repository_url,
+          })),
+        };
+      },
+      'search_pull_requests'
+    ),
   });
 
   // Add write operations if not in read-only mode
