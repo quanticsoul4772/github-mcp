@@ -56,6 +56,12 @@
     "agents:generate-tests": "npm run build && node -e \"import('./build/agents/examples/basic-usage.js').then(m => m.generateTestsForFile(process.argv[1] || 'src/index.ts'))\" --",
     "agents:report": "npm run build && node -e \"import('./build/agents/examples/basic-usage.js').then(m => m.generateAnalysisReport('src/', 'markdown', 'analysis-report.md'))\"",
     "agents:health": "npm run build && node -e \"import('./build/agents/examples/basic-usage.js').then(m => m.monitorAgentHealth())\"",
+    "agents:cli": "npm run build && node build/agents/cli/analysis-cli.js",
+    "analyze": "npm run agents:cli",
+    "analyze:security": "npm run agents:cli -- --agents security",
+    "analyze:types": "npm run agents:cli -- --agents type-safety",
+    "analyze:tests": "npm run agents:cli -- --agents testing",
+    "analyze:all": "npm run agents:cli -- --format html --output analysis-report.html",
     "ci:agents": "npm run build && npm run agents:quick-scan"
   },
   "keywords": [
@@ -73,7 +79,6 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.2",
     "@octokit/rest": "^22.0.0",
-    "@octokit/types": "^14.1.0",
     "dotenv": "^17.2.1",
     "zod": "^4.0.17"
   },

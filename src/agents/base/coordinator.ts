@@ -1,430 +1,253 @@
-/**
- * Agent coordinator for orchestrating multiple analysis agents
- */
-
-import {
-  CodeAnalysisAgent,
-  CoordinationRequest,
-  CoordinationResult,
-  AnalysisReport,
-  Finding,
-  Severity,
-  FindingCategory,
-  AgentRegistry
-} from '../types.js';
-import { logger } from '../../logger.js';
-import { performance } from 'perf_hooks';
+import { 
+  AgentCoordinator, 
+  AnalysisContext, 
+  AnalysisResult, 
+  AnalysisReport, 
+  AgentEvent,
+  AgentEventListener,
+  BaseAgent
+} from '../types/agent-interfaces.js';
+import { DefaultAgentRegistry } from './agent-registry.js';
 
 /**
- * Registry implementation for managing agents
+ * Main coordinator for orchestrating agent-based code analysis
  */
-export class DefaultAgentRegistry implements AgentRegistry {
-  private agents = new Map<string, CodeAnalysisAgent>();
+export class DefaultAgentCoordinator implements AgentCoordinator {
+  private registry: DefaultAgentRegistry;
+  private eventListeners: AgentEventListener[] = [];
 
-  register(agent: CodeAnalysisAgent): void {
-    this.agents.set(agent.name, agent);
-    logger.info(`Registered agent: ${agent.name}`, { version: agent.version });
-  }
-
-  unregister(name: string): void {
-    if (this.agents.delete(name)) {
-      logger.info(`Unregistered agent: ${name}`);
-    }
-  }
-
-  get(name: string): CodeAnalysisAgent | undefined {
-    return this.agents.get(name);
-  }
-
-  getAll(): CodeAnalysisAgent[] {
-    return Array.from(this.agents.values());
-  }
-
-  getByCapability(capability: keyof import('../types.js').AgentCapabilities): CodeAnalysisAgent[] {
-    return this.getAll().filter(agent => {
-      const cap = agent.capabilities[capability];
-      return Array.isArray(cap) ? cap.length > 0 : Boolean(cap);
-    });
-  }
-}
-
-/**
- * Coordinator for orchestrating multiple analysis agents
- */
-export class AgentCoordinator {
-  private registry: AgentRegistry;
-
-  constructor(registry?: AgentRegistry) {
+  constructor(registry?: DefaultAgentRegistry) {
     this.registry = registry || new DefaultAgentRegistry();
   }
 
   /**
-   * Register an agent with the coordinator
+   * Add event listener
    */
-  registerAgent(agent: CodeAnalysisAgent): void {
-    this.registry.register(agent);
+  public addEventListener(listener: AgentEventListener): void {
+    this.eventListeners.push(listener);
   }
 
   /**
-   * Unregister an agent
+   * Remove event listener
    */
-  unregisterAgent(name: string): void {
-    this.registry.unregister(name);
-  }
-
-  /**
-   * Get all registered agents
-   */
-  getAgents(): CodeAnalysisAgent[] {
-    return this.registry.getAll();
-  }
-
-  /**
-   * Get agent by name
-   */
-  getAgent(name: string): CodeAnalysisAgent | undefined {
-    return this.registry.get(name);
-  }
-
-  /**
-   * Coordinate analysis across multiple agents
-   */
-  async coordinate(request: CoordinationRequest): Promise<CoordinationResult> {
-    const startTime = performance.now();
-    
-    try {
-      logger.info('Starting coordinated analysis', {
-        target: request.target,
-        requestedAgents: request.agents,
-        parallel: request.parallel
-      });
-
-      // Determine which agents to use
-      const agentsToUse = this.selectAgents(request);
-      
-      if (agentsToUse.length === 0) {
-        throw new Error('No suitable agents found for the analysis target');
-      }
-
-      // Configure agents if global config provided
-      if (request.config) {
-        agentsToUse.forEach(agent => {
-          agent.configure(request.config!);
-        });
-      }
-
-      // Run analysis
-      const reports = request.parallel 
-        ? await this.runParallelAnalysis(agentsToUse, request)
-        : await this.runSequentialAnalysis(agentsToUse, request);
-
-      // Consolidate findings
-      const consolidatedFindings = this.consolidateFindings(reports);
-
-      // Generate summary
-      const summary = this.generateCoordinationSummary(reports, consolidatedFindings);
-
-      const totalDuration = performance.now() - startTime;
-
-      logger.info('Coordinated analysis completed', {
-        agentsUsed: agentsToUse.map(a => a.name),
-        totalFindings: consolidatedFindings.length,
-        duration: totalDuration
-      });
-
-      return {
-        reports,
-        consolidatedFindings,
-        summary: {
-          ...summary,
-          totalDuration
-        }
-      };
-
-    } catch (error) {
-      logger.error('Coordinated analysis failed', {
-        error: error instanceof Error ? error.message : String(error),
-        target: request.target
-      });
-
-      return {
-        reports: [],
-        consolidatedFindings: [],
-        summary: {
-          totalFindings: 0,
-          findingsBySeverity: {} as Record<Severity, number>,
-          findingsByCategory: {} as Record<FindingCategory, number>,
-          agentsUsed: [],
-          totalDuration: performance.now() - startTime
-        },
-        errors: [error instanceof Error ? error.message : String(error)]
-      };
+  public removeEventListener(listener: AgentEventListener): void {
+    const index = this.eventListeners.indexOf(listener);
+    if (index > -1) {
+      this.eventListeners.splice(index, 1);
     }
   }
 
   /**
-   * Select agents for the coordination request
+   * Emit event to all listeners
    */
-  private selectAgents(request: CoordinationRequest): CodeAnalysisAgent[] {
-    const allAgents = this.registry.getAll();
-
-    // If specific agents requested, use those
-    if (request.agents && request.agents.length > 0) {
-      return request.agents
-        .map(name => this.registry.get(name))
-        .filter((agent, index): agent is CodeAnalysisAgent => {
-          if (!agent) {
-            logger.warn(`Requested agent not found: ${request.agents![index]}`);
-            return false;
-          }
-          return agent.canAnalyze(request.target);
-        });
-        .map(n => ({ name: n, agent: this.registry.get(n) }))
-        .filter(({ name, agent }) => {
-          if (!agent) {
-            logger.warn(`Requested agent not found: ${name}`);
-            return false;
-          }
-          return agent.canAnalyze(request.target);
-        })
-        .map(({ agent }) => agent as CodeAnalysisAgent);
-    }
-
-    // Otherwise, use all agents that can analyze the target
-    return allAgents.filter(agent => 
-      agent.canAnalyze(request.target) && 
-      agent.getConfig().enabled
-    );
-  }
-
-  /**
-   * Run analysis in parallel
-   */
-  private async runParallelAnalysis(
-    agents: CodeAnalysisAgent[], 
-    request: CoordinationRequest
-  ): Promise<AnalysisReport[]> {
-    const timeout = request.timeout || 300000; // 5 minutes default
-
-    const analysisPromises = agents.map(async (agent) => {
+  private emitEvent(event: AgentEvent): void {
+    this.eventListeners.forEach(listener => {
       try {
-        return await this.withTimeout(
-          agent.analyze(request.target),
-          timeout,
-          `Agent ${agent.name} timed out`
-        );
+        listener(event);
       } catch (error) {
-        logger.error(`Agent ${agent.name} failed`, {
-          error: error instanceof Error ? error.message : String(error)
-        });
-        
-        // Return empty report for failed agent
-        return {
-          agentName: agent.name,
-          agentVersion: agent.version,
-          target: request.target,
-          startTime: new Date(),
-          endTime: new Date(),
-          duration: 0,
-          findings: [],
-          summary: {
-            totalFindings: 0,
-            findingsBySeverity: {} as Record<Severity, number>,
-            findingsByCategory: {} as Record<FindingCategory, number>,
-            filesAnalyzed: 0,
-            linesAnalyzed: 0
-          },
-          config: agent.getConfig(),
-          errors: [error instanceof Error ? error.message : String(error)]
-        };
+        console.error('Error in event listener:', error);
       }
     });
-
-    return await Promise.all(analysisPromises);
   }
 
   /**
-   * Run analysis sequentially
+   * Run analysis with all registered agents
    */
-  private async runSequentialAnalysis(
-    agents: CodeAnalysisAgent[], 
-    request: CoordinationRequest
-  ): Promise<AnalysisReport[]> {
-    const reports: AnalysisReport[] = [];
-    const timeout = request.timeout || 300000; // 5 minutes default
+  public async runFullAnalysis(context: AnalysisContext): Promise<AnalysisReport> {
+    this.emitEvent({
+      type: 'analysis-start',
+      timestamp: new Date(),
+      data: { context }
+    });
+
+    const startTime = Date.now();
+    const agents = this.registry.getExecutionOrder();
+    const results: AnalysisResult[] = [];
+
+    console.log(`Starting full analysis with ${agents.length} agents...`);
 
     for (const agent of agents) {
       try {
-        logger.debug(`Running analysis with ${agent.name}`);
+        const result = await this.runSingleAgentInternal(agent, context);
+        results.push(result);
         
-        const report = await this.withTimeout(
-          agent.analyze(request.target),
-          timeout,
-          `Agent ${agent.name} timed out`
-        );
-        
-        reports.push(report);
-      } catch (error) {
-        logger.error(`Agent ${agent.name} failed`, {
-          error: error instanceof Error ? error.message : String(error)
-        });
-        
-        // Continue with other agents even if one fails
-        reports.push({
-          agentName: agent.name,
-          agentVersion: agent.version,
-          target: request.target,
-          startTime: new Date(),
-          endTime: new Date(),
-          duration: 0,
-          findings: [],
-          summary: {
-            totalFindings: 0,
-            findingsBySeverity: {} as Record<Severity, number>,
-            findingsByCategory: {} as Record<FindingCategory, number>,
-            filesAnalyzed: 0,
-            linesAnalyzed: 0
-          },
-          config: agent.getConfig(),
-          errors: [error instanceof Error ? error.message : String(error)]
-        });
-      }
-    }
-
-    return reports;
-  }
-
-  /**
-   * Consolidate findings from multiple reports
-   */
-  private consolidateFindings(reports: AnalysisReport[]): Finding[] {
-    const allFindings: Finding[] = [];
-    const seenFindings = new Set<string>();
-
-    for (const report of reports) {
-      for (const finding of report.findings) {
-        // Create a unique key for deduplication
-        const key = this.createFindingKey(finding);
-        
-        if (!seenFindings.has(key)) {
-          seenFindings.add(key);
-          allFindings.push(finding);
-        } else {
-          // If we've seen this finding before, we might want to merge metadata
-          const existingIndex = allFindings.findIndex(f => this.createFindingKey(f) === key);
-          if (existingIndex >= 0) {
-            const existing = allFindings[existingIndex];
-            // Merge metadata from multiple agents
-            if (finding.metadata && existing.metadata) {
-              existing.metadata = { ...existing.metadata, ...finding.metadata };
-            }
-          }
+        // Add result to context for dependent agents
+        if (!context.previousResults) {
+          context.previousResults = new Map();
         }
+        context.previousResults.set(agent.name, result);
+        
+      } catch (error) {
+        console.error(`Agent ${agent.name} failed:`, error);
+        results.push({
+          agentName: agent.name,
+          timestamp: new Date(),
+          status: 'error',
+          findings: [{
+            id: `${agent.name}-error-${Date.now()}`,
+            severity: 'critical',
+            category: 'agent-error',
+            message: `Agent execution failed: ${error instanceof Error ? error.message : String(error)}`,
+            evidence: error instanceof Error ? error.stack : undefined
+          }]
+        });
       }
     }
 
-    // Sort by severity (critical first)
-    const severityOrder = [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW, Severity.INFO];
-    allFindings.sort((a, b) => severityOrder.indexOf(a.severity) - severityOrder.indexOf(b.severity));
+    const report = this.generateReport(results, context);
+    report.summary.totalExecutionTime = Date.now() - startTime;
 
-    return allFindings;
+    this.emitEvent({
+      type: 'analysis-complete',
+      timestamp: new Date(),
+      data: { report }
+    });
+
+    console.log(`Analysis complete. Found ${report.summary.totalFindings} findings.`);
+    return report;
   }
 
   /**
-   * Create a unique key for finding deduplication
+   * Run analysis with specific agents
    */
-  private createFindingKey(finding: Finding): string {
-    return `${finding.file}:${finding.line || 0}:${finding.column || 0}:${finding.category}:${finding.title}`;
+  public async runSelectedAgents(agentNames: string[], context: AnalysisContext): Promise<AnalysisReport> {
+    const agents = agentNames
+      .map(name => this.registry.getAgent(name))
+      .filter((agent): agent is BaseAgent => agent !== undefined);
+
+    if (agents.length !== agentNames.length) {
+      const missing = agentNames.filter(name => !this.registry.hasAgent(name));
+      throw new Error(`Unknown agents: ${missing.join(', ')}`);
+    }
+
+    // Sort by priority and resolve dependencies
+    const sortedAgents = agents.sort((a, b) => a.getPriority() - b.getPriority());
+    const results: AnalysisResult[] = [];
+
+    console.log(`Running selected agents: ${agentNames.join(', ')}`);
+
+    for (const agent of sortedAgents) {
+      const result = await this.runSingleAgentInternal(agent, context);
+      results.push(result);
+      
+      if (!context.previousResults) {
+        context.previousResults = new Map();
+      }
+      context.previousResults.set(agent.name, result);
+    }
+
+    return this.generateReport(results, context);
   }
 
   /**
-   * Generate coordination summary
+   * Run a single agent
    */
-  private generateCoordinationSummary(
-    reports: AnalysisReport[], 
-    consolidatedFindings: Finding[]
-  ) {
-    const findingsBySeverity = {} as Record<Severity, number>;
-    const findingsByCategory = {} as Record<FindingCategory, number>;
+  public async runSingleAgent(agentName: string, context: AnalysisContext): Promise<AnalysisResult> {
+    const agent = this.registry.getAgent(agentName);
+    if (!agent) {
+      throw new Error(`Agent '${agentName}' not found`);
+    }
 
-    // Initialize counters
-    Object.values(Severity).forEach(severity => {
-      findingsBySeverity[severity] = 0;
-    });
-    Object.values(FindingCategory).forEach(category => {
-      findingsByCategory[category] = 0;
+    return this.runSingleAgentInternal(agent, context);
+  }
+
+  /**
+   * Internal method to run a single agent with event handling
+   */
+  private async runSingleAgentInternal(agent: BaseAgent, context: AnalysisContext): Promise<AnalysisResult> {
+    this.emitEvent({
+      type: 'agent-start',
+      agentName: agent.name,
+      timestamp: new Date()
     });
 
-    // Count consolidated findings
-    consolidatedFindings.forEach(finding => {
-      findingsBySeverity[finding.severity]++;
-      findingsByCategory[finding.category]++;
-    });
+    const startTime = Date.now();
+    
+    try {
+      console.log(`Running agent: ${agent.name}`);
+      const result = await agent.analyze(context);
+      result.executionTime = Date.now() - startTime;
+
+      this.emitEvent({
+        type: 'agent-complete',
+        agentName: agent.name,
+        timestamp: new Date(),
+        data: { result }
+      });
+
+      console.log(`Agent ${agent.name} completed with ${result.findings.length} findings`);
+      return result;
+      
+    } catch (error) {
+      this.emitEvent({
+        type: 'agent-error',
+        agentName: agent.name,
+        timestamp: new Date(),
+        error: error instanceof Error ? error : new Error(String(error))
+      });
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Generate analysis report from results
+   */
+  public generateReport(results: AnalysisResult[], context: AnalysisContext): AnalysisReport {
+    const allFindings = results.flatMap(result => result.findings);
+    const recommendations = results.flatMap(result => result.recommendations || []);
+
+    const summary = {
+      totalFindings: allFindings.length,
+      criticalFindings: allFindings.filter(f => f.severity === 'critical').length,
+      highFindings: allFindings.filter(f => f.severity === 'high').length,
+      mediumFindings: allFindings.filter(f => f.severity === 'medium').length,
+      lowFindings: allFindings.filter(f => f.severity === 'low').length,
+      infoFindings: allFindings.filter(f => f.severity === 'info').length,
+      agentsRun: results.length,
+      totalExecutionTime: results.reduce((sum, r) => sum + (r.executionTime || 0), 0),
+      filesAnalyzed: new Set(allFindings.map(f => f.file).filter(Boolean)).size
+    };
 
     return {
-      totalFindings: consolidatedFindings.length,
-      findingsBySeverity,
-      findingsByCategory,
-      agentsUsed: reports.map(r => r.agentName)
+      summary,
+      agentResults: results,
+      findings: allFindings,
+      recommendations: [...new Set(recommendations)], // Remove duplicates
+      timestamp: new Date(),
+      projectPath: context.projectPath,
+      gitContext: context.gitContext
     };
   }
 
   /**
-   * Utility method to add timeout to promises
+   * Get the agent registry
    */
-  private async withTimeout<T>(
-    promise: Promise<T>, 
-    timeoutMs: number, 
-    timeoutMessage: string
-  ): Promise<T> {
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
-    });
-
-    return Promise.race([promise, timeoutPromise]);
+  public getRegistry(): DefaultAgentRegistry {
+    return this.registry;
   }
 
   /**
-   * Get health status of all agents
+   * Validate all agent configurations
    */
-  async getAgentsHealth(): Promise<Record<string, import('../types.js').AgentHealth>> {
-    const agents = this.registry.getAll();
-    const healthPromises = agents.map(async (agent) => {
-      try {
-        const health = await agent.getHealth();
-        return [agent.name, health] as const;
-      } catch (error) {
-        return [agent.name, {
-          healthy: false,
-          status: `Health check failed: ${error instanceof Error ? error.message : String(error)}`,
-          lastCheck: new Date()
-        }] as const;
+  public validateConfigurations(context: AnalysisContext): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+    const agents = this.registry.getAllAgents();
+
+    for (const agent of agents) {
+      const config = context.configuration?.get(agent.name) || agent.getDefaultConfiguration();
+      if (!agent.validateConfiguration(config)) {
+        errors.push(`Invalid configuration for agent '${agent.name}'`);
       }
-    });
+    }
 
-    const healthResults = await Promise.all(healthPromises);
-    return Object.fromEntries(healthResults);
-  }
-
-  /**
-   * Run a quick health check on all agents
-   */
-  async healthCheck(): Promise<{
-    healthy: boolean;
-    agentCount: number;
-    healthyAgents: number;
-    unhealthyAgents: string[];
-  }> {
-    const healthStatuses = await this.getAgentsHealth();
-    const agents = Object.keys(healthStatuses);
-    const healthyAgents = agents.filter(name => healthStatuses[name].healthy);
-    const unhealthyAgents = agents.filter(name => !healthStatuses[name].healthy);
+    // Validate dependencies
+    const depValidation = this.registry.validateDependencies();
+    errors.push(...depValidation.errors);
 
     return {
-      healthy: unhealthyAgents.length === 0,
-      agentCount: agents.length,
-      healthyAgents: healthyAgents.length,
-      unhealthyAgents
+      valid: errors.length === 0,
+      errors
     };
   }
 }

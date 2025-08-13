@@ -1,84 +1,62 @@
 /**
- * Main entry point for the agent system
+ * Main entry point for the agent-based code analysis system
  * Exports all agents, types, and utilities
  */
 
-// Export types
-export * from './types.js';
-
-// Export base classes
-export * from './base/agent-base.js';
-export { AgentCoordinator, DefaultAgentRegistry } from './base/coordinator.js';
-
-// Export analysis agents
-export { StaticAnalysisAgent } from './analysis/static-analysis.js';
-export { ErrorDetectionAgent } from './analysis/error-detection.js';
-
-// Export testing agents
-export { TestGenerationAgent } from './testing/test-generation.js';
-
-// Export reporting
-export { ReportGenerator } from './reporting/report-generator.js';
-
-// Export tools
-export { createAgentTools } from './tools/agent-tools.js';
-
-// Export examples
-export * from './examples/basic-usage.js';
-
-// Import classes for the factory function
-import { AgentCoordinator } from './base/coordinator.js';
-import { StaticAnalysisAgent } from './analysis/static-analysis.js';
-import { ErrorDetectionAgent } from './analysis/error-detection.js';
-import { TestGenerationAgent } from './testing/test-generation.js';
-import { ReportGenerator } from './reporting/report-generator.js';
-import { createAgentTools } from './tools/agent-tools.js';
-
- * Main exports for the code analysis agent system
- */
-
 // Core types and interfaces
-export * from './types.js';
+export * from './types/agent-interfaces.js';
 
 // Base classes
-export { BaseAgent, DEFAULT_AGENT_CONFIG } from './base/agent-base.js';
-export { AgentCoordinator, DefaultAgentRegistry } from './base/coordinator.js';
+export * from './base/base-agent.js';
+export * from './base/agent-registry.js';
+export * from './base/coordinator.js';
 
 // Analysis agents
-export { StaticAnalysisAgent } from './analysis/static-analysis.js';
-export { ErrorDetectionAgent } from './analysis/error-detection.js';
+export * from './analysis/code-analysis-agent.js';
+export * from './analysis/type-safety-agent.js';
+export * from './analysis/static-analysis.js';
 
 // Testing agents
-export { TestGenerationAgent } from './testing/test-generation.js';
+export * from './testing/testing-agent.js';
 
-// Reporting
-export { ReportGenerator } from './reporting/report-generator.js';
-export type { ReportOptions, ReportSummary } from './reporting/report-generator.js';
+// Security agents
+export * from './security/security-agent.js';
 
-// MCP Tools
-export { createAgentTools } from './tools/agent-tools.js';
+// Tools and utilities
+export * from './tools/agent-tools.js';
+export * from './reporting/report-generator.js';
+
+// CLI
+export * from './cli/analysis-cli.js';
 
 // Examples
-export * from './examples/basic-usage.js';
+export * from './examples/example-usage.js';
+
+// Legacy exports for backward compatibility
+export * from './types.js';
+export { BaseAgent as LegacyBaseAgent, DEFAULT_AGENT_CONFIG } from './base/agent-base.js';
+export { AgentCoordinator as LegacyAgentCoordinator } from './base/coordinator.js';
+export { StaticAnalysisAgent } from './analysis/static-analysis.js';
+export { ErrorDetectionAgent } from './analysis/error-detection.js';
+export { TestGenerationAgent } from './testing/test-generation.js';
 
 /**
  * Convenience function to create a fully configured agent system
  */
 export function createAgentSystem() {
-  const coordinator = new AgentCoordinator();
+  const registry = new DefaultAgentRegistry();
+  const coordinator = new DefaultAgentCoordinator(registry);
   
   // Register all available agents
-  coordinator.registerAgent(new StaticAnalysisAgent());
-  coordinator.registerAgent(new ErrorDetectionAgent());
-  coordinator.registerAgent(new TestGenerationAgent());
-  
-  const reportGenerator = new ReportGenerator();
+  registry.register(new CodeAnalysisAgent());
+  registry.register(new TypeSafetyAgent());
+  registry.register(new TestingAgent());
+  registry.register(new SecurityAgent());
   
   return {
+    registry,
     coordinator,
-    reportGenerator,
-    agents: coordinator.getAgents(),
-    tools: createAgentTools()
+    agents: registry.getAllAgents()
   };
 }
 
@@ -86,47 +64,170 @@ export function createAgentSystem() {
  * Quick analysis function for immediate use
  */
 export async function quickAnalyze(
-  targetPath: string,
+  projectPath: string,
   options: {
-    type?: 'file' | 'directory' | 'project';
     agents?: string[];
-    depth?: 'shallow' | 'deep' | 'comprehensive';
-    parallel?: boolean;
-    format?: 'json' | 'markdown' | 'console';
+    format?: 'json' | 'text' | 'html';
+    output?: string;
+    exclude?: string[];
+    include?: string[];
   } = {}
 ) {
-  const { coordinator, reportGenerator } = createAgentSystem();
+  const { coordinator } = createAgentSystem();
   
-  const target = {
-    type: options.type || 'file',
-    path: targetPath,
-    depth: options.depth || 'deep'
-  };
+  // Discover files
+  const files = await discoverFiles(projectPath, options.include, options.exclude);
   
-  const request = {
-    target,
-    agents: options.agents,
-    parallel: options.parallel !== false
+  const context = {
+    projectPath,
+    files,
+    excludePatterns: options.exclude
   };
   
   // Run analysis
-  const result = await coordinator.coordinate(request);
+  const report = options.agents && options.agents.length > 0
+    ? await coordinator.runSelectedAgents(options.agents, context)
+    : await coordinator.runFullAnalysis(context);
   
-  // Generate report if format specified
-  if (options.format) {
-    const reportOptions = {
-      format: options.format,
-      includeDetails: true,
-      includeRecommendations: true
-    };
-    
-    const report = await reportGenerator.generateReport(result, reportOptions);
-    
-    return {
-      analysis: result,
-      report: options.format === 'json' ? JSON.parse(report) : report
-    };
+  // Format output
+  if (options.format === 'json') {
+    return JSON.stringify(report, null, 2);
+  } else if (options.format === 'html') {
+    return generateHtmlReport(report);
+  } else {
+    return generateTextReport(report);
   }
+}
+
+// Helper functions
+async function discoverFiles(
+  projectPath: string, 
+  include?: string[], 
+  exclude?: string[]
+): Promise<string[]> {
+  const fs = await import('fs/promises');
+  const path = await import('path');
   
-  return { analysis: result };
+  const files: string[] = [];
+  
+  const walk = async (dir: string): Promise<void> => {
+    try {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        const relativePath = path.relative(projectPath, fullPath);
+        
+        if (entry.isDirectory() && !shouldSkipDirectory(entry.name)) {
+          await walk(fullPath);
+        } else if (entry.isFile() && shouldIncludeFile(relativePath, include, exclude)) {
+          files.push(relativePath);
+        }
+      }
+    } catch {
+      // Skip directories we can't read
+    }
+  };
+
+  await walk(projectPath);
+  return files;
+}
+
+function shouldSkipDirectory(dirName: string): boolean {
+  const skipDirs = ['node_modules', '.git', 'dist', 'build', 'coverage'];
+  return skipDirs.includes(dirName);
+}
+
+function shouldIncludeFile(filePath: string, include?: string[], exclude?: string[]): boolean {
+  // Check exclude patterns first
+  if (exclude) {
+    for (const pattern of exclude) {
+      if (new RegExp(pattern).test(filePath)) {
+        return false;
+      }
+    }
+  }
+
+  // Check include patterns
+  if (include && include.length > 0) {
+    return include.some(pattern => new RegExp(pattern).test(filePath));
+  }
+
+  // Default: include common source file extensions
+  const sourceExtensions = ['.ts', '.js', '.tsx', '.jsx', '.json'];
+  return sourceExtensions.some(ext => filePath.endsWith(ext));
+}
+
+function generateTextReport(report: any): string {
+  const { summary, findings } = report;
+  
+  let output = '\n📊 ANALYSIS SUMMARY\n';
+  output += '═'.repeat(50) + '\n';
+  output += `Total Findings: ${summary.totalFindings}\n`;
+  output += `Critical: ${summary.criticalFindings}\n`;
+  output += `High: ${summary.highFindings}\n`;
+  output += `Medium: ${summary.mediumFindings}\n`;
+  output += `Low: ${summary.lowFindings}\n`;
+  output += `Files Analyzed: ${summary.filesAnalyzed}\n\n`;
+
+  if (findings.length > 0) {
+    output += '🔍 FINDINGS\n';
+    output += '═'.repeat(50) + '\n';
+    
+    findings.forEach((finding: any) => {
+      output += `• ${finding.message}\n`;
+      if (finding.file) {
+        output += `  📁 ${finding.file}${finding.line ? `:${finding.line}` : ''}\n`;
+      }
+      if (finding.fix) {
+        output += `  🔧 ${finding.fix}\n`;
+      }
+      output += '\n';
+    });
+  }
+
+  return output;
+}
+
+function generateHtmlReport(report: any): string {
+  const { summary, findings } = report;
+  
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Code Analysis Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .summary { background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .finding { border-left: 4px solid #ccc; padding: 10px; margin: 10px 0; }
+        .critical { border-left-color: #d32f2f; background: #ffebee; }
+        .high { border-left-color: #f57c00; background: #fff3e0; }
+        .medium { border-left-color: #fbc02d; background: #fffde7; }
+        .low { border-left-color: #388e3c; background: #e8f5e8; }
+    </style>
+</head>
+<body>
+    <h1>Code Analysis Report</h1>
+    
+    <div class="summary">
+        <h2>Summary</h2>
+        <p><strong>Total Findings:</strong> ${summary.totalFindings}</p>
+        <p><strong>Critical:</strong> ${summary.criticalFindings} | 
+           <strong>High:</strong> ${summary.highFindings} | 
+           <strong>Medium:</strong> ${summary.mediumFindings} | 
+           <strong>Low:</strong> ${summary.lowFindings}</p>
+        <p><strong>Files Analyzed:</strong> ${summary.filesAnalyzed}</p>
+    </div>
+
+    <h2>Findings</h2>
+    ${findings.map((finding: any) => `
+        <div class="finding ${finding.severity}">
+            <div><strong>${finding.message}</strong></div>
+            ${finding.file ? `<div>📁 ${finding.file}${finding.line ? `:${finding.line}` : ''}</div>` : ''}
+            ${finding.fix ? `<div><strong>Fix:</strong> ${finding.fix}</div>` : ''}
+        </div>
+    `).join('')}
+</body>
+</html>`;
 }
