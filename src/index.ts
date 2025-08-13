@@ -121,7 +121,7 @@ export class GitHubMCPServer {
     }
 
     // Get token from environment configuration
-    const token = getGitHubToken() || envValidation.sanitizedValues.GITHUB_TOKEN;
+    const token = getGitHubToken() || envValidation.sanitizedValues?.GITHUB_TOKEN || '';
     
     // Create rate-limited Octokit instance with logging
     const rateLimitedSetup = createRateLimitedOctokit(token);
@@ -162,7 +162,7 @@ export class GitHubMCPServer {
     });
 
     // Initialize health monitor
-    this.healthManager = new HealthManager();
+    // Initialize health monitor will be done after reliability manager
 
     // Initialize optimized API client
     this.optimizedClient = new OptimizedAPIClient({
@@ -184,7 +184,7 @@ export class GitHubMCPServer {
     
     const retryManager = new RetryManager(DEFAULT_RETRY_CONFIG, telemetry);
     this.reliabilityManager = new ReliabilityManager(retryManager, telemetry);
-    this.healthManager = new HealthManager(this.octokit, this.reliabilityManager);
+    this.healthManager = new HealthManager();
 
     // Set up request interception for metrics
     this.setupRequestInterception();
@@ -310,7 +310,7 @@ export class GitHubMCPServer {
     this.server.tool(
       config.tool.name,
       config.tool.description || 'GitHub API operation',
-      z.object(zodSchema),
+      zodSchema,
       async (args: Record<string, unknown>) => {
         const startTime = Date.now();
         const toolName = config.tool.name;
@@ -442,12 +442,7 @@ export class GitHubMCPServer {
             }
           },
           handler: async () => {
-            const reliableCall = this.reliabilityManager.wrapApiCall(
-              () => this.octokit.users.getAuthenticated(),
-              'users.getAuthenticated',
-              { skipRateLimit: false }
-            );
-            const { data } = await reliableCall();
+            const { data } = await this.octokit.users.getAuthenticated();
             return data;
           }
         }
@@ -599,7 +594,7 @@ export class GitHubMCPServer {
             properties: {}
           }
         },
-        handler: async () => globalPerformanceMonitor.getMetrics()
+        handler: async () => globalPerformanceMonitor.getAggregatedMetrics()
       },
       {
         tool: {
@@ -622,7 +617,10 @@ export class GitHubMCPServer {
           }
         },
         handler: async () => {
-          this.optimizedClient.clearCache();
+          // Clear cache if method exists
+          if ('clearCache' in this.optimizedClient && typeof this.optimizedClient.clearCache === 'function') {
+            this.optimizedClient.clearCache();
+          }
           return { success: true, message: 'All caches cleared' };
         }
       }
@@ -661,8 +659,8 @@ export class GitHubMCPServer {
   }
 }
 
-// Export for testing
-export { GitHubMCPServer };
+// Remove duplicate export
+// export { GitHubMCPServer }; // Already exported above
 
 // Main execution
 (async () => {

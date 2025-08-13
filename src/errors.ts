@@ -212,7 +212,7 @@ export async function withErrorHandling<T>(
       success: false,
       errorType: normalizedError.name,
       errorCode: normalizedError.code,
-      statusCode: normalizedError.statusCode,
+      statusCode: normalizedError.statusCode || undefined,
       isRetryable: normalizedError.isRetryable
     }, normalizedError);
 
