@@ -78,14 +78,15 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: ListSecretScanningAlertsParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListSecretScanningAlertsParams;
       try {
         const { data } = await octokit.secretScanning.listAlertsForRepo({
-          owner: args.owner,
-          repo: args.repo,
-          state: args.state,
-          secret_type: args.secret_type,
-          resolution: args.resolution,
+          owner: params.owner,
+          repo: params.repo,
+          state: params.state as any as any,
+          secret_type: params.secret_type as any,
+          resolution: params.resolution as any,
         });
 
         return data.map((alert) => ({
@@ -149,12 +150,13 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
         required: ['owner', 'repo', 'alertNumber'],
       },
     },
-    handler: async (args: GetSecretScanningAlertParams) => {
+    handler: async (args: unknown) => {
+      const params = args as GetSecretScanningAlertParams;
       try {
         const { data } = await octokit.secretScanning.getAlert({
-          owner: args.owner,
-          repo: args.repo,
-          alert_number: args.alertNumber,
+          owner: params.owner,
+          repo: params.repo,
+          alert_number: params.alertNumber,
         });
 
         return {
@@ -231,14 +233,15 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
         required: ['owner', 'repo', 'alertNumber'],
       },
     },
-    handler: async (args: ListSecretScanningAlertLocationsParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListSecretScanningAlertLocationsParams;
       try {
         const { data } = await octokit.secretScanning.listLocationsForAlert({
-          owner: args.owner,
-          repo: args.repo,
-          alert_number: args.alertNumber,
-          page: args.page,
-          per_page: args.perPage,
+          owner: params.owner,
+          repo: params.repo,
+          alert_number: params.alertNumber,
+          page: params.page,
+          per_page: params.perPage,
         });
 
         return data.map((location) => ({
@@ -297,15 +300,16 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
         required: ['org'],
       },
     },
-    handler: async (args: ListOrgSecretScanningAlertsParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListOrgSecretScanningAlertsParams;
       try {
         const { data } = await octokit.secretScanning.listAlertsForOrg({
-          org: args.org,
-          state: args.state,
-          secret_type: args.secret_type,
-          resolution: args.resolution,
-          page: args.page,
-          per_page: args.perPage,
+          org: params.org,
+          state: params.state as any as any,
+          secret_type: params.secret_type as any,
+          resolution: params.resolution as any,
+          page: params.page,
+          per_page: params.perPage,
         });
 
         return data.map((alert) => ({
@@ -325,8 +329,8 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
           secret_type: alert.secret_type,
           secret_type_display_name: alert.secret_type_display_name,
           repository: {
-            name: alert.repository.name,
-            full_name: alert.repository.full_name,
+            name: alert.repository?.name || "",
+            full_name: alert.repository?.full_name || "",
             owner: {
               login: alert.repository.owner.login,
             },
@@ -388,14 +392,15 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
           required: ['owner', 'repo', 'alertNumber', 'state'],
         },
       },
-      handler: async (args: UpdateSecretScanningAlertParams) => {
+      handler: async (args: unknown) => {
+      const params = args as UpdateSecretScanningAlertParams;
         const { data } = await octokit.secretScanning.updateAlert({
-          owner: args.owner,
-          repo: args.repo,
-          alert_number: args.alertNumber,
-          state: args.state,
-          resolution: args.resolution,
-          resolution_comment: args.resolution_comment,
+          owner: params.owner,
+          repo: params.repo,
+          alert_number: params.alertNumber,
+          state: params.state as any as any,
+          resolution: params.resolution as any,
+          resolution_comment: params.resolution_comment,
         });
 
         return {

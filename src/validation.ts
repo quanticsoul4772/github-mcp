@@ -811,9 +811,10 @@ export function validateGitHubTokenFormat(
   if (level === ValidationLevel.LENIENT) {
     const isValid = token.trim().length > 0;
     if (isValid && token.length === 40 && /^[a-f0-9]{40}$/i.test(token)) {
+      const legacyFormat = TOKEN_FORMATS.find(f => f.prefix === '');
       return {
         isValid: true,
-        format: 'legacy'
+        format: TOKEN_FORMATS.find(f => f.prefix === "")
       };
     }
     return {
@@ -859,31 +860,31 @@ export function validateGitHubTokenFormat(
     if (format.prefix === 'ghp_') {
       return {
         isValid: true,
-        format: 'classic_pat'
+        format
       };
     }
     if (format.prefix === 'gho_') {
       return {
         isValid: true,
-        format: 'oauth'
+        format
       };
     }
     if (format.prefix === 'github_pat_') {
       return {
         isValid: true,
-        format: 'fine_grained_pat'
+        format
       };
     }
     if (format.prefix === 'ghi_') {
       return {
         isValid: true,
-        format: 'installation'
+        format
       };
     }
     if (format.prefix === '') {
       return {
         isValid: true,
-        format: 'legacy'
+        format: TOKEN_FORMATS.find(f => f.prefix === "")
       };
     }
     

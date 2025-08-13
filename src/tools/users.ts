@@ -124,9 +124,10 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         required: ['username'],
       },
     },
-    handler: async (args: GetUserParams) => {
+    handler: async (args: unknown) => {
+      const params = args as GetUserParams;
       const { data } = await octokit.users.getByUsername({
-        username: args.username,
+        username: params.username,
       });
 
       return {
@@ -193,13 +194,14 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         required: ['query'],
       },
     },
-    handler: async (args: SearchUsersParams) => {
+    handler: async (args: unknown) => {
+      const params = args as SearchUsersParams;
       const { data } = await octokit.search.users({
-        q: args.query,
-        sort: args.sort,
-        order: args.order,
-        page: args.page,
-        per_page: args.perPage,
+        q: params.query,
+        sort: params.sort as any as any,
+        order: params.order as any as any,
+        page: params.page,
+        per_page: params.perPage,
       });
 
       return {
@@ -262,26 +264,27 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         },
       },
     },
-    handler: async (args: ListUserReposParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListUserReposParams;
       let data;
       
-      if (args.username) {
+      if (params.username) {
         const response = await octokit.repos.listForUser({
-          username: args.username,
-          type: args.type,
-          sort: args.sort,
-          direction: args.direction,
-          page: args.page,
-          per_page: args.perPage,
+          username: params.username,
+          type: params.type as any,
+          sort: params.sort as any as any,
+          direction: params.direction as any as any,
+          page: params.page,
+          per_page: params.perPage,
         });
         data = response.data;
       } else {
         const response = await octokit.repos.listForAuthenticatedUser({
-          type: args.type,
-          sort: args.sort,
-          direction: args.direction,
-          page: args.page,
-          per_page: args.perPage,
+          type: params.type as any,
+          sort: params.sort as any as any,
+          direction: params.direction as any as any,
+          page: params.page,
+          per_page: params.perPage,
         });
         data = response.data;
       }
@@ -340,20 +343,21 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         },
       },
     },
-    handler: async (args: ListFollowersParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListFollowersParams;
       let data;
       
-      if (args.username) {
+      if (params.username) {
         const response = await octokit.users.listFollowersForUser({
-          username: args.username,
-          page: args.page,
-          per_page: args.perPage,
+          username: params.username,
+          page: params.page,
+          per_page: params.perPage,
         });
         data = response.data;
       } else {
         const response = await octokit.users.listFollowersForAuthenticatedUser({
-          page: args.page,
-          per_page: args.perPage,
+          page: params.page,
+          per_page: params.perPage,
         });
         data = response.data;
       }
@@ -398,20 +402,21 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         },
       },
     },
-    handler: async (args: ListFollowingParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListFollowingParams;
       let data;
       
-      if (args.username) {
+      if (params.username) {
         const response = await octokit.users.listFollowingForUser({
-          username: args.username,
-          page: args.page,
-          per_page: args.perPage,
+          username: params.username,
+          page: params.page,
+          per_page: params.perPage,
         });
         data = response.data;
       } else {
         const response = await octokit.users.listFollowedByAuthenticatedUser({
-          page: args.page,
-          per_page: args.perPage,
+          page: params.page,
+          per_page: params.perPage,
         });
         data = response.data;
       }
@@ -450,32 +455,33 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         required: ['target_user'],
       },
     },
-    handler: async (args: CheckFollowingParams) => {
+    handler: async (args: unknown) => {
+      const params = args as CheckFollowingParams;
       try {
-        if (args.username) {
+        if (params.username) {
           await octokit.users.checkFollowingForUser({
-            username: args.username,
-            target_user: args.target_user,
+            username: params.username,
+            target_user: params.target_user,
           });
         } else {
           await octokit.users.checkPersonIsFollowedByAuthenticated({
-            username: args.target_user,
+            username: params.target_user,
           });
         }
         
         return {
           following: true,
-          message: args.username 
-            ? `${args.username} is following ${args.target_user}`
-            : `You are following ${args.target_user}`,
+          message: params.username 
+            ? `${params.username} is following ${params.target_user}`
+            : `You are following ${params.target_user}`,
         };
       } catch (error: any) {
         if (error.status === 404) {
           return {
             following: false,
-            message: args.username
-              ? `${args.username} is not following ${args.target_user}`
-              : `You are not following ${args.target_user}`,
+            message: params.username
+              ? `${params.username} is not following ${params.target_user}`
+              : `You are not following ${params.target_user}`,
           };
         }
         throw error;
@@ -501,14 +507,15 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
           required: ['username'],
         },
       },
-      handler: async (args: FollowUserParams) => {
+      handler: async (args: unknown) => {
+      const params = args as FollowUserParams;
         await octokit.users.follow({
-          username: args.username,
+          username: params.username,
         });
 
         return {
           success: true,
-          message: `Successfully followed ${args.username}`,
+          message: `Successfully followed ${params.username}`,
         };
       },
     });
@@ -529,14 +536,15 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
           required: ['username'],
         },
       },
-      handler: async (args: UnfollowUserParams) => {
+      handler: async (args: unknown) => {
+      const params = args as UnfollowUserParams;
         await octokit.users.unfollow({
-          username: args.username,
+          username: params.username,
         });
 
         return {
           success: true,
-          message: `Successfully unfollowed ${args.username}`,
+          message: `Successfully unfollowed ${params.username}`,
         };
       },
     });
@@ -584,16 +592,17 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
           },
         },
       },
-      handler: async (args: UpdateMeParams) => {
+      handler: async (args: unknown) => {
+      const params = args as UpdateMeParams;
         const { data } = await octokit.users.updateAuthenticated({
-          name: args.name,
-          email: args.email,
-          blog: args.blog,
-          company: args.company,
-          location: args.location,
-          hireable: args.hireable,
-          bio: args.bio,
-          twitter_username: args.twitter_username,
+          name: params.name,
+          email: params.email,
+          blog: params.blog,
+          company: params.company,
+          location: params.location,
+          hireable: params.hireable,
+          bio: params.bio,
+          twitter_username: params.twitter_username,
         });
 
         return {

@@ -1,3 +1,4 @@
+import { Octokit } from '@octokit/rest';
 /**
  * Performance Benchmarks Test Suite
  * Tests performance metrics, response times, memory usage, and concurrent processing
@@ -145,7 +146,7 @@ describe('Performance Benchmarks', () => {
         ...Array(30).fill(null).map(() => listIssues.handler({
           owner: 'test-owner', repo: 'test-repo', state: 'all'
         })),
-        ...Array(30).fill(null).map(() => getRepo.handler({
+...Array(30).fill(null).map(() => octokit.repos.get({
           owner: 'test-owner', repo: 'test-repo'
         })),
         ...Array(40).fill(null).map(() => listPRs.handler({

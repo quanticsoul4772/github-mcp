@@ -1,4 +1,39 @@
 /**
+ * Main entry point for the agent system
+ * Exports all agents, types, and utilities
+ */
+
+// Export types
+export * from './types.js';
+
+// Export base classes
+export * from './base/agent-base.js';
+export { AgentCoordinator, DefaultAgentRegistry } from './base/coordinator.js';
+
+// Export analysis agents
+export { StaticAnalysisAgent } from './analysis/static-analysis.js';
+export { ErrorDetectionAgent } from './analysis/error-detection.js';
+
+// Export testing agents
+export { TestGenerationAgent } from './testing/test-generation.js';
+
+// Export reporting
+export { ReportGenerator } from './reporting/report-generator.js';
+
+// Export tools
+export { createAgentTools } from './tools/agent-tools.js';
+
+// Export examples
+export * from './examples/basic-usage.js';
+
+// Import classes for the factory function
+import { AgentCoordinator } from './base/coordinator.js';
+import { StaticAnalysisAgent } from './analysis/static-analysis.js';
+import { ErrorDetectionAgent } from './analysis/error-detection.js';
+import { TestGenerationAgent } from './testing/test-generation.js';
+import { ReportGenerator } from './reporting/report-generator.js';
+import { createAgentTools } from './tools/agent-tools.js';
+
  * Main exports for the code analysis agent system
  */
 

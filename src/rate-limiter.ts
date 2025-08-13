@@ -594,7 +594,7 @@ export function createRateLimitedOctokit(token: string): {
     auth: token,
     request: {
       // Add custom request hook to apply rate limiting
-      hook: async (request, options) => {
+      hook: async (request: any, options: any) => {
         // Determine resource type from URL
         let resource = 'core';
         if (options.url?.includes('/search/')) {

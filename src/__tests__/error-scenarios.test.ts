@@ -46,7 +46,7 @@ describe('Error Scenarios', () => {
 
       const getTool = tools.find(tool => tool.tool.name === 'get_file_contents');
       
-      const result = await retry(
+      const result: any = await retry(
         () => getTool.handler({ owner: 'test-owner', repo: 'test-repo', path: 'README.md' }),
         { retries: 3, delay: 10 }
       );
@@ -157,7 +157,7 @@ describe('Error Scenarios', () => {
       });
 
       const getTool = tools.find(tool => tool.tool.name === 'get_file_contents');
-      const result = await getTool.handler({ owner: 'test-owner', repo: 'test-repo', path: 'some-dir/' });
+      const result: any = await getTool.handler({ owner: 'test-owner', repo: 'test-repo', path: 'some-dir/' });
       
       // Should handle empty directory
       expect(Array.isArray(result)).toBe(true);
@@ -176,7 +176,7 @@ describe('Error Scenarios', () => {
       });
 
       const getTool = tools.find(tool => tool.tool.name === 'get_file_contents');
-      const result = await getTool.handler({ 
+      const result: any = await getTool.handler({ 
         owner: 'owner', 
         repo: 'repo', 
         path: '测试-file-🚀.md' 

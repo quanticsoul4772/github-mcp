@@ -385,6 +385,7 @@ export async function runExamples() {
 }
 
 // Export all examples for individual use
+// (exports are already declared above with the function definitions)
 export {
   analyzeFile,
   analyzeProject,

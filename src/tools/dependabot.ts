@@ -77,13 +77,14 @@ export function createDependabotTools(octokit: Octokit, readOnly: boolean): Tool
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: ListDependabotAlertsParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListDependabotAlertsParams;
       try {
         const { data } = await octokit.dependabot.listAlertsForRepo({
-          owner: args.owner,
-          repo: args.repo,
-          state: args.state,
-          severity: args.severity,
+          owner: params.owner,
+          repo: params.repo,
+          state: params.state as any as any,
+          severity: params.severity,
         });
 
         return data.map((alert) => ({
@@ -158,12 +159,13 @@ export function createDependabotTools(octokit: Octokit, readOnly: boolean): Tool
         required: ['owner', 'repo', 'alertNumber'],
       },
     },
-    handler: async (args: GetDependabotAlertParams) => {
+    handler: async (args: unknown) => {
+      const params = args as GetDependabotAlertParams;
       try {
         const { data } = await octokit.dependabot.getAlert({
-          owner: args.owner,
-          repo: args.repo,
-          alert_number: args.alertNumber,
+          owner: params.owner,
+          repo: params.repo,
+          alert_number: params.alertNumber,
         });
 
         return {
@@ -250,13 +252,14 @@ export function createDependabotTools(octokit: Octokit, readOnly: boolean): Tool
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: ListDependabotSecretsParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListDependabotSecretsParams;
       try {
         const { data } = await octokit.dependabot.listRepoSecrets({
-          owner: args.owner,
-          repo: args.repo,
-          page: args.page,
-          per_page: args.perPage,
+          owner: params.owner,
+          repo: params.repo,
+          page: params.page,
+          per_page: params.perPage,
         });
 
         return {
@@ -318,14 +321,15 @@ export function createDependabotTools(octokit: Octokit, readOnly: boolean): Tool
           required: ['owner', 'repo', 'alertNumber', 'state'],
         },
       },
-      handler: async (args: UpdateDependabotAlertParams) => {
+      handler: async (args: unknown) => {
+      const params = args as UpdateDependabotAlertParams;
         const { data } = await octokit.dependabot.updateAlert({
-          owner: args.owner,
-          repo: args.repo,
-          alert_number: args.alertNumber,
-          state: args.state,
-          dismissed_reason: args.dismissed_reason,
-          dismissed_comment: args.dismissed_comment,
+          owner: params.owner,
+          repo: params.repo,
+          alert_number: params.alertNumber,
+          state: params.state as any as any,
+          dismissed_reason: params.dismissed_reason as any,
+          dismissed_comment: params.dismissed_comment,
         });
 
         return {
@@ -374,18 +378,19 @@ export function createDependabotTools(octokit: Octokit, readOnly: boolean): Tool
           required: ['owner', 'repo', 'secret_name', 'encrypted_value', 'key_id'],
         },
       },
-      handler: async (args: SetDependabotSecretParams) => {
+      handler: async (args: unknown) => {
+      const params = args as SetDependabotSecretParams;
         await octokit.dependabot.createOrUpdateRepoSecret({
-          owner: args.owner,
-          repo: args.repo,
-          secret_name: args.secret_name,
-          encrypted_value: args.encrypted_value,
-          key_id: args.key_id,
+          owner: params.owner,
+          repo: params.repo,
+          secret_name: params.secret_name,
+          encrypted_value: params.encrypted_value,
+          key_id: params.key_id,
         });
 
         return {
           success: true,
-          message: `Dependabot secret ${args.secret_name} set successfully`,
+          message: `Dependabot secret ${params.secret_name} set successfully`,
         };
       },
     });
@@ -414,16 +419,17 @@ export function createDependabotTools(octokit: Octokit, readOnly: boolean): Tool
           required: ['owner', 'repo', 'secret_name'],
         },
       },
-      handler: async (args: DeleteDependabotSecretParams) => {
+      handler: async (args: unknown) => {
+      const params = args as DeleteDependabotSecretParams;
         await octokit.dependabot.deleteRepoSecret({
-          owner: args.owner,
-          repo: args.repo,
-          secret_name: args.secret_name,
+          owner: params.owner,
+          repo: params.repo,
+          secret_name: params.secret_name,
         });
 
         return {
           success: true,
-          message: `Dependabot secret ${args.secret_name} deleted successfully`,
+          message: `Dependabot secret ${params.secret_name} deleted successfully`,
         };
       },
     });
