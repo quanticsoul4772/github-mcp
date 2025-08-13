@@ -102,15 +102,16 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: ListCodeScanningAlertsParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListCodeScanningAlertsParams;
       try {
         const { data } = await octokit.codeScanning.listAlertsForRepo({
-          owner: args.owner,
-          repo: args.repo,
-          state: args.state,
-          ref: args.ref,
-          tool_name: args.tool_name,
-          severity: args.severity,
+          owner: params.owner,
+          repo: params.repo,
+          state: params.state as any as any,
+          ref: params.ref,
+          tool_name: params.tool_name,
+          severity: params.severity,
         });
 
         return data.map((alert) => ({
@@ -172,12 +173,13 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
         required: ['owner', 'repo', 'alertNumber'],
       },
     },
-    handler: async (args: GetCodeScanningAlertParams) => {
+    handler: async (args: unknown) => {
+      const params = args as GetCodeScanningAlertParams;
       try {
         const { data } = await octokit.codeScanning.getAlert({
-          owner: args.owner,
-          repo: args.repo,
-          alert_number: args.alertNumber,
+          owner: params.owner,
+          repo: params.repo,
+          alert_number: params.alertNumber,
         });
 
         return {
@@ -252,12 +254,13 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: ListRepositorySecurityAdvisoriesParams) => {
+    handler: async (args: unknown) => {
+      const params = args as ListRepositorySecurityAdvisoriesParams;
       try {
         const { data } = await octokit.securityAdvisories.listRepositoryAdvisories({
-          owner: args.owner,
-          repo: args.repo,
-          state: args.state,
+          owner: params.owner,
+          repo: params.repo,
+          state: params.state as any as any,
         });
 
         return data.map((advisory) => ({
@@ -308,11 +311,12 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
         required: ['owner', 'repo'],
       },
     },
-    handler: async (args: CheckVulnerabilityAlertsParams) => {
+    handler: async (args: unknown) => {
+      const params = args as CheckVulnerabilityAlertsParams;
       try {
         await octokit.repos.checkVulnerabilityAlerts({
-          owner: args.owner,
-          repo: args.repo,
+          owner: params.owner,
+          repo: params.repo,
         });
 
         return {
@@ -355,12 +359,13 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
         required: ['owner', 'repo', 'sarif_id'],
       },
     },
-    handler: async (args: GetSarifUploadParams) => {
+    handler: async (args: unknown) => {
+      const params = args as GetSarifUploadParams;
       try {
         const { data } = await octokit.codeScanning.getSarif({
-          owner: args.owner,
-          repo: args.repo,
-          sarif_id: args.sarif_id,
+          owner: params.owner,
+          repo: params.repo,
+          sarif_id: params.sarif_id,
         });
 
         return {
@@ -419,14 +424,15 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
           required: ['owner', 'repo', 'alertNumber', 'state'],
         },
       },
-      handler: async (args: UpdateCodeScanningAlertParams) => {
+      handler: async (args: unknown) => {
+      const params = args as UpdateCodeScanningAlertParams;
         const { data } = await octokit.codeScanning.updateAlert({
-          owner: args.owner,
-          repo: args.repo,
-          alert_number: args.alertNumber,
-          state: args.state,
-          dismissed_reason: args.dismissed_reason,
-          dismissed_comment: args.dismissed_comment,
+          owner: params.owner,
+          repo: params.repo,
+          alert_number: params.alertNumber,
+          state: params.state as any as any,
+          dismissed_reason: params.dismissed_reason as any,
+          dismissed_comment: params.dismissed_comment,
         });
 
         return {
@@ -479,25 +485,26 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
           required: ['owner', 'repo', 'sarif', 'commit_sha'],
         },
       },
-      handler: async (args: UploadSarifParams) => {
+      handler: async (args: unknown) => {
+      const params = args as UploadSarifParams;
         const { gzip } = await import('zlib');
         const { promisify } = await import('util');
         const gzipAsync = promisify(gzip);
         
         // Properly gzip the SARIF data as required by GitHub API
         const sarifBuffer = Buffer.from(
-          typeof args.sarif === 'string' ? args.sarif : JSON.stringify(args.sarif)
+          typeof params.sarif === 'string' ? params.sarif : JSON.stringify(params.sarif)
         );
         const gzippedBuffer = await gzipAsync(sarifBuffer);
         const gzippedSarif = gzippedBuffer.toString('base64');
 
         const { data } = await octokit.codeScanning.uploadSarif({
-          owner: args.owner,
-          repo: args.repo,
+          owner: params.owner,
+          repo: params.repo,
           sarif: gzippedSarif,
-          ref: args.ref,
-          commit_sha: args.commit_sha,
-          tool_name: args.tool_name,
+          ref: params.ref,
+          commit_sha: params.commit_sha || "",
+          tool_name: params.tool_name,
         });
 
         return {
@@ -527,10 +534,11 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
           required: ['owner', 'repo'],
         },
       },
-      handler: async (args: EnableVulnerabilityAlertsParams) => {
+      handler: async (args: unknown) => {
+      const params = args as EnableVulnerabilityAlertsParams;
         await octokit.repos.enableVulnerabilityAlerts({
-          owner: args.owner,
-          repo: args.repo,
+          owner: params.owner,
+          repo: params.repo,
         });
 
         return {
@@ -560,10 +568,11 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
           required: ['owner', 'repo'],
         },
       },
-      handler: async (args: DisableVulnerabilityAlertsParams) => {
+      handler: async (args: unknown) => {
+      const params = args as DisableVulnerabilityAlertsParams;
         await octokit.repos.disableVulnerabilityAlerts({
-          owner: args.owner,
-          repo: args.repo,
+          owner: params.owner,
+          repo: params.repo,
         });
 
         return {

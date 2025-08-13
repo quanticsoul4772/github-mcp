@@ -303,40 +303,25 @@ export class OptimizedAPIClient {
   /**
    * Optimized workflow runs listing
    */
-  async listWorkflowRuns(
-    owner: string,
-    repo: string,
-    workflowId: string | number,
-    options: {
-      branch?: string;
-      event?: string;
-      status?: string;
-      maxPages?: number;
-    } = {}
-  ): Promise<any[]> {
-    const { maxPages = 3, ...otherOptions } = options;
-    const params = { owner, repo, workflow_id: workflowId, per_page: 100, ...otherOptions };
-
-    // Dynamic data - use shorter cache TTL
-    return this.call(
-      'actions.listWorkflowRuns',
-      params,
-      async () => {
-        if (maxPages === 1) {
-          const { data } = await this.octokit.actions.listWorkflowRuns(params);
-          return data.workflow_runs;
-        }
-
-        const fetcher = this.paginationHandler.createGitHubFetcher(
-          (fetchParams) => this.octokit.actions.listWorkflowRuns(fetchParams),
-          { owner, repo, workflow_id: workflowId, ...otherOptions }
-        );
-
-        const results = await this.paginationHandler.paginateSmart(fetcher, { maxPages, perPage: 100 });
-        return results;
-      },
-      { cacheTTL: 30 * 1000 } // 30 seconds for dynamic data
-    );
+  async listWorkflowRuns(params: any): Promise<{ data: unknown[]; headers?: any; }> {
+    const fetchParams = {
+      owner: params.owner,
+      repo: params.repo,
+      workflow_id: params.workflow_id,
+      actor: params.actor,
+      branch: params.branch,
+      event: params.event,
+      status: params.status as any,
+      created: params.created,
+      exclude_pull_requests: params.exclude_pull_requests,
+      check_suite_id: params.check_suite_id,
+      head_sha: params.head_sha,
+      per_page: params.per_page || 30,
+      page: params.page || 1
+    };
+    
+    const response = await this.octokit.actions.listWorkflowRuns(fetchParams);
+    return { data: response.data.workflow_runs, headers: response.headers };
   }
 
   /**
@@ -495,6 +480,13 @@ export class OptimizedAPIClient {
     }
     
     return this.performanceMonitor.generateReport();
+  }
+
+  /**
+   * Clear cache only
+   */
+  clearCache(): void {
+    this.cache?.clear();
   }
 
   /**

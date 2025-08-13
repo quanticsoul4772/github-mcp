@@ -13,7 +13,7 @@ interface RequestOptions {
   enableMetrics?: boolean;
 }
 
-interface DeduplicationMetrics {
+export interface DeduplicationMetrics {
   totalRequests: number;
   deduplicatedRequests: number;
   pendingRequests: number;

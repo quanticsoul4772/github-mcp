@@ -226,6 +226,8 @@ export class ReportGenerator {
    */
   private sortFindings(findings: Finding[], sortBy: string): Finding[] {
     const severityOrder = [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW, Severity.INFO];
+
+    return findings.sort((a, b) => {
     const list = findings.slice();
 
     return list.sort((a, b) => {
@@ -722,6 +724,9 @@ export class ReportGenerator {
   }
 
   private escapeHtml(text: string): string {
+    const div = { innerHTML: '' } as any;
+    div.textContent = text;
+    return div.innerHTML;
     const s = String(text);
     return s
       .replace(/&/g, '&')

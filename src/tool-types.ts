@@ -150,6 +150,9 @@ export interface ListIssuesParams {
   state?: 'open' | 'closed' | 'all';
   assignee?: string;
   labels?: string;
+  sort?: 'created' | 'updated' | 'comments';
+  direction?: 'asc' | 'desc';
+  since?: string;
   page?: number;
   perPage?: number;
 }
@@ -171,6 +174,7 @@ export interface UpdateIssueParams {
   title?: string;
   body?: string;
   state?: 'open' | 'closed';
+  milestone?: number | null;
   assignees?: string[];
   labels?: string[];
 }
@@ -229,6 +233,8 @@ export interface ListPullRequestsParams {
   state?: 'open' | 'closed' | 'all';
   head?: string;
   base?: string;
+  sort?: 'created' | 'updated' | 'popularity' | 'long-running';
+  direction?: 'asc' | 'desc';
   page?: number;
   perPage?: number;
 }
@@ -240,22 +246,25 @@ export interface CreatePullRequestParams {
   head: string;
   base: string;
   body?: string;
+  maintainer_can_modify?: boolean;
   draft?: boolean;
 }
 
 export interface UpdatePullRequestParams {
   owner: string;
   repo: string;
-  pullNumber: number;
+  pull_number: number;
   title?: string;
   body?: string;
   state?: 'open' | 'closed';
+  base?: string;
+  maintainer_can_modify?: boolean;
 }
 
 export interface MergePullRequestParams {
   owner: string;
   repo: string;
-  pullNumber: number;
+  pull_number: number;
   merge_method?: 'merge' | 'squash' | 'rebase';
   commit_title?: string;
   commit_message?: string;
@@ -264,13 +273,13 @@ export interface MergePullRequestParams {
 export interface GetPullRequestDiffParams {
   owner: string;
   repo: string;
-  pullNumber: number;
+  pull_number: number;
 }
 
 export interface DismissPullRequestReviewParams {
   owner: string;
   repo: string;
-  pullNumber: number;
+  pull_number: number;
   review_id: number;
   message: string;
 }
@@ -278,7 +287,7 @@ export interface DismissPullRequestReviewParams {
 export interface CreatePullRequestReviewCommentParams {
   owner: string;
   repo: string;
-  pullNumber: number;
+  pull_number: number;
   body: string;
   commit_id: string;
   path: string;
@@ -439,10 +448,11 @@ export interface SetThreadSubscriptionParams {
 // Search Tools Parameters
 export interface SearchCodeParams {
   q: string;
-  sort?: 'indexed';
+  sort?: 'indexed' | 'author-date' | 'committer-date' | 'created' | 'updated';
   order?: 'asc' | 'desc';
   page?: number;
   perPage?: number;
+  repository_id?: number;
 }
 
 export interface SearchReposParams {
@@ -459,6 +469,12 @@ export interface SearchIssuesParams {
   order?: 'asc' | 'desc';
   page?: number;
   perPage?: number;
+}
+
+export interface SearchIssuesWithRepoParams extends SearchIssuesParams {
+  owner?: string;
+  repo?: string;
+  query: string;
 }
 
 export interface SearchUsersParams {

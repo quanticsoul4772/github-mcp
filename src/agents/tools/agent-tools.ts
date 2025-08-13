@@ -149,6 +149,9 @@ export function createAgentTools(): ToolConfig<unknown, unknown>[] {
           logger.info('Starting coordinated analysis', { target: args.target });
           const result = await coordinator.coordinate(request);
 
+          return {
+            summary: result.summary,
+            findings: result.consolidatedFindings,
           const MAX_FINDINGS = 200;
           const totalFindings = result.consolidatedFindings.length;
           const findings = totalFindings > MAX_FINDINGS
@@ -486,6 +489,9 @@ export function createAgentTools(): ToolConfig<unknown, unknown>[] {
               break;
             case 'performance':
               agents = ['static-analysis'];
+              break;
+            case 'style':
+              agents = ['static-analysis'];
               config.includeCategories = [FindingCategory.PERFORMANCE_ISSUE];
               break;
             case 'style':
@@ -581,6 +587,10 @@ export function createAgentTools(): ToolConfig<unknown, unknown>[] {
           agent.configure(args.config);
           logger.info('Agent configured', { agent: args.agent, config: args.config });
 
+          return {
+            agent: args.agent,
+            previousConfig: agent.getConfig(),
+            newConfig: args.config,
           const prevConfig = agent.getConfig();
           agent.configure(args.config);
           logger.info('Agent configured', { agent: args.agent, config: args.config });

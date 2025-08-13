@@ -12,7 +12,7 @@ interface PerformanceMetric {
   apiCallCount?: number;
 }
 
-interface AggregatedMetrics {
+export interface AggregatedMetrics {
   operation: string;
   count: number;
   totalDuration: number;
@@ -25,7 +25,7 @@ interface AggregatedMetrics {
   lastUpdated: number;
 }
 
-interface SystemMetrics {
+export interface SystemMetrics {
   totalRequests: number;
   totalDuration: number;
   averageResponseTime: number;
@@ -284,6 +284,13 @@ export class PerformanceMonitor {
    */
   getApiCallCount(): number {
     return this.apiCallCount;
+  }
+
+  /**
+   * Get all metrics (alias for getSystemMetrics for compatibility)
+   */
+  getMetrics(): SystemMetrics {
+    return this.getSystemMetrics();
   }
 }
 

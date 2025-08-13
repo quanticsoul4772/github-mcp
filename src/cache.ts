@@ -15,7 +15,7 @@ interface CacheOptions {
   enableMetrics?: boolean; // Track cache hits/misses
 }
 
-interface CacheMetrics {
+export interface CacheMetrics {
   hits: number;
   misses: number;
   evictions: number;
