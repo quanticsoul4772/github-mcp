@@ -20,7 +20,7 @@
     "build": "tsc",
     "dev": "tsx src/index.ts",
     "start": "node build/index.js",
-    "clean": "rm -rf build",
+    "clean": "rm -rf build coverage .npm-cache .claude",
     "prepare": "husky && npm run build",
     "test": "vitest",
     "test:ui": "vitest --ui",

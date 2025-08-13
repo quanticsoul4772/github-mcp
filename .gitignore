@@ -50,8 +50,11 @@ Thumbs.db
 # Package manager files
 yarn.lock
 pnpm-lock.yaml
+.npm-cache/
+.pnpm-store/
 
 # Claude local settings
+.claude/
 .claude/settings.local.json
 
 # Debug files
