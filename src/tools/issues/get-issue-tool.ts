@@ -1,13 +1,22 @@
+import { z } from 'zod';
 import { ToolConfig } from '../../types.js';
 import { IIssueService } from '../../foundation/interfaces.js';
 import { BaseToolHandler } from '../../foundation/base-tool-handler.js';
 import { ErrorHandler } from '../../foundation/error-handler.js';
+import { createTypeSafeHandler } from '../../utils/type-safety.js';
 
 interface GetIssueParams {
   owner: string;
   repo: string;
   issue_number: number;
 }
+
+// Zod schema for validation
+const GetIssueSchema = z.object({
+  owner: z.string().min(1, 'Owner is required'),
+  repo: z.string().min(1, 'Repository name is required'),
+  issue_number: z.number().int().min(1, 'Issue number must be a positive integer'),
+});
 
 interface GetIssueResult {
   number: number;
@@ -116,6 +125,10 @@ export function createGetIssueTool(octokit: any, issueService: IIssueService): T
         required: ['owner', 'repo', 'issue_number'],
       },
     },
-    handler: async (args: any) => handler.handle(args),
+    handler: createTypeSafeHandler(
+      GetIssueSchema,
+      async (params: GetIssueParams) => handler.handle(params),
+      'get_issue'
+    ),
   };
 }

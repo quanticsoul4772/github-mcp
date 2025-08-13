@@ -1,5 +1,73 @@
 import { Octokit } from '@octokit/rest';
+import { z } from 'zod';
 import { ToolConfig } from '../types.js';
+<<<<<<< HEAD
+import { createTypeSafeHandler } from '../utils/type-safety.js';
+
+// Type definitions for advanced search
+interface SearchAcrossReposParams {
+  query: string;
+  type: 'REPOSITORY' | 'ISSUE' | 'USER' | 'DISCUSSION';
+  first?: number;
+  after?: string;
+}
+
+interface SearchRepositoriesAdvancedParams {
+  query: string;
+  language?: string;
+  stars?: string;
+  forks?: string;
+  size?: string;
+  created?: string;
+  pushed?: string;
+  license?: string;
+  topics?: string[];
+  includeMetrics?: boolean;
+  first?: number;
+}
+
+interface SearchWithRelationshipsParams {
+  entityType: 'USER' | 'ORGANIZATION';
+  query: string;
+  includeRepositories?: boolean;
+  includeGists?: boolean;
+  includeFollowers?: boolean;
+  repositoryLimit?: number;
+  first?: number;
+}
+
+// Zod schemas for validation
+const SearchAcrossReposSchema = z.object({
+  query: z.string().min(1, 'Search query is required'),
+  type: z.enum(['REPOSITORY', 'ISSUE', 'USER', 'DISCUSSION']),
+  first: z.number().int().min(1).max(100).optional().default(25),
+  after: z.string().optional(),
+});
+
+const SearchRepositoriesAdvancedSchema = z.object({
+  query: z.string().min(1, 'Base search query is required'),
+  language: z.string().optional(),
+  stars: z.string().optional(),
+  forks: z.string().optional(),
+  size: z.string().optional(),
+  created: z.string().optional(),
+  pushed: z.string().optional(),
+  license: z.string().optional(),
+  topics: z.array(z.string()).optional(),
+  includeMetrics: z.boolean().optional().default(false),
+  first: z.number().int().min(1).max(50).optional().default(25),
+});
+
+const SearchWithRelationshipsSchema = z.object({
+  entityType: z.enum(['USER', 'ORGANIZATION']),
+  query: z.string().min(1, 'Search query for the entity is required'),
+  includeRepositories: z.boolean().optional().default(false),
+  includeGists: z.boolean().optional().default(false),
+  includeFollowers: z.boolean().optional().default(false),
+  repositoryLimit: z.number().int().min(1).max(25).optional().default(10),
+  first: z.number().int().min(1).max(20).optional().default(10),
+});
+=======
 import { GraphQLPaginationHandler, GraphQLPaginationOptions, GraphQLPaginationUtils } from '../graphql-pagination-handler.js';
 import {
   validateGraphQLInput,
@@ -10,6 +78,7 @@ import {
   GraphQLValidationError
 } from '../graphql-validation.js';
 import { withErrorHandling } from '../errors.js';
+>>>>>>> main
 
 /**
  * Creates advanced search tools using GraphQL API for enhanced search capabilities.
@@ -79,6 +148,11 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
         required: ['query', 'type'],
       },
     },
+<<<<<<< HEAD
+    handler: createTypeSafeHandler(
+      SearchAcrossReposSchema,
+      async (params: SearchAcrossReposParams) => {
+=======
     handler: async (args: any) => {
       try {
         GraphQLPaginationUtils.validatePaginationParams(args);
@@ -108,6 +182,7 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
       // Validate and sanitize input parameters
       const validatedArgs = validateGraphQLInput(CrossRepoSearchSchema, args, 'search_across_repos');
       
+>>>>>>> main
       const query = `
         query($searchQuery: String!, $type: SearchType!, $first: Int!, $after: String) {
           search(query: $searchQuery, type: $type, first: $first, after: $after) {
@@ -261,6 +336,13 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
             }
           `;
 
+<<<<<<< HEAD
+      const result: any = await octokit.graphql(query, {
+        searchQuery: params.query,
+        type: params.type,
+        first: params.first,
+        after: params.after,
+=======
           const result: any = await octokit.graphql(query, {
             searchQuery: args.query,
             type: args.type,
@@ -282,6 +364,7 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
         type: args.type,
         first: args.first || 25,
         after: args.after,
+>>>>>>> main
       });
           if (!result.search) {
             throw new Error('Search query returned no results');
@@ -298,9 +381,18 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
             results: result.search.nodes,
           };
         },
+<<<<<<< HEAD
+        pageInfo: result.search.pageInfo,
+        results: result.search.nodes,
+      };
+      },
+      'search_across_repos'
+    ),
+=======
         { tool: 'search_across_repos', query: args.query, type: args.type }
       );
     },
+>>>>>>> main
   });
 
   // Complex repository search with filters
@@ -362,6 +454,25 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
         required: ['query'],
       },
     },
+<<<<<<< HEAD
+    handler: createTypeSafeHandler(
+      SearchRepositoriesAdvancedSchema,
+      async (params: SearchRepositoriesAdvancedParams) => {
+        // Build search query with filters - all parameters are now properly typed
+        let searchQuery = params.query;
+        
+        if (params.language) searchQuery += ` language:${params.language}`;
+        if (params.stars) searchQuery += ` stars:${params.stars}`;
+        if (params.forks) searchQuery += ` forks:${params.forks}`;
+        if (params.size) searchQuery += ` size:${params.size}`;
+        if (params.created) searchQuery += ` created:${params.created}`;
+        if (params.pushed) searchQuery += ` pushed:${params.pushed}`;
+        if (params.license) searchQuery += ` license:${params.license}`;
+        if (params.topics) {
+          for (const topic of params.topics) {
+            searchQuery += ` topic:${topic}`;
+          }
+=======
     handler: async (args: any) => {
       // Validate and sanitize input parameters
       const validatedArgs = validateGraphQLInput(AdvancedRepoSearchSchema, args, 'search_repositories_advanced');
@@ -379,8 +490,8 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
       if (validatedArgs.topics) {
         for (const topic of validatedArgs.topics) {
           searchQuery += ` topic:${topic}`;
+>>>>>>> main
         }
-      }
 
       const baseQuery = `
         query($searchQuery: String!, $first: Int!) {
@@ -463,7 +574,11 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                     }
                   }
                 }
+<<<<<<< HEAD
+                ${params.includeMetrics ? `
+=======
                 ${validatedArgs.includeMetrics ? `
+>>>>>>> main
                 issues {
                   totalCount
                 }
@@ -517,6 +632,12 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
             }
           `;
 
+<<<<<<< HEAD
+      const result: any = await octokit.graphql(baseQuery, {
+        searchQuery,
+        first: params.first,
+      });
+=======
       // Validate GraphQL variables before execution
       const variables = {
         searchQuery: validateGraphQLVariableValue(searchQuery, 'searchQuery'),
@@ -524,6 +645,7 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
       };
       
       const result: any = await octokit.graphql(baseQuery, variables);
+>>>>>>> main
 
       return {
         query: searchQuery,
@@ -540,7 +662,11 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
             forks: repo.forkCount,
             watchers: repo.watchers.totalCount,
             size: repo.diskUsage,
+<<<<<<< HEAD
+            ...(params.includeMetrics && {
+=======
             ...(validatedArgs.includeMetrics && {
+>>>>>>> main
               issues: repo.issues?.totalCount,
               pullRequests: repo.pullRequests?.totalCount,
               releases: repo.releases?.totalCount,
@@ -565,6 +691,11 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
           defaultBranch: repo.defaultBranchRef?.name,
         })),
       };
+<<<<<<< HEAD
+      },
+      'search_repositories_advanced'
+    ),
+=======
       const result: any = await (octokit as any).graphqlWithComplexity(baseQuery, {
         searchQuery,
         first: args.first || 25,
@@ -622,6 +753,7 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
         { tool: 'search_repositories_advanced', query: args.query, filters: { language: args.language, stars: args.stars } }
       );
     },
+>>>>>>> main
   });
 
   // Multi-entity search with relationships
@@ -669,10 +801,16 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
         required: ['entityType', 'query'],
       },
     },
+<<<<<<< HEAD
+    handler: createTypeSafeHandler(
+      SearchWithRelationshipsSchema,
+      async (params: SearchWithRelationshipsParams) => {
+=======
     handler: async (args: any) => {
       // Validate and sanitize input parameters
       const validatedArgs = validateGraphQLInput(SearchWithRelationshipsSchema, args, 'search_with_relationships');
       
+>>>>>>> main
       const query = `
         query($searchQuery: String!, $entityType: SearchType!, $first: Int!, $repoLimit: Int!) {
           search(query: $searchQuery, type: $entityType, first: $first) {
@@ -694,7 +832,11 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                 avatarUrl
                 createdAt
                 updatedAt
+<<<<<<< HEAD
+                ${params.includeRepositories ? `
+=======
                 ${validatedArgs.includeRepositories ? `
+>>>>>>> main
                 repositories(first: $repoLimit, orderBy: {field: STARGAZERS, direction: DESC}) {
                   totalCount
                   nodes {
@@ -713,7 +855,11 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                   }
                 }
                 ` : ''}
+<<<<<<< HEAD
+                ${params.includeGists ? `
+=======
                 ${validatedArgs.includeGists ? `
+>>>>>>> main
                 gists(first: 10) {
                   totalCount
                   nodes {
@@ -783,7 +929,11 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                   }
                 }
                 ` : ''}
+<<<<<<< HEAD
+                ${params.includeFollowers ? `
+=======
                 ${validatedArgs.includeFollowers ? `
+>>>>>>> main
                 followers {
                   totalCount
                 }
@@ -803,7 +953,11 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                 avatarUrl
                 createdAt
                 updatedAt
+<<<<<<< HEAD
+                ${params.includeRepositories ? `
+=======
                 ${validatedArgs.includeRepositories ? `
+>>>>>>> main
                 repositories(first: $repoLimit, orderBy: {field: STARGAZERS, direction: DESC}) {
                   totalCount
                   nodes {
@@ -846,6 +1000,13 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
             }
           `;
 
+<<<<<<< HEAD
+      const result: any = await octokit.graphql(query, {
+        searchQuery: params.query,
+        entityType: params.entityType,
+        first: params.first,
+        repoLimit: params.repositoryLimit,
+=======
           const result: any = await octokit.graphql(query, {
             searchQuery: args.query,
             entityType: args.entityType,
@@ -867,11 +1028,22 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
         entityType: args.entityType,
         first: args.first || 10,
         repoLimit: args.repositoryLimit || 10,
+>>>>>>> main
       });
           if (!result.search) {
             throw new Error('Entity search with relationships returned no results');
           }
 
+<<<<<<< HEAD
+      return {
+        totalCount: result.search.userCount,
+        pageInfo: result.search.pageInfo,
+        entities: result.search.nodes,
+      };
+      },
+      'search_with_relationships'
+    ),
+=======
           return {
             totalCount: result.search.userCount,
             pageInfo: result.search.pageInfo,
@@ -881,6 +1053,7 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
         { tool: 'search_with_relationships', entityType: args.entityType, query: args.query }
       );
     },
+>>>>>>> main
   });
 
   return tools;
