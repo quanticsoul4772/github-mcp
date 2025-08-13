@@ -29,6 +29,9 @@ import { createAdvancedSearchTools } from './tools/advanced-search.js';
 import { createProjectManagementTools } from './tools/project-management.js';
 import { createBatchOperationsTools } from './tools/batch-operations.js';
 import { createOptimizedRepositoryTools } from './tools/optimized-repositories.js';
+import { createAgentTools } from './agents/tools/agent-tools.js';
+import { createCacheManagementTools } from './tools/cache-management.js';
+import { validateEnvironmentConfiguration } from './validation.js';
 
 // Performance optimizations
 import { OptimizedAPIClient } from './optimized-api-client.js';
@@ -87,14 +90,13 @@ export class GitHubMCPServer {
    * Sets up the MCP server, configures GitHub authentication,
    * parses environment variables, and registers tools.
    */
-  constructor() {
+  constructor(testMode: boolean = false) {
     // Initialize monitoring first
     logger.info('Starting GitHub MCP Server', { 
       version: SERVER_VERSION,
       node: process.version,
       platform: process.platform
     });
-
     // Initialize MCP server
     this.server = new McpServer({
       name: SERVER_NAME,
@@ -109,14 +111,24 @@ export class GitHubMCPServer {
         errors: envValidation.errors 
       });
       
+      console.error('ERROR: Environment configuration validation failed:');
+      envValidation.errors.forEach(error => console.error(`  - ${error}`));
+      console.error('Please check your environment variables and try again.');
+      console.error('Create a GitHub Personal Access Token at: https://github.com/settings/tokens');
+      console.error('Required scopes: repo, workflow, user, notifications');
+      
       // Don't exit in test environment
-      if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
-        console.error('ERROR: Environment configuration validation failed:');
-        envValidation.errors.forEach(error => console.error(`  - ${error}`));
-        console.error('Please check your environment variables and try again.');
-        console.error('Create a GitHub Personal Access Token at: https://github.com/settings/tokens');
-        console.error('Required scopes: repo, workflow, user, notifications');
+      if (!testMode && process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
         process.exit(1);
+      } else if (testMode) {
+        throw new Error('Environment validation failed: ' + envValidation.errors.join(', '));
+ claude/issue-38-20250810-0103
+        // In test mode, avoid throwing in constructor to prevent side effects.
+        // Consumers can inspect `envValidation.errors` or `server` state, or throw during start().
+        logger.warn('Environment validation failed (test mode): ' + envValidation.errors.join(', '));
+
+        throw new Error('Environment validation failed: ' + envValidation.errors.join(', '));
+ main
       }
     }
 
@@ -168,6 +180,7 @@ export class GitHubMCPServer {
     this.optimizedClient = new OptimizedAPIClient({
       octokit: this.octokit,
       enableCache: process.env.GITHUB_ENABLE_CACHE !== 'false',
+      enableGraphQLCache: process.env.GITHUB_ENABLE_GRAPHQL_CACHE !== 'false',
       enableDeduplication: process.env.GITHUB_ENABLE_DEDUPLICATION !== 'false',
       enablePerformanceMonitoring: process.env.GITHUB_ENABLE_MONITORING !== 'false',
     });
@@ -310,8 +323,8 @@ export class GitHubMCPServer {
     this.server.tool(
       config.tool.name,
       config.tool.description || 'GitHub API operation',
-      z.object(zodSchema),
-      async (args: Record<string, unknown>) => {
+      zodSchema,
+      async (args: Record<string, unknown>, extra: unknown) => {
         const startTime = Date.now();
         const toolName = config.tool.name;
         try {
@@ -361,13 +374,26 @@ export class GitHubMCPServer {
             args
           });
           
-          // Return standardized error response with both approaches
-          const errorMessage = formatErrorResponse(error);
+          // Return standardized error response with proper formatting
+          const errorResponse = formatErrorResponse(error);
+          const errorMessage = errorResponse.error.message;
+          const errorCode = errorResponse.error.code;
+          const errorDetails = errorResponse.error.details;
+          
+          // Build a helpful error message
+          let errorText = `Error: ${errorMessage}`;
+          if (errorCode && errorCode !== 'UNKNOWN_ERROR') {
+            errorText += `\nCode: ${errorCode}`;
+          }
+          if (errorDetails?.statusCode) {
+            errorText += `\nStatus: ${errorDetails.statusCode}`;
+          }
+          
           return {
             content: [
               {
                 type: 'text' as const,
-                text: `Error: ${errorMessage}`,
+                text: errorText,
               },
             ],
             isError: true,
@@ -442,12 +468,10 @@ export class GitHubMCPServer {
             }
           },
           handler: async () => {
-            const reliableCall = this.reliabilityManager.wrapApiCall(
-              () => this.octokit.users.getAuthenticated(),
+            const { data } = await this.reliabilityManager.executeWithReliability(
               'users.getAuthenticated',
-              { skipRateLimit: false }
+              () => this.octokit.users.getAuthenticated()
             );
-            const { data } = await reliableCall();
             return data;
           }
         }
@@ -528,7 +552,7 @@ export class GitHubMCPServer {
 
     // Register discussion tools
     if (this.enabledToolsets.has('discussions')) {
-      const discussionTools = createDiscussionTools(this.octokit, this.readOnly);
+      const discussionTools = createDiscussionTools(this.optimizedClient, this.readOnly);
       discussionTools.forEach(tool => this.registerTool(tool));
       // Discussion tools registered
     }
@@ -549,7 +573,7 @@ export class GitHubMCPServer {
 
     // GraphQL repository insights tools
     if (this.enabledToolsets.has('graphql_insights')) {
-      const insightsTools = createRepositoryInsightsTools(this.octokit, this.readOnly);
+      const insightsTools = createRepositoryInsightsTools(this.optimizedClient, this.readOnly);
       insightsTools.forEach(tool => this.registerTool(tool));
       // Repository Insights tools registered
     }
@@ -579,6 +603,11 @@ export class GitHubMCPServer {
     const healthTools = createHealthTools(this.healthManager);
     healthTools.forEach(tool => this.registerTool(tool));
     // Health monitoring tools registered
+
+    // Register cache management tools
+    const cacheManagementTools = createCacheManagementTools(this.optimizedClient);
+    cacheManagementTools.forEach(tool => this.registerTool(tool));
+    console.log(`  ✓ Cache management tools (${cacheManagementTools.length})`);
 
     // Register monitoring and observability tools
     if (this.enabledToolsets.has('monitoring')) {
@@ -630,6 +659,11 @@ export class GitHubMCPServer {
     perfTools.forEach(tool => this.registerTool(tool));
     // Performance monitoring tools registered
 
+    // Register code analysis agent tools
+    const agentTools = createAgentTools();
+    agentTools.forEach(tool => this.registerTool(tool));
+    // Code analysis agent tools registered
+
     // Total tools registered successfully
   }
 
@@ -661,19 +695,5 @@ export class GitHubMCPServer {
   }
 }
 
-// Export for testing
+// Export for testing and external usage
 export { GitHubMCPServer };
-
-// Main execution
-(async () => {
-  try {
-    const server = new GitHubMCPServer();
-    await server.start();
-  } catch (error) {
-    logger.error('Failed to start GitHub MCP server', { error });
-    // Error already logged via logger above
-    if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
-      process.exit(1);
-    }
-  }
-})();

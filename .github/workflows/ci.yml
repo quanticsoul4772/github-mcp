@@ -90,12 +90,74 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build project for analysis
+        run: npm run build
+
       - name: Check for TypeScript errors
         run: npx tsc --noEmit || echo "::warning::TypeScript errors found"
 
       - name: Check code formatting
         run: |
           npm run format:check || echo "::warning::Code formatting issues found"
+
+      - name: Run code analysis agents
+        id: agent_analysis
+        run: |
+          echo "Running code analysis agents..."
+          
+          # Create agent analysis script
+          cat > agent_quality_check.mjs << 'EOF'
+          import { quickAnalyze } from './build/agents/index.js';
+          import fs from 'fs/promises';
+          
+          try {
+            console.log('Running quality analysis with agents...');
+            
+            const result = await quickAnalyze('src/', {
+              type: 'directory',
+              depth: 'shallow',
+              format: 'json'
+            });
+            
+            const summary = result.analysis.summary;
+            console.log(`Analysis completed: ${summary.totalFindings} issues found`);
+            
+            // Create quality metrics
+            const qualityMetrics = {
+              totalIssues: summary.totalFindings,
+              critical: summary.findingsBySeverity?.critical || 0,
+              high: summary.findingsBySeverity?.high || 0,
+              medium: summary.findingsBySeverity?.medium || 0,
+              low: summary.findingsBySeverity?.low || 0,
+              categories: summary.findingsByCategory,
+              agentsUsed: summary.agentsUsed
+            };
+            
+            await fs.writeFile('quality-metrics.json', JSON.stringify(qualityMetrics, null, 2));
+            
+            // Set GitHub outputs
+            console.log(`total_issues=${qualityMetrics.totalIssues}`);
+            console.log(`critical_issues=${qualityMetrics.critical}`);
+            console.log(`high_issues=${qualityMetrics.high}`);
+            
+            // Fail if critical issues found
+            if (qualityMetrics.critical > 0) {
+              console.log('❌ Critical quality issues found!');
+              process.exit(1);
+            } else if (qualityMetrics.high > 5) {
+              console.log('⚠️ Too many high-priority issues found!');
+              process.exit(1);
+            } else {
+              console.log('✅ Quality check passed');
+            }
+            
+          } catch (error) {
+            console.error('Agent analysis failed:', error);
+            process.exit(1);
+          }
+          EOF
+          
+          node agent_quality_check.mjs
 
       - name: Analyze code complexity
         run: |
@@ -104,6 +166,66 @@ jobs:
       - name: Check for unused dependencies
         run: |
           npx depcheck || echo "::notice::Unused dependencies check complete"
+
+      - name: Upload quality metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-metrics-${{ github.run_number }}
+          path: quality-metrics.json
+          retention-days: 7
+
+      - name: Comment quality results on PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            try {
+              const metrics = JSON.parse(fs.readFileSync('quality-metrics.json', 'utf8'));
+              
+              let comment = '## 📊 Code Quality Check\n\n';
+              comment += `**Total Issues**: ${metrics.totalIssues}\n`;
+              
+              if (metrics.critical > 0) {
+                comment += `🔴 **Critical**: ${metrics.critical}\n`;
+              }
+              if (metrics.high > 0) {
+                comment += `🟠 **High**: ${metrics.high}\n`;
+              }
+              if (metrics.medium > 0) {
+                comment += `🟡 **Medium**: ${metrics.medium}\n`;
+              }
+              if (metrics.low > 0) {
+                comment += `🔵 **Low**: ${metrics.low}\n`;
+              }
+              
+              if (metrics.totalIssues === 0) {
+                comment += '\n✅ **No quality issues found!**\n';
+              } else {
+                comment += '\n**Top Issue Categories**:\n';
+                const topCategories = Object.entries(metrics.categories)
+                  .filter(([_, count]) => count > 0)
+                  .sort(([_, a], [__, b]) => b - a)
+                  .slice(0, 3);
+                
+                for (const [category, count] of topCategories) {
+                  comment += `- ${category.replace(/_/g, ' ')}: ${count}\n`;
+                }
+              }
+              
+              comment += `\n**Analysis by**: ${metrics.agentsUsed.join(', ')}`;
+              
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            } catch (error) {
+              console.error('Error reading quality metrics:', error);
+            }
 
   security-check:
     runs-on: ubuntu-latest

@@ -1,72 +1,94 @@
 # Configuration for PR labeler action
 # Add labels based on file paths
+# Format for actions/labeler@v5
 
 documentation:
-  - '**/*.md'
-  - docs/**/*
-  - LICENSE
-  - .github/**/*.md
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+          - 'docs/**/*'
+          - 'LICENSE'
+          - '.github/**/*.md'
 
 github-actions:
-  - .github/workflows/**/*
-  - .github/actions/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/workflows/**/*'
+          - '.github/actions/**/*'
 
 dependencies:
-  - package.json
-  - package-lock.json
-  - yarn.lock
-  - pnpm-lock.yaml
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'package.json'
+          - 'package-lock.json'
+          - 'yarn.lock'
+          - 'pnpm-lock.yaml'
 
 typescript:
-  - '**/*.ts'
-  - '**/*.tsx'
-  - tsconfig.json
-  - tsconfig.*.json
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.ts'
+          - '**/*.tsx'
+          - 'tsconfig.json'
+          - 'tsconfig.*.json'
 
 testing:
-  - '**/*.test.ts'
-  - '**/*.test.tsx'
-  - '**/*.test.js'
-  - '**/*.spec.ts'
-  - '**/*.spec.tsx'
-  - '**/*.spec.js'
-  - __tests__/**/*
-  - test/**/*
-  - tests/**/*
-  - jest.config.*
-  - vitest.config.*
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.test.ts'
+          - '**/*.test.tsx'
+          - '**/*.test.js'
+          - '**/*.spec.ts'
+          - '**/*.spec.tsx'
+          - '**/*.spec.js'
+          - '__tests__/**/*'
+          - 'test/**/*'
+          - 'tests/**/*'
+          - 'jest.config.*'
+          - 'vitest.config.*'
 
 security:
-  - .github/workflows/security.yml
-  - .github/dependabot.yml
-  - src/validation.ts
-  - src/auth/**/*
-  - '**/*security*'
-  - '**/*auth*'
-  - '**/*token*'
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/workflows/security.yml'
+          - '.github/dependabot.yml'
+          - 'src/validation.ts'
+          - 'src/auth/**/*'
+          - '**/*security*'
+          - '**/*auth*'
+          - '**/*token*'
 
 api:
-  - src/handlers/**/*
-  - src/services/**/*
-  - src/api/**/*
-  - '**/*api*'
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/handlers/**/*'
+          - 'src/services/**/*'
+          - 'src/api/**/*'
+          - '**/*api*'
 
 configuration:
-  - .eslintrc*
-  - .prettierrc*
-  - .gitignore
-  - .editorconfig
-  - .env.example
-  - config/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.eslintrc*'
+          - '.prettierrc*'
+          - '.gitignore'
+          - '.editorconfig'
+          - '.env.example'
+          - 'config/**/*'
+          - 'eslint.config.js'
 
 docker:
-  - Dockerfile
-  - docker-compose.yml
-  - .dockerignore
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'Dockerfile'
+          - 'docker-compose.yml'
+          - '.dockerignore'
 
 infrastructure:
-  - terraform/**/*
-  - k8s/**/*
-  - helm/**/*
-  - .github/workflows/release.yml
-  - .github/workflows/deploy.yml
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'terraform/**/*'
+          - 'k8s/**/*'
+          - 'helm/**/*'
+          - '.github/workflows/release.yml'
+          - '.github/workflows/deploy.yml'

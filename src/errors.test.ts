@@ -49,7 +49,7 @@ describe('Error Classes', () => {
       );
 
       const json = error.toJSON();
-      expect(json).toEqual({
+      expect(json).toMatchObject({
         name: 'GitHubMCPError',
         message: 'Test error',
         code: 'TEST_CODE',
@@ -57,6 +57,8 @@ describe('Error Classes', () => {
         context: { resource: 'test' },
         isRetryable: false,
       });
+      expect(json.correlationId).toBeDefined();
+      expect(json.timestamp).toBeDefined();
     });
   });
 
@@ -253,11 +255,11 @@ describe('Error Handling Utilities', () => {
         },
       };
       
-      const normalized = normalizeError(apiError);
+      const normalized = normalizeError(apiError) as RateLimitError;
       
       expect(normalized).toBeInstanceOf(RateLimitError);
-      expect((normalized as RateLimitError).limit).toBe(5000);
-      expect((normalized as RateLimitError).remaining).toBe(0);
+      expect(normalized.limit).toBe(5000);
+      expect(normalized.remaining).toBe(0);
     });
 
     it('should normalize network errors', () => {

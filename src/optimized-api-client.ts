@@ -4,6 +4,10 @@
  */
 
 import { Octokit } from '@octokit/rest';
+import { GitHubAPICache, CACHE_CONFIG } from './cache.js';
+import { GraphQLCache } from './graphql-cache.js';
+import { RequestDeduplicator } from './request-deduplication.js';
+import { PerformanceMonitor } from './performance-monitor.js';
 import { GitHubAPICache, CACHE_CONFIG, type CacheMetrics } from './cache.js';
 import { RequestDeduplicator, type DeduplicationMetrics } from './request-deduplication.js';
 import { PerformanceMonitor, type AggregatedMetrics, type SystemMetrics } from './performance-monitor.js';
@@ -14,9 +18,15 @@ export type { CacheMetrics, DeduplicationMetrics, AggregatedMetrics, SystemMetri
 interface OptimizedClientOptions {
   octokit: Octokit;
   enableCache?: boolean;
+  enableGraphQLCache?: boolean;
   enableDeduplication?: boolean;
   enablePerformanceMonitoring?: boolean;
   cacheOptions?: {
+    defaultTTL?: number;
+    maxSize?: number;
+    enableMetrics?: boolean;
+  };
+  graphqlCacheOptions?: {
     defaultTTL?: number;
     maxSize?: number;
     enableMetrics?: boolean;
@@ -26,16 +36,19 @@ interface OptimizedClientOptions {
 export class OptimizedAPIClient {
   private octokit: Octokit;
   private cache?: GitHubAPICache;
+  private graphqlCache?: GraphQLCache;
   private deduplicator?: RequestDeduplicator;
   private performanceMonitor?: PerformanceMonitor;
   private paginationHandler: PaginationHandler;
   private readonly enableCache: boolean;
+  private readonly enableGraphQLCache: boolean;
   private readonly enableDeduplication: boolean;
   private readonly enablePerformanceMonitoring: boolean;
 
   constructor(options: OptimizedClientOptions) {
     this.octokit = options.octokit;
     this.enableCache = options.enableCache ?? true;
+    this.enableGraphQLCache = options.enableGraphQLCache ?? true;
     this.enableDeduplication = options.enableDeduplication ?? true;
     this.enablePerformanceMonitoring = options.enablePerformanceMonitoring ?? true;
 
@@ -46,6 +59,15 @@ export class OptimizedAPIClient {
         maxSize: 1000,
         enableMetrics: true,
         ...options.cacheOptions,
+      });
+    }
+
+    if (this.enableGraphQLCache) {
+      this.graphqlCache = new GraphQLCache({
+        defaultTTL: 5 * 60 * 1000, // 5 minutes
+        maxSize: 500, // Smaller cache for GraphQL as responses can be larger
+        enableMetrics: true,
+        ...options.graphqlCacheOptions,
       });
     }
 
@@ -346,6 +368,89 @@ export class OptimizedAPIClient {
   }
 
   /**
+   * Execute an optimized GraphQL query with caching and performance monitoring
+   */
+  async graphql<T>(
+    query: string,
+    variables: Record<string, any> = {},
+    options: {
+      ttl?: number;
+      skipCache?: boolean;
+      skipDeduplication?: boolean;
+      operation?: string;
+    const fetcher = async (): Promise<T> => {
+      const sortedVars = Object.keys(variables || {})
+        .sort()
+        .reduce((acc, k) => { acc[k] = (variables as any)[k]; return acc; }, {} as Record<string, any>);
+      const dedupeKey = `graphql:${this.hashQuery(query)}:${JSON.stringify(sortedVars)}`;
+      if (this.enableDeduplication && !options.skipDeduplication && this.deduplicator) {
+        const deduplicatedCall = async () => this.octokit.graphql(query, variables) as Promise<T>;
+        return this.deduplicator.deduplicate(dedupeKey, sortedVars, deduplicatedCall);
+      }
+      return this.octokit.graphql(query, variables) as Promise<T>;
+          deduplicatedCall
+        );
+      }
+      
+      return this.octokit.graphql(query, variables) as Promise<T>;
+    };
+
+    // Use GraphQL cache if enabled
+    if (this.enableGraphQLCache && !options.skipCache && this.graphqlCache) {
+      const cachedExecutor = async (): Promise<T> => {
+        return this.graphqlCache!.get(
+          query,
+          variables,
+          fetcher,
+          {
+            ttl: options.ttl,
+            skipCache: options.skipCache,
+            operation: options.operation,
+          }
+        );
+      };
+
+      // Apply performance monitoring if enabled
+      if (this.enablePerformanceMonitoring && this.performanceMonitor) {
+        return this.performanceMonitor.measure(operation, cachedExecutor);
+      }
+
+      return cachedExecutor();
+    }
+
+    // Apply performance monitoring if enabled (fallback)
+    if (this.enablePerformanceMonitoring && this.performanceMonitor) {
+      return this.performanceMonitor.measure(operation, fetcher);
+    }
+
+    return fetcher();
+  }
+
+  /**
+   * Invalidate GraphQL cache after mutations
+   */
+  invalidateGraphQLCacheForMutation(mutation: string, variables: Record<string, any> = {}): number {
+    if (!this.graphqlCache) return 0;
+    return this.graphqlCache.invalidateForMutation(mutation, variables);
+  }
+
+  /**
+   * Simple hash function for query deduplication
+   */
+  private hashQuery(query: string): string {
+    const normalizedQuery = query.replace(/\s+/g, ' ').trim();
+    let hash = 0;
+    
+    for (let i = 0; i < normalizedQuery.length; i++) {
+      const char = normalizedQuery.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    
+    return hash.toString(36);
+  }
+
+  /**
    * Invalidate cache entries matching pattern
    */
   invalidateCache(pattern: string | RegExp): number {
@@ -354,15 +459,31 @@ export class OptimizedAPIClient {
   }
 
   /**
+   * Invalidate GraphQL cache entries matching pattern
+   */
+  invalidateGraphQLCache(pattern: string | RegExp): number {
+    if (!this.graphqlCache) return 0;
+    return this.graphqlCache.invalidate(pattern);
+  }
+
+  /**
    * Get performance metrics
    */
   getMetrics(): any {
     return {
       cache: this.cache?.getMetrics(),
+      graphqlCache: this.graphqlCache?.getMetrics(),
       deduplication: this.deduplicator?.getMetrics(),
       performance: this.performanceMonitor?.getSystemMetrics(),
       aggregatedPerformance: this.performanceMonitor?.getAggregatedMetrics(),
     };
+  }
+
+  /**
+   * Get comprehensive GraphQL cache statistics
+   */
+  getGraphQLCacheStats() {
+    return this.graphqlCache?.getDetailedStats() || null;
   }
 
   /**
@@ -381,6 +502,7 @@ export class OptimizedAPIClient {
    */
   clearAll(): void {
     this.cache?.clear();
+    this.graphqlCache?.clear();
     this.deduplicator?.clear();
     this.performanceMonitor?.clear();
   }

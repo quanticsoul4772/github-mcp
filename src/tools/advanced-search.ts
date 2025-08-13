@@ -1,6 +1,7 @@
 import { Octokit } from '@octokit/rest';
 import { z } from 'zod';
 import { ToolConfig } from '../types.js';
+<<<<<<< HEAD
 import { createTypeSafeHandler } from '../utils/type-safety.js';
 
 // Type definitions for advanced search
@@ -66,9 +67,41 @@ const SearchWithRelationshipsSchema = z.object({
   repositoryLimit: z.number().int().min(1).max(25).optional().default(10),
   first: z.number().int().min(1).max(20).optional().default(10),
 });
+=======
+import { GraphQLPaginationHandler, GraphQLPaginationOptions, GraphQLPaginationUtils } from '../graphql-pagination-handler.js';
+import {
+  validateGraphQLInput,
+  validateGraphQLVariableValue,
+  CrossRepoSearchSchema,
+  AdvancedRepoSearchSchema,
+  SearchWithRelationshipsSchema,
+  GraphQLValidationError
+} from '../graphql-validation.js';
+import { withErrorHandling } from '../errors.js';
+>>>>>>> main
 
+/**
+ * Creates advanced search tools using GraphQL API for enhanced search capabilities.
+ * 
+ * These tools provide sophisticated search functionality that leverages GraphQL's
+ * ability to fetch nested relationships and contextual data in single queries,
+ * offering performance and feature advantages over REST-based search.
+ * 
+ * @param octokit - Configured Octokit instance with GraphQL support
+ * @param readOnly - Whether to exclude write operations (all search tools are read-only)
+ * @returns Array of advanced search tool configurations
+ * 
+ * @example
+ * ```typescript
+ * const tools = createAdvancedSearchTools(octokit, true);
+ * // Returns tools: search_across_repos, advanced_code_search, etc.
+ * ```
+ * 
+ * @see https://docs.github.com/en/graphql/reference/queries#search
+ */
 export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
+  const paginationHandler = new GraphQLPaginationHandler(octokit);
 
   // Cross-repository search tool
   tools.push({
@@ -97,13 +130,59 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
             type: 'string',
             description: 'Cursor for pagination',
           },
+          autoPage: {
+            type: 'boolean',
+            description: 'Automatically paginate through all results',
+          },
+          maxPages: {
+            type: 'number',
+            description: 'Maximum number of pages to fetch (default 10)',
+            minimum: 1,
+          },
+          maxItems: {
+            type: 'number',
+            description: 'Maximum number of items to fetch across all pages',
+            minimum: 1,
+          },
         },
         required: ['query', 'type'],
       },
     },
+<<<<<<< HEAD
     handler: createTypeSafeHandler(
       SearchAcrossReposSchema,
       async (params: SearchAcrossReposParams) => {
+=======
+    handler: async (args: any) => {
+      try {
+        GraphQLPaginationUtils.validatePaginationParams(args);
+      } catch (error) {
+        throw new Error(`Invalid pagination parameters: ${error.message}`);
+      }
+
+      const queryBuilder = paginationHandler.createSearchQuery(args.query, args.type);
+
+      const paginationOptions: GraphQLPaginationOptions = {
+        first: args.first,
+        after: args.after,
+        autoPage: args.autoPage,
+        maxPages: args.maxPages,
+        maxItems: args.maxItems,
+      };
+
+      const result = await paginationHandler.paginate(queryBuilder, paginationOptions);
+
+      return {
+        totalCount: result.totalCount,
+        hasNextPage: result.hasMore,
+        endCursor: result.nextCursor,
+        pageInfo: result.pageInfo,
+        results: result.data,
+      };
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(CrossRepoSearchSchema, args, 'search_across_repos');
+      
+>>>>>>> main
       const query = `
         query($searchQuery: String!, $type: SearchType!, $first: Int!, $after: String) {
           search(query: $searchQuery, type: $type, first: $first, after: $after) {
@@ -137,110 +216,183 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                 licenseInfo {
                   name
                   spdxId
+      return withErrorHandling(
+        'search_across_repos',
+        async () => {
+          const query = `
+            query($searchQuery: String!, $type: SearchType!, $first: Int!, $after: String) {
+              search(query: $searchQuery, type: $type, first: $first, after: $after) {
+                repositoryCount
+                issueCount
+                userCount
+                discussionCount
+                pageInfo {
+                  hasNextPage
+                  endCursor
                 }
-                repositoryTopics(first: 10) {
-                  nodes {
-                    topic {
+                nodes {
+                  ... on Repository {
+                    id
+                    name
+                    nameWithOwner
+                    description
+                    url
+                    stargazerCount
+                    forkCount
+                    createdAt
+                    updatedAt
+                    primaryLanguage {
                       name
+                      color
+                    }
+                    owner {
+                      login
+                      avatarUrl
+                    }
+                    licenseInfo {
+                      name
+                      spdxId
+                    }
+                    repositoryTopics(first: 10) {
+                      nodes {
+                        topic {
+                          name
+                        }
+                      }
                     }
                   }
-                }
-              }
-              ... on Issue {
-                id
-                number
-                title
-                body
-                url
-                state
-                createdAt
-                updatedAt
-                author {
-                  login
-                  avatarUrl
-                }
-                repository {
-                  name
-                  nameWithOwner
-                }
-                labels(first: 10) {
-                  nodes {
+                  ... on Issue {
+                    id
+                    number
+                    title
+                    body
+                    url
+                    state
+                    createdAt
+                    updatedAt
+                    author {
+                      login
+                      avatarUrl
+                    }
+                    repository {
+                      name
+                      nameWithOwner
+                    }
+                    labels(first: 10) {
+                      nodes {
+                        name
+                        color
+                      }
+                    }
+                    comments {
+                      totalCount
+                    }
+                  }
+                  ... on User {
+                    id
+                    login
                     name
-                    color
+                    email
+                    bio
+                    company
+                    location
+                    url
+                    avatarUrl
+                    createdAt
+                    followers {
+                      totalCount
+                    }
+                    following {
+                      totalCount
+                    }
+                    repositories {
+                      totalCount
+                    }
+                  }
+                  ... on Discussion {
+                    id
+                    number
+                    title
+                    body
+                    url
+                    createdAt
+                    updatedAt
+                    author {
+                      login
+                      avatarUrl
+                    }
+                    repository {
+                      name
+                      nameWithOwner
+                    }
+                    category {
+                      name
+                      slug
+                    }
+                    upvoteCount
                   }
                 }
-                comments {
-                  totalCount
-                }
-              }
-              ... on User {
-                id
-                login
-                name
-                email
-                bio
-                company
-                location
-                url
-                avatarUrl
-                createdAt
-                followers {
-                  totalCount
-                }
-                following {
-                  totalCount
-                }
-                repositories {
-                  totalCount
-                }
-              }
-              ... on Discussion {
-                id
-                number
-                title
-                body
-                url
-                createdAt
-                updatedAt
-                author {
-                  login
-                  avatarUrl
-                }
-                repository {
-                  name
-                  nameWithOwner
-                }
-                category {
-                  name
-                  slug
-                }
-                upvoteCount
               }
             }
-          }
-        }
-      `;
+          `;
 
+<<<<<<< HEAD
       const result: any = await octokit.graphql(query, {
         searchQuery: params.query,
         type: params.type,
         first: params.first,
         after: params.after,
-      });
+=======
+          const result: any = await octokit.graphql(query, {
+            searchQuery: args.query,
+            type: args.type,
+            first: args.first || 25,
+            after: args.after,
+          });
 
-      return {
-        totalCount: {
-          repositories: result.search.repositoryCount,
-          issues: result.search.issueCount,
-          users: result.search.userCount,
-          discussions: result.search.discussionCount,
+      // Validate GraphQL variables before execution
+      const variables = {
+        searchQuery: validateGraphQLVariableValue(validatedArgs.query, 'searchQuery'),
+        type: validateGraphQLVariableValue(validatedArgs.type, 'type'),
+        first: validateGraphQLVariableValue(validatedArgs.first || 25, 'first'),
+        after: validatedArgs.after ? validateGraphQLVariableValue(validatedArgs.after, 'after') : undefined,
+      };
+      
+      const result: any = await octokit.graphql(query, variables);
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
+        searchQuery: args.query,
+        type: args.type,
+        first: args.first || 25,
+        after: args.after,
+>>>>>>> main
+      });
+          if (!result.search) {
+            throw new Error('Search query returned no results');
+          }
+
+          return {
+            totalCount: {
+              repositories: result.search.repositoryCount,
+              issues: result.search.issueCount,
+              users: result.search.userCount,
+              discussions: result.search.discussionCount,
+            },
+            pageInfo: result.search.pageInfo,
+            results: result.search.nodes,
+          };
         },
+<<<<<<< HEAD
         pageInfo: result.search.pageInfo,
         results: result.search.nodes,
       };
       },
       'search_across_repos'
     ),
+=======
+        { tool: 'search_across_repos', query: args.query, type: args.type }
+      );
+    },
+>>>>>>> main
   });
 
   // Complex repository search with filters
@@ -302,6 +454,7 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
         required: ['query'],
       },
     },
+<<<<<<< HEAD
     handler: createTypeSafeHandler(
       SearchRepositoriesAdvancedSchema,
       async (params: SearchRepositoriesAdvancedParams) => {
@@ -319,6 +472,25 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
           for (const topic of params.topics) {
             searchQuery += ` topic:${topic}`;
           }
+=======
+    handler: async (args: any) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(AdvancedRepoSearchSchema, args, 'search_repositories_advanced');
+      
+      // Build search query with filters
+      let searchQuery = validatedArgs.query;
+      
+      if (validatedArgs.language) searchQuery += ` language:${validatedArgs.language}`;
+      if (validatedArgs.stars) searchQuery += ` stars:${validatedArgs.stars}`;
+      if (validatedArgs.forks) searchQuery += ` forks:${validatedArgs.forks}`;
+      if (validatedArgs.size) searchQuery += ` size:${validatedArgs.size}`;
+      if (validatedArgs.created) searchQuery += ` created:${validatedArgs.created}`;
+      if (validatedArgs.pushed) searchQuery += ` pushed:${validatedArgs.pushed}`;
+      if (validatedArgs.license) searchQuery += ` license:${validatedArgs.license}`;
+      if (validatedArgs.topics) {
+        for (const topic of validatedArgs.topics) {
+          searchQuery += ` topic:${topic}`;
+>>>>>>> main
         }
 
       const baseQuery = `
@@ -328,60 +500,85 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
             pageInfo {
               hasNextPage
               endCursor
+      return withErrorHandling(
+        'search_repositories_advanced',
+        async () => {
+          // Build search query with filters
+          let searchQuery = args.query;
+          
+          if (args.language) searchQuery += ` language:${args.language}`;
+          if (args.stars) searchQuery += ` stars:${args.stars}`;
+          if (args.forks) searchQuery += ` forks:${args.forks}`;
+          if (args.size) searchQuery += ` size:${args.size}`;
+          if (args.created) searchQuery += ` created:${args.created}`;
+          if (args.pushed) searchQuery += ` pushed:${args.pushed}`;
+          if (args.license) searchQuery += ` license:${args.license}`;
+          if (args.topics) {
+            for (const topic of args.topics) {
+              searchQuery += ` topic:${topic}`;
             }
-            nodes {
-              ... on Repository {
-                id
-                name
-                nameWithOwner
-                description
-                url
-                stargazerCount
-                forkCount
-                watchers {
-                  totalCount
+          }
+
+          const baseQuery = `
+            query($searchQuery: String!, $first: Int!) {
+              search(query: $searchQuery, type: REPOSITORY, first: $first) {
+                repositoryCount
+                pageInfo {
+                  hasNextPage
+                  endCursor
                 }
-                createdAt
-                updatedAt
-                pushedAt
-                diskUsage
-                primaryLanguage {
-                  name
-                  color
-                }
-                languages(first: 10, orderBy: {field: SIZE, direction: DESC}) {
-                  edges {
-                    size
-                    node {
+                nodes {
+                  ... on Repository {
+                    id
+                    name
+                    nameWithOwner
+                    description
+                    url
+                    stargazerCount
+                    forkCount
+                    watchers {
+                      totalCount
+                    }
+                    createdAt
+                    updatedAt
+                    pushedAt
+                    diskUsage
+                    primaryLanguage {
                       name
                       color
                     }
-                  }
-                }
-                owner {
-                  login
-                  avatarUrl
-                  ... on User {
-                    name
-                    company
-                  }
-                  ... on Organization {
-                    name
-                    description
-                  }
-                }
-                licenseInfo {
-                  name
-                  spdxId
-                }
-                repositoryTopics(first: 20) {
-                  nodes {
-                    topic {
+                    languages(first: 10, orderBy: {field: SIZE, direction: DESC}) {
+                      edges {
+                        size
+                        node {
+                          name
+                          color
+                        }
+                      }
+                    }
+                    owner {
+                      login
+                      avatarUrl
+                      ... on User {
+                        name
+                        company
+                      }
+                      ... on Organization {
+                        name
+                        description
+                      }
+                    }
+                    licenseInfo {
                       name
+                      spdxId
                     }
                   }
                 }
+<<<<<<< HEAD
                 ${params.includeMetrics ? `
+=======
+                ${validatedArgs.includeMetrics ? `
+>>>>>>> main
                 issues {
                   totalCount
                 }
@@ -400,19 +597,55 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                   target {
                     ... on Commit {
                       committedDate
+                    repositoryTopics(first: 20) {
+                      nodes {
+                        topic {
+                          name
+                        }
+                      }
+                    }
+                    ${args.includeMetrics ? `
+                    issues {
+                      totalCount
+                    }
+                    pullRequests {
+                      totalCount
+                    }
+                    releases {
+                      totalCount
+                    }
+                    collaborators {
+                      totalCount
+                    }
+                    ` : ''}
+                    defaultBranchRef {
+                      name
+                      target {
+                        ... on Commit {
+                          committedDate
+                        }
+                      }
                     }
                   }
                 }
               }
             }
-          }
-        }
-      `;
+          `;
 
+<<<<<<< HEAD
       const result: any = await octokit.graphql(baseQuery, {
         searchQuery,
         first: params.first,
       });
+=======
+      // Validate GraphQL variables before execution
+      const variables = {
+        searchQuery: validateGraphQLVariableValue(searchQuery, 'searchQuery'),
+        first: validateGraphQLVariableValue(validatedArgs.first || 25, 'first'),
+      };
+      
+      const result: any = await octokit.graphql(baseQuery, variables);
+>>>>>>> main
 
       return {
         query: searchQuery,
@@ -429,7 +662,11 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
             forks: repo.forkCount,
             watchers: repo.watchers.totalCount,
             size: repo.diskUsage,
+<<<<<<< HEAD
             ...(params.includeMetrics && {
+=======
+            ...(validatedArgs.includeMetrics && {
+>>>>>>> main
               issues: repo.issues?.totalCount,
               pullRequests: repo.pullRequests?.totalCount,
               releases: repo.releases?.totalCount,
@@ -454,9 +691,69 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
           defaultBranch: repo.defaultBranchRef?.name,
         })),
       };
+<<<<<<< HEAD
       },
       'search_repositories_advanced'
     ),
+=======
+      const result: any = await (octokit as any).graphqlWithComplexity(baseQuery, {
+        searchQuery,
+        first: args.first || 25,
+      });
+          const result: any = await octokit.graphql(baseQuery, {
+            searchQuery,
+            first: args.first || 25,
+          });
+
+          if (!result.search) {
+            throw new Error('Advanced repository search returned no results');
+          }
+
+          return {
+            query: searchQuery,
+            totalCount: result.search.repositoryCount,
+            pageInfo: result.search.pageInfo,
+            repositories: result.search.nodes.map((repo: any) => ({
+              id: repo.id,
+              name: repo.name,
+              fullName: repo.nameWithOwner,
+              description: repo.description,
+              url: repo.url,
+              statistics: {
+                stars: repo.stargazerCount,
+                forks: repo.forkCount,
+                watchers: repo.watchers.totalCount,
+                size: repo.diskUsage,
+                ...(args.includeMetrics && {
+                  issues: repo.issues?.totalCount,
+                  pullRequests: repo.pullRequests?.totalCount,
+                  releases: repo.releases?.totalCount,
+                  collaborators: repo.collaborators?.totalCount,
+                }),
+              },
+              languages: repo.languages.edges.map((edge: any) => ({
+                name: edge.node.name,
+                color: edge.node.color,
+                size: edge.size,
+              })),
+              primaryLanguage: repo.primaryLanguage,
+              owner: repo.owner,
+              license: repo.licenseInfo,
+              topics: repo.repositoryTopics.nodes.map((node: any) => node.topic.name),
+              dates: {
+                created: repo.createdAt,
+                updated: repo.updatedAt,
+                pushed: repo.pushedAt,
+                lastCommit: repo.defaultBranchRef?.target?.committedDate,
+              },
+              defaultBranch: repo.defaultBranchRef?.name,
+            })),
+          };
+        },
+        { tool: 'search_repositories_advanced', query: args.query, filters: { language: args.language, stars: args.stars } }
+      );
+    },
+>>>>>>> main
   });
 
   // Multi-entity search with relationships
@@ -504,9 +801,16 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
         required: ['entityType', 'query'],
       },
     },
+<<<<<<< HEAD
     handler: createTypeSafeHandler(
       SearchWithRelationshipsSchema,
       async (params: SearchWithRelationshipsParams) => {
+=======
+    handler: async (args: any) => {
+      // Validate and sanitize input parameters
+      const validatedArgs = validateGraphQLInput(SearchWithRelationshipsSchema, args, 'search_with_relationships');
+      
+>>>>>>> main
       const query = `
         query($searchQuery: String!, $entityType: SearchType!, $first: Int!, $repoLimit: Int!) {
           search(query: $searchQuery, type: $entityType, first: $first) {
@@ -528,7 +832,11 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                 avatarUrl
                 createdAt
                 updatedAt
+<<<<<<< HEAD
                 ${params.includeRepositories ? `
+=======
+                ${validatedArgs.includeRepositories ? `
+>>>>>>> main
                 repositories(first: $repoLimit, orderBy: {field: STARGAZERS, direction: DESC}) {
                   totalCount
                   nodes {
@@ -547,19 +855,85 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                   }
                 }
                 ` : ''}
+<<<<<<< HEAD
                 ${params.includeGists ? `
+=======
+                ${validatedArgs.includeGists ? `
+>>>>>>> main
                 gists(first: 10) {
                   totalCount
                   nodes {
+      return withErrorHandling(
+        'search_with_relationships',
+        async () => {
+          const query = `
+            query($searchQuery: String!, $entityType: SearchType!, $first: Int!, $repoLimit: Int!) {
+              search(query: $searchQuery, type: $entityType, first: $first) {
+                userCount
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
+                nodes {
+                  ... on User {
+                    id
+                    login
                     name
-                    description
+                    email
+                    bio
+                    company
+                    location
                     url
+                    avatarUrl
                     createdAt
-                    isPublic
+                    updatedAt
+                    ${args.includeRepositories ? `
+                    repositories(first: $repoLimit, orderBy: {field: STARGAZERS, direction: DESC}) {
+                      totalCount
+                      nodes {
+                        name
+                        nameWithOwner
+                        description
+                        url
+                        stargazerCount
+                        forkCount
+                        primaryLanguage {
+                          name
+                          color
+                        }
+                        createdAt
+                        updatedAt
+                      }
+                    }
+                    ` : ''}
+                    ${args.includeGists ? `
+                    gists(first: 10) {
+                      totalCount
+                      nodes {
+                        name
+                        description
+                        url
+                        createdAt
+                        isPublic
+                      }
+                    }
+                    ` : ''}
+                    ${args.includeFollowers ? `
+                    followers {
+                      totalCount
+                    }
+                    following {
+                      totalCount
+                    }
+                    ` : ''}
                   }
                 }
                 ` : ''}
+<<<<<<< HEAD
                 ${params.includeFollowers ? `
+=======
+                ${validatedArgs.includeFollowers ? `
+>>>>>>> main
                 followers {
                   totalCount
                 }
@@ -579,41 +953,88 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
                 avatarUrl
                 createdAt
                 updatedAt
+<<<<<<< HEAD
                 ${params.includeRepositories ? `
+=======
+                ${validatedArgs.includeRepositories ? `
+>>>>>>> main
                 repositories(first: $repoLimit, orderBy: {field: STARGAZERS, direction: DESC}) {
                   totalCount
                   nodes {
+                  ... on Organization {
+                    id
+                    login
                     name
-                    nameWithOwner
+                    email
                     description
+                    location
                     url
-                    stargazerCount
-                    forkCount
-                    primaryLanguage {
-                      name
-                      color
-                    }
+                    avatarUrl
                     createdAt
                     updatedAt
+                    ${args.includeRepositories ? `
+                    repositories(first: $repoLimit, orderBy: {field: STARGAZERS, direction: DESC}) {
+                      totalCount
+                      nodes {
+                        name
+                        nameWithOwner
+                        description
+                        url
+                        stargazerCount
+                        forkCount
+                        primaryLanguage {
+                          name
+                          color
+                        }
+                        createdAt
+                        updatedAt
+                      }
+                    }
+                    ` : ''}
+                    membersWithRole {
+                      totalCount
+                    }
                   }
-                }
-                ` : ''}
-                membersWithRole {
-                  totalCount
                 }
               }
             }
-          }
-        }
-      `;
+          `;
 
+<<<<<<< HEAD
       const result: any = await octokit.graphql(query, {
         searchQuery: params.query,
         entityType: params.entityType,
         first: params.first,
         repoLimit: params.repositoryLimit,
-      });
+=======
+          const result: any = await octokit.graphql(query, {
+            searchQuery: args.query,
+            entityType: args.entityType,
+            first: args.first || 10,
+            repoLimit: args.repositoryLimit || 10,
+          });
 
+      // Validate GraphQL variables before execution
+      const variables = {
+        searchQuery: validateGraphQLVariableValue(validatedArgs.query, 'searchQuery'),
+        entityType: validateGraphQLVariableValue(validatedArgs.entityType, 'entityType'),
+        first: validateGraphQLVariableValue(validatedArgs.first || 10, 'first'),
+        repoLimit: validateGraphQLVariableValue(validatedArgs.repositoryLimit || 10, 'repoLimit'),
+      };
+      
+      const result: any = await octokit.graphql(query, variables);
+      const result: any = await (octokit as any).graphqlWithComplexity(query, {
+        searchQuery: args.query,
+        entityType: args.entityType,
+        first: args.first || 10,
+        repoLimit: args.repositoryLimit || 10,
+>>>>>>> main
+      });
+          if (!result.search) {
+            throw new Error('Entity search with relationships returned no results');
+          }
+
+<<<<<<< HEAD
       return {
         totalCount: result.search.userCount,
         pageInfo: result.search.pageInfo,
@@ -622,6 +1043,17 @@ export function createAdvancedSearchTools(octokit: Octokit, readOnly: boolean): 
       },
       'search_with_relationships'
     ),
+=======
+          return {
+            totalCount: result.search.userCount,
+            pageInfo: result.search.pageInfo,
+            entities: result.search.nodes,
+          };
+        },
+        { tool: 'search_with_relationships', entityType: args.entityType, query: args.query }
+      );
+    },
+>>>>>>> main
   });
 
   return tools;

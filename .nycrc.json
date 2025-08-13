@@ -1,0 +1,25 @@
+{
+  "check-coverage": true,
+  "lines": 80,
+  "functions": 80,
+  "branches": 80,
+  "statements": 80,
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "src/__tests__/**",
+    "src/**/*.test.ts",
+    "src/index-refactored-example.ts",
+    "test-reliability.js",
+    "**/*.config.*"
+  ],
+  "reporter": [
+    "text",
+    "json",
+    "html",
+    "lcov",
+    "cobertura"
+  ],
+  "report-dir": "coverage"
+}
