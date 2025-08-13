@@ -1,525 +1,231 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-# Security Setup Script for GitHub MCP Server
-# This script sets up security tools and pre-commit hooks with enhanced security practices
-# 
-# Security Features:
-# - Virtual environment isolation for Python packages
-# - Version pinning with integrity verification
-# - Comprehensive error handling and dependency checks
-# - Backup and rollback capabilities
-# - Dry-run mode for safe testing
-# - Detailed logging
+# GitHub Repository Security Setup Script
+# This script helps configure security settings for the github-mcp repository
 
-set -euo pipefail  # Exit on error, undefined vars, pipe failures
-IFS=$'\n\t'        # Secure Internal Field Separator
+set -e
 
-# Configuration
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-readonly VENV_DIR="${PROJECT_ROOT}/.venv-security"
-readonly REQUIREMENTS_FILE="${PROJECT_ROOT}/requirements-security.txt"
-readonly BACKUP_DIR="${PROJECT_ROOT}/.security-backups"
-readonly LOG_FILE="${PROJECT_ROOT}/security-setup.log"
+echo "================================================"
+echo "GitHub MCP Repository Security Setup"
+echo "================================================"
+echo ""
 
-# Color output
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly BLUE='\033[0;34m'
-readonly NC='\033[0m' # No Color
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-# Global flags
-DRY_RUN=false
-VERBOSE=false
+# Check if gh CLI is installed
+if ! command -v gh &> /dev/null; then
+    echo -e "${RED}❌ GitHub CLI (gh) is not installed${NC}"
+    echo "Please install it from: https://cli.github.com/"
+    exit 1
+fi
 
-# Minimum version requirements
-readonly MIN_PYTHON_VERSION="3.8"
-readonly MIN_NODE_VERSION="16.0.0"
+echo -e "${GREEN}✓ GitHub CLI detected${NC}"
 
-# Logging function
-log() {
-    local level="$1"
-    shift
-    local message="$*"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+# Check if logged in
+if ! gh auth status &> /dev/null; then
+    echo -e "${YELLOW}⚠ Not logged in to GitHub CLI${NC}"
+    echo "Running: gh auth login"
+    gh auth login
+fi
+
+# Get repository info
+REPO_OWNER="quanticsoul4772"
+REPO_NAME="github-mcp"
+REPO="${REPO_OWNER}/${REPO_NAME}"
+
+echo ""
+echo "Repository: $REPO"
+echo ""
+
+# Function to enable a setting
+enable_setting() {
+    local setting_name=$1
+    local api_path=$2
+    local data=$3
     
-    case "$level" in
-        "INFO")  echo -e "${GREEN}[INFO]${NC}  $message" ;;
-        "WARN")  echo -e "${YELLOW}[WARN]${NC}  $message" ;;
-        "ERROR") echo -e "${RED}[ERROR]${NC} $message" ;;
-        "DEBUG") [[ "$VERBOSE" == true ]] && echo -e "${BLUE}[DEBUG]${NC} $message" ;;
-    esac
+    echo -n "Enabling $setting_name... "
     
-    # Always log to file
-    echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
-}
-
-# Error handler
-error_exit() {
-    local line_no="$1"
-    local error_code="$2"
-    log "ERROR" "Script failed at line $line_no with exit code $error_code"
-    cleanup_on_error
-    exit "$error_code"
-}
-
-# Set error trap
-trap 'error_exit ${LINENO} $?' ERR
-
-# Cleanup function for errors
-cleanup_on_error() {
-    log "INFO" "Cleaning up after error..."
-    if [[ -d "$VENV_DIR" ]] && [[ ! -f "${VENV_DIR}/.keep" ]]; then
-        log "INFO" "Removing incomplete virtual environment"
-        rm -rf "$VENV_DIR"
-    fi
-}
-
-# Show usage information
-usage() {
-    cat << EOF
-Usage: $0 [OPTIONS]
-
-Security Setup Script for GitHub MCP Server
-
-OPTIONS:
-    -d, --dry-run       Show what would be done without making changes
-    -v, --verbose       Enable verbose output
-    -h, --help          Show this help message
-
-ENVIRONMENT VARIABLES:
-    SKIP_NODE_CHECK     Skip Node.js version check
-    SKIP_PYTHON_CHECK   Skip Python version check
-
-Examples:
-    $0                  Run setup with default options
-    $0 --dry-run        Preview changes without executing
-    $0 --verbose        Run with detailed output
-
-EOF
-}
-
-# Parse command line arguments
-parse_args() {
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            -d|--dry-run)
-                DRY_RUN=true
-                shift
-                ;;
-            -v|--verbose)
-                VERBOSE=true
-                shift
-                ;;
-            -h|--help)
-                usage
-                exit 0
-                ;;
-            *)
-                log "ERROR" "Unknown option: $1"
-                usage
-                exit 1
-                ;;
-        esac
-    done
-}
-
-# Version comparison function
-# Compares two semantic versions to check if version1 >= version2
-# Works by:
-# 1. Printing both versions on separate lines
-# 2. Using sort -V (version sort) to sort them naturally 
-# 3. Taking the first (smallest) version
-# 4. Checking if it matches version2 (meaning version2 <= version1)
-# Returns: 0 if version1 >= version2, 1 otherwise
-version_ge() {
-    local version1="$1"
-    local version2="$2"
-    printf '%s\n%s\n' "$version1" "$version2" | sort -V | head -n 1 | grep -q "^$version2$"
-}
-
-# Check system dependencies
-check_system_dependencies() {
-    local exit_code=0
-    
-    log "INFO" "Checking system dependencies..."
-    
-    # Check Python
-    if [[ "${SKIP_PYTHON_CHECK:-}" != "true" ]]; then
-        if command -v python3 &> /dev/null; then
-            local python_version
-            python_version=$(python3 --version | awk '{print $2}')
-            log "DEBUG" "Found Python version: $python_version"
-            
-            if ! version_ge "$python_version" "$MIN_PYTHON_VERSION"; then
-                log "ERROR" "Python $MIN_PYTHON_VERSION or higher is required (found: $python_version)"
-                exit_code=1
-            else
-                log "INFO" "✓ Python $python_version meets requirements"
-            fi
-        else
-            log "ERROR" "Python 3 is required but not installed"
-            exit_code=1
-        fi
-    fi
-    
-    # Check Node.js
-    if [[ "${SKIP_NODE_CHECK:-}" != "true" ]]; then
-        if command -v node &> /dev/null; then
-            local node_version
-            node_version=$(node --version | sed 's/v//')
-            log "DEBUG" "Found Node.js version: $node_version"
-            
-            if ! version_ge "$node_version" "$MIN_NODE_VERSION"; then
-                log "ERROR" "Node.js $MIN_NODE_VERSION or higher is required (found: $node_version)"
-                exit_code=1
-            else
-                log "INFO" "✓ Node.js $node_version meets requirements"
-            fi
-            
-            # Check npm
-            if ! command -v npm &> /dev/null; then
-                log "ERROR" "npm is required but not found"
-                exit_code=1
-            else
-                local npm_version
-                npm_version=$(npm --version)
-                log "INFO" "✓ npm $npm_version available"
-            fi
-        else
-            log "ERROR" "Node.js is required but not installed"
-            exit_code=1
-        fi
-    fi
-    
-    # Check git
-    if ! command -v git &> /dev/null; then
-        log "ERROR" "Git is required but not installed"
-        exit_code=1
+    if gh api -X PUT "$api_path" --input - <<< "$data" &> /dev/null; then
+        echo -e "${GREEN}✓${NC}"
     else
-        log "INFO" "✓ Git available"
+        echo -e "${YELLOW}⚠ May already be enabled or requires admin permissions${NC}"
     fi
-    
-    return $exit_code
 }
 
-# Create backup directory
-create_backup_dir() {
-    if [[ "$DRY_RUN" == true ]]; then
-        log "INFO" "[DRY-RUN] Would create backup directory: $BACKUP_DIR"
+# Function to check if secret exists
+check_secret() {
+    local secret_name=$1
+    
+    if gh secret list --repo "$REPO" | grep -q "$secret_name"; then
+        echo -e "${GREEN}✓ Secret $secret_name exists${NC}"
         return 0
-    fi
-    
-    if [[ ! -d "$BACKUP_DIR" ]]; then
-        log "INFO" "Creating backup directory: $BACKUP_DIR"
-        mkdir -p "$BACKUP_DIR"
-    fi
-}
-
-# Backup a file
-backup_file() {
-    local file="$1"
-    local backup_name="${2:-$(basename "$file")}"
-    
-    if [[ -f "$file" ]]; then
-        local timestamp=$(date +%Y%m%d_%H%M%S)
-        local backup_path="${BACKUP_DIR}/${backup_name}.backup.${timestamp}"
-        
-        if [[ "$DRY_RUN" == true ]]; then
-            log "INFO" "[DRY-RUN] Would backup $file to $backup_path"
-        else
-            log "INFO" "Backing up $file to $backup_path"
-            cp "$file" "$backup_path"
-        fi
     else
-        log "DEBUG" "File $file does not exist, skipping backup"
-    fi
-}
-
-# Create and setup virtual environment
-setup_virtual_environment() {
-    log "INFO" "Setting up Python virtual environment..."
-    
-    if [[ "$DRY_RUN" == true ]]; then
-        log "INFO" "[DRY-RUN] Would create virtual environment at: $VENV_DIR"
-        return 0
-    fi
-    
-    if [[ ! -d "$VENV_DIR" ]]; then
-        log "INFO" "Creating virtual environment: $VENV_DIR"
-        python3 -m venv "$VENV_DIR"
-        
-        # Create a marker file to indicate this is our venv
-        touch "${VENV_DIR}/.keep"
-    else
-        log "INFO" "Virtual environment already exists: $VENV_DIR"
-    fi
-    
-    # Activate virtual environment
-    log "DEBUG" "Activating virtual environment"
-    if [[ ! -f "${VENV_DIR}/bin/activate" ]]; then
-        log "ERROR" "Virtual environment activation script not found at ${VENV_DIR}/bin/activate"
-        return 1
-    fi
-    # shellcheck source=/dev/null
-    source "${VENV_DIR}/bin/activate"
-    
-    # Upgrade pip
-    log "INFO" "Upgrading pip..."
-    pip install --upgrade pip --quiet
-    
-    log "INFO" "✓ Virtual environment ready"
-}
-
-# Install Python security tools
-install_security_tools() {
-    log "INFO" "Installing Python security tools..."
-    
-    if [[ ! -f "$REQUIREMENTS_FILE" ]]; then
-        log "ERROR" "Requirements file not found: $REQUIREMENTS_FILE"
-        return 1
-    fi
-    
-    if [[ "$DRY_RUN" == true ]]; then
-        log "INFO" "[DRY-RUN] Would install packages from: $REQUIREMENTS_FILE"
-        log "INFO" "[DRY-RUN] Would verify package integrity with hashes"
-        return 0
-    fi
-    
-    # Activate virtual environment
-    # shellcheck source=/dev/null
-    source "${VENV_DIR}/bin/activate"
-    
-    log "INFO" "Installing packages with hash verification..."
-    # Install all dependencies with hash verification (no --no-deps since we have complete tree)
-    pip install --require-hashes -r "$REQUIREMENTS_FILE" --quiet
-    
-    # Verify installations
-    log "INFO" "Verifying installations..."
-    if command -v pre-commit &> /dev/null; then
-        local pc_version
-        pc_version=$(pre-commit --version | awk '{print $2}')
-        log "INFO" "✓ pre-commit $pc_version installed"
-    else
-        log "ERROR" "pre-commit installation verification failed"
-        return 1
-    fi
-    
-    if command -v detect-secrets &> /dev/null; then
-        local ds_version
-        ds_version=$(detect-secrets --version)
-        log "INFO" "✓ detect-secrets $ds_version installed"
-    else
-        log "ERROR" "detect-secrets installation verification failed"
+        echo -e "${RED}✗ Secret $secret_name not found${NC}"
         return 1
     fi
 }
 
-# Setup pre-commit hooks
-setup_pre_commit() {
-    log "INFO" "Setting up pre-commit hooks..."
-    
-    # Backup existing pre-commit config
-    backup_file "${PROJECT_ROOT}/.pre-commit-config.yaml"
-    
-    if [[ "$DRY_RUN" == true ]]; then
-        log "INFO" "[DRY-RUN] Would install pre-commit hooks"
-        return 0
-    fi
-    
-    # Activate virtual environment
-    # shellcheck source=/dev/null
-    source "${VENV_DIR}/bin/activate"
-    
-    cd "$PROJECT_ROOT"
-    
-    # Install pre-commit hooks
-    log "INFO" "Installing pre-commit hooks..."
-    pre-commit install
-    
-    log "INFO" "✓ Pre-commit hooks installed"
-}
+echo "================================================"
+echo "1. Checking Repository Secrets"
+echo "================================================"
+echo ""
 
-# Generate secrets baseline
-setup_secrets_detection() {
-    log "INFO" "Setting up secrets detection..."
+# Check for required secrets
+if ! check_secret "CLAUDE_CODE_OAUTH_TOKEN"; then
+    echo ""
+    echo -e "${YELLOW}To add CLAUDE_CODE_OAUTH_TOKEN:${NC}"
+    echo "1. Go to: https://claude.ai/settings/code"
+    echo "2. Generate or copy your OAuth token"
+    echo "3. Run: gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo $REPO"
+    echo ""
+fi
+
+echo ""
+echo "================================================"
+echo "2. Enabling Security Features"
+echo "================================================"
+echo ""
+
+# Enable vulnerability alerts
+enable_setting "Vulnerability Alerts" \
+    "repos/$REPO/vulnerability-alerts" \
+    ''
+
+# Enable automated security fixes
+enable_setting "Automated Security Fixes" \
+    "repos/$REPO/automated-security-fixes" \
+    ''
+
+# Enable Dependabot alerts
+enable_setting "Dependabot Alerts" \
+    "repos/$REPO/vulnerability-alerts" \
+    ''
+
+echo ""
+echo "================================================"
+echo "3. Creating Branch Protection Rules"
+echo "================================================"
+echo ""
+
+# Create branch protection for main
+echo -n "Setting up branch protection for 'main'... "
+
+PROTECTION_RULES='{
+  "required_status_checks": {
+    "strict": true,
+    "checks": [
+      {
+        "context": "CodeQL",
+        "app_id": null
+      },
+      {
+        "context": "NPM Security Audit",
+        "app_id": null
+      }
+    ]
+  },
+  "enforce_admins": false,
+  "required_pull_request_reviews": {
+    "dismissal_restrictions": {},
+    "dismiss_stale_reviews": true,
+    "require_code_owner_reviews": false,
+    "required_approving_review_count": 1,
+    "require_last_push_approval": false
+  },
+  "restrictions": null,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "block_creations": false,
+  "required_conversation_resolution": true,
+  "lock_branch": false,
+  "allow_fork_syncing": false
+}'
+
+if gh api -X PUT "repos/$REPO/branches/main/protection" --input - <<< "$PROTECTION_RULES" &> /dev/null; then
+    echo -e "${GREEN}✓${NC}"
+else
+    echo -e "${YELLOW}⚠ May already be configured or requires admin permissions${NC}"
+fi
+
+echo ""
+echo "================================================"
+echo "4. Setting up Labels"
+echo "================================================"
+echo ""
+
+# Create labels for issues
+declare -a labels=(
+    "security:ff0000"
+    "critical:ff0000"
+    "high-priority:ff6b6b"
+    "bug:d73a4a"
+    "enhancement:a2eeef"
+    "documentation:0075ca"
+    "technical-debt:fbca04"
+    "testing:006b75"
+    "infrastructure:1d76db"
+    "performance:d4c5f9"
+    "dependencies:0366d6"
+    "ci/cd:0e8a16"
+    "compliance:5319e7"
+)
+
+for label in "${labels[@]}"; do
+    IFS=':' read -r name color <<< "$label"
+    echo -n "Creating label '$name'... "
     
-    local baseline_file="${PROJECT_ROOT}/.secrets.baseline"
-    
-    # Backup existing baseline
-    backup_file "$baseline_file"
-    
-    if [[ "$DRY_RUN" == true ]]; then
-        log "INFO" "[DRY-RUN] Would generate secrets baseline: $baseline_file"
-        return 0
-    fi
-    
-    # Activate virtual environment
-    # shellcheck source=/dev/null
-    source "${VENV_DIR}/bin/activate"
-    
-    cd "$PROJECT_ROOT"
-    
-    if [[ ! -f "$baseline_file" ]]; then
-        log "INFO" "Generating secrets baseline..."
-        detect-secrets scan --baseline "$baseline_file"
-        log "INFO" "✓ Secrets baseline generated"
+    if gh label create "$name" --color "$color" --repo "$REPO" &> /dev/null; then
+        echo -e "${GREEN}✓${NC}"
     else
-        log "INFO" "Secrets baseline already exists, skipping generation"
-        log "INFO" "Run 'detect-secrets scan --baseline .secrets.baseline --force-use-all-plugins' to regenerate"
+        echo -e "${YELLOW}Already exists${NC}"
     fi
-}
+done
 
-# Install Node.js dependencies
-install_node_dependencies() {
-    if [[ ! -f "${PROJECT_ROOT}/package.json" ]]; then
-        log "INFO" "No package.json found, skipping Node.js dependencies"
-        return 0
-    fi
-    
-    log "INFO" "Installing Node.js dependencies..."
-    
-    if [[ "$DRY_RUN" == true ]]; then
-        log "INFO" "[DRY-RUN] Would run: npm install"
-        return 0
-    fi
-    
-    cd "$PROJECT_ROOT"
-    
-    # Use npm ci for reproducible builds if package-lock.json exists
-    if [[ -f "package-lock.json" ]]; then
-        log "INFO" "Using npm ci for reproducible build..."
-        npm ci --silent
-    else
-        log "INFO" "Running npm install..."
-        npm install --silent
-    fi
-    
-    log "INFO" "✓ Node.js dependencies installed"
-}
+echo ""
+echo "================================================"
+echo "5. Manual Steps Required"
+echo "================================================"
+echo ""
 
-# Build TypeScript project
-build_project() {
-    if [[ ! -f "${PROJECT_ROOT}/tsconfig.json" ]]; then
-        log "INFO" "No tsconfig.json found, skipping TypeScript build"
-        return 0
-    fi
-    
-    log "INFO" "Building TypeScript project..."
-    
-    if [[ "$DRY_RUN" == true ]]; then
-        log "INFO" "[DRY-RUN] Would run: npm run build"
-        return 0
-    fi
-    
-    cd "$PROJECT_ROOT"
-    
-    # Try npm run build first, fall back to npx tsc
-    if npm run build --silent 2>/dev/null; then
-        log "INFO" "✓ Project built successfully with npm run build"
-    elif npx tsc --noEmit; then
-        log "INFO" "✓ TypeScript compilation successful"
-    else
-        log "WARN" "Build/compilation had issues, but continuing..."
-        return 0
-    fi
-}
+echo "Please complete these manual steps in your browser:"
+echo ""
+echo "1. Enable GitHub Pages (if needed):"
+echo "   https://github.com/$REPO/settings/pages"
+echo ""
+echo "2. Configure Code Security:"
+echo "   https://github.com/$REPO/settings/security_analysis"
+echo "   - Enable: Dependency graph"
+echo "   - Enable: Dependabot security updates"
+echo "   - Enable: Secret scanning"
+echo "   - Enable: Push protection"
+echo ""
+echo "3. Set up Environments (if needed):"
+echo "   https://github.com/$REPO/settings/environments"
+echo ""
+echo "4. Add additional secrets:"
+echo "   https://github.com/$REPO/settings/secrets/actions"
+echo "   - SEMGREP_APP_TOKEN (optional, from semgrep.dev)"
+echo ""
 
-# Run initial security validation
-run_security_validation() {
-    log "INFO" "Running initial security validation..."
-    
-    if [[ "$DRY_RUN" == true ]]; then
-        log "INFO" "[DRY-RUN] Would run: pre-commit run --all-files"
-        return 0
-    fi
-    
-    # Activate virtual environment
-    # shellcheck source=/dev/null
-    source "${VENV_DIR}/bin/activate"
-    
-    cd "$PROJECT_ROOT"
-    
-    # Run pre-commit checks
-    if pre-commit run --all-files; then
-        log "INFO" "✓ All pre-commit checks passed"
-    else
-        log "WARN" "Some pre-commit checks failed - this is normal for the first run"
-        log "INFO" "Please review the output above and fix any issues"
-    fi
-}
+echo "================================================"
+echo "6. Testing Workflows"
+echo "================================================"
+echo ""
 
-# Print summary
-print_summary() {
-    local start_time="$1"
-    local end_time=$(date +%s)
-    local duration=$((end_time - start_time))
-    
-    echo ""
-    log "INFO" "🔒 Security setup completed in ${duration}s!"
-    echo ""
-    
-    if [[ "$DRY_RUN" == true ]]; then
-        echo -e "${BLUE}DRY-RUN MODE: No changes were made${NC}"
-        echo ""
-    fi
-    
-    echo "📋 Next steps:"
-    echo "1. Review and fix any issues identified by the security scan"
-    echo "2. Ensure your GitHub token is set in environment variables"
-    echo "3. Review the SECURITY.md file for security best practices" 
-    echo "4. Run 'source .venv-security/bin/activate && pre-commit run --all-files' to validate all files"
-    echo ""
-    echo "🛡️  Security features now active:"
-    echo "- ✅ Isolated Python virtual environment"
-    echo "- ✅ Version-pinned security tools with hash verification"
-    echo "- ✅ Pre-commit hooks for secret detection"
-    echo "- ✅ Comprehensive error handling and logging"
-    echo "- ✅ Backup and rollback capabilities"
-    echo "- ✅ GitHub Actions workflows for security scanning"
-    echo ""
-    echo "📁 Files created/modified:"
-    echo "- Virtual environment: $VENV_DIR"
-    echo "- Requirements file: $REQUIREMENTS_FILE"
-    echo "- Backup directory: $BACKUP_DIR"
-    echo "- Log file: $LOG_FILE"
-    echo ""
-}
+echo "To test the workflows:"
+echo "1. Create a test issue mentioning @claude"
+echo "2. Create a test PR to trigger security scans"
+echo "3. Check Actions tab for workflow runs"
+echo ""
 
-# Main function
-main() {
-    local start_time=$(date +%s)
-    
-    # Initialize logging
-    : > "$LOG_FILE"  # Clear log file
-    log "INFO" "Starting security setup script..."
-    log "INFO" "Script arguments: $*"
-    
-    # Parse arguments
-    parse_args "$@"
-    
-    if [[ "$DRY_RUN" == true ]]; then
-        log "INFO" "Running in DRY-RUN mode - no changes will be made"
-    fi
-    
-    # Change to project root
-    cd "$PROJECT_ROOT"
-    
-    # Execute setup steps
-    check_system_dependencies
-    create_backup_dir
-    setup_virtual_environment
-    install_security_tools
-    setup_pre_commit
-    setup_secrets_detection
-    install_node_dependencies
-    build_project
-    run_security_validation
-    
-    # Show summary
-    print_summary "$start_time"
-}
-
-# Run main function with all arguments
-main "$@"
+echo -e "${GREEN}✓ Setup script completed!${NC}"
+echo ""
+echo "Next steps:"
+echo "1. Review and commit the workflow files"
+echo "2. Push to GitHub"
+echo "3. Complete the manual configuration steps"
+echo "4. Test the workflows"

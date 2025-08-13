@@ -21,7 +21,7 @@
     "dev": "tsx src/main.ts",
     "start": "node build/main.js",
     "clean": "rm -rf build",
-    "prepare": "husky && npm run build",
+    "prepare": "npm run build",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",

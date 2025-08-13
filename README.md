@@ -92,7 +92,7 @@ kubectl create secret generic github-mcp-secrets \
 - CI/CD: GitHub Actions for automated deployments
 - Monitoring: Prometheus metrics and health checks
 
-For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
+For detailed deployment instructions, see [docs/deployment/DEPLOYMENT.md](docs/deployment/DEPLOYMENT.md).
 
 ## Installation
 
