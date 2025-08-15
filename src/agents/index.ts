@@ -94,23 +94,38 @@ export async function quickAnalyze(
     ? await coordinator.runSelectedAgents(options.agents, context)
     : await coordinator.runFullAnalysis(context);
   
+  // Add null-safe defaults to prevent runtime crashes
+  const summary = report.summary ?? {
+    totalFindings: (report.findings ?? []).length,
+    criticalFindings: 0,
+    highFindings: 0,
+    mediumFindings: 0,
+    lowFindings: 0,
+    infoFindings: 0
+  };
+  
+  const findings = report.findings ?? [];
+  
+  // Create safe report object for formatting functions
+  const safeReport = { ...report, summary, findings };
+  
   // Return in the format expected by workflow
   return {
     analysis: {
       summary: {
-        totalFindings: report.summary.totalFindings,
+        totalFindings: summary.totalFindings,
         findingsBySeverity: {
-          critical: report.summary.criticalFindings,
-          high: report.summary.highFindings,
-          medium: report.summary.mediumFindings,
-          low: report.summary.lowFindings,
-          info: report.summary.infoFindings
+          critical: summary.criticalFindings,
+          high: summary.highFindings,
+          medium: summary.mediumFindings,
+          low: summary.lowFindings,
+          info: summary.infoFindings
         }
       },
-      findings: report.findings,
-      report: options.format === 'json' ? JSON.stringify(report, null, 2) :
-              options.format === 'html' ? generateHtmlReport(report) :
-              generateTextReport(report)
+      findings,
+      report: options.format === 'json' ? JSON.stringify(safeReport, null, 2) :
+              options.format === 'html' ? generateHtmlReport(safeReport) :
+              generateTextReport(safeReport)
     }
   };
 }
