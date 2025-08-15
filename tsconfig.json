@@ -24,7 +24,8 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "moduleResolution": "node16"
+    "moduleResolution": "node16",
+    "types": ["vitest/globals"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "build", "src/index-refactored-example.ts"]
