@@ -9,6 +9,34 @@ import {
 } from '../types/agent-interfaces.js';
 import { DefaultAgentRegistry } from './agent-registry.js';
 
+// CoordinationResult type for workflow compatibility
+export interface CoordinationResult {
+  summary: {
+    totalFindings: number;
+    agentsUsed: string[];
+    totalDuration: number;
+    findingsBySeverity: {
+      critical: number;
+      high: number;
+      medium: number;
+      low: number;
+      info: number;
+    };
+    findingsByCategory: Record<string, number>;
+  };
+  reports: Array<{
+    agentName: string;
+    summary: {
+      filesAnalyzed: number;
+      totalFindings: number;
+      duration: number;
+    };
+    findings: any[];
+    duration: number;
+  }>;
+  consolidatedFindings: any[];
+}
+
 // Re-export the interface
 export type { AgentCoordinator };
 
@@ -228,6 +256,81 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
    */
   public getRegistry(): DefaultAgentRegistry {
     return this.registry;
+  }
+
+  /**
+   * Get all agents
+   */
+  public getAgents(): BaseAgent[] {
+    return this.registry.getAllAgents();
+  }
+
+  /**
+   * Coordinate analysis - wrapper method expected by workflow
+   */
+  public async coordinate(options: {
+    target: {
+      type: 'project' | 'file' | 'directory';
+      path: string;
+      depth?: string;
+      exclude?: string[];
+    };
+    parallel?: boolean;
+    config?: {
+      enabled: boolean;
+      depth: string;
+      minSeverity?: string;
+      maxFindings?: number;
+      includeCategories?: string[];
+    };
+  }): Promise<CoordinationResult> {
+    // Convert options to AnalysisContext
+    const context: AnalysisContext = {
+      projectPath: options.target.path,
+      files: [], // Will be populated during discovery
+      excludePatterns: options.target.exclude
+    };
+
+    // Run the analysis
+    const report = await this.runFullAnalysis(context);
+    
+    // Convert AnalysisReport to CoordinationResult format expected by workflow
+    const result: CoordinationResult = {
+      summary: {
+        totalFindings: report.summary.totalFindings,
+        agentsUsed: report.agentResults.map(r => r.agentName),
+        totalDuration: report.summary.totalExecutionTime,
+        findingsBySeverity: {
+          critical: report.summary.criticalFindings,
+          high: report.summary.highFindings,
+          medium: report.summary.mediumFindings,
+          low: report.summary.lowFindings,
+          info: report.summary.infoFindings
+        },
+        findingsByCategory: {}
+      },
+      reports: report.agentResults.map(r => ({
+        agentName: r.agentName,
+        summary: {
+          filesAnalyzed: new Set(r.findings.map(f => f.file).filter(Boolean)).size,
+          totalFindings: r.findings.length,
+          duration: r.executionTime || 0
+        },
+        findings: r.findings,
+        duration: r.executionTime || 0
+      })),
+      consolidatedFindings: report.findings
+    };
+
+    // Populate findingsByCategory
+    report.findings.forEach(finding => {
+      if (finding.category) {
+        result.summary.findingsByCategory[finding.category] = 
+          (result.summary.findingsByCategory[finding.category] || 0) + 1;
+      }
+    });
+
+    return result;
   }
 
   /**

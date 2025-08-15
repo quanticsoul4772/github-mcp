@@ -727,3 +727,6 @@ export class TestGenerationAgent extends BaseAgent {
     return files;
   }
 }
+
+// Export the TestGenerationAgent for use in index.ts
+export { TestGenerationAgent };
