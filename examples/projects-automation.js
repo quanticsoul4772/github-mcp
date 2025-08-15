@@ -90,9 +90,6 @@ async function projectsAutomation(mcpClient, orgName) {
     );
     const candidateIssues = newIssues.issues.filter(i => !existingItemContentIds.has(i.node_id));
 
-  projectId: devProject.id,
-  contentId: issue.id, // Use GraphQL node ID
-  contentType: 'Issue'
   for (const issue of newIssues.issues.slice(0, 3)) { // Limit to 3 for demo
     console.log(`\n➕ Adding issue: ${issue.title}`);
     
