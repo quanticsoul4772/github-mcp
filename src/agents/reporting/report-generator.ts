@@ -136,15 +136,17 @@ export class ReportGenerator {
    * @param data - Partial report data that might be missing required fields
    * @returns A secure HTML string
    */
-  public generateReportSafe(data: Partial<ReportData> & { title?: string }): string {
+  public generateReportSafe(data: Partial<ReportData>): string {
     const safeData: ReportData = {
       title: data.title || 'Security Analysis Report',
       summary: data.summary || 'Analysis completed',
       sections: data.sections || [],
       metadata: data.metadata || {
         generatedAt: new Date(),
-        generatedBy: 'Security Analysis Agent',
-        version: '1.0.0'
+        generatedBy: 'Security Analysis Agent (Safe Mode)',
+        version: '1.0.0',
+        repository: data.metadata?.repository || 'Unknown',
+        branch: data.metadata?.branch || 'Unknown'
       }
     };
 
@@ -1436,7 +1438,7 @@ export function generatePlainTextReport(data: ReportData): string {
 /**
  * Convenience function to generate a safe HTML report with defaults
  */
-export function generateSafeReport(data: Partial<ReportData> & { title?: string }): string {
+export function generateSafeReport(data: Partial<ReportData>): string {
   const generator = createReportGenerator();
   return generator.generateReportSafe(data);
 }
