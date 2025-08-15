@@ -145,8 +145,8 @@ export class ReportGenerator {
         generatedAt: new Date(),
         generatedBy: 'Security Analysis Agent (Safe Mode)',
         version: '1.0.0',
-        repository: data.metadata?.repository || 'Unknown',
-        branch: data.metadata?.branch || 'Unknown'
+        repository: (data.metadata as Partial<ReportMetadata>)?.repository || 'Unknown',
+        branch: (data.metadata as Partial<ReportMetadata>)?.branch || 'Unknown'
       }
     };
 
