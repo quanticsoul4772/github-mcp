@@ -389,30 +389,30 @@ npm run security:secrets
 ## Documentation
 
 ### Getting Started
-- 🚀 [Quick Start Guide](docs/QUICK_START.md) - Get running in 5 minutes
-- 📋 [Installation Guide](#installation) - Detailed setup instructions
-- ⚙️ [Configuration Guide](docs/CONFIGURATION.md) - All configuration options
+- [Quick Start Guide](docs/QUICK_START.md) - Get running in 5 minutes
+- [Installation Guide](#installation) - Detailed setup instructions
+- [Configuration Guide](docs/CONFIGURATION.md) - All configuration options
 
 ### Development
-- 🧪 [Testing Guide](docs/TESTING.md) - Testing strategy and instructions
-- 📝 [CLAUDE.md](CLAUDE.md) - Guide for Claude Code development
-- 🔨 [Contributing](CONTRIBUTING.md) - How to contribute
+- [Testing Guide](docs/TESTING.md) - Testing strategy and instructions
+- [CLAUDE.md](CLAUDE.md) - Guide for Claude Code development
+- [Contributing](CONTRIBUTING.md) - How to contribute
 
 ### Reference
-- 📚 [Tool Reference](docs/tool-reference.md) - Complete tool documentation
-- 🔄 [Migration Guide](docs/migration-guide.md) - Upgrading from previous versions
-- 📊 [Performance Guide](docs/performance.md) - Performance optimization
-- 🔍 [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
+- [Tool Reference](docs/tool-reference.md) - Complete tool documentation
+- [Migration Guide](docs/migration-guide.md) - Upgrading from previous versions
+- [Performance Guide](docs/performance.md) - Performance optimization
+- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
 
 ### Advanced Topics
-- 🎯 [GraphQL Tools](docs/graphql-tools.md) - GraphQL-specific features
-- 🚢 [Deployment Guide](docs/deployment/DEPLOYMENT.md) - Production deployment
-- 🔐 [Security Guide](docs/guides/AUTHENTICATION_SECURITY.md) - Security best practices
-- 🤖 [Agent System](docs/guides/AGENT_SYSTEM_GUIDE.md) - Code analysis agents
+- [GraphQL Tools](docs/graphql-tools.md) - GraphQL-specific features
+- [Deployment Guide](docs/deployment/DEPLOYMENT.md) - Production deployment
+- [Security Guide](docs/guides/AUTHENTICATION_SECURITY.md) - Security best practices
+- [Agent System](docs/guides/AGENT_SYSTEM_GUIDE.md) - Code analysis agents
 
 ### API Documentation
-- 📖 [API Reference](docs/api/API_REFERENCE.md) - Complete API documentation
-- 💡 [Examples](docs/EXAMPLES.md) - Usage examples and patterns
+- [API Reference](docs/api/API_REFERENCE.md) - Complete API documentation
+- [Examples](docs/EXAMPLES.md) - Usage examples and patterns
 
 ## Resources
 
@@ -476,10 +476,10 @@ Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md)
 
 ## Support
 
-- 📋 **Issues**: [GitHub Issues](https://github.com/quanticsoul4772/github-mcp/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/quanticsoul4772/github-mcp/discussions)
-- 📚 **Documentation**: [Full Documentation](docs/)
-- 🚀 **Quick Start**: [Get started in 5 minutes](docs/QUICK_START.md)
+- **Issues**: [GitHub Issues](https://github.com/quanticsoul4772/github-mcp/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/quanticsoul4772/github-mcp/discussions)
+- **Documentation**: [Full Documentation](docs/)
+- **Quick Start**: [Get started in 5 minutes](docs/QUICK_START.md)
 
 ## Acknowledgments
 
