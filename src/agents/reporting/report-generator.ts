@@ -141,10 +141,10 @@ export class ReportGenerator {
       title: data.title || 'Security Analysis Report',
       summary: data.summary || 'Analysis completed',
       sections: data.sections || [],
-      metadata: data.metadata || {
-        generatedAt: new Date(),
-        generatedBy: 'Security Analysis Agent (Safe Mode)',
-        version: '1.0.0',
+      metadata: {
+        generatedAt: data.metadata?.generatedAt ?? new Date(),
+        generatedBy: data.metadata?.generatedBy ?? 'Security Analysis Agent (Safe Mode)',
+        version: data.metadata?.version ?? '1.0.0',
         repository: data.metadata?.repository ?? 'Unknown',
         branch: data.metadata?.branch ?? 'Unknown'
       }
