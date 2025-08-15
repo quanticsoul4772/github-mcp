@@ -514,9 +514,6 @@ export function createAgentTools(): ToolConfig<unknown, unknown>[] {
               break;
             case 'performance':
               agents = ['static-analysis'];
-              break;
-            case 'style':
-              agents = ['static-analysis'];
               // config.includeCategories = [FindingCategory.PERFORMANCE_ISSUE];
               break;
             case 'style':
