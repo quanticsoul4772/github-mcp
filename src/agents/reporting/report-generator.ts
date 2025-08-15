@@ -130,6 +130,28 @@ export class ReportGenerator {
   }
 
   /**
+   * Safely generates a report with default values for missing fields
+   * This method provides defensive programming to prevent workflow failures
+   * 
+   * @param data - Partial report data that might be missing required fields
+   * @returns A secure HTML string
+   */
+  public generateReportSafe(data: Partial<ReportData> & { title?: string }): string {
+    const safeData: ReportData = {
+      title: data.title || 'Security Analysis Report',
+      summary: data.summary || 'Analysis completed',
+      sections: data.sections || [],
+      metadata: data.metadata || {
+        generatedAt: new Date(),
+        generatedBy: 'Security Analysis Agent',
+        version: '1.0.0'
+      }
+    };
+
+    return this.generateReport(safeData);
+  }
+
+  /**
    * Generate a report from analysis results
    */
   async generateAnalysisReport(
@@ -1117,28 +1139,28 @@ export class ReportGenerator {
     }
 
     if (!data.title || typeof data.title !== 'string') {
-      throw new Error('Report title must be a non-empty string');
+      throw new Error(`Report title must be a non-empty string. Received: ${typeof data.title} (${JSON.stringify(data.title)})`);
     }
 
     if (!data.summary || typeof data.summary !== 'string') {
-      throw new Error('Report summary must be a non-empty string');
+      throw new Error(`Report summary must be a non-empty string. Received: ${typeof data.summary} (${JSON.stringify(data.summary)})`);
     }
 
     if (!Array.isArray(data.sections)) {
-      throw new Error('Report sections must be an array');
+      throw new Error(`Report sections must be an array. Received: ${typeof data.sections} (${JSON.stringify(data.sections)})`);
     }
 
     if (!data.metadata || typeof data.metadata !== 'object') {
-      throw new Error('Report metadata must be a valid object');
+      throw new Error(`Report metadata must be a valid object. Received: ${typeof data.metadata} (${JSON.stringify(data.metadata)})`);
     }
 
     // Validate each section
     data.sections.forEach((section, index) => {
       if (!section.title || typeof section.title !== 'string') {
-        throw new Error(`Section ${index} must have a valid title`);
+        throw new Error(`Section ${index} must have a valid title. Received: ${typeof section.title} (${JSON.stringify(section.title)})`);
       }
       if (!section.content || typeof section.content !== 'string') {
-        throw new Error(`Section ${index} must have valid content`);
+        throw new Error(`Section ${index} must have valid content. Received: ${typeof section.content} (${JSON.stringify(section.content)})`);
       }
     });
   }
@@ -1409,6 +1431,14 @@ export function generateHtmlReport(data: ReportData): string {
 export function generatePlainTextReport(data: ReportData): string {
   const generator = createReportGenerator();
   return generator.generatePlainTextReport(data);
+}
+
+/**
+ * Convenience function to generate a safe HTML report with defaults
+ */
+export function generateSafeReport(data: Partial<ReportData> & { title?: string }): string {
+  const generator = createReportGenerator();
+  return generator.generateReportSafe(data);
 }
 
 /**
