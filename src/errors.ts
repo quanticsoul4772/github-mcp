@@ -32,7 +32,8 @@ export class GitHubMCPError extends Error {
     this.statusCode = statusCode;
     this.context = context;
     this.originalError = originalError;
-    this.correlationId = correlationId;
+    // Generate a correlation ID if not provided
+    this.correlationId = correlationId || logger.generateCorrelationId();
     this.timestamp = new Date();
     this.isRetryable = this.determineRetryability();
     

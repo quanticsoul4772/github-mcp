@@ -494,4 +494,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   cli.run(options).catch(console.error);
 }
 
-export { AnalysisCLI };

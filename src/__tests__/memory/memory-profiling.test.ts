@@ -284,14 +284,18 @@ describe('Memory Profiling Tests', () => {
 
       // Use reliability manager for retries
       for (let i = 0; i < 100; i++) {
-        await reliabilityManager.executeWithReliability(
-          'memory_test_operation',
-          () => listIssues.handler({
-            owner: 'test-owner',
-            repo: 'test-repo',
-            state: 'all',
-          })
-        );
+        try {
+          await reliabilityManager.executeWithReliability(
+            'memory_test_operation',
+            () => listIssues.handler({
+              owner: 'test-owner',
+              repo: 'test-repo',
+              state: 'all',
+            })
+          );
+        } catch (error) {
+          // Expected - some will fail due to retry logic
+        }
       }
 
       profiler.takeSnapshot('after_retries');

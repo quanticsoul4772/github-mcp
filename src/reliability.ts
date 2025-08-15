@@ -4,6 +4,7 @@
  */
 
 import { GitHubMCPError } from './errors.js';
+import { logger } from './logger.js';
 
 /**
  * Interface for telemetry and monitoring hooks
@@ -35,26 +36,26 @@ export class ConsoleTelemetry implements Telemetry {
 
   trackRequest(operation: string, duration: number, success: boolean): void {
     if (this.verbose) {
-      console.error(`[TELEMETRY] Request: ${operation} - ${duration}ms - ${success ? 'SUCCESS' : 'FAILED'}`);
+      logger.info(`[TELEMETRY] Request: ${operation} - ${duration}ms - ${success ? 'SUCCESS' : 'FAILED'}`, { operation, duration, success });
     }
   }
 
   trackError(error: Error, context?: Record<string, any>): void {
-    console.error(`[TELEMETRY] Error: ${error.message}`, context);
+    logger.error(`[TELEMETRY] Error: ${error.message}`, context || {}, error);
   }
 
   trackMetric(name: string, value: number, tags?: Record<string, string>): void {
     if (this.verbose) {
-      console.error(`[TELEMETRY] Metric: ${name}=${value}`, tags);
+      logger.info(`[TELEMETRY] Metric: ${name}=${value}`, { name, value, tags });
     }
   }
 
   trackRetry(operation: string, attempt: number, error: Error): void {
-    console.error(`[TELEMETRY] Retry: ${operation} attempt ${attempt} - ${error.message}`);
+    logger.warn(`[TELEMETRY] Retry: ${operation} attempt ${attempt} - ${error.message}`, { operation, attempt, errorMessage: error.message });
   }
 
   trackCircuitBreakerState(operation: string, state: CircuitBreakerState): void {
-    console.error(`[TELEMETRY] Circuit Breaker: ${operation} -> ${state}`);
+    logger.warn(`[TELEMETRY] Circuit Breaker: ${operation} -> ${state}`, { operation, state });
   }
 }
 

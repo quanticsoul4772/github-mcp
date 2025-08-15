@@ -31,7 +31,6 @@ import { createBatchOperationsTools } from './tools/batch-operations.js';
 import { createOptimizedRepositoryTools } from './tools/optimized-repositories.js';
 import { createAgentTools } from './agents/tools/agent-tools.js';
 import { createCacheManagementTools } from './tools/cache-management.js';
-import { validateEnvironmentConfiguration } from './validation.js';
 
 // Performance optimizations
 import { OptimizedAPIClient } from './optimized-api-client.js';
@@ -111,21 +110,15 @@ export class GitHubMCPServer {
         errors: envValidation.errors 
       });
       
-      console.error('ERROR: Environment configuration validation failed:');
-      envValidation.errors.forEach(error => console.error(`  - ${error}`));
-      console.error('Please check your environment variables and try again.');
-      console.error('Create a GitHub Personal Access Token at: https://github.com/settings/tokens');
-      console.error('Required scopes: repo, workflow, user, notifications');
+      // Environment validation errors are already logged via logger.error above
+      // Removed console.error statements to avoid breaking MCP protocol
       
       // Don't exit in test environment
       if (!testMode && process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
         process.exit(1);
       } else if (testMode) {
-        throw new Error('Environment validation failed: ' + envValidation.errors.join(', '));
-        // In test mode, avoid throwing in constructor to prevent side effects.
-        // Consumers can inspect `envValidation.errors` or `server` state, or throw during start().
+        // In test mode, throw an error instead of exiting
         logger.warn('Environment validation failed (test mode): ' + envValidation.errors.join(', '));
-
         throw new Error('Environment validation failed: ' + envValidation.errors.join(', '));
       }
     }
@@ -216,7 +209,7 @@ export class GitHubMCPServer {
   private setupRequestInterception() {
     // Hook into Octokit's request lifecycle
     this.octokit.hook.before('request', async (options) => {
-      metrics.recordApiCall(options.method, options.url);
+      metrics.recordApiCall({ method: options.method, url: options.url } as any);
       logger.debug('API request', {
         method: options.method,
         url: options.url
@@ -232,7 +225,7 @@ export class GitHubMCPServer {
     });
 
     this.octokit.hook.error('request', async (error, options) => {
-      metrics.recordError(error.name, error.message);
+      metrics.recordError({ name: error.name, message: error.message } as any);
       logger.error('API error', {
         method: options.method,
         url: options.url,
@@ -310,7 +303,7 @@ export class GitHubMCPServer {
   private registerTool(config: ToolConfig<unknown, unknown>): void {
     // Skip if tool name is already registered (prevent duplicates)
     if (this.registeredTools.has(config.tool.name)) {
-      console.warn(`Tool ${config.tool.name} is already registered. Skipping duplicate.`);
+      logger.warn(`Tool ${config.tool.name} is already registered. Skipping duplicate.`);
       return;
     }
 
@@ -327,7 +320,7 @@ export class GitHubMCPServer {
         const toolName = config.tool.name;
         try {
           logger.debug(`Tool invoked: ${toolName}`, { args });
-          metrics.recordApiCall('TOOL', toolName);
+          metrics.recordApiCall({ method: 'TOOL', url: toolName } as any);
           
           // Execute the tool handler
           const result = await config.handler(args);
@@ -363,7 +356,7 @@ export class GitHubMCPServer {
           };
         } catch (error: any) {
           const duration = Date.now() - startTime;
-          metrics.recordError('TOOL_ERROR', error.message);
+          metrics.recordError({ name: 'TOOL_ERROR', message: error.message } as any);
           
           // Log error details for debugging
           logger.error(`Tool error: ${toolName}`, {
@@ -544,7 +537,7 @@ export class GitHubMCPServer {
 
     // Register discussion tools
     if (this.enabledToolsets.has('discussions')) {
-      const discussionTools = createDiscussionTools(this.optimizedClient, this.readOnly);
+      const discussionTools = createDiscussionTools(this.optimizedClient.getOctokit(), this.readOnly);
       discussionTools.forEach(tool => this.registerTool(tool));
       // Discussion tools registered
     }
@@ -565,14 +558,14 @@ export class GitHubMCPServer {
 
     // GraphQL repository insights tools
     if (this.enabledToolsets.has('graphql_insights')) {
-      const insightsTools = createRepositoryInsightsTools(this.optimizedClient, this.readOnly);
+      const insightsTools = createRepositoryInsightsTools(this.optimizedClient.getOctokit(), this.readOnly);
       insightsTools.forEach(tool => this.registerTool(tool));
       // Repository Insights tools registered
     }
 
     // Advanced search tools
     if (this.enabledToolsets.has('advanced_search')) {
-      const advancedSearchTools = createAdvancedSearchTools(this.octokit, this.readOnly);
+      const advancedSearchTools = createAdvancedSearchTools(this.optimizedClient, this.readOnly);
       advancedSearchTools.forEach(tool => this.registerTool(tool));
       // Advanced Search tools registered
     }
@@ -599,7 +592,7 @@ export class GitHubMCPServer {
     // Register cache management tools
     const cacheManagementTools = createCacheManagementTools(this.optimizedClient);
     cacheManagementTools.forEach(tool => this.registerTool(tool));
-    console.log(`  ✓ Cache management tools (${cacheManagementTools.length})`);
+    logger.info(`Cache management tools registered`, { count: cacheManagementTools.length });
 
     // Register monitoring and observability tools
     if (this.enabledToolsets.has('monitoring')) {
@@ -680,4 +673,4 @@ export class GitHubMCPServer {
 
 // Export for testing and external usage
 // GitHubMCPServer is already exported above
-export { GitHubMCPServer };
+

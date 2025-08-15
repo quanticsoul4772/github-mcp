@@ -13,6 +13,8 @@ import {
   quickSecurityScan,
   monitorAgentHealth 
 } from './examples/basic-usage.js';
+import { AnalysisContext } from './types/agent-interfaces.js';
+import { ReportData, ReportGenerator } from './reporting/report-generator.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -145,12 +147,11 @@ async function runDemo() {
     
     // Quick analysis
     const quickResult = await quickAnalyze(sampleFile, {
-      type: 'file',
-      format: 'console'
+      format: 'text'
     });
     
     console.log('Quick analysis completed!');
-    console.log(`Found ${quickResult.analysis.summary.totalFindings} issues`);
+    console.log(`Found ${(quickResult as any).analysis.summary.totalFindings} issues`);
     
     console.log('\\n2️⃣ Detailed Single File Analysis');
     console.log('─'.repeat(40));
@@ -188,37 +189,35 @@ async function runDemo() {
     console.log('─'.repeat(40));
     
     // Demonstrate the agent system API
-    const { coordinator, reportGenerator } = createAgentSystem();
+    const { coordinator, registry, agents } = createAgentSystem();
     
-    console.log(`🤖 Available agents: ${coordinator.getAgents().map((a: any) => a.name).join(', ')}`);
-    console.log(`🤖 Available agents: ${coordinator.getAgents().map(a => a.name).join(', ')}`);
+    console.log(`🤖 Available agents: ${agents.map((a: any) => a.name).join(', ')}`);
     
     // Run coordinated analysis
-    const result = await coordinator.coordinate({
-      target: {
-        type: 'file',
-        path: sampleFile,
-        depth: 'comprehensive'
-      },
-      parallel: true,
-      config: {
-        enabled: true,
-        depth: 'comprehensive',
-        minSeverity: 'low' as const,
-        maxFindings: 20
-      }
-    });
+    const context: AnalysisContext = {
+      projectPath: path.dirname(sampleFile),
+      files: [sampleFile]
+    };
+    const result = await coordinator.runFullAnalysis(context);
     
     console.log(`\\n📊 Coordinated Analysis Results:`);
     console.log(`   Total Findings: ${result.summary.totalFindings}`);
-    console.log(`   Agents Used: ${result.summary.agentsUsed.join(', ')}`);
-    console.log(`   Analysis Time: ${Math.round(result.summary.totalDuration)}ms`);
+    console.log(`   Agents Run: ${result.summary.agentsRun}`);
+    console.log(`   Analysis Time: ${Math.round(result.summary.totalExecutionTime)}ms`);
     
     // Generate JSON report
-    const jsonReport = await reportGenerator.generateReport(result, {
-      format: 'json',
-      includeDetails: false
-    });
+    const reportData: ReportData = {
+      title: 'Demo Analysis Report',
+      summary: `Analysis completed with ${result.summary.totalFindings} findings`,
+      sections: [],
+      metadata: {
+        generatedAt: new Date(),
+        generatedBy: 'demo',
+        version: '1.0.0'
+      }
+    };
+    const reportGenerator = new ReportGenerator();
+    const jsonReport = await reportGenerator.generateReport(reportData);
     
     const summary = JSON.parse(jsonReport).summary;
     console.log(`\\n📈 Summary Statistics:`);

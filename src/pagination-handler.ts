@@ -3,6 +3,8 @@
  * Provides efficient data streaming and automatic pagination
  */
 
+import { logger } from './logger.js';
+
 interface PaginationOptions {
   perPage?: number;
   maxPages?: number;
@@ -76,12 +78,12 @@ export class PaginationHandler {
           // Cap backoff to a reasonable upper limit (e.g., 5 seconds) to avoid stalling
           const backoffMs = Math.min(untilResetMs, 5000);
           if (backoffMs > 0) {
-            console.warn(`Rate limit low (${response.rateLimit.remaining}), backing off for ${backoffMs}ms`);
+            logger.warn(`Rate limit low (${response.rateLimit.remaining}), backing off for ${backoffMs}ms`, { remaining: response.rateLimit.remaining, backoffMs });
             await new Promise(resolve => setTimeout(resolve, backoffMs));
           }
         }
       } catch (error) {
-        console.error(`Error fetching page ${page}:`, error);
+        logger.error(`Error fetching page ${page}`, { page }, error instanceof Error ? error : new Error(String(error)));
         break;
       }
     }
@@ -148,7 +150,7 @@ export class PaginationHandler {
     for (const batch of batches) {
       const batchPromises = batch.map(page => 
         fetcher(page, perPage).catch(error => {
-          console.error(`Error fetching page ${page}:`, error);
+          logger.error(`Error fetching page ${page}`, { page }, error);
           return { data: [], hasNext: false };
         })
       );

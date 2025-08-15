@@ -23,7 +23,7 @@ describe('Authentication Security Tests', () => {
       
       expect(result.isValid).toBe(false);
       expect(result.errors).toContainEqual(
-        expect.stringContaining('GitHub Personal Access Token is required')
+        expect.stringContaining('GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN environment variable is required')
       );
     });
 
@@ -34,7 +34,7 @@ describe('Authentication Security Tests', () => {
       
       expect(result.isValid).toBe(false);
       expect(result.errors).toContainEqual(
-        expect.stringContaining('appears to be invalid')
+        expect.stringContaining('Unrecognized token format')
       );
     });
 
@@ -225,7 +225,7 @@ describe('Authentication Security Tests', () => {
       
       // Should sanitize error messages in production
       const sanitizedMessage = error.message.replace(
-        /ghp_[a-zA-Z0-9]{36}/g, 
+        /ghp_[a-zA-Z0-9_]+/g, 
         'ghp_***'
       );
 

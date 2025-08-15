@@ -128,7 +128,14 @@ export class GraphQLPaginationHandler {
         const extracted = queryBuilder.extractData(result);
         
         const pageData = extracted.nodes || extracted.edges?.map(e => e.node) || [];
-        allData.push(...pageData);
+        
+        // Respect maxItems limit
+        if (maxItems) {
+          const remaining = maxItems - allData.length;
+          allData.push(...pageData.slice(0, remaining));
+        } else {
+          allData.push(...pageData);
+        }
         
         lastPageInfo = extracted.pageInfo;
         totalCount = extracted.totalCount;
@@ -687,13 +694,13 @@ export const GraphQLPaginationUtils = {
    * Validate pagination parameters
    */
   validatePaginationParams(options: GraphQLPaginationOptions): void {
-    if (options.first && (options.first < 1 || options.first > 100)) {
+    if (options.first !== undefined && (options.first < 1 || options.first > 100)) {
       throw new Error('first parameter must be between 1 and 100');
     }
-    if (options.maxPages && options.maxPages < 1) {
+    if (options.maxPages !== undefined && options.maxPages < 1) {
       throw new Error('maxPages must be positive');
     }
-    if (options.maxItems && options.maxItems < 1) {
+    if (options.maxItems !== undefined && options.maxItems < 1) {
       throw new Error('maxItems must be positive');
     }
   },
@@ -740,7 +747,7 @@ export const GraphQLPaginationUtils = {
     return {
       data: allData,
       pageInfo: lastPageInfo || { hasNextPage: false },
-      totalCount: totalCount || undefined,
+      totalCount: results.length > 0 ? totalCount : 0,
       hasMore,
       nextCursor: lastPageInfo?.endCursor,
     };

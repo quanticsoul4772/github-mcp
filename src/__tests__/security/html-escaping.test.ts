@@ -16,7 +16,7 @@ import {
 } from '../../utils/html-security.js';
 
 import {
-  SecureReportGenerator,
+  ReportGenerator,
   generateHtmlReport,
   generatePlainTextReport,
   type ReportData
@@ -132,9 +132,9 @@ describe('HTML Security - XSS Prevention', () => {
     });
 
     it('should handle non-string inputs', () => {
-      expect(isHtmlSafe(null)).toBe(false);
-      expect(isHtmlSafe(undefined)).toBe(false);
-      expect(isHtmlSafe(123)).toBe(false);
+      expect(isHtmlSafe(null as any)).toBe(false);
+      expect(isHtmlSafe(undefined as any)).toBe(false);
+      expect(isHtmlSafe(123 as any)).toBe(false);
     });
   });
 
@@ -198,12 +198,12 @@ describe('HTML Security - XSS Prevention', () => {
   });
 });
 
-describe('SecureReportGenerator', () => {
-  let generator: SecureReportGenerator;
+describe('ReportGenerator', () => {
+  let generator: ReportGenerator;
   let mockReportData: ReportData;
 
   beforeEach(() => {
-    generator = new SecureReportGenerator();
+    generator = new ReportGenerator();
     mockReportData = {
       title: 'Test Report',
       summary: 'This is a test report summary',

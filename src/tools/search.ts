@@ -150,12 +150,12 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
             comment_count: item.commit.comment_count,
           },
           author: item.author ? {
-            login: item.author.login,
-            type: item.author.type,
+            login: (item.author as any).login,
+            type: (item.author as any).type,
           } : null,
           committer: item.committer ? {
-            login: item.committer.login,
-            type: item.committer.type,
+            login: (item.committer as any).login,
+            type: (item.committer as any).type,
           } : null,
           repository: {
             name: item.repository.name,
@@ -272,7 +272,7 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
     handler: async (args: unknown) => {
       const params = args as SearchCodeParams;
       const { data } = await octokit.search.labels({
-        repository_id: params.repository_id,
+        repository_id: params.repository_id!,
         q: params.q,
         sort: params.sort as any as any,
         order: params.order as any as any,

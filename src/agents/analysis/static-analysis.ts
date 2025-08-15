@@ -432,7 +432,6 @@ export class StaticAnalysisAgent extends BaseAgent {
 
           // Check for non-camelCase variables
           if (!/^[a-z][a-zA-Z0-9]*$/.test(varName) && !varName.startsWith('_') && varName.toUpperCase() !== varName) {
-          if (!/^[a-z][a-zA-Z0-9]*$/.test(varName) && !varName.startsWith('_') && !varName.toUpperCase() === varName) {
             findings.push(this.createFinding(
               Severity.LOW,
               FindingCategory.BEST_PRACTICE,

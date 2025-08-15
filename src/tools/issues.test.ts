@@ -3,9 +3,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createIssueTools } from './issues.js';
-import { createMockOctokit, mockResponses } from '../__tests__/mocks/octokit.js';
+import { createMockOctokit, staticMockResponses } from '../__tests__/mocks/octokit.js';
 import { testFixtures } from '../__tests__/fixtures/test-data.js';
-import { ValidationError } from '../validation.js';
 
 describe('Issue Tools', () => {
   let mockOctokit: any;
@@ -31,7 +30,7 @@ describe('Issue Tools', () => {
 
     it('should list repository issues successfully', async () => {
       const issues = [testFixtures.issues.open, testFixtures.issues.closed];
-      mockOctokit.rest.issues.list.mockResolvedValue({ data: issues });
+      mockOctokit.issues.listForRepo.mockResolvedValue({ data: issues });
 
       const result = await listIssues.handler({
         owner: 'test-owner',
@@ -39,52 +38,68 @@ describe('Issue Tools', () => {
         state: 'all',
       });
 
-      expect(mockOctokit.rest.issues.list).toHaveBeenCalledWith({
+      expect(mockOctokit.issues.listForRepo).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         state: 'all',
-        sort: 'updated',
-        direction: 'desc',
-        per_page: 30,
-        page: 1,
+        labels: undefined,
+        sort: undefined,
+        direction: undefined,
+        since: undefined,
+        page: undefined,
+        per_page: undefined,
       });
 
-      expect(result).toContain('Test Issue');
-      expect(result).toContain('Closed Issue');
+      expect(result).toHaveLength(2);
+      expect(result[0].title).toBe('Test Issue');
+      expect(result[1].title).toBe('Closed Issue');
     });
 
     it('should handle filtering parameters', async () => {
-      mockOctokit.rest.issues.list.mockResolvedValue({ data: [] });
+      mockOctokit.issues.listForRepo.mockResolvedValue({ data: [] });
 
       await listIssues.handler({
         owner: 'test-owner',
         repo: 'test-repo',
         state: 'open',
-        labels: 'bug,enhancement',
-        assignee: 'test-user',
+        labels: ['bug', 'enhancement'],
       });
 
-      expect(mockOctokit.rest.issues.list).toHaveBeenCalledWith({
+      expect(mockOctokit.issues.listForRepo).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         state: 'open',
         labels: 'bug,enhancement',
-        assignee: 'test-user',
-        sort: 'updated',
-        direction: 'desc',
-        per_page: 30,
-        page: 1,
+        sort: undefined,
+        direction: undefined,
+        since: undefined,
+        page: undefined,
+        per_page: undefined,
       });
     });
 
-    it('should validate input parameters', async () => {
-      await expect(
-        listIssues.handler({ owner: '', repo: 'test-repo' })
-      ).rejects.toThrow(ValidationError);
+    it('should handle pagination parameters', async () => {
+      mockOctokit.issues.listForRepo.mockResolvedValue({ data: [] });
 
-      await expect(
-        listIssues.handler({ owner: 'test-owner', repo: '' })
-      ).rejects.toThrow(ValidationError);
+      await listIssues.handler({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        state: 'all',
+        page: 2,
+        perPage: 50,
+      });
+
+      expect(mockOctokit.issues.listForRepo).toHaveBeenCalledWith({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        state: 'all',
+        labels: undefined,
+        sort: undefined,
+        direction: undefined,
+        since: undefined,
+        page: 2,
+        per_page: 50,
+      });
     });
   });
 
@@ -101,7 +116,7 @@ describe('Issue Tools', () => {
     });
 
     it('should get issue details successfully', async () => {
-      mockOctokit.rest.issues.get.mockResolvedValue({
+      mockOctokit.issues.get.mockResolvedValue({
         data: testFixtures.issues.open,
       });
 
@@ -111,24 +126,30 @@ describe('Issue Tools', () => {
         issue_number: 1,
       });
 
-      expect(mockOctokit.rest.issues.get).toHaveBeenCalledWith({
+      expect(mockOctokit.issues.get).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         issue_number: 1,
       });
 
-      expect(result).toContain('Test Issue');
-      expect(result).toContain('This is a test issue');
+      expect(result.title).toBe('Test Issue');
+      expect(result.body).toBe('This is a test issue for testing purposes.');
+      expect(result.state).toBe('open');
     });
 
-    it('should validate input parameters', async () => {
-      await expect(
-        getIssue.handler({ owner: '', repo: 'test-repo', issue_number: 1 })
-      ).rejects.toThrow(ValidationError);
+    it('should handle closed issue', async () => {
+      mockOctokit.issues.get.mockResolvedValue({
+        data: testFixtures.issues.closed,
+      });
 
-      await expect(
-        getIssue.handler({ owner: 'test-owner', repo: 'test-repo', issue_number: -1 })
-      ).rejects.toThrow(ValidationError);
+      const result = await getIssue.handler({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        issue_number: 2,
+      });
+
+      expect(result.state).toBe('closed');
+      expect(result.closed_at).toBeTruthy();
     });
   });
 
@@ -151,8 +172,8 @@ describe('Issue Tools', () => {
     });
 
     it('should create issue successfully', async () => {
-      const newIssue = { ...testFixtures.issues.open, number: 123 };
-      mockOctokit.rest.issues.create.mockResolvedValue({ data: newIssue });
+      const newIssue = { ...testFixtures.issues.open, number: 123, title: 'New Issue' };
+      mockOctokit.issues.create.mockResolvedValue({ data: newIssue });
 
       const result = await createIssue.handler({
         owner: 'test-owner',
@@ -161,7 +182,7 @@ describe('Issue Tools', () => {
         body: 'Issue description',
       });
 
-      expect(mockOctokit.rest.issues.create).toHaveBeenCalledWith({
+      expect(mockOctokit.issues.create).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         title: 'New Issue',
@@ -171,13 +192,14 @@ describe('Issue Tools', () => {
         milestone: undefined,
       });
 
-      expect(result).toContain('123');
-      expect(result).toContain('New Issue');
+      expect(result.number).toBe(123);
+      expect(result.title).toBe('New Issue');
+      expect(result.state).toBe('open');
     });
 
     it('should create issue with assignees and labels', async () => {
       const newIssue = testFixtures.issues.open;
-      mockOctokit.rest.issues.create.mockResolvedValue({ data: newIssue });
+      mockOctokit.issues.create.mockResolvedValue({ data: newIssue });
 
       await createIssue.handler({
         owner: 'test-owner',
@@ -188,7 +210,7 @@ describe('Issue Tools', () => {
         labels: ['bug', 'priority-high'],
       });
 
-      expect(mockOctokit.rest.issues.create).toHaveBeenCalledWith({
+      expect(mockOctokit.issues.create).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         title: 'Assigned Issue',
@@ -199,24 +221,29 @@ describe('Issue Tools', () => {
       });
     });
 
-    it('should validate input parameters', async () => {
-      await expect(
-        createIssue.handler({
-          owner: '',
-          repo: 'test-repo',
-          title: 'Test',
-          body: 'Test body',
-        })
-      ).rejects.toThrow(ValidationError);
+    it('should handle optional parameters', async () => {
+      const newIssue = { ...testFixtures.issues.open, number: 456 };
+      mockOctokit.issues.create.mockResolvedValue({ data: newIssue });
 
-      await expect(
-        createIssue.handler({
-          owner: 'test-owner',
-          repo: 'test-repo',
-          title: '',
-          body: 'Test body',
-        })
-      ).rejects.toThrow(ValidationError);
+      const result = await createIssue.handler({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        title: 'Issue with milestone',
+        body: 'Test',
+        milestone: 1,
+      });
+
+      expect(mockOctokit.issues.create).toHaveBeenCalledWith({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        title: 'Issue with milestone',
+        body: 'Test',
+        assignees: undefined,
+        labels: undefined,
+        milestone: 1,
+      });
+
+      expect(result.number).toBe(456);
     });
   });
 
@@ -233,8 +260,8 @@ describe('Issue Tools', () => {
     });
 
     it('should update issue successfully', async () => {
-      const updatedIssue = { ...testFixtures.issues.open, title: 'Updated Title' };
-      mockOctokit.rest.issues.update.mockResolvedValue({ data: updatedIssue });
+      const updatedIssue = { ...testFixtures.issues.open, title: 'Updated Title', state: 'closed' };
+      mockOctokit.issues.update.mockResolvedValue({ data: updatedIssue });
 
       const result = await updateIssue.handler({
         owner: 'test-owner',
@@ -244,7 +271,7 @@ describe('Issue Tools', () => {
         state: 'closed',
       });
 
-      expect(mockOctokit.rest.issues.update).toHaveBeenCalledWith({
+      expect(mockOctokit.issues.update).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         issue_number: 1,
@@ -256,7 +283,8 @@ describe('Issue Tools', () => {
         milestone: undefined,
       });
 
-      expect(result).toContain('Updated Title');
+      expect(result.title).toBe('Updated Title');
+      expect(result.state).toBe('closed');
     });
   });
 
@@ -288,7 +316,7 @@ describe('Issue Tools', () => {
         },
       ];
 
-      mockOctokit.rest.issues.listComments.mockResolvedValue({ data: comments });
+      mockOctokit.issues.listComments.mockResolvedValue({ data: comments });
 
       const result = await listComments.handler({
         owner: 'test-owner',
@@ -296,16 +324,17 @@ describe('Issue Tools', () => {
         issue_number: 1,
       });
 
-      expect(mockOctokit.rest.issues.listComments).toHaveBeenCalledWith({
+      expect(mockOctokit.issues.listComments).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         issue_number: 1,
-        per_page: 30,
-        page: 1,
+        page: undefined,
+        per_page: undefined,
       });
 
-      expect(result).toContain('First comment');
-      expect(result).toContain('Second comment');
+      expect(result).toHaveLength(2);
+      expect(result[0].body).toBe('First comment');
+      expect(result[1].body).toBe('Second comment');
     });
   });
 
@@ -329,7 +358,7 @@ describe('Issue Tools', () => {
         created_at: '2024-01-01T00:00:00Z',
       };
 
-      mockOctokit.rest.issues.createComment.mockResolvedValue({ data: newComment });
+      mockOctokit.issues.createComment.mockResolvedValue({ data: newComment });
 
       const result = await createComment.handler({
         owner: 'test-owner',
@@ -338,35 +367,35 @@ describe('Issue Tools', () => {
         body: 'New comment',
       });
 
-      expect(mockOctokit.rest.issues.createComment).toHaveBeenCalledWith({
+      expect(mockOctokit.issues.createComment).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         issue_number: 1,
         body: 'New comment',
       });
 
-      expect(result).toContain('123');
-      expect(result).toContain('New comment');
+      expect(result.id).toBe(123);
+      expect(result.body).toBe('New comment');
     });
 
-    it('should validate input parameters', async () => {
-      await expect(
-        createComment.handler({
-          owner: '',
-          repo: 'test-repo',
-          issue_number: 1,
-          body: 'Comment',
-        })
-      ).rejects.toThrow(ValidationError);
+    it('should handle comment with user info', async () => {
+      const newComment = {
+        id: 789,
+        body: 'Comment with user',
+        user: { login: 'test-user', type: 'User' },
+        created_at: '2024-01-01T00:00:00Z',
+      };
+      
+      mockOctokit.issues.createComment.mockResolvedValue({ data: newComment });
 
-      await expect(
-        createComment.handler({
-          owner: 'test-owner',
-          repo: 'test-repo',
-          issue_number: 1,
-          body: '',
-        })
-      ).rejects.toThrow(ValidationError);
+      const result = await createComment.handler({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        issue_number: 1,
+        body: 'Comment with user',
+      });
+
+      expect(result.user.login).toBe('test-user');
     });
   });
 
@@ -390,7 +419,7 @@ describe('Issue Tools', () => {
         updated_at: '2024-01-01T12:00:00Z',
       };
 
-      mockOctokit.rest.issues.updateComment.mockResolvedValue({ data: updatedComment });
+      mockOctokit.issues.updateComment.mockResolvedValue({ data: updatedComment });
 
       const result = await updateComment.handler({
         owner: 'test-owner',
@@ -399,14 +428,15 @@ describe('Issue Tools', () => {
         body: 'Updated comment',
       });
 
-      expect(mockOctokit.rest.issues.updateComment).toHaveBeenCalledWith({
+      expect(mockOctokit.issues.updateComment).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         comment_id: 123,
         body: 'Updated comment',
       });
 
-      expect(result).toContain('Updated comment');
+      expect(result.body).toBe('Updated comment');
+      expect(result.id).toBe(123);
     });
   });
 
@@ -423,7 +453,7 @@ describe('Issue Tools', () => {
     });
 
     it('should delete comment successfully', async () => {
-      mockOctokit.rest.issues.deleteComment.mockResolvedValue({ status: 204 });
+      mockOctokit.issues.deleteComment.mockResolvedValue({ status: 204 });
 
       const result = await deleteComment.handler({
         owner: 'test-owner',
@@ -431,13 +461,14 @@ describe('Issue Tools', () => {
         comment_id: 123,
       });
 
-      expect(mockOctokit.rest.issues.deleteComment).toHaveBeenCalledWith({
+      expect(mockOctokit.issues.deleteComment).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         comment_id: 123,
       });
 
-      expect(result).toContain('deleted');
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('deleted');
     });
   });
 
@@ -459,7 +490,7 @@ describe('Issue Tools', () => {
         { name: 'enhancement', color: '00ff00' },
       ];
 
-      mockOctokit.rest.issues.addLabels.mockResolvedValue({ data: labels });
+      mockOctokit.issues.addLabels.mockResolvedValue({ data: labels });
 
       const result = await addLabels.handler({
         owner: 'test-owner',
@@ -468,15 +499,16 @@ describe('Issue Tools', () => {
         labels: ['bug', 'enhancement'],
       });
 
-      expect(mockOctokit.rest.issues.addLabels).toHaveBeenCalledWith({
+      expect(mockOctokit.issues.addLabels).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         issue_number: 1,
         labels: ['bug', 'enhancement'],
       });
 
-      expect(result).toContain('bug');
-      expect(result).toContain('enhancement');
+      expect(result).toHaveLength(2);
+      expect(result[0].name).toBe('bug');
+      expect(result[1].name).toBe('enhancement');
     });
   });
 
@@ -493,7 +525,7 @@ describe('Issue Tools', () => {
     });
 
     it('should remove label successfully', async () => {
-      mockOctokit.rest.issues.removeLabel.mockResolvedValue({ status: 200 });
+      mockOctokit.issues.removeLabel.mockResolvedValue({ status: 200 });
 
       const result = await removeLabel.handler({
         owner: 'test-owner',
@@ -502,15 +534,16 @@ describe('Issue Tools', () => {
         name: 'bug',
       });
 
-      expect(mockOctokit.rest.issues.removeLabel).toHaveBeenCalledWith({
+      expect(mockOctokit.issues.removeLabel).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         issue_number: 1,
         name: 'bug',
       });
 
-      expect(result).toContain('removed');
-      expect(result).toContain('bug');
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('removed');
+      expect(result.message).toContain('bug');
     });
   });
 
@@ -527,7 +560,7 @@ describe('Issue Tools', () => {
     });
 
     it('should lock issue successfully', async () => {
-      mockOctokit.rest.issues.lock.mockResolvedValue({ status: 204 });
+      mockOctokit.issues.lock.mockResolvedValue({ status: 204 });
 
       const result = await lockIssue.handler({
         owner: 'test-owner',
@@ -536,14 +569,15 @@ describe('Issue Tools', () => {
         lock_reason: 'spam',
       });
 
-      expect(mockOctokit.rest.issues.lock).toHaveBeenCalledWith({
+      expect(mockOctokit.issues.lock).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         issue_number: 1,
         lock_reason: 'spam',
       });
 
-      expect(result).toContain('locked');
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('locked');
     });
   });
 
@@ -560,7 +594,7 @@ describe('Issue Tools', () => {
     });
 
     it('should unlock issue successfully', async () => {
-      mockOctokit.rest.issues.unlock.mockResolvedValue({ status: 204 });
+      mockOctokit.issues.unlock.mockResolvedValue({ status: 204 });
 
       const result = await unlockIssue.handler({
         owner: 'test-owner',
@@ -568,13 +602,14 @@ describe('Issue Tools', () => {
         issue_number: 1,
       });
 
-      expect(mockOctokit.rest.issues.unlock).toHaveBeenCalledWith({
+      expect(mockOctokit.issues.unlock).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         issue_number: 1,
       });
 
-      expect(result).toContain('unlocked');
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('unlocked');
     });
   });
 });

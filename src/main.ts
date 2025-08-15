@@ -18,7 +18,6 @@ async function main() {
     logger.info('GitHub MCP server started successfully');
   } catch (error) {
     logger.error('Failed to start GitHub MCP server', { error });
-    console.error('Fatal error:', error);
     process.exit(1);
   }
 }

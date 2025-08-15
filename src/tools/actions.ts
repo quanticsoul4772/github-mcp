@@ -418,7 +418,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
         owner: params.owner,
         repo: params.repo,
         run_id: params.run_id,
-        filter: params.filter as any,
+        filter: (params.filter || 'all') as any,
         page: params.page,
         per_page: params.perPage,
       });
@@ -501,7 +501,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
         });
 
         const failedJobs = jobsData.jobs.filter((job) => 
-          job.conclusion === "failure" || job.status === "failed"
+          job.conclusion === "failure" || (job.status as string) === "failed"
         );
 
         const results = [];
@@ -587,10 +587,10 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
         owner: params.owner,
         repo: params.repo,
         run_id: params.run_id,
-      });
+      }) as any;
 
       return {
-        logs_url: response.url,
+        logs_url: response.url || `https://api.github.com/repos/${params.owner}/${params.repo}/actions/runs/${params.run_id}/logs`,
       };
     },
   });

@@ -261,7 +261,9 @@ export class HealthManager {
 /**
  * Create health check tools for MCP server
  */
-export function createHealthTools(healthManager: HealthManager) {
+import { ToolConfig } from './types.js';
+
+export function createHealthTools(healthManager: HealthManager): ToolConfig[] {
   return [
     {
       tool: {

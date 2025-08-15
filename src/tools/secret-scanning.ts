@@ -332,7 +332,7 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
             name: alert.repository?.name || "",
             full_name: alert.repository?.full_name || "",
             owner: {
-              login: alert.repository.owner.login,
+              login: alert.repository?.owner?.login || "",
             },
           },
           push_protection_bypassed: alert.push_protection_bypassed,

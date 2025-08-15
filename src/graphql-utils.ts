@@ -48,14 +48,10 @@ export async function smartGraphQL<T>(
   // If this was a mutation and we have an OptimizedAPIClient, invalidate related cache entries
   if (options.isMutation && client && 'invalidateGraphQLCacheForMutation' in client) {
     (client as OptimizedAPIClient).invalidateGraphQLCacheForMutation(query, variables);
- * Utilities for type-safe GraphQL operations
- * 
- * This module provides wrapper functions and utilities for making type-safe
- * GraphQL queries and mutations with proper error handling.
- */
-
-import { Octokit } from '@octokit/rest';
-import { GraphQLResponse, extractGraphQLData } from './graphql-types.js';
+  }
+  
+  return result;
+}
 
 /**
  * Type-safe wrapper for Octokit GraphQL queries
@@ -189,7 +185,17 @@ export function getQueryOperation(query: string): string {
  * Migration helper for existing GraphQL tools
  * Provides a drop-in replacement for octokit.graphql calls
  */
-export function createGraphQLWrapper(client: OptimizedAPIClient | Octokit) {
+export function createGraphQLWrapper(client: OptimizedAPIClient | Octokit): {
+  query: <T>(query: string, variables?: Record<string, any>, ttl?: number) => Promise<T>;
+  mutate: <T>(mutation: string, variables?: Record<string, any>) => Promise<T>;
+  execute: <T>(query: string, variables?: Record<string, any>, options?: {
+    ttl?: number;
+    skipCache?: boolean;
+    operation?: string;
+    isMutation?: boolean;
+  }) => Promise<T>;
+  getClient: () => OptimizedAPIClient | Octokit;
+} {
   return {
     /**
      * Execute a GraphQL query with automatic caching
@@ -330,6 +336,8 @@ export const GraphQLQueries = {
     ttl: GraphQLTTL.CONTRIBUTORS
   })
 };
+
+/**
  * Helper to create type-safe parameter interfaces
  * This ensures handler function parameters are properly typed
  */

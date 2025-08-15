@@ -122,6 +122,7 @@ export const createMockOctokit = () => {
   
   const actionsMocks = {
     listRepoWorkflows: mockFn({ total_count: 1, workflows: [mockResponses.workflow] }),
+    listWorkflows: mockFn({ total_count: 1, workflows: [mockResponses.workflow] }), // Alias for compatibility
     getWorkflow: mockFn(mockResponses.workflow),
     listWorkflowRuns: mockFn({ total_count: 1, workflow_runs: [mockResponses.workflowRun] }),
     getWorkflowRun: mockFn(mockResponses.workflowRun),

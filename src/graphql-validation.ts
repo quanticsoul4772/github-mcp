@@ -28,7 +28,7 @@ export const ISO8601DateSchema = z.string()
   .refine((date) => {
     try {
       const parsed = new Date(date);
-      return !isNaN(parsed.getTime()) && parsed.getFullYear() >= 2000 && parsed.getFullYear() <= 2100;
+      return !isNaN(parsed.getTime()) && parsed.getUTCFullYear() >= 2000 && parsed.getUTCFullYear() <= 2100;
     } catch {
       return false;
     }
@@ -113,30 +113,22 @@ export const RefNameSchema = z.string()
 /**
  * Validates GitHub search types
  */
-export const SearchTypeSchema = z.enum(['REPOSITORY', 'ISSUE', 'USER', 'DISCUSSION'], {
-  errorMap: () => ({ message: 'Search type must be one of: REPOSITORY, ISSUE, USER, DISCUSSION' })
-});
+export const SearchTypeSchema = z.enum(['REPOSITORY', 'ISSUE', 'USER', 'DISCUSSION']);
 
 /**
  * Validates GitHub issue/milestone states
  */
-export const IssueStateSchema = z.enum(['OPEN', 'CLOSED'], {
-  errorMap: () => ({ message: 'State must be either OPEN or CLOSED' })
-});
+export const IssueStateSchema = z.enum(['OPEN', 'CLOSED']);
 
 /**
  * Validates milestone states
  */
-export const MilestoneStateSchema = z.enum(['OPEN', 'CLOSED'], {
-  errorMap: () => ({ message: 'Milestone state must be either OPEN or CLOSED' })
-});
+export const MilestoneStateSchema = z.enum(['OPEN', 'CLOSED']);
 
 /**
  * Validates entity types for user/organization queries
  */
-export const EntityTypeSchema = z.enum(['USER', 'ORGANIZATION'], {
-  errorMap: () => ({ message: 'Entity type must be either USER or ORGANIZATION' })
-});
+export const EntityTypeSchema = z.enum(['USER', 'ORGANIZATION']);
 
 /**
  * Validates star count filter strings (e.g., ">100", "10..50")
@@ -172,8 +164,9 @@ function sanitizeSearchQuery(query: string): string {
   let sanitized = query.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ');
 
   // Neutralize potential GraphQL injection patterns by spacing them out
-  sanitized = sanitized.replace(/[{}]/g, ' ');
-  sanitized = sanitized.replace(/\$[a-zA-Z_][a-zA-Z0-9_]*/g, ' ');
+  sanitized = sanitized.replace(/\$\{[^}]*\}/g, ' '); // Handle ${...} template literals first
+  sanitized = sanitized.replace(/\$[a-zA-Z_][a-zA-Z0-9_]*/g, ' '); // Handle $variable references
+  sanitized = sanitized.replace(/[{}]/g, ' '); // Remove any remaining braces
   sanitized = sanitized.replace(/\b(query|mutation|subscription)\b\s*{/gi, ' ');
 
   // Limit special characters that could be dangerous
@@ -318,7 +311,7 @@ export const BatchGraphQLQuerySchema = z.object({
     z.object({
       alias: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Alias must be a valid identifier'),
       query: z.string().min(1, 'Query cannot be empty').max(5000, 'Query too long'),
-      variables: z.record(z.any()).optional(),
+      variables: z.record(z.string(), z.any()).optional(),
     })
   ).min(1).max(10),
 });

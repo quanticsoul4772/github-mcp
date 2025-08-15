@@ -94,10 +94,11 @@ describe('Batch Operations Tools', () => {
         ],
       });
 
-      expect(mockOctokit.graphql).toHaveBeenCalledWith(
-        expect.stringContaining('query BatchRepositoryQuery'),
-        {}
-      );
+      expect(mockOctokit.graphql).toHaveBeenCalled();
+      const callArgs = mockOctokit.graphql.mock.calls[0];
+      expect(callArgs[0]).toContain('query BatchRepositoryQuery');
+      expect(callArgs[0]).toContain('repo0: repository(owner: "owner1", name: "test-repo1")');
+      expect(callArgs[0]).toContain('custom_alias: repository(owner: "owner2", name: "test-repo2")');
 
       expect(result).toEqual({
         totalQueried: 2,
@@ -492,10 +493,11 @@ describe('Batch Operations Tools', () => {
         usernames: ['testuser1', 'testuser2'],
       });
 
-      expect(mockOctokit.graphql).toHaveBeenCalledWith(
-        expect.stringContaining('query BatchUserQuery'),
-        {}
-      );
+      expect(mockOctokit.graphql).toHaveBeenCalled();
+      const callArgs = mockOctokit.graphql.mock.calls[0];
+      expect(callArgs[0]).toContain('query BatchUserQuery');
+      expect(callArgs[0]).toContain('user0: user(login: "testuser1")');
+      expect(callArgs[0]).toContain('user1: user(login: "testuser2")');
 
       expect(result).toEqual({
         totalQueried: 2,
@@ -631,8 +633,8 @@ describe('Batch Operations Tools', () => {
         repositoryLimit: 5,
       });
 
-      expect(result.entities[0].repositories.totalCount).toBe(15);
-      expect(result.entities[0].repositories.nodes).toHaveLength(1);
+      expect(result.entities[0].totalRepositories).toBe(15);
+      expect(result.entities[0].repositories).toHaveLength(1);
       expect(result.summary.totalRepositories).toBe(15);
       expect(result.summary.topLanguages).toEqual(['TypeScript']);
     });
@@ -846,12 +848,10 @@ describe('Batch Operations Tools', () => {
         ],
       });
 
-      expect(result).toEqual({
-        successful: false,
-        error: 'GraphQL Error: Field not found',
-        executedQuery: expect.stringContaining('errorQuery: invalidField'),
-        variables: {},
-      });
+      expect(result.successful).toBe(false);
+      expect(result.error).toContain('Batch operation failed');
+      expect(result.executedQuery).toContain('errorQuery: invalidField');
+      expect(result.variables).toEqual({});
     });
 
     it('should build query without variables when none provided', async () => {

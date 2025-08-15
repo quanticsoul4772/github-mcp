@@ -9,6 +9,9 @@ import {
 } from '../types/agent-interfaces.js';
 import { DefaultAgentRegistry } from './agent-registry.js';
 
+// Re-export the interface
+export type { AgentCoordinator };
+
 /**
  * Main coordinator for orchestrating agent-based code analysis
  */

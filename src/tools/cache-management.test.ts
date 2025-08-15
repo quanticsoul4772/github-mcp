@@ -14,7 +14,7 @@ describe('Cache Management Tools', () => {
   beforeEach(() => {
     const mockOctokit = createMockOctokit();
     mockOptimizedClient = new OptimizedAPIClient({
-      octokit: mockOctokit,
+      octokit: mockOctokit as any,
       enableCache: true,
       enableGraphQLCache: true,
     });
@@ -77,9 +77,9 @@ describe('Cache Management Tools', () => {
       };
 
       const mockDetailedStats = {
-        general: { hits: 8, misses: 2, size: 5 },
-        topQueries: [{ query: 'GetRepo', hits: 5 }],
-        cacheEfficiency: { overall: 80 },
+        general: { hits: 8, misses: 2, size: 5, evictions: 0, queryTypes: {} },
+        topQueries: [{ query: 'GetRepo', hits: 5, misses: 1, hitRate: 83.33, avgResponseTime: 150 }],
+        cacheEfficiency: { overall: 80, byQuery: {} },
         memorySummary: { entries: 5, estimatedSize: '2.5 KB' },
       };
 
@@ -102,10 +102,10 @@ describe('Cache Management Tools', () => {
 
     it('should return detailed GraphQL cache statistics', async () => {
       const mockStats = {
-        general: { hits: 15, misses: 5, size: 8 },
+        general: { hits: 15, misses: 5, size: 8, evictions: 0, queryTypes: {} },
         topQueries: [
-          { query: 'GetRepository', hits: 10, misses: 2, hitRate: 83.33 },
-          { query: 'ListDiscussions', hits: 5, misses: 3, hitRate: 62.5 },
+          { query: 'GetRepository', hits: 10, misses: 2, hitRate: 83.33, avgResponseTime: 200 },
+          { query: 'ListDiscussions', hits: 5, misses: 3, hitRate: 62.5, avgResponseTime: 150 },
         ],
         cacheEfficiency: { overall: 75, byQuery: { GetRepository: 83.33 } },
         memorySummary: { entries: 8, estimatedSize: '4.2 KB' },
@@ -197,7 +197,8 @@ describe('Cache Management Tools', () => {
       };
 
       const mockGraphQLStats = {
-        general: { hits: 90, misses: 10 },
+        general: { hits: 90, misses: 10, size: 50, evictions: 0, queryTypes: {} },
+        topQueries: [],
         cacheEfficiency: { overall: 90, byQuery: { GetRepo: 95, ListDiscussions: 85 } },
         memorySummary: { entries: 50, estimatedSize: '2.5 MB' },
       };
@@ -208,7 +209,7 @@ describe('Cache Management Tools', () => {
       const result = await cacheHealthCheckTool.handler({});
 
       expect(result.overallHealth).toBe('healthy');
-      expect(result.recommendations).toContain('Cache performance looks good');
+      expect(result.recommendations[0]).toContain('Cache performance looks good');
       expect(result.summary.restCache.hitRate).toBe(80);
       expect(result.summary.graphqlCache.hitRate).toBe(90);
     });
@@ -219,6 +220,8 @@ describe('Cache Management Tools', () => {
       };
 
       const mockGraphQLStats = {
+        general: { hits: 20, misses: 80, size: 50, evictions: 0, queryTypes: {} },
+        topQueries: [],
         cacheEfficiency: { overall: 25, byQuery: { BadQuery: 10, GoodQuery: 85 } },
         memorySummary: { entries: 50, estimatedSize: '2.5 MB' },
       };
@@ -229,8 +232,8 @@ describe('Cache Management Tools', () => {
       const result = await cacheHealthCheckTool.handler({});
 
       expect(result.overallHealth).toBe('warning');
-      expect(result.recommendations.some(r => r.includes('hit rate is low'))).toBe(true);
-      expect(result.recommendations.some(r => r.includes('BadQuery'))).toBe(true);
+      expect(result.recommendations.some((r: string) => r.includes('hit rate is low'))).toBe(true);
+      expect(result.recommendations.some((r: string) => r.includes('BadQuery'))).toBe(true);
     });
 
     it('should detect high eviction rate', async () => {
@@ -244,7 +247,7 @@ describe('Cache Management Tools', () => {
       const result = await cacheHealthCheckTool.handler({});
 
       expect(result.overallHealth).toBe('warning');
-      expect(result.recommendations.some(r => r.includes('eviction rate'))).toBe(true);
+      expect(result.recommendations.some((r: string) => r.includes('eviction rate'))).toBe(true);
     });
   });
 

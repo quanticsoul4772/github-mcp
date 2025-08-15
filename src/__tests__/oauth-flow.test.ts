@@ -102,7 +102,7 @@ describe('OAuth Flow Testing Infrastructure', () => {
       const authUrl = generateOAuthUrl(config, state);
 
       expect(authUrl).toContain('client_id=test-client-123');
-      expect(authUrl).toContain('scope=repo%20user');
+      expect(authUrl).toContain('scope=repo+user'); // URLSearchParams uses + for spaces
       expect(authUrl).toContain('state=' + state);
       expect(authUrl).toContain('response_type=code');
       expect(authUrl).not.toContain('client_secret'); // Should never be in URL
@@ -380,7 +380,7 @@ describe('OAuth Flow Testing Infrastructure', () => {
         validateOAuthFlow: (authCode: string, state: string) => {
           return authCode.length > 10 && 
                  state.startsWith('state_') && 
-                 state.length > 15;
+                 state.length >= 15;
         }
       };
 

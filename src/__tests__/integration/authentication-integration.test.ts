@@ -9,9 +9,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Octokit } from '@octokit/rest';
 import { AuthenticationError, AuthorizationError, RateLimitError, normalizeError } from '../../errors.js';
 import { validateGitHubToken } from '../../validation.js';
+import { config } from 'dotenv';
 
-// Skip integration tests unless an explicit test token is provided (CI alone is not sufficient)
-const shouldSkipIntegrationTests = !process.env.GITHUB_TEST_TOKEN;
+// Load .env file to get GITHUB_TEST_TOKEN
+config();
+
+// Check if we should skip integration tests - evaluate dynamically
+const shouldSkipIntegrationTests = () => !process.env.GITHUB_TEST_TOKEN;
 
 describe('Authentication Integration Tests', () => {
   let testToken: string | undefined;
@@ -20,7 +24,7 @@ describe('Authentication Integration Tests', () => {
   beforeEach(() => {
     testToken = process.env.GITHUB_TEST_TOKEN;
     
-    if (shouldSkipIntegrationTests) {
+    if (!testToken) {
       console.warn('Skipping integration tests: No GITHUB_TEST_TOKEN provided');
       return;
     }
@@ -31,7 +35,7 @@ describe('Authentication Integration Tests', () => {
   });
 
   describe('Real Token Validation with GitHub API', function() {
-    it.skipIf(shouldSkipIntegrationTests)('should authenticate with valid test token', async () => {
+    it.skipIf(shouldSkipIntegrationTests())('should authenticate with valid test token', async () => {
       expect(testToken).toBeDefined();
       expect(validateGitHubToken(testToken!)).toBe(true);
       
@@ -43,7 +47,7 @@ describe('Authentication Integration Tests', () => {
       expect(response.data.id).toBeGreaterThan(0);
     });
 
-    it.skipIf(shouldSkipIntegrationTests)('should fail with invalid token format', async () => {
+    it.skipIf(shouldSkipIntegrationTests())('should fail with invalid token format', async () => {
       const invalidOctokit = new Octokit({ auth: 'invalid-token-format' });
       
       await expect(async () => {
@@ -51,7 +55,7 @@ describe('Authentication Integration Tests', () => {
       }).rejects.toThrow();
     });
 
-    it.skipIf(shouldSkipIntegrationTests)('should handle expired/revoked token', async () => {
+    it.skipIf(shouldSkipIntegrationTests())('should handle expired/revoked token', async () => {
       // Use a token that's definitely expired (old format from 2020)
       const expiredToken = 'a'.repeat(40);
       const expiredOctokit = new Octokit({ auth: expiredToken });
@@ -69,14 +73,14 @@ describe('Authentication Integration Tests', () => {
   });
 
   describe('Token Permission Verification', function() {
-    it.skipIf(shouldSkipIntegrationTests)('should verify token has basic user permissions', async () => {
+    it.skipIf(shouldSkipIntegrationTests())('should verify token has basic user permissions', async () => {
       // Test basic read permissions
       const userResponse = await octokit.rest.users.getAuthenticated();
       expect(userResponse.status).toBe(200);
       expect(userResponse.data.login).toBeTruthy();
     });
 
-    it.skipIf(shouldSkipIntegrationTests)('should handle insufficient permissions gracefully', async () => {
+    it.skipIf(shouldSkipIntegrationTests())('should handle insufficient permissions gracefully', async () => {
       try {
         // Try to access organization data - may fail with insufficient permissions
         await octokit.rest.orgs.list();
@@ -92,7 +96,7 @@ describe('Authentication Integration Tests', () => {
       }
     });
 
-    it.skipIf(shouldSkipIntegrationTests)('should detect rate limiting', async () => {
+    it.skipIf(shouldSkipIntegrationTests())('should detect rate limiting', async () => {
       // Check rate limit headers
       const response = await octokit.rest.users.getAuthenticated();
       
@@ -112,7 +116,7 @@ describe('Authentication Integration Tests', () => {
   });
 
   describe('Error Handling Integration', function() {
-    it.skipIf(shouldSkipIntegrationTests)('should normalize GitHub API errors correctly', async () => {
+    it.skipIf(shouldSkipIntegrationTests())('should normalize GitHub API errors correctly', async () => {
       try {
         // Try to access a repository that definitely doesn't exist
         await octokit.rest.repos.get({
@@ -133,7 +137,7 @@ describe('Authentication Integration Tests', () => {
       }
     });
 
-    it.skipIf(shouldSkipIntegrationTests)('should handle network timeouts', async () => {
+    it.skipIf(shouldSkipIntegrationTests())('should handle network timeouts', async () => {
       // Create octokit with very short timeout
       const timeoutOctokit = new Octokit({
         auth: testToken,
@@ -155,7 +159,7 @@ describe('Authentication Integration Tests', () => {
   });
 
   describe('Token Scope Detection', function() {
-    it.skipIf(shouldSkipIntegrationTests)('should detect available OAuth scopes', async () => {
+    it.skipIf(shouldSkipIntegrationTests())('should detect available OAuth scopes', async () => {
       try {
         // Make a request that returns OAuth scope headers
         const response = await octokit.rest.users.getAuthenticated();
@@ -178,7 +182,7 @@ describe('Authentication Integration Tests', () => {
       }
     });
 
-    it.skipIf(shouldSkipIntegrationTests)('should test repository access permissions', async () => {
+    it.skipIf(shouldSkipIntegrationTests())('should test repository access permissions', async () => {
       try {
         // Try to list user's repositories
         const response = await octokit.rest.repos.listForAuthenticatedUser({
@@ -212,7 +216,7 @@ describe('Authentication Integration Tests', () => {
   });
 
   describe('Security Validation', function() {
-    it.skipIf(shouldSkipIntegrationTests)('should never log raw tokens in error messages', async () => {
+    it.skipIf(shouldSkipIntegrationTests())('should never log raw tokens in error messages', async () => {
       const logSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       
@@ -244,7 +248,7 @@ describe('Authentication Integration Tests', () => {
       warnSpy.mockRestore();
     });
 
-    it.skipIf(shouldSkipIntegrationTests)('should validate token format before API calls', async () => {
+    it.skipIf(shouldSkipIntegrationTests())('should validate token format before API calls', async () => {
       // This test verifies that we validate token format before making API calls
       // This prevents sending malformed tokens to GitHub API
       
@@ -259,7 +263,7 @@ describe('Authentication Integration Tests', () => {
   });
 
   describe('Rate Limiting Integration', function() {
-    it.skipIf(shouldSkipIntegrationTests)('should handle rate limit responses', async () => {
+    it.skipIf(shouldSkipIntegrationTests())('should handle rate limit responses', async () => {
       // Get current rate limit status
       const rateLimitResponse = await octokit.rest.rateLimit.get();
       
@@ -279,7 +283,7 @@ describe('Authentication Integration Tests', () => {
     // Note: This test is commented out as it would exhaust rate limits
     // In a real test environment, you might want to test this with a dedicated test token
     /*
-    it.skipIf(shouldSkipIntegrationTests)('should handle rate limit exhaustion', async () => {
+    it.skipIf(shouldSkipIntegrationTests())('should handle rate limit exhaustion', async () => {
       // This test would make many requests to exhaust rate limit
       // and verify proper error handling
       // WARNING: Don't run this in production or with important tokens

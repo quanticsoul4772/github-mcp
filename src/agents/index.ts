@@ -32,13 +32,13 @@ export * from './cli/analysis-cli.js';
 // Examples
 export * from './examples/example-usage.js';
 
-// Legacy exports for backward compatibility
-export * from './types.js';
-export { BaseAgent as LegacyBaseAgent, DEFAULT_AGENT_CONFIG } from './base/agent-base.js';
-export { AgentCoordinator as LegacyAgentCoordinator } from './base/coordinator.js';
-export { StaticAnalysisAgent } from './analysis/static-analysis.js';
-export { ErrorDetectionAgent } from './analysis/error-detection.js';
-export { TestGenerationAgent } from './testing/test-generation.js';
+// Import specific classes for the convenience function
+import { DefaultAgentRegistry } from './base/agent-registry.js';
+import { DefaultAgentCoordinator } from './base/coordinator.js';
+import { CodeAnalysisAgent } from './analysis/code-analysis-agent.js';
+import { TypeSafetyAgent } from './analysis/type-safety-agent.js';
+import { TestingAgent } from './testing/testing-agent.js';
+import { SecurityAgent } from './security/security-agent.js';
 
 /**
  * Convenience function to create a fully configured agent system

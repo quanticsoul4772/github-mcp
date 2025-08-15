@@ -200,14 +200,14 @@ describe('Authentication Security Tests', () => {
       const result = validateEnvironmentConfiguration();
       
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Invalid GitHub token format');
+      expect(result.errors).toContain('Unrecognized token format');
     });
 
     it('should handle missing token', () => {
       const result = validateEnvironmentConfiguration();
       
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN is required');
+      expect(result.errors).toContain('GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN environment variable is required');
     });
 
     it('should prioritize GITHUB_PERSONAL_ACCESS_TOKEN over GITHUB_TOKEN', () => {

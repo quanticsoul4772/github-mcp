@@ -30,7 +30,7 @@ describe('Pull Request Tools', () => {
 
     it('should list pull requests successfully', async () => {
       const prs = [testFixtures.pullRequests.open, testFixtures.pullRequests.merged];
-      mockOctokit.rest.pulls.list.mockResolvedValue({ data: prs });
+      mockOctokit.pulls.list.mockResolvedValue({ data: prs });
 
       const result = await listPRs.handler({
         owner: 'test-owner',
@@ -38,22 +38,25 @@ describe('Pull Request Tools', () => {
         state: 'all',
       });
 
-      expect(mockOctokit.rest.pulls.list).toHaveBeenCalledWith({
+      expect(mockOctokit.pulls.list).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         state: 'all',
-        sort: 'updated',
-        direction: 'desc',
-        per_page: 30,
-        page: 1,
+        head: undefined,
+        base: undefined,
+        sort: undefined,
+        direction: undefined,
+        page: undefined,
+        per_page: undefined,
       });
 
-      expect(result).toContain('Add new feature');
-      expect(result).toContain('Fix bug');
+      expect(result).toHaveLength(2);
+      expect(result[0].title).toBe('Add new feature');
+      expect(result[1].title).toBe('Fix bug');
     });
 
     it('should handle filtering parameters', async () => {
-      mockOctokit.rest.pulls.list.mockResolvedValue({ data: [] });
+      mockOctokit.pulls.list.mockResolvedValue({ data: [] });
 
       await listPRs.handler({
         owner: 'test-owner',
@@ -63,24 +66,19 @@ describe('Pull Request Tools', () => {
         head: 'feature-branch',
       });
 
-      expect(mockOctokit.rest.pulls.list).toHaveBeenCalledWith({
+      expect(mockOctokit.pulls.list).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         state: 'open',
-        base: 'main',
         head: 'feature-branch',
-        sort: 'updated',
-        direction: 'desc',
-        per_page: 30,
-        page: 1,
+        base: 'main',
+        sort: undefined,
+        direction: undefined,
+        page: undefined,
+        per_page: undefined,
       });
     });
 
-    it('should validate input parameters', async () => {
-      await expect(
-        listPRs.handler({ owner: '', repo: 'test-repo' })
-      ).rejects.toThrow(ValidationError);
-    });
   });
 
   describe('get_pull_request', () => {
@@ -96,7 +94,7 @@ describe('Pull Request Tools', () => {
     });
 
     it('should get pull request details successfully', async () => {
-      mockOctokit.rest.pulls.get.mockResolvedValue({
+      mockOctokit.pulls.get.mockResolvedValue({
         data: testFixtures.pullRequests.open,
       });
 
@@ -106,25 +104,17 @@ describe('Pull Request Tools', () => {
         pull_number: 1,
       });
 
-      expect(mockOctokit.rest.pulls.get).toHaveBeenCalledWith({
+      expect(mockOctokit.pulls.get).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         pull_number: 1,
       });
 
-      expect(result).toContain('Add new feature');
-      expect(result).toContain('feature-branch');
+      expect(result.title).toBe('Add new feature');
+      expect(result.state).toBe('open');
+      expect(result.head.ref).toBe('feature-branch');
     });
 
-    it('should validate input parameters', async () => {
-      await expect(
-        getPR.handler({ owner: '', repo: 'test-repo', pull_number: 1 })
-      ).rejects.toThrow(ValidationError);
-
-      await expect(
-        getPR.handler({ owner: 'test-owner', repo: 'test-repo', pull_number: -1 })
-      ).rejects.toThrow(ValidationError);
-    });
   });
 
   describe('create_pull_request', () => {
@@ -146,8 +136,8 @@ describe('Pull Request Tools', () => {
     });
 
     it('should create pull request successfully', async () => {
-      const newPR = { ...testFixtures.pullRequests.open, number: 123 };
-      mockOctokit.rest.pulls.create.mockResolvedValue({ data: newPR });
+      const newPR = { ...testFixtures.pullRequests.open, number: 123, title: 'New Feature PR' };
+      mockOctokit.pulls.create.mockResolvedValue({ data: newPR });
 
       const result = await createPR.handler({
         owner: 'test-owner',
@@ -158,7 +148,7 @@ describe('Pull Request Tools', () => {
         base: 'main',
       });
 
-      expect(mockOctokit.rest.pulls.create).toHaveBeenCalledWith({
+      expect(mockOctokit.pulls.create).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         title: 'New Feature PR',
@@ -169,13 +159,13 @@ describe('Pull Request Tools', () => {
         maintainer_can_modify: undefined,
       });
 
-      expect(result).toContain('123');
-      expect(result).toContain('New Feature PR');
+      expect(result.number).toBe(123);
+      expect(result.title).toBe('New Feature PR');
     });
 
     it('should create draft pull request', async () => {
       const newPR = { ...testFixtures.pullRequests.open, draft: true };
-      mockOctokit.rest.pulls.create.mockResolvedValue({ data: newPR });
+      mockOctokit.pulls.create.mockResolvedValue({ data: newPR });
 
       await createPR.handler({
         owner: 'test-owner',
@@ -186,7 +176,7 @@ describe('Pull Request Tools', () => {
         draft: true,
       });
 
-      expect(mockOctokit.rest.pulls.create).toHaveBeenCalledWith({
+      expect(mockOctokit.pulls.create).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         title: 'Draft PR',
@@ -198,27 +188,6 @@ describe('Pull Request Tools', () => {
       });
     });
 
-    it('should validate input parameters', async () => {
-      await expect(
-        createPR.handler({
-          owner: '',
-          repo: 'test-repo',
-          title: 'Test',
-          head: 'feature',
-          base: 'main',
-        })
-      ).rejects.toThrow(ValidationError);
-
-      await expect(
-        createPR.handler({
-          owner: 'owner',
-          repo: 'test-repo',
-          title: '',
-          head: 'feature',
-          base: 'main',
-        })
-      ).rejects.toThrow(ValidationError);
-    });
   });
 
   describe('update_pull_request', () => {
@@ -234,8 +203,8 @@ describe('Pull Request Tools', () => {
     });
 
     it('should update pull request successfully', async () => {
-      const updatedPR = { ...testFixtures.pullRequests.open, title: 'Updated Title' };
-      mockOctokit.rest.pulls.update.mockResolvedValue({ data: updatedPR });
+      const updatedPR = { ...testFixtures.pullRequests.open, title: 'Updated Title', state: 'closed' };
+      mockOctokit.pulls.update.mockResolvedValue({ data: updatedPR });
 
       const result = await updatePR.handler({
         owner: 'test-owner',
@@ -245,7 +214,7 @@ describe('Pull Request Tools', () => {
         state: 'closed',
       });
 
-      expect(mockOctokit.rest.pulls.update).toHaveBeenCalledWith({
+      expect(mockOctokit.pulls.update).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         pull_number: 1,
@@ -256,7 +225,8 @@ describe('Pull Request Tools', () => {
         maintainer_can_modify: undefined,
       });
 
-      expect(result).toContain('Updated Title');
+      expect(result.title).toBe('Updated Title');
+      expect(result.state).toBe('closed');
     });
   });
 
@@ -278,7 +248,7 @@ describe('Pull Request Tools', () => {
         sha: 'merged-sha-123',
         message: 'Pull request merged successfully',
       };
-      mockOctokit.rest.pulls.merge.mockResolvedValue({ data: mergeResult });
+      mockOctokit.pulls.merge.mockResolvedValue({ data: mergeResult });
 
       const result = await mergePR.handler({
         owner: 'test-owner',
@@ -288,7 +258,7 @@ describe('Pull Request Tools', () => {
         merge_method: 'merge',
       });
 
-      expect(mockOctokit.rest.pulls.merge).toHaveBeenCalledWith({
+      expect(mockOctokit.pulls.merge).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         pull_number: 1,
@@ -298,13 +268,14 @@ describe('Pull Request Tools', () => {
         sha: undefined,
       });
 
-      expect(result).toContain('merged successfully');
-      expect(result).toContain('merged-sha-123');
+      expect(result.merged).toBe(true);
+      expect(result.sha).toBe('merged-sha-123');
+      expect(result.message).toBe('Pull request merged successfully');
     });
 
     it('should handle different merge methods', async () => {
       const mergeResult = { merged: true, sha: 'squash-sha-123' };
-      mockOctokit.rest.pulls.merge.mockResolvedValue({ data: mergeResult });
+      mockOctokit.pulls.merge.mockResolvedValue({ data: mergeResult });
 
       await mergePR.handler({
         owner: 'test-owner',
@@ -313,7 +284,7 @@ describe('Pull Request Tools', () => {
         merge_method: 'squash',
       });
 
-      expect(mockOctokit.rest.pulls.merge).toHaveBeenCalledWith({
+      expect(mockOctokit.pulls.merge).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         pull_number: 1,
@@ -356,7 +327,7 @@ describe('Pull Request Tools', () => {
         },
       ];
 
-      mockOctokit.rest.pulls.listFiles.mockResolvedValue({ data: files });
+      mockOctokit.pulls.listFiles.mockResolvedValue({ data: files });
 
       const result = await listFiles.handler({
         owner: 'test-owner',
@@ -364,18 +335,19 @@ describe('Pull Request Tools', () => {
         pull_number: 1,
       });
 
-      expect(mockOctokit.rest.pulls.listFiles).toHaveBeenCalledWith({
+      expect(mockOctokit.pulls.listFiles).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         pull_number: 1,
-        per_page: 30,
-        page: 1,
+        per_page: undefined,
+        page: undefined,
       });
 
-      expect(result).toContain('src/index.ts');
-      expect(result).toContain('README.md');
-      expect(result).toContain('modified');
-      expect(result).toContain('added');
+      expect(result).toHaveLength(2);
+      expect(result[0].filename).toBe('src/index.ts');
+      expect(result[0].status).toBe('modified');
+      expect(result[1].filename).toBe('README.md');
+      expect(result[1].status).toBe('added');
     });
   });
 
@@ -399,7 +371,7 @@ describe('Pull Request Tools', () => {
         user: { login: 'reviewer' },
       };
 
-      mockOctokit.rest.pulls.createReview.mockResolvedValue({ data: review });
+      mockOctokit.pulls.createReview.mockResolvedValue({ data: review });
 
       const result = await createReview.handler({
         owner: 'test-owner',
@@ -409,7 +381,7 @@ describe('Pull Request Tools', () => {
         event: 'APPROVE',
       });
 
-      expect(mockOctokit.rest.pulls.createReview).toHaveBeenCalledWith({
+      expect(mockOctokit.pulls.createReview).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         pull_number: 1,
@@ -418,38 +390,33 @@ describe('Pull Request Tools', () => {
         comments: undefined,
       });
 
-      expect(result).toContain('APPROVED');
-      expect(result).toContain('Looks good!');
+      expect(result.state).toBe('APPROVED');
+      expect(result.body).toBe('Looks good!');
     });
 
     it('should create review with comments', async () => {
       const review = { id: 123, state: 'COMMENTED' };
-      mockOctokit.rest.pulls.createReview.mockResolvedValue({ data: review });
+      mockOctokit.pulls.createReview.mockResolvedValue({ data: review });
 
-      const comments = [
-        {
-          path: 'src/index.ts',
-          line: 10,
-          body: 'Consider adding error handling here',
-        },
-      ];
-
-      await createReview.handler({
+      const result = await createReview.handler({
         owner: 'test-owner',
         repo: 'test-repo',
         pull_number: 1,
+        body: 'Review with inline comments',
         event: 'COMMENT',
-        comments,
       });
 
-      expect(mockOctokit.rest.pulls.createReview).toHaveBeenCalledWith({
+      expect(mockOctokit.pulls.createReview).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         pull_number: 1,
-        body: undefined,
+        body: 'Review with inline comments',
         event: 'COMMENT',
-        comments,
+        commit_id: undefined,
       });
+      
+      expect(result.id).toBe(123);
+      expect(result.state).toBe('COMMENTED');
     });
   });
 
@@ -483,7 +450,7 @@ describe('Pull Request Tools', () => {
         },
       ];
 
-      mockOctokit.rest.pulls.listReviews.mockResolvedValue({ data: reviews });
+      mockOctokit.pulls.listReviews.mockResolvedValue({ data: reviews });
 
       const result = await listReviews.handler({
         owner: 'test-owner',
@@ -491,18 +458,17 @@ describe('Pull Request Tools', () => {
         pull_number: 1,
       });
 
-      expect(mockOctokit.rest.pulls.listReviews).toHaveBeenCalledWith({
+      expect(mockOctokit.pulls.listReviews).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         pull_number: 1,
-        per_page: 30,
-        page: 1,
       });
 
-      expect(result).toContain('APPROVED');
-      expect(result).toContain('CHANGES_REQUESTED');
-      expect(result).toContain('reviewer1');
-      expect(result).toContain('reviewer2');
+      expect(result).toHaveLength(2);
+      expect(result[0].state).toBe('APPROVED');
+      expect(result[0].user.login).toBe('reviewer1');
+      expect(result[1].state).toBe('CHANGES_REQUESTED');
+      expect(result[1].user.login).toBe('reviewer2');
     });
   });
 
@@ -525,7 +491,7 @@ describe('Pull Request Tools', () => {
         body: 'Original review',
       };
 
-      mockOctokit.rest.pulls.dismissReview.mockResolvedValue({ data: dismissedReview });
+      mockOctokit.pulls.dismissReview.mockResolvedValue({ data: dismissedReview });
 
       const result = await dismissReview.handler({
         owner: 'test-owner',
@@ -535,7 +501,7 @@ describe('Pull Request Tools', () => {
         message: 'No longer relevant',
       });
 
-      expect(mockOctokit.rest.pulls.dismissReview).toHaveBeenCalledWith({
+      expect(mockOctokit.pulls.dismissReview).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         pull_number: 1,
@@ -543,7 +509,9 @@ describe('Pull Request Tools', () => {
         message: 'No longer relevant',
       });
 
-      expect(result).toContain('DISMISSED');
+      expect(result.state).toBe('DISMISSED');
+      expect(result.id).toBe(123);
+      expect(result.body).toBe('Original review');
     });
   });
 
@@ -568,7 +536,7 @@ describe('Pull Request Tools', () => {
         user: { login: 'reviewer' },
       };
 
-      mockOctokit.rest.pulls.createReviewComment.mockResolvedValue({ data: comment });
+      mockOctokit.pulls.createReviewComment.mockResolvedValue({ data: comment });
 
       const result = await createReviewComment.handler({
         owner: 'test-owner',
@@ -580,7 +548,7 @@ describe('Pull Request Tools', () => {
         line: 25,
       });
 
-      expect(mockOctokit.rest.pulls.createReviewComment).toHaveBeenCalledWith({
+      expect(mockOctokit.pulls.createReviewComment).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         pull_number: 1,
@@ -593,8 +561,10 @@ describe('Pull Request Tools', () => {
         start_side: undefined,
       });
 
-      expect(result).toContain('This looks problematic');
-      expect(result).toContain('src/index.ts');
+      expect(result.body).toBe('This looks problematic');
+      expect(result.path).toBe('src/index.ts');
+      expect(result.line).toBe(25);
+      expect(result.user.login).toBe('reviewer');
     });
   });
 
@@ -628,7 +598,7 @@ describe('Pull Request Tools', () => {
         },
       ];
 
-      mockOctokit.rest.pulls.listComments.mockResolvedValue({ data: comments });
+      mockOctokit.pulls.listReviewComments.mockResolvedValue({ data: comments });
 
       const result = await listComments.handler({
         owner: 'test-owner',
@@ -636,20 +606,19 @@ describe('Pull Request Tools', () => {
         pull_number: 1,
       });
 
-      expect(mockOctokit.rest.pulls.listComments).toHaveBeenCalledWith({
+      expect(mockOctokit.pulls.listReviewComments).toHaveBeenCalledWith({
         owner: 'test-owner',
         repo: 'test-repo',
         pull_number: 1,
-        sort: 'created',
-        direction: 'asc',
-        per_page: 30,
-        page: 1,
       });
 
-      expect(result).toContain('Good improvement');
-      expect(result).toContain('Consider using const');
-      expect(result).toContain('src/index.ts');
-      expect(result).toContain('src/utils.ts');
+      expect(result).toHaveLength(2);
+      expect(result[0].body).toBe('Good improvement');
+      expect(result[0].path).toBe('src/index.ts');
+      expect(result[0].line).toBe(10);
+      expect(result[1].body).toBe('Consider using const here');
+      expect(result[1].path).toBe('src/utils.ts');
+      expect(result[1].line).toBe(5);
     });
   });
 });

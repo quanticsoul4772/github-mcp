@@ -58,7 +58,7 @@ describe('GraphQL Validation', () => {
       };
       
       const result = validateGraphQLInput(CrossRepoSearchSchema, input, 'test');
-      expect(result.query).toBe('react  test'); // malicious variable reference removed
+      expect(result.query).toBe('react test'); // malicious variable reference removed
       expect(result.type).toBe('REPOSITORY');
       expect(result.first).toBe(10);
     });
@@ -70,7 +70,7 @@ describe('GraphQL Validation', () => {
       };
       
       const result = validateGraphQLInput(CrossRepoSearchSchema, input, 'test');
-      expect(result.query).toBe('test  repository  name'); // GraphQL syntax removed
+      expect(result.query).toBe('test repository name'); // GraphQL syntax removed
     });
   });
 
@@ -215,7 +215,7 @@ describe('GraphQL Validation', () => {
     it('should sanitize dangerous patterns', () => {
       const dangerous = 'search query { malicious } $variable';
       const result = SearchQuerySchema.parse(dangerous);
-      expect(result).toBe('search query  malicious'); // cleaned
+      expect(result).toBe('search query malicious'); // cleaned
     });
 
     it('should remove quotes and backslashes', () => {

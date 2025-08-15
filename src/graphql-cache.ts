@@ -12,6 +12,7 @@ interface GraphQLCacheEntry<T> {
   ttl: number;
   queryHash: string;
   variables: Record<string, any>;
+  query?: string; // Store original query for invalidation matching
 }
 
 interface GraphQLCacheOptions {
@@ -20,7 +21,7 @@ interface GraphQLCacheOptions {
   enableMetrics?: boolean;
 }
 
-interface GraphQLCacheMetrics {
+export interface GraphQLCacheMetrics {
   hits: number;
   misses: number;
   evictions: number;
@@ -302,6 +303,7 @@ export class GraphQLCache {
       ttl,
       queryHash,
       variables,
+      query,
     });
 
     this.updateAccessOrder(key);
@@ -348,69 +350,62 @@ export class GraphQLCache {
    */
   invalidateForMutation(mutation: string, variables: Record<string, any> = {}): number {
     let count = 0;
-    const mutationName = this.extractQueryName(mutation)?.toLowerCase() || '';
+    const op = this.extractQueryName(mutation)?.toLowerCase() || '';
+    const affectedOps: Record<string, true> = {};
     
-    // Define invalidation patterns based on mutation types
-    const invalidationPatterns: Record<string, RegExp[]> = {
-      'create_discussion': [/discussion/i, /list_discussions/i],
-      'add_discussion_comment': [/discussion.*comments?/i, /get_discussion/i],
-      'update_discussion': [/discussion/i],
-      'delete_discussion': [/discussion/i],
-        let count = 0;
-        const op = this.extractQueryName(mutation)?.toLowerCase() || '';
-        const affectedOps: Record<string, true> = {};
-        // Map common mutations to affected query operation prefixes
-        const opMap: Record<string, string[]> = {
-          create_discussion: ['list_discussions', 'get_discussion', 'discussion', 'discussion_comments'],
-          add_discussion_comment: ['get_discussion', 'discussion_comments'],
-          update_discussion: ['get_discussion', 'discussion', 'discussion_comments'],
-          delete_discussion: ['list_discussions', 'get_discussion', 'discussion'],
-          create_issue: ['issues', 'repository'],
-          update_issue: ['issues'],
-          create_pull_request: ['pull', 'repository'],
-          update_pull_request: ['pull'],
-        };
-        (opMap[op] || []).forEach(name => (affectedOps[name] = true));
-        const repoPattern = variables.owner && variables.repo
-          ? new RegExp(`${variables.owner}\\W+${variables.repo}`, 'i')
-          : null;
+    // Map common mutations to affected query operation prefixes
+    const opMap: Record<string, string[]> = {
+      create_discussion: ['list_discussions', 'get_discussion', 'discussion', 'discussion_comments'],
+      creatediscussion: ['list_discussions', 'get_discussion', 'getdiscussion', 'discussion', 'discussion_comments'],
+      add_discussion_comment: ['get_discussion', 'discussion_comments'],
+      update_discussion: ['get_discussion', 'discussion', 'discussion_comments'],
+      delete_discussion: ['list_discussions', 'get_discussion', 'discussion'],
+      create_issue: ['issues', 'repository'],
+      update_issue: ['issues'],
+      create_pull_request: ['pull', 'repository'],
+      update_pull_request: ['pull'],
+    };
+    
+    (opMap[op] || []).forEach(name => (affectedOps[name] = true));
+    
+    const repoPattern = variables.owner && variables.repo
+      ? new RegExp(`${variables.owner}\\W+${variables.repo}`, 'i')
+      : null;
 
-        for (const key of this.cache.keys()) {
-          // key format: gql:${queryName}:${hash}:${sortedVariables}
-          const parts = key.split(':');
-          const keyOp = parts[1]?.toLowerCase();
-          let invalidate = false;
-          if (keyOp && affectedOps[keyOp]) {
-            invalidate = true;
-          } else if (repoPattern && repoPattern.test(key)) {
-            invalidate = true;
-          }
-          if (invalidate) {
-            this.cache.delete(key);
-            const idx = this.accessOrder.indexOf(key);
-            if (idx > -1) this.accessOrder.splice(idx, 1);
-            count++;
-          }
-        }
-        if (this.enableMetrics) {
-          this.metrics.size = this.cache.size;
-        }
-        return count;
     for (const key of this.cache.keys()) {
-      if (regex.test(key)) {
-        this.cache.delete(key);
-        const index = this.accessOrder.indexOf(key);
-        if (index > -1) {
-          this.accessOrder.splice(index, 1);
+      // key format: gql:${queryName}:${hash}:${sortedVariables}
+      const parts = key.split(':');
+      const keyOp = parts[1]?.toLowerCase();
+      const entry = this.cache.get(key);
+      let invalidate = false;
+      
+      if (keyOp && affectedOps[keyOp]) {
+        invalidate = true;
+      } else if (repoPattern && repoPattern.test(key)) {
+        invalidate = true;
+      } else if (entry?.query) {
+        // Check if the actual query contains related keywords
+        const queryLower = entry.query.toLowerCase();
+        for (const affectedOp of Object.keys(affectedOps)) {
+          if (queryLower.includes(affectedOp)) {
+            invalidate = true;
+            break;
+          }
         }
+      }
+      
+      if (invalidate) {
+        this.cache.delete(key);
+        const idx = this.accessOrder.indexOf(key);
+        if (idx > -1) this.accessOrder.splice(idx, 1);
         count++;
       }
     }
-
+    
     if (this.enableMetrics) {
       this.metrics.size = this.cache.size;
     }
-
+    
     return count;
   }
 
@@ -432,6 +427,33 @@ export class GraphQLCache {
     }
 
     return result;
+  }
+
+  /**
+   * Invalidate cache entries matching a pattern
+   */
+  invalidate(pattern: string | RegExp): number {
+    let count = 0;
+    const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern;
+    
+    for (const key of this.cache.keys()) {
+      const entry = this.cache.get(key);
+      // Check both the key and the actual query text
+      if (regex.test(key) || (entry?.query && regex.test(entry.query))) {
+        this.cache.delete(key);
+        const index = this.accessOrder.indexOf(key);
+        if (index > -1) {
+          this.accessOrder.splice(index, 1);
+        }
+        count++;
+      }
+    }
+    
+    if (this.enableMetrics) {
+      this.metrics.size = this.cache.size;
+    }
+    
+    return count;
   }
 
   /**

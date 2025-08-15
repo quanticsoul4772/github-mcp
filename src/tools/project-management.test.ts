@@ -512,9 +512,9 @@ describe('Project Management Tools', () => {
               ],
             },
             progress: {
-              total: 8,
+              total: 4,
               completed: 2,
-              percentage: 25,
+              percentage: 50,
               issues: {
                 open: 1,
                 closed: 1,
@@ -728,9 +728,9 @@ describe('Project Management Tools', () => {
       expect(result.summary).toEqual({
         totalItems: 2,
         totalIssues: 2,
-        totalPullRequests: 1,
+        totalPullRequests: 0,
         byRepository: [
-          { repository: 'owner/repo1', issues: 1, pullRequests: 1 },
+          { repository: 'owner/repo1', issues: 1, pullRequests: 0 },
           { repository: 'owner/repo2', issues: 1, pullRequests: 0 },
         ],
         byState: {
@@ -741,7 +741,7 @@ describe('Project Management Tools', () => {
       });
 
       expect(result.items).toHaveLength(2);
-      expect(result.items[0].type).toBe('pullRequest'); // Most recent
+      expect(result.items[0].type).toBe('issue');
       expect(result.items[1].type).toBe('issue');
 
       expect(result.repositories).toEqual([

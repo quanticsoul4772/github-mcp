@@ -25,7 +25,8 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
         },
       },
     },
-    handler: async (args: { includeDetails?: boolean }) => {
+    handler: async (args: unknown) => {
+      const params = args as { includeDetails?: boolean };
       const metrics = optimizedClient.getMetrics();
       
       const result: any = {
@@ -37,7 +38,7 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
       };
 
       // Add detailed GraphQL cache statistics if requested
-      if (args.includeDetails) {
+      if (params.includeDetails) {
         const graphqlStats = optimizedClient.getGraphQLCacheStats();
         if (graphqlStats) {
           result.graphql_cache_details = graphqlStats;
@@ -97,12 +98,13 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
         },
       },
     },
-    handler: async (args: { cacheType?: string; pattern?: string }) => {
-      const cacheType = args.cacheType || 'all';
+    handler: async (args: unknown) => {
+      const params = args as { cacheType?: string; pattern?: string };
+      const cacheType = params.cacheType || 'all';
       let clearedEntries = 0;
       
-      if (args.pattern) {
-        const pattern = new RegExp(args.pattern, 'i');
+      if (params.pattern) {
+        const pattern = new RegExp(params.pattern, 'i');
         
         if (cacheType === 'all' || cacheType === 'rest') {
           clearedEntries += optimizedClient.invalidateCache(pattern);
@@ -113,9 +115,9 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
         }
         
         return {
-          message: `Cleared ${clearedEntries} cache entries matching pattern: ${args.pattern}`,
+          message: `Cleared ${clearedEntries} cache entries matching pattern: ${params.pattern}`,
           cacheType,
-          pattern: args.pattern,
+          pattern: params.pattern,
           clearedEntries,
         };
       } else {
@@ -140,6 +142,12 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
           };
         }
       }
+      
+      // Default return if no conditions match
+      return {
+        message: 'No cache cleared',
+        cacheType,
+      };
     },
   });
 
@@ -188,7 +196,7 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
         
         // Check for queries with very low hit rates
         const lowHitRateQueries = Object.entries(graphqlStats.cacheEfficiency.byQuery)
-          .filter(([, hitRate]) => hitRate < 20)
+          .filter(([, hitRate]) => (hitRate as number) < 20)
           .map(([query]) => query);
         
         if (lowHitRateQueries.length > 0) {
@@ -254,22 +262,23 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
         },
       },
     },
-    handler: async (args: {
-      repositories?: Array<{ owner: string; repo: string }>;
-      queryTypes?: string[];
-    }) => {
-      if (!args.repositories || args.repositories.length === 0) {
+    handler: async (args: unknown) => {
+      const params = args as {
+        repositories?: Array<{ owner: string; repo: string }>;
+        queryTypes?: string[];
+      };
+      if (!params.repositories || params.repositories.length === 0) {
         return {
           message: 'No repositories specified for cache warmup',
           warmedQueries: 0,
         };
       }
       
-      const queryTypes = args.queryTypes || ['insights', 'contributors'];
+      const queryTypes = params.queryTypes || ['insights', 'contributors'];
       let warmedQueries = 0;
       const results: Array<{ repo: string; queryType: string; success: boolean; error?: string }> = [];
       
-      for (const { owner, repo } of args.repositories) {
+      for (const { owner, repo } of params.repositories) {
         for (const queryType of queryTypes) {
           try {
             switch (queryType) {
@@ -345,7 +354,7 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
       return {
         message: `Cache warmup completed. Warmed ${warmedQueries} queries.`,
         warmedQueries,
-        totalAttempts: args.repositories.length * queryTypes.length,
+        totalAttempts: params.repositories.length * queryTypes.length,
         results,
       };
     },

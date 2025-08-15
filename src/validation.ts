@@ -1,3 +1,5 @@
+import { logger } from './logger.js';
+
 /**
  * Input validation utilities for GitHub MCP Server
  * Provides security-focused validation for user inputs with error recovery and graceful degradation
@@ -118,7 +120,7 @@ if (typeof process !== 'undefined' && typeof setInterval !== 'undefined') {
       process.exit(0);
     });
     process.on('uncaughtException', (error) => {
-      console.error('Uncaught exception:', error);
+      logger.error('Uncaught exception:', error);
       cleanupValidation();
       process.exit(1);
     });
@@ -567,8 +569,11 @@ export function validateFilePath(path: string): string | null {
     return null;
   }
   
-  // Reject absolute paths (Unix and Windows)
-  if (sanitized.startsWith('/') || /^[a-zA-Z]:/.test(sanitized)) {
+  // Remove leading slashes to convert absolute paths to relative
+  sanitized = sanitized.replace(/^\/+/, '');
+  
+  // Reject Windows absolute paths
+  if (/^[a-zA-Z]:/.test(sanitized)) {
     return null;
   }
   
@@ -689,8 +694,8 @@ const TOKEN_FORMATS: TokenFormat[] = [
   {
     prefix: 'ghp_',
     minLength: 40,
-    maxLength: 255,
-    pattern: /^ghp_[A-Za-z0-9_]{36,}$/,
+    maxLength: 40,
+    pattern: /^ghp_[A-Za-z0-9_]{36}$/,
     description: 'GitHub Personal Access Token (classic)'
   },
   {
@@ -703,8 +708,8 @@ const TOKEN_FORMATS: TokenFormat[] = [
   {
     prefix: 'gho_',
     minLength: 40,
-    maxLength: 255,
-    pattern: /^gho_[A-Za-z0-9_]{36,}$/,
+    maxLength: 40,
+    pattern: /^gho_[A-Za-z0-9_]{36}$/,
     description: 'GitHub OAuth token'
   },
   {
@@ -787,7 +792,16 @@ export function validateGitHubToken(token: string): boolean {
   }
   
   // Check length constraints
-  return token.length >= format.minLength && token.length <= format.maxLength;
+  if (token.length < format.minLength || token.length > format.maxLength) {
+    return false;
+  }
+  
+  // Check pattern if available (for strict validation)
+  if (format.pattern && !format.pattern.test(token)) {
+    return false;
+  }
+  
+  return true;
 }
 
 /**
@@ -941,8 +955,11 @@ export function validateGitHubTokenWithResult(
     return createSuccessResult(token, warnings);
   }
   
+  // Sanitize the token by removing control characters
+  const sanitizedToken = token ? token.replace(/[\x00-\x1f\x7f]/g, '') : token;
+  
   // Check for missing token
-  if (!token || typeof token !== 'string') {
+  if (!sanitizedToken || typeof sanitizedToken !== 'string') {
     errors.push(createValidationError(
       'MISSING_TOKEN',
       'GitHub token is required',
@@ -954,8 +971,8 @@ export function validateGitHubTokenWithResult(
     return createErrorResult(errors, warnings, ['Create a token at https://github.com/settings/tokens']);
   }
   
-  // Check for whitespace
-  const hasWhitespace = token.trim() !== token || token.includes(' ') || token.includes('\n') || token.includes('\t');
+  // Check for whitespace in sanitized token
+  const hasWhitespace = sanitizedToken.trim() !== sanitizedToken || sanitizedToken.includes(' ') || sanitizedToken.includes('\n') || sanitizedToken.includes('\t');
   if (hasWhitespace) {
     errors.push(createValidationError(
       'TOKEN_CONTAINS_WHITESPACE',
@@ -967,8 +984,8 @@ export function validateGitHubTokenWithResult(
     ));
   }
   
-  // Validate token format
-  const formatResult = validateGitHubTokenFormat(token, level);
+  // Validate token format using sanitized token
+  const formatResult = validateGitHubTokenFormat(sanitizedToken, level);
   if (typeof formatResult === 'object' && !formatResult.isValid) {
     errors.push(createValidationError(
       'INVALID_TOKEN_FORMAT',
@@ -984,7 +1001,7 @@ export function validateGitHubTokenWithResult(
     return createErrorResult(errors, warnings, ['Check your token format and try again']);
   }
   
-  return createSuccessResult(token, warnings);
+  return createSuccessResult(sanitizedToken, warnings);
 }
 
 /**
@@ -1853,8 +1870,15 @@ export function validateWorkflowFileName(filename: string): boolean {
  * Validates environment variables (legacy version)
  */
 export function validateEnvironment(env: Record<string, string>): ValidationResult<Record<string, string>> {
-  const result = validateEnvironmentConfigurationWithResult();
-  return result;
+  // Temporarily override process.env to validate the provided environment
+  const originalEnv = process.env;
+  try {
+    process.env = { ...env };
+    const result = validateEnvironmentConfigurationWithResult();
+    return result;
+  } finally {
+    process.env = originalEnv;
+  }
 }
 
 /**
@@ -1917,7 +1941,7 @@ export class ValidationError extends Error {
   public field: string;
   
   constructor(field: string, message: string) {
-    super(message);
+    super(`Validation failed for ${field}: ${message}`);
     this.name = 'ValidationError';
     this.field = field;
   }

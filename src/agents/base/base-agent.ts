@@ -160,7 +160,7 @@ export abstract class AbstractBaseAgent implements BaseAgent {
   /**
    * Get relative path from project root
    */
-  protected getRelativePath(filePath: string, projectPath: string): string {
+  protected async getRelativePath(filePath: string, projectPath: string): Promise<string> {
     const path = await import('path');
     return path.relative(projectPath, filePath);
   }

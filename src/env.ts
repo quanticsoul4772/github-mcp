@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import { logger } from './logger.js';
 
 /**
  * Environment variable schema definition
@@ -47,34 +48,12 @@ export const env = (() => {
   try {
     return envSchema.parse(process.env);
   } catch (error) {
-    console.error('❌ Environment validation failed:');
+    // Environment validation failed - log using logger instead of console.error
+    const errorMessage = error instanceof z.ZodError 
+      ? `Environment validation failed: ${error.issues.map(err => `${err.path.join('.')}: ${err.message}`).join(', ')}`
+      : `Environment validation failed: ${error}`;
     
-    if (error instanceof z.ZodError) {
-      error.issues.forEach((err: any) => {
-        console.error(`  - ${err.path.join('.')}: ${err.message}`);
-      });
-      
-      console.error('\n📋 Required environment variables:');
-      console.error('  - GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN: GitHub API authentication token');
-      console.error('  - Create a token at: https://github.com/settings/tokens');
-      console.error('  - Required scopes: repo, workflow, user, notifications');
-      
-      console.error('\n🔧 Optional environment variables:');
-      console.error('  - NODE_ENV: development|production|test (default: development)');
-      console.error('  - PORT: Server port number (default: 3000)');
-      console.error('  - LOG_LEVEL: debug|info|warn|error (default: info)');
-      console.error('  - GITHUB_READ_ONLY: true|false (default: false)');
-      console.error('  - GITHUB_TOOLSETS: Comma-separated toolsets or "all" (default: all)');
-      console.error('  - GITHUB_HOST: GitHub Enterprise API endpoint (optional)');
-    } else {
-      console.error('  Unknown validation error:', error);
-    }
-    
-    console.error('\n💡 Example .env file:');
-    console.error('GITHUB_PERSONAL_ACCESS_TOKEN=ghp_your_token_here');
-    console.error('NODE_ENV=development');
-    console.error('PORT=3000');
-    console.error('LOG_LEVEL=info');
+    logger.error(errorMessage);
     
     process.exit(1);
   }
@@ -153,15 +132,13 @@ export function getEnabledToolsets(): string[] {
  * Display environment configuration summary
  */
 export function displayConfig(): void {
-  console.error(`🌍 Environment: ${env.NODE_ENV}`);
-  console.error(`🚀 Port: ${env.PORT}`);
-  console.error(`📝 Log Level: ${env.LOG_LEVEL}`);
-  console.error(`🔒 Read Only: ${env.GITHUB_READ_ONLY}`);
-  console.error(`🛠️  Toolsets: ${env.GITHUB_TOOLSETS}`);
-  
-  if (env.GITHUB_HOST) {
-    console.error(`🏢 GitHub Host: ${env.GITHUB_HOST}`);
-  }
-  
-  console.error(`🔑 GitHub Token: ${getGitHubToken().substring(0, 10)}...`);
+  logger.info('Environment configuration', {
+    environment: env.NODE_ENV,
+    port: env.PORT,
+    logLevel: env.LOG_LEVEL,
+    readOnly: env.GITHUB_READ_ONLY,
+    toolsets: env.GITHUB_TOOLSETS,
+    githubHost: env.GITHUB_HOST,
+    tokenPrefix: getGitHubToken().substring(0, 10) + '...'
+  });
 }

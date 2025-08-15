@@ -1,1 +1,609 @@
-import { Octokit } from '@octokit/rest';\nimport { z } from 'zod';\nimport { ToolConfig } from '../types.js';\nimport { createTypeSafeHandler } from '../utils/type-safety.js';\nimport {\n  validateGraphQLInput,\n  validateGraphQLVariableValue,\n  RepositoryInsightsSchema,\n  ContributionStatsSchema,\n  CommitActivitySchema,\n  GraphQLValidationError\n} from '../graphql-validation.js';\nimport { withErrorHandling } from '../errors.js';\n\n// Type definitions for repository insights\ninterface RepositoryInsightsParams {\n  owner: string;\n  repo: string;\n  since?: string;\n}\n\ninterface ContributionStatsParams {\n  owner: string;\n  repo: string;\n  first?: number;\n}\n\ninterface CommitActivityParams {\n  owner: string;\n  repo: string;\n  branch?: string;\n  since?: string;\n  until?: string;\n}\n\n// Zod schemas for validation\nconst RepositoryInsightsSchema = z.object({\n  owner: z.string().min(1, 'Owner is required'),\n  repo: z.string().min(1, 'Repository name is required'),\n  since: z.string().optional(),\n});\n\nconst ContributionStatsSchema = z.object({\n  owner: z.string().min(1, 'Owner is required'),\n  repo: z.string().min(1, 'Repository name is required'),\n  first: z.number().int().min(1).max(100).optional(),\n});\n\nconst CommitActivitySchema = z.object({\n  owner: z.string().min(1, 'Owner is required'),\n  repo: z.string().min(1, 'Repository name is required'),\n  branch: z.string().optional(),\n  since: z.string().optional(),\n  until: z.string().optional(),\n});\n\n/**\n * Creates repository insights tools using GraphQL API for enhanced analytics capabilities.\n * \n * These tools provide sophisticated repository analytics functionality that leverages GraphQL's\n * ability to fetch nested relationships and statistical data in single queries,\n * offering performance and feature advantages over REST-based analytics.\n * \n * @param octokit - Configured Octokit instance with GraphQL support\n * @param readOnly - Whether to exclude write operations (all insights tools are read-only)\n * @returns Array of repository insights tool configurations\n * \n * @example\n * ```typescript\n * const tools = createRepositoryInsightsTools(octokit, true);\n * // Returns tools: get_repository_insights, get_contribution_stats, etc.\n * ```\n * \n * @see https://docs.github.com/en/graphql/reference/objects#repository\n */\nexport function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {\n  const tools: ToolConfig[] = [];\n\n  // Get repository statistics tool\n  tools.push({\n    tool: {\n      name: 'get_repository_insights',\n      description: 'Get comprehensive repository statistics and insights',\n      inputSchema: {\n        type: 'object',\n        properties: {\n          owner: {\n            type: 'string',\n            description: 'Repository owner',\n          },\n          repo: {\n            type: 'string',\n            description: 'Repository name',\n          },\n          since: {\n            type: 'string',\n            description: 'Filter data since this date (ISO 8601)',\n          },\n        },\n        required: ['owner', 'repo'],\n      },\n    },\n    handler: createTypeSafeHandler(\n      RepositoryInsightsSchema,\n      async (params: RepositoryInsightsParams) => {\n        return withErrorHandling(\n          'get_repository_insights',\n          async () => {\n            const query = `\n              query($owner: String!, $repo: String!) {\n                repository(owner: $owner, name: $repo) {\n                  id\n                  name\n                  nameWithOwner\n                  description\n                  url\n                  stargazerCount\n                  forkCount\n                  watchers {\n                    totalCount\n                  }\n                  createdAt\n                  updatedAt\n                  pushedAt\n                  primaryLanguage {\n                    name\n                    color\n                  }\n                  licenseInfo {\n                    name\n                    spdxId\n                  }\n                  languages(first: 10, orderBy: {field: SIZE, direction: DESC}) {\n                    edges {\n                      size\n                      node {\n                        name\n                        color\n                      }\n                    }\n                    totalSize\n                  }\n                  collaborators(first: 25) {\n                    totalCount\n                    nodes {\n                      login\n                      name\n                      avatarUrl\n                      contributionsCollection {\n                        totalCommitContributions\n                      }\n                    }\n                  }\n                  issues {\n                    totalCount\n                  }\n                  openIssues: issues(states: OPEN) {\n                    totalCount\n                  }\n                  pullRequests {\n                    totalCount\n                  }\n                  openPullRequests: pullRequests(states: OPEN) {\n                    totalCount\n                  }\n                  releases {\n                    totalCount\n                  }\n                  defaultBranchRef {\n                    name\n                    target {\n                      ... on Commit {\n                        history(first: 10) {\n                          totalCount\n                          nodes {\n                            committedDate\n                            messageHeadline\n                            author {\n                              user {\n                                login\n                              }\n                            }\n                            additions\n                            deletions\n                          }\n                        }\n                      }\n                    }\n                  }\n                  repositoryTopics(first: 20) {\n                    nodes {\n                      topic {\n                        name\n                      }\n                    }\n                  }\n                  diskUsage\n                  isPrivate\n                  isFork\n                  isArchived\n                  isTemplate\n                  visibility\n                }\n              }\n            `;\n\n            // Validate GraphQL variables before execution\n            const variables = {\n              owner: validateGraphQLVariableValue(params.owner, 'owner'),\n              repo: validateGraphQLVariableValue(params.repo, 'repo'),\n            };\n\n            const result: any = await (octokit as any).graphqlWithComplexity ? \n              await (octokit as any).graphqlWithComplexity(query, variables) :\n              await octokit.graphql(query, variables);\n\n            if (!result.repository) {\n              throw new Error('Repository not found or insights query failed');\n            }\n\n            const repository = result.repository;\n\n            return {\n              basic: {\n                id: repository.id,\n                name: repository.name,\n                fullName: repository.nameWithOwner,\n                description: repository.description,\n                url: repository.url,\n                primaryLanguage: repository.primaryLanguage,\n                license: repository.licenseInfo,\n                topics: repository.repositoryTopics.nodes.map((node: any) => node.topic.name),\n                diskUsage: repository.diskUsage,\n              },\n              statistics: {\n                stars: repository.stargazerCount,\n                forks: repository.forkCount,\n                watchers: repository.watchers.totalCount,\n                collaborators: repository.collaborators.totalCount,\n                issues: {\n                  total: repository.issues.totalCount,\n                  open: repository.openIssues.totalCount,\n                  closed: repository.issues.totalCount - repository.openIssues.totalCount,\n                },\n                pullRequests: {\n                  total: repository.pullRequests.totalCount,\n                  open: repository.openPullRequests.totalCount,\n                  closed: repository.pullRequests.totalCount - repository.openPullRequests.totalCount,\n                },\n                releases: repository.releases.totalCount,\n                commits: repository.defaultBranchRef?.target?.history?.totalCount || 0,\n              },\n              languages: {\n                totalSize: repository.languages.totalSize,\n                breakdown: repository.languages.edges.map((edge: any) => ({\n                  name: edge.node.name,\n                  color: edge.node.color,\n                  size: edge.size,\n                  percentage: Math.round((edge.size / repository.languages.totalSize) * 100 * 100) / 100,\n                })),\n              },\n              activity: {\n                recentCommits: repository.defaultBranchRef?.target?.history?.nodes.map((commit: any) => ({\n                  date: commit.committedDate,\n                  message: commit.messageHeadline,\n                  author: commit.author?.user?.login,\n                  additions: commit.additions,\n                  deletions: commit.deletions,\n                })) || [],\n              },\n              metadata: {\n                createdAt: repository.createdAt,\n                updatedAt: repository.updatedAt,\n                pushedAt: repository.pushedAt,\n                defaultBranch: repository.defaultBranchRef?.name,\n                isPrivate: repository.isPrivate,\n                isFork: repository.isFork,\n                isArchived: repository.isArchived,\n                isTemplate: repository.isTemplate,\n                visibility: repository.visibility,\n              },\n            };\n          },\n          { tool: 'get_repository_insights', owner: params.owner, repo: params.repo }\n        );\n      },\n      'get_repository_insights'\n    ),\n  });\n\n  // Get contribution statistics tool\n  tools.push({\n    tool: {\n      name: 'get_contribution_stats',\n      description: 'Get detailed contribution statistics for repository contributors',\n      inputSchema: {\n        type: 'object',\n        properties: {\n          owner: {\n            type: 'string',\n            description: 'Repository owner',\n          },\n          repo: {\n            type: 'string',\n            description: 'Repository name',\n          },\n          first: {\n            type: 'number',\n            description: 'Number of contributors to analyze (max 100)',\n            minimum: 1,\n            maximum: 100,\n          },\n        },\n        required: ['owner', 'repo'],\n      },\n    },\n    handler: createTypeSafeHandler(\n      ContributionStatsSchema,\n      async (params: ContributionStatsParams) => {\n        return withErrorHandling(\n          'get_contribution_stats',\n          async () => {\n            const query = `\n              query($owner: String!, $repo: String!, $first: Int!) {\n                repository(owner: $owner, name: $repo) {\n                  collaborators(first: $first, affiliation: ALL) {\n                    totalCount\n                    nodes {\n                      login\n                      name\n                      avatarUrl\n                      contributionsCollection {\n                        totalCommitContributions\n                        totalIssueContributions\n                        totalPullRequestContributions\n                        totalPullRequestReviewContributions\n                      }\n                    }\n                  }\n                  defaultBranchRef {\n                    target {\n                      ... on Commit {\n                        history(first: 100) {\n                          nodes {\n                            author {\n                              user {\n                                login\n                              }\n                            }\n                            additions\n                            deletions\n                            committedDate\n                          }\n                        }\n                      }\n                    }\n                  }\n                }\n              }\n            `;\n\n            // Validate GraphQL variables before execution\n            const variables = {\n              owner: validateGraphQLVariableValue(params.owner, 'owner'),\n              repo: validateGraphQLVariableValue(params.repo, 'repo'),\n              first: validateGraphQLVariableValue(params.first || 25, 'first'),\n            };\n\n            const result: any = await (octokit as any).graphqlWithComplexity ? \n              await (octokit as any).graphqlWithComplexity(query, variables) :\n              await octokit.graphql(query, variables);\n\n            if (!result.repository) {\n              throw new Error('Repository not found or contribution stats query failed');\n            }\n\n            const repository = result.repository;\n            const commitHistory = repository.defaultBranchRef?.target?.history?.nodes || [];\n\n            // Calculate commit statistics per contributor\n            const commitStats: Record<string, { commits: number; additions: number; deletions: number }> = {};\n            \n            commitHistory.forEach((commit: any) => {\n              const author = commit.author?.user?.login;\n              if (author) {\n                if (!commitStats[author]) {\n                  commitStats[author] = { commits: 0, additions: 0, deletions: 0 };\n                }\n                commitStats[author].commits++;\n                commitStats[author].additions += commit.additions || 0;\n                commitStats[author].deletions += commit.deletions || 0;\n              }\n            });\n\n            return {\n              totalContributors: repository.collaborators.totalCount,\n              contributors: repository.collaborators.nodes.map((contributor: any) => ({\n                user: {\n                  login: contributor.login,\n                  name: contributor.name,\n                  avatarUrl: contributor.avatarUrl,\n                },\n                contributions: {\n                  commits: contributor.contributionsCollection.totalCommitContributions,\n                  issues: contributor.contributionsCollection.totalIssueContributions,\n                  pullRequests: contributor.contributionsCollection.totalPullRequestContributions,\n                  reviews: contributor.contributionsCollection.totalPullRequestReviewContributions,\n                },\n                commitStats: commitStats[contributor.login] || { commits: 0, additions: 0, deletions: 0 },\n              })),\n            };\n          },\n          { tool: 'get_contribution_stats', owner: params.owner, repo: params.repo }\n        );\n      },\n      'get_contribution_stats'\n    ),\n  });\n\n  // Get commit activity patterns tool\n  tools.push({\n    tool: {\n      name: 'get_commit_activity',\n      description: 'Get commit activity patterns and trends for a repository',\n      inputSchema: {\n        type: 'object',\n        properties: {\n          owner: {\n            type: 'string',\n            description: 'Repository owner',\n          },\n          repo: {\n            type: 'string',\n            description: 'Repository name',\n          },\n          branch: {\n            type: 'string',\n            description: 'Branch to analyze (defaults to default branch)',\n          },\n          since: {\n            type: 'string',\n            description: 'Start date for analysis (ISO 8601)',\n          },\n          until: {\n            type: 'string',\n            description: 'End date for analysis (ISO 8601)',\n          },\n        },\n        required: ['owner', 'repo'],\n      },\n    },\n    handler: createTypeSafeHandler(\n      CommitActivitySchema,\n      async (params: CommitActivityParams) => {\n        return withErrorHandling(\n          'get_commit_activity',\n          async () => {\n            const query = `\n              query($owner: String!, $repo: String!, $branch: String, $since: GitTimestamp, $until: GitTimestamp) {\n                repository(owner: $owner, name: $repo) {\n                  ref(qualifiedName: $branch) {\n                    target {\n                      ... on Commit {\n                        history(first: 100, since: $since, until: $until) {\n                          totalCount\n                          nodes {\n                            committedDate\n                            messageHeadline\n                            author {\n                              user {\n                                login\n                              }\n                            }\n                            additions\n                            deletions\n                            changedFiles\n                          }\n                        }\n                      }\n                    }\n                  }\n                  defaultBranchRef {\n                    name\n                    target {\n                      ... on Commit {\n                        history(first: 100, since: $since, until: $until) {\n                          totalCount\n                          nodes {\n                            committedDate\n                            messageHeadline\n                            author {\n                              user {\n                                login\n                              }\n                            }\n                            additions\n                            deletions\n                            changedFiles\n                          }\n                        }\n                      }\n                    }\n                  }\n                }\n              }\n            `;\n\n            // Validate GraphQL variables before execution\n            const variables = {\n              owner: validateGraphQLVariableValue(params.owner, 'owner'),\n              repo: validateGraphQLVariableValue(params.repo, 'repo'),\n              branch: params.branch ? validateGraphQLVariableValue(params.branch, 'branch') : undefined,\n              since: params.since ? validateGraphQLVariableValue(params.since, 'since') : undefined,\n              until: params.until ? validateGraphQLVariableValue(params.until, 'until') : undefined,\n            };\n\n            const result: any = await (octokit as any).graphqlWithComplexity ? \n              await (octokit as any).graphqlWithComplexity(query, variables) :\n              await octokit.graphql(query, variables);\n\n            if (!result.repository) {\n              throw new Error('Repository not found or commit activity query failed');\n            }\n\n            const repository = result.repository;\n            const history = params.branch \n              ? repository.ref?.target?.history\n              : repository.defaultBranchRef?.target?.history;\n\n            if (!history) {\n              throw new Error('No commit history found for the specified branch');\n            }\n\n            const commits = history.nodes;\n\n            // Analyze commit patterns\n            const activityByDay: Record<string, number> = {};\n            const activityByHour: Record<number, number> = {};\n            const activityByAuthor: Record<string, number> = {};\n            const activityByWeekday: Record<string, number> = {};\n            \n            let totalAdditions = 0;\n            let totalDeletions = 0;\n            let totalFilesChanged = 0;\n\n            commits.forEach((commit: any) => {\n              const date = new Date(commit.committedDate);\n              const dayKey = date.toISOString().split('T')[0];\n              const hour = date.getHours();\n              const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });\n              const author = commit.author?.user?.login || 'Unknown';\n\n              // Count by day\n              activityByDay[dayKey] = (activityByDay[dayKey] || 0) + 1;\n              \n              // Count by hour\n              activityByHour[hour] = (activityByHour[hour] || 0) + 1;\n              \n              // Count by author\n              activityByAuthor[author] = (activityByAuthor[author] || 0) + 1;\n              \n              // Count by weekday\n              activityByWeekday[weekday] = (activityByWeekday[weekday] || 0) + 1;\n\n              // Accumulate stats\n              totalAdditions += commit.additions || 0;\n              totalDeletions += commit.deletions || 0;\n              totalFilesChanged += commit.changedFiles || 0;\n            });\n\n            return {\n              summary: {\n                totalCommits: commits.length,\n                totalAdditions,\n                totalDeletions,\n                totalFilesChanged,\n                averageAdditionsPerCommit: commits.length > 0 ? Math.round(totalAdditions / commits.length) : 0,\n                averageDeletionsPerCommit: commits.length > 0 ? Math.round(totalDeletions / commits.length) : 0,\n                averageFilesPerCommit: commits.length > 0 ? Math.round(totalFilesChanged / commits.length) : 0,\n              },\n              patterns: {\n                byDay: Object.entries(activityByDay)\n                  .sort(([a], [b]) => a.localeCompare(b))\n                  .map(([date, count]) => ({ date, commits: count })),\n                byHour: Object.entries(activityByHour)\n                  .sort(([a], [b]) => parseInt(a) - parseInt(b))\n                  .map(([hour, count]) => ({ hour: parseInt(hour), commits: count })),\n                byWeekday: Object.entries(activityByWeekday)\n                  .map(([weekday, count]) => ({ weekday, commits: count })),\n                byAuthor: Object.entries(activityByAuthor)\n                  .sort(([, a], [, b]) => b - a)\n                  .map(([author, count]) => ({ author, commits: count })),\n              },\n              commits: commits.map((commit: any) => ({\n                date: commit.committedDate,\n                message: commit.messageHeadline,\n                author: commit.author?.user?.login,\n                additions: commit.additions,\n                deletions: commit.deletions,\n                filesChanged: commit.changedFiles,\n              })),\n            };\n          },\n          { tool: 'get_commit_activity', owner: params.owner, repo: params.repo }\n        );\n      },\n      'get_commit_activity'\n    ),\n  });\n\n  return tools;\n}"
+import { Octokit } from '@octokit/rest';
+import { z } from 'zod';
+import { ToolConfig } from '../types.js';
+import { createTypeSafeHandler } from '../utils/type-safety.js';
+import {
+  validateGraphQLInput,
+  validateGraphQLVariableValue,
+  GraphQLValidationError
+} from '../graphql-validation.js';
+import { withErrorHandling } from '../errors.js';
+
+// Type definitions for repository insights
+interface RepositoryInsightsParams {
+  owner: string;
+  repo: string;
+  since?: string;
+}
+
+interface ContributionStatsParams {
+  owner: string;
+  repo: string;
+  first?: number;
+}
+
+interface CommitActivityParams {
+  owner: string;
+  repo: string;
+  branch?: string;
+  since?: string;
+  until?: string;
+}
+
+// Zod schemas for validation
+const RepositoryInsightsSchema = z.object({
+  owner: z.string().min(1, 'Owner is required'),
+  repo: z.string().min(1, 'Repository name is required'),
+  since: z.string().optional(),
+});
+
+const ContributionStatsSchema = z.object({
+  owner: z.string().min(1, 'Owner is required'),
+  repo: z.string().min(1, 'Repository name is required'),
+  first: z.number().int().min(1).max(100).optional(),
+});
+
+const CommitActivitySchema = z.object({
+  owner: z.string().min(1, 'Owner is required'),
+  repo: z.string().min(1, 'Repository name is required'),
+  branch: z.string().optional(),
+  since: z.string().optional(),
+  until: z.string().optional(),
+});
+
+/**
+ * Creates repository insights tools using GraphQL API for enhanced analytics capabilities.
+ * 
+ * These tools provide sophisticated repository analytics functionality that leverages GraphQL's
+ * ability to fetch nested relationships and statistical data in single queries,
+ * offering performance and feature advantages over REST-based analytics.
+ * 
+ * @param octokit - Configured Octokit instance with GraphQL support
+ * @param readOnly - Whether to exclude write operations (all insights tools are read-only)
+ * @returns Array of repository insights tool configurations
+ * 
+ * @example
+ * ```typescript
+ * const tools = createRepositoryInsightsTools(octokit, true);
+ * // Returns tools: get_repository_insights, get_contribution_stats, etc.
+ * ```
+ * 
+ * @see https://docs.github.com/en/graphql/reference/objects#repository
+ */
+export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
+  const tools: ToolConfig[] = [];
+
+  // Get repository statistics tool
+  tools.push({
+    tool: {
+      name: 'get_repository_insights',
+      description: 'Get comprehensive repository statistics and insights',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          owner: {
+            type: 'string',
+            description: 'Repository owner',
+          },
+          repo: {
+            type: 'string',
+            description: 'Repository name',
+          },
+          since: {
+            type: 'string',
+            description: 'Filter data since this date (ISO 8601)',
+          },
+        },
+        required: ['owner', 'repo'],
+      },
+    },
+    handler: createTypeSafeHandler(
+      RepositoryInsightsSchema,
+      async (params: RepositoryInsightsParams) => {
+        return withErrorHandling(
+          'get_repository_insights',
+          async () => {
+            const query = `
+              query($owner: String!, $repo: String!) {
+                repository(owner: $owner, name: $repo) {
+                  id
+                  name
+                  nameWithOwner
+                  description
+                  url
+                  stargazerCount
+                  forkCount
+                  watchers {
+                    totalCount
+                  }
+                  createdAt
+                  updatedAt
+                  pushedAt
+                  primaryLanguage {
+                    name
+                    color
+                  }
+                  licenseInfo {
+                    name
+                    spdxId
+                  }
+                  languages(first: 10, orderBy: {field: SIZE, direction: DESC}) {
+                    edges {
+                      size
+                      node {
+                        name
+                        color
+                      }
+                    }
+                    totalSize
+                  }
+                  collaborators(first: 25) {
+                    totalCount
+                    nodes {
+                      login
+                      name
+                      avatarUrl
+                      contributionsCollection {
+                        totalCommitContributions
+                      }
+                    }
+                  }
+                  issues {
+                    totalCount
+                  }
+                  openIssues: issues(states: OPEN) {
+                    totalCount
+                  }
+                  pullRequests {
+                    totalCount
+                  }
+                  openPullRequests: pullRequests(states: OPEN) {
+                    totalCount
+                  }
+                  releases {
+                    totalCount
+                  }
+                  defaultBranchRef {
+                    name
+                    target {
+                      ... on Commit {
+                        history(first: 10) {
+                          totalCount
+                          nodes {
+                            committedDate
+                            messageHeadline
+                            author {
+                              user {
+                                login
+                              }
+                            }
+                            additions
+                            deletions
+                          }
+                        }
+                      }
+                    }
+                  }
+                  repositoryTopics(first: 20) {
+                    nodes {
+                      topic {
+                        name
+                      }
+                    }
+                  }
+                  diskUsage
+                  isPrivate
+                  isFork
+                  isArchived
+                  isTemplate
+                  visibility
+                }
+              }
+            `;
+
+            // Validate GraphQL variables before execution
+            const variables = {
+              owner: validateGraphQLVariableValue(params.owner, 'owner'),
+              repo: validateGraphQLVariableValue(params.repo, 'repo'),
+            };
+
+            const result: any = await (octokit as any).graphqlWithComplexity ? 
+              await (octokit as any).graphqlWithComplexity(query, variables) :
+              await octokit.graphql(query, variables);
+
+            if (!result.repository) {
+              throw new Error('Repository not found or insights query failed');
+            }
+
+            const repository = result.repository;
+
+            return {
+              basic: {
+                id: repository.id,
+                name: repository.name,
+                fullName: repository.nameWithOwner,
+                description: repository.description,
+                url: repository.url,
+                primaryLanguage: repository.primaryLanguage,
+                license: repository.licenseInfo,
+                topics: repository.repositoryTopics.nodes.map((node: any) => node.topic.name),
+                diskUsage: repository.diskUsage,
+              },
+              statistics: {
+                stars: repository.stargazerCount,
+                forks: repository.forkCount,
+                watchers: repository.watchers.totalCount,
+                collaborators: repository.collaborators.totalCount,
+                issues: {
+                  total: repository.issues.totalCount,
+                  open: repository.openIssues.totalCount,
+                  closed: repository.issues.totalCount - repository.openIssues.totalCount,
+                },
+                pullRequests: {
+                  total: repository.pullRequests.totalCount,
+                  open: repository.openPullRequests.totalCount,
+                  closed: repository.pullRequests.totalCount - repository.openPullRequests.totalCount,
+                },
+                releases: repository.releases.totalCount,
+                commits: repository.defaultBranchRef?.target?.history?.totalCount || 0,
+              },
+              languages: {
+                totalSize: repository.languages.totalSize,
+                breakdown: repository.languages.edges.map((edge: any) => ({
+                  name: edge.node.name,
+                  color: edge.node.color,
+                  size: edge.size,
+                  percentage: Math.round((edge.size / repository.languages.totalSize) * 100 * 100) / 100,
+                })),
+              },
+              activity: {
+                recentCommits: repository.defaultBranchRef?.target?.history?.nodes.map((commit: any) => ({
+                  date: commit.committedDate,
+                  message: commit.messageHeadline,
+                  author: commit.author?.user?.login,
+                  additions: commit.additions,
+                  deletions: commit.deletions,
+                })) || [],
+              },
+              metadata: {
+                createdAt: repository.createdAt,
+                updatedAt: repository.updatedAt,
+                pushedAt: repository.pushedAt,
+                defaultBranch: repository.defaultBranchRef?.name,
+                isPrivate: repository.isPrivate,
+                isFork: repository.isFork,
+                isArchived: repository.isArchived,
+                isTemplate: repository.isTemplate,
+                visibility: repository.visibility,
+              },
+            };
+          },
+          { tool: 'get_repository_insights', owner: params.owner, repo: params.repo }
+        );
+      },
+      'get_repository_insights'
+    ),
+  });
+
+  // Get contribution statistics tool
+  tools.push({
+    tool: {
+      name: 'get_contribution_stats',
+      description: 'Get detailed contribution statistics for repository contributors',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          owner: {
+            type: 'string',
+            description: 'Repository owner',
+          },
+          repo: {
+            type: 'string',
+            description: 'Repository name',
+          },
+          first: {
+            type: 'number',
+            description: 'Number of contributors to analyze (max 100)',
+            minimum: 1,
+            maximum: 100,
+          },
+        },
+        required: ['owner', 'repo'],
+      },
+    },
+    handler: createTypeSafeHandler(
+      ContributionStatsSchema,
+      async (params: ContributionStatsParams) => {
+        return withErrorHandling(
+          'get_contribution_stats',
+          async () => {
+            const query = `
+              query($owner: String!, $repo: String!, $first: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  collaborators(first: $first, affiliation: ALL) {
+                    totalCount
+                    nodes {
+                      login
+                      name
+                      avatarUrl
+                      contributionsCollection {
+                        totalCommitContributions
+                        totalIssueContributions
+                        totalPullRequestContributions
+                        totalPullRequestReviewContributions
+                      }
+                    }
+                  }
+                  defaultBranchRef {
+                    target {
+                      ... on Commit {
+                        history(first: 100) {
+                          nodes {
+                            author {
+                              user {
+                                login
+                              }
+                            }
+                            additions
+                            deletions
+                            committedDate
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            // Validate GraphQL variables before execution
+            const variables = {
+              owner: validateGraphQLVariableValue(params.owner, 'owner'),
+              repo: validateGraphQLVariableValue(params.repo, 'repo'),
+              first: validateGraphQLVariableValue(params.first || 25, 'first'),
+            };
+
+            const result: any = await (octokit as any).graphqlWithComplexity ? 
+              await (octokit as any).graphqlWithComplexity(query, variables) :
+              await octokit.graphql(query, variables);
+
+            if (!result.repository) {
+              throw new Error('Repository not found or contribution stats query failed');
+            }
+
+            const repository = result.repository;
+            const commitHistory = repository.defaultBranchRef?.target?.history?.nodes || [];
+
+            // Calculate commit statistics per contributor
+            const commitStats: Record<string, { commits: number; additions: number; deletions: number }> = {};
+            
+            commitHistory.forEach((commit: any) => {
+              const author = commit.author?.user?.login;
+              if (author) {
+                if (!commitStats[author]) {
+                  commitStats[author] = { commits: 0, additions: 0, deletions: 0 };
+                }
+                commitStats[author].commits++;
+                commitStats[author].additions += commit.additions || 0;
+                commitStats[author].deletions += commit.deletions || 0;
+              }
+            });
+
+            return {
+              totalContributors: repository.collaborators.totalCount,
+              contributors: repository.collaborators.nodes.map((contributor: any) => ({
+                user: {
+                  login: contributor.login,
+                  name: contributor.name,
+                  avatarUrl: contributor.avatarUrl,
+                },
+                contributions: {
+                  commits: contributor.contributionsCollection.totalCommitContributions,
+                  issues: contributor.contributionsCollection.totalIssueContributions,
+                  pullRequests: contributor.contributionsCollection.totalPullRequestContributions,
+                  reviews: contributor.contributionsCollection.totalPullRequestReviewContributions,
+                },
+                commitStats: commitStats[contributor.login] || { commits: 0, additions: 0, deletions: 0 },
+              })),
+            };
+          },
+          { tool: 'get_contribution_stats', owner: params.owner, repo: params.repo }
+        );
+      },
+      'get_contribution_stats'
+    ),
+  });
+
+  // Get commit activity patterns tool
+  tools.push({
+    tool: {
+      name: 'get_commit_activity',
+      description: 'Get commit activity patterns and trends for a repository',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          owner: {
+            type: 'string',
+            description: 'Repository owner',
+          },
+          repo: {
+            type: 'string',
+            description: 'Repository name',
+          },
+          branch: {
+            type: 'string',
+            description: 'Branch to analyze (defaults to default branch)',
+          },
+          since: {
+            type: 'string',
+            description: 'Start date for analysis (ISO 8601)',
+          },
+          until: {
+            type: 'string',
+            description: 'End date for analysis (ISO 8601)',
+          },
+        },
+        required: ['owner', 'repo'],
+      },
+    },
+    handler: createTypeSafeHandler(
+      CommitActivitySchema,
+      async (params: CommitActivityParams) => {
+        return withErrorHandling(
+          'get_commit_activity',
+          async () => {
+            const query = `
+              query($owner: String!, $repo: String!, $branch: String, $since: GitTimestamp, $until: GitTimestamp) {
+                repository(owner: $owner, name: $repo) {
+                  ref(qualifiedName: $branch) {
+                    target {
+                      ... on Commit {
+                        history(first: 100, since: $since, until: $until) {
+                          totalCount
+                          nodes {
+                            committedDate
+                            messageHeadline
+                            author {
+                              user {
+                                login
+                              }
+                            }
+                            additions
+                            deletions
+                            changedFiles
+                          }
+                        }
+                      }
+                    }
+                  }
+                  defaultBranchRef {
+                    name
+                    target {
+                      ... on Commit {
+                        history(first: 100, since: $since, until: $until) {
+                          totalCount
+                          nodes {
+                            committedDate
+                            messageHeadline
+                            author {
+                              user {
+                                login
+                              }
+                            }
+                            additions
+                            deletions
+                            changedFiles
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            // Validate GraphQL variables before execution
+            const variables = {
+              owner: validateGraphQLVariableValue(params.owner, 'owner'),
+              repo: validateGraphQLVariableValue(params.repo, 'repo'),
+              branch: params.branch ? validateGraphQLVariableValue(`refs/heads/${params.branch}`, 'branch') : undefined,
+              since: params.since ? validateGraphQLVariableValue(params.since, 'since') : undefined,
+              until: params.until ? validateGraphQLVariableValue(params.until, 'until') : undefined,
+            };
+
+            const result: any = await (octokit as any).graphqlWithComplexity ? 
+              await (octokit as any).graphqlWithComplexity(query, variables) :
+              await octokit.graphql(query, variables);
+
+            if (!result.repository) {
+              throw new Error('Repository not found or commit activity query failed');
+            }
+
+            const repository = result.repository;
+            const history = params.branch 
+              ? repository.ref?.target?.history
+              : repository.defaultBranchRef?.target?.history;
+
+            if (!history) {
+              throw new Error('Unable to fetch commit history for the specified branch');
+            }
+
+            const commits = history.nodes;
+
+            // Analyze commit patterns
+            const activityByDay: Record<string, number> = {};
+            const activityByHour: Record<number, number> = {};
+            const activityByAuthor: Record<string, number> = {};
+            const activityByWeekday: Record<string, number> = {};
+            
+            let totalAdditions = 0;
+            let totalDeletions = 0;
+            let totalFilesChanged = 0;
+
+            commits.forEach((commit: any) => {
+              const date = new Date(commit.committedDate);
+              const dayKey = date.toISOString().split('T')[0];
+              const hour = date.getUTCHours();
+              const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
+              const author = commit.author?.user?.login || 'unknown';
+
+              // Count by day
+              activityByDay[dayKey] = (activityByDay[dayKey] || 0) + 1;
+              
+              // Count by hour
+              activityByHour[hour] = (activityByHour[hour] || 0) + 1;
+              
+              // Count by author
+              activityByAuthor[author] = (activityByAuthor[author] || 0) + 1;
+              
+              // Count by weekday
+              activityByWeekday[weekday] = (activityByWeekday[weekday] || 0) + 1;
+
+              // Accumulate stats
+              totalAdditions += commit.additions || 0;
+              totalDeletions += commit.deletions || 0;
+              totalFilesChanged += commit.changedFiles || 0;
+            });
+
+            return {
+              summary: {
+                totalCommits: history.totalCount,
+                totalAdditions,
+                totalDeletions,
+                totalFilesChanged,
+                averageAdditionsPerCommit: commits.length > 0 ? Math.round(totalAdditions / commits.length) : 0,
+                averageDeletionsPerCommit: commits.length > 0 ? Math.round(totalDeletions / commits.length) : 0,
+                averageFilesPerCommit: commits.length > 0 ? Math.round(totalFilesChanged / commits.length) : 0,
+              },
+              patterns: {
+                byDay: Object.entries(activityByDay)
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .map(([date, count]) => ({ date, commits: count })),
+                byHour: Object.entries(activityByHour)
+                  .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                  .map(([hour, count]) => ({ hour: parseInt(hour), commits: count })),
+                byWeekday: Object.entries(activityByWeekday)
+                  .map(([weekday, count]) => ({ weekday, commits: count })),
+                byAuthor: Object.entries(activityByAuthor)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([author, count]) => ({ author, commits: count })),
+              },
+              commits: commits.map((commit: any) => ({
+                date: commit.committedDate,
+                message: commit.messageHeadline,
+                author: commit.author?.user?.login,
+                additions: commit.additions,
+                deletions: commit.deletions,
+                filesChanged: commit.changedFiles,
+              })),
+            };
+          },
+          { tool: 'get_commit_activity', owner: params.owner, repo: params.repo }
+        );
+      },
+      'get_commit_activity'
+    ),
+  });
+
+  return tools;
+}

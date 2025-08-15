@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createRepositoryTools } from './repositories.js';
-import { createMockOctokit, mockResponses } from '../__tests__/mocks/octokit.js';
+import { createMockOctokit, staticMockResponses } from '../__tests__/mocks/octokit.js';
 import { ValidationError } from '../validation.js';
 
 describe('Repository Tools', () => {
@@ -40,7 +40,7 @@ describe('Repository Tools', () => {
 
     it('should get file contents successfully', async () => {
       mockOctokit.rest.repos.getContent.mockResolvedValue({
-        data: mockResponses.fileContent,
+        data: staticMockResponses.fileContent,
       });
 
       const result = await getFileContents.handler({
@@ -56,7 +56,7 @@ describe('Repository Tools', () => {
         ref: undefined,
       });
 
-      expect(result).toContain('Test file content');
+      expect(result.content).toBe('Test file content');
     });
 
     it('should handle directory contents', async () => {
@@ -75,8 +75,9 @@ describe('Repository Tools', () => {
         path: 'src/',
       });
 
-      expect(result).toContain('file1.txt');
-      expect(result).toContain('subdir');
+      expect(result).toHaveLength(2);
+      expect(result[0].name).toBe('file1.txt');
+      expect(result[1].name).toBe('subdir');
     });
 
     it('should handle API errors', async () => {
@@ -107,7 +108,7 @@ describe('Repository Tools', () => {
     });
 
     it('should list repositories successfully', async () => {
-      const repositories = [mockResponses.repo];
+      const repositories = [staticMockResponses.repo];
       mockOctokit.rest.repos.listForAuthenticatedUser.mockResolvedValue({
         data: repositories,
       });
@@ -122,12 +123,13 @@ describe('Repository Tools', () => {
         page: 1,
       });
 
-      expect(result).toContain('test-repo');
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('test-repo');
     });
 
     it('should handle pagination parameters', async () => {
       mockOctokit.rest.repos.listForAuthenticatedUser.mockResolvedValue({
-        data: [mockResponses.repo],
+        data: [staticMockResponses.repo],
       });
 
       await listRepos.handler({ page: 2, perPage: 50 });
@@ -156,7 +158,7 @@ describe('Repository Tools', () => {
 
     it('should get repository details successfully', async () => {
       mockOctokit.rest.repos.get.mockResolvedValue({
-        data: mockResponses.repo,
+        data: staticMockResponses.repo,
       });
 
       const result = await getRepo.handler({
@@ -224,7 +226,7 @@ describe('Repository Tools', () => {
         branch: undefined,
       });
 
-      expect(result).toContain('abc123');
+      expect(result.commit.sha).toBe('abc123');
     });
 
     it('should update existing file with SHA', async () => {
@@ -294,8 +296,13 @@ describe('Repository Tools', () => {
     });
 
     it('should delete file successfully', async () => {
+      // Mock getContent to return file with SHA
+      mockOctokit.rest.repos.getContent.mockResolvedValue({
+        data: { type: 'file', sha: 'file-sha-123' },
+      });
+      
       mockOctokit.rest.repos.deleteFile.mockResolvedValue({
-        data: { commit: { sha: 'delete123' } },
+        data: { commit: { sha: 'delete123', message: 'Delete file', html_url: 'https://github.com' } },
       });
 
       const result = await deleteFile.handler({
@@ -303,7 +310,7 @@ describe('Repository Tools', () => {
         repo: 'test-repo',
         path: 'file-to-delete.txt',
         message: 'Delete file',
-        sha: 'file-sha',
+        branch: 'main',
       });
 
       expect(mockOctokit.rest.repos.deleteFile).toHaveBeenCalledWith({
@@ -311,11 +318,11 @@ describe('Repository Tools', () => {
         repo: 'test-repo',
         path: 'file-to-delete.txt',
         message: 'Delete file',
-        sha: 'file-sha',
-        branch: undefined,
+        sha: 'file-sha-123',
+        branch: 'main',
       });
 
-      expect(result).toContain('delete123');
+      expect(result.commit.sha).toBe('delete123');
     });
 
     it('should validate inputs', async () => {
@@ -325,7 +332,7 @@ describe('Repository Tools', () => {
           repo: 'test-repo',
           path: 'file.txt',
           message: 'message',
-          sha: 'sha123',
+          branch: 'main',
         })
       ).rejects.toThrow(ValidationError);
 
@@ -335,7 +342,7 @@ describe('Repository Tools', () => {
           repo: 'test-repo',
           path: '../../../etc/passwd',
           message: 'message',
-          sha: 'sha123',
+          branch: 'main',
         })
       ).rejects.toThrow(ValidationError);
     });
@@ -375,8 +382,9 @@ describe('Repository Tools', () => {
         page: 1,
       });
 
-      expect(result).toContain('main');
-      expect(result).toContain('feature-branch');
+      expect(result).toHaveLength(2);
+      expect(result[0].name).toBe('main');
+      expect(result[1].name).toBe('feature-branch');
     });
   });
 
@@ -400,7 +408,7 @@ describe('Repository Tools', () => {
 
     it('should fork repository successfully', async () => {
       mockOctokit.rest.repos.createFork.mockResolvedValue({
-        data: { ...mockResponses.repo, name: 'forked-repo' },
+        data: { ...staticMockResponses.repo, name: 'forked-repo' },
       });
 
       const result = await forkRepo.handler({
@@ -416,12 +424,12 @@ describe('Repository Tools', () => {
         default_branch_only: undefined,
       });
 
-      expect(result).toContain('forked');
+      expect(result.name).toBe('forked-repo');
     });
 
     it('should fork to organization', async () => {
       mockOctokit.rest.repos.createFork.mockResolvedValue({
-        data: mockResponses.repo,
+        data: staticMockResponses.repo,
       });
 
       await forkRepo.handler({

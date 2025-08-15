@@ -502,7 +502,7 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
           owner: params.owner,
           repo: params.repo,
           sarif: gzippedSarif,
-          ref: params.ref,
+          ref: params.ref || "",
           commit_sha: params.commit_sha || "",
           tool_name: params.tool_name,
         });

@@ -1,1 +1,635 @@
-import { Octokit } from '@octokit/rest';\nimport { z } from 'zod';\nimport { ToolConfig } from '../types.js';\nimport { createTypeSafeHandler } from '../utils/type-safety.js';\nimport {\n  validateGraphQLInput,\n  validateGraphQLVariableValue,\n  BatchRepositoryQuerySchema,\n  BatchUserQuerySchema,\n  BatchGraphQLQuerySchema,\n  GraphQLValidationError\n} from '../graphql-validation.js';\nimport { withErrorHandling } from '../errors.js';\n\n// Type definitions for batch operations\ninterface RepositoryRef {\n  owner: string;\n  repo: string;\n  alias?: string;\n}\n\ninterface BatchQueryRepositoriesParams {\n  repositories: RepositoryRef[];\n  includeLanguages?: boolean;\n  includeContributors?: boolean;\n  includeIssuesSummary?: boolean;\n  includeRecentCommits?: boolean;\n}\n\ninterface BatchQueryUsersParams {\n  usernames: string[];\n  includeRepositories?: boolean;\n  includeFollowers?: boolean;\n  repositoryLimit?: number;\n}\n\ninterface GraphQLQueryDef {\n  alias: string;\n  query: string;\n  variables?: Record<string, any>;\n}\n\ninterface BatchGraphQLQueryParams {\n  queries: GraphQLQueryDef[];\n}\n\n// Zod schemas for validation\nconst RepositoryRefSchema = z.object({\n  owner: z.string().min(1, 'Owner is required'),\n  repo: z.string().min(1, 'Repository name is required'),\n  alias: z.string().optional(),\n});\n\nconst BatchQueryRepositoriesSchema = z.object({\n  repositories: z.array(RepositoryRefSchema).min(1, 'At least one repository is required').max(10, 'Maximum 10 repositories allowed'),\n  includeLanguages: z.boolean().optional(),\n  includeContributors: z.boolean().optional(),\n  includeIssuesSummary: z.boolean().optional(),\n  includeRecentCommits: z.boolean().optional(),\n});\n\nconst BatchQueryUsersSchema = z.object({\n  usernames: z.array(z.string().min(1, 'Username cannot be empty')).min(1, 'At least one username is required').max(10, 'Maximum 10 usernames allowed'),\n  includeRepositories: z.boolean().optional(),\n  includeFollowers: z.boolean().optional(),\n  repositoryLimit: z.number().int().min(1).max(10).optional(),\n});\n\nconst GraphQLQueryDefSchema = z.object({\n  alias: z.string().min(1, 'Alias is required'),\n  query: z.string().min(1, 'Query is required'),\n  variables: z.record(z.any()).optional(),\n});\n\nconst BatchGraphQLQuerySchema = z.object({\n  queries: z.array(GraphQLQueryDefSchema).min(1, 'At least one query is required').max(10, 'Maximum 10 queries allowed'),\n});\n\nexport function createBatchOperationsTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {\n  const tools: ToolConfig[] = [];\n\n  // Batch query multiple repositories\n  tools.push({\n    tool: {\n      name: 'batch_query_repositories',\n      description: 'Query multiple repositories in a single GraphQL request for improved performance',\n      inputSchema: {\n        type: 'object',\n        properties: {\n          repositories: {\n            type: 'array',\n            items: {\n              type: 'object',\n              properties: {\n                owner: { type: 'string' },\n                repo: { type: 'string' },\n                alias: { type: 'string', description: 'Optional alias for the query result' },\n              },\n              required: ['owner', 'repo'],\n            },\n            description: 'List of repositories to query (max 10)',\n            maxItems: 10,\n          },\n          includeLanguages: {\n            type: 'boolean',\n            description: 'Include language statistics',\n          },\n          includeContributors: {\n            type: 'boolean',\n            description: 'Include contributor information',\n          },\n          includeIssuesSummary: {\n            type: 'boolean',\n            description: 'Include issues and PRs summary',\n          },\n          includeRecentCommits: {\n            type: 'boolean',\n            description: 'Include recent commit information',\n          },\n        },\n        required: ['repositories'],\n      },\n    },\n    handler: createTypeSafeHandler(\n      BatchQueryRepositoriesSchema,\n      async (params: BatchQueryRepositoriesParams) => {\n        return withErrorHandling(\n          'batch_query_repositories',\n          async () => {\n            // Build dynamic GraphQL query for multiple repositories\n            const repositoryQueries = params.repositories.map((repo: RepositoryRef, index: number) => {\n              const alias = repo.alias || `repo${index}`;\n              return `\n                ${alias}: repository(owner: \"${repo.owner}\", name: \"${repo.repo}\") {\n                  id\n                  name\n                  nameWithOwner\n                  description\n                  url\n                  stargazerCount\n                  forkCount\n                  watchers {\n                    totalCount\n                  }\n                  createdAt\n                  updatedAt\n                  pushedAt\n                  primaryLanguage {\n                    name\n                    color\n                  }\n                  licenseInfo {\n                    name\n                    spdxId\n                  }\n                  ${params.includeLanguages ? `\n                  languages(first: 10, orderBy: {field: SIZE, direction: DESC}) {\n                    edges {\n                      size\n                      node {\n                        name\n                        color\n                      }\n                    }\n                    totalSize\n                  }\n                  ` : ''}\n                  ${params.includeContributors ? `\n                  collaborators(first: 10) {\n                    totalCount\n                    nodes {\n                      login\n                      name\n                      avatarUrl\n                      contributionsCollection {\n                        totalCommitContributions\n                      }\n                    }\n                  }\n                  ` : ''}\n                  ${params.includeIssuesSummary ? `\n                  issues {\n                    totalCount\n                  }\n                  openIssues: issues(states: OPEN) {\n                    totalCount\n                  }\n                  pullRequests {\n                    totalCount\n                  }\n                  openPullRequests: pullRequests(states: OPEN) {\n                    totalCount\n                  }\n                  ` : ''}\n                  ${params.includeRecentCommits ? `\n                  defaultBranchRef {\n                    name\n                    target {\n                      ... on Commit {\n                        history(first: 5) {\n                          nodes {\n                            committedDate\n                            messageHeadline\n                            author {\n                              user {\n                                login\n                              }\n                            }\n                            additions\n                            deletions\n                          }\n                        }\n                      }\n                    }\n                  }\n                  ` : ''}\n                  repositoryTopics(first: 10) {\n                    nodes {\n                      topic {\n                        name\n                      }\n                    }\n                  }\n                }\n              `;\n            }).join('\\n');\n\n            const query = `\n              query BatchRepositoryQuery {\n                ${repositoryQueries}\n              }\n            `;\n\n            const result: any = await (octokit as any).graphqlWithComplexity ? \n              await (octokit as any).graphqlWithComplexity(query) :\n              await octokit.graphql(query);\n\n            if (!result) {\n              throw new Error('Batch repository query returned no results');\n            }\n\n            // Process results\n            const repositories = Object.keys(result).map(key => {\n              const repo = result[key];\n              if (!repo) return null;\n\n              const processed: any = {\n                id: repo.id,\n                name: repo.name,\n                fullName: repo.nameWithOwner,\n                description: repo.description,\n                url: repo.url,\n                statistics: {\n                  stars: repo.stargazerCount,\n                  forks: repo.forkCount,\n                  watchers: repo.watchers.totalCount,\n                },\n                primaryLanguage: repo.primaryLanguage,\n                license: repo.licenseInfo,\n                topics: repo.repositoryTopics.nodes.map((node: any) => node.topic.name),\n                dates: {\n                  created: repo.createdAt,\n                  updated: repo.updatedAt,\n                  pushed: repo.pushedAt,\n                },\n              };\n\n              if (params.includeLanguages && repo.languages) {\n                processed.languages = {\n                  totalSize: repo.languages.totalSize,\n                  breakdown: repo.languages.edges.map((edge: any) => ({\n                    name: edge.node.name,\n                    color: edge.node.color,\n                    size: edge.size,\n                    percentage: Math.round((edge.size / repo.languages.totalSize) * 100 * 100) / 100,\n                  })),\n                };\n              }\n\n              if (params.includeContributors && repo.collaborators) {\n                processed.contributors = {\n                  totalCount: repo.collaborators.totalCount,\n                  top: repo.collaborators.nodes.map((contributor: any) => ({\n                    login: contributor.login,\n                    name: contributor.name,\n                    avatarUrl: contributor.avatarUrl,\n                    commits: contributor.contributionsCollection.totalCommitContributions,\n                  })),\n                };\n              }\n\n              if (params.includeIssuesSummary) {\n                processed.issues = {\n                  total: repo.issues?.totalCount || 0,\n                  open: repo.openIssues?.totalCount || 0,\n                  closed: (repo.issues?.totalCount || 0) - (repo.openIssues?.totalCount || 0),\n                };\n                processed.pullRequests = {\n                  total: repo.pullRequests?.totalCount || 0,\n                  open: repo.openPullRequests?.totalCount || 0,\n                  closed: (repo.pullRequests?.totalCount || 0) - (repo.openPullRequests?.totalCount || 0),\n                };\n              }\n\n              if (params.includeRecentCommits && repo.defaultBranchRef?.target?.history) {\n                processed.recentCommits = {\n                  branch: repo.defaultBranchRef.name,\n                  commits: repo.defaultBranchRef.target.history.nodes.map((commit: any) => ({\n                    date: commit.committedDate,\n                    message: commit.messageHeadline,\n                    author: commit.author?.user?.login,\n                    additions: commit.additions,\n                    deletions: commit.deletions,\n                  })),\n                };\n              }\n\n              return processed;\n            }).filter(Boolean);\n\n            return {\n              totalQueried: params.repositories.length,\n              successful: repositories.length,\n              failed: params.repositories.length - repositories.length,\n              repositories,\n              summary: {\n                totalStars: repositories.reduce((sum: number, repo: any) => sum + (repo.statistics?.stars || 0), 0),\n                totalForks: repositories.reduce((sum: number, repo: any) => sum + (repo.statistics?.forks || 0), 0),\n                languages: [...new Set(repositories.flatMap((repo: any) => \n                  repo.languages?.breakdown?.map((lang: any) => lang.name) || \n                  (repo.primaryLanguage ? [repo.primaryLanguage.name] : [])\n                ))],\n                licenses: [...new Set(repositories.map((repo: any) => repo.license?.name).filter(Boolean))],\n              },\n            };\n          },\n          { tool: 'batch_query_repositories', totalRepositories: params.repositories.length }\n        );\n      },\n      'batch_query_repositories'\n    ),\n  });\n\n  // Batch user/organization information\n  tools.push({\n    tool: {\n      name: 'batch_query_users',\n      description: 'Query multiple users or organizations in a single request',\n      inputSchema: {\n        type: 'object',\n        properties: {\n          usernames: {\n            type: 'array',\n            items: { type: 'string' },\n            description: 'List of usernames to query (max 10)',\n            maxItems: 10,\n          },\n          includeRepositories: {\n            type: 'boolean',\n            description: 'Include top repositories for each user',\n          },\n          includeFollowers: {\n            type: 'boolean',\n            description: 'Include follower/following counts',\n          },\n          repositoryLimit: {\n            type: 'number',\n            description: 'Number of top repositories to include per user (max 10)',\n            minimum: 1,\n            maximum: 10,\n          },\n        },\n        required: ['usernames'],\n      },\n    },\n    handler: createTypeSafeHandler(\n      BatchQueryUsersSchema,\n      async (params: BatchQueryUsersParams) => {\n        return withErrorHandling(\n          'batch_query_users',\n          async () => {\n            // Build dynamic GraphQL query for multiple users\n            const userQueries = params.usernames.map((username: string, index: number) => `\n              user${index}: user(login: \"${username}\") {\n                id\n                login\n                name\n                email\n                bio\n                company\n                location\n                url\n                avatarUrl\n                createdAt\n                updatedAt\n                ${params.includeFollowers ? `\n                followers {\n                  totalCount\n                }\n                following {\n                  totalCount\n                }\n                ` : ''}\n                ${params.includeRepositories ? `\n                repositories(first: ${params.repositoryLimit || 5}, orderBy: {field: STARGAZERS, direction: DESC}) {\n                  totalCount\n                  nodes {\n                    name\n                    nameWithOwner\n                    description\n                    url\n                    stargazerCount\n                    forkCount\n                    primaryLanguage {\n                      name\n                      color\n                    }\n                    createdAt\n                    updatedAt\n                  }\n                }\n                ` : ''}\n              }\n              org${index}: organization(login: \"${username}\") {\n                id\n                login\n                name\n                email\n                description\n                location\n                url\n                avatarUrl\n                createdAt\n                updatedAt\n                membersWithRole {\n                  totalCount\n                }\n                ${params.includeRepositories ? `\n                repositories(first: ${params.repositoryLimit || 5}, orderBy: {field: STARGAZERS, direction: DESC}) {\n                  totalCount\n                  nodes {\n                    name\n                    nameWithOwner\n                    description\n                    url\n                    stargazerCount\n                    forkCount\n                    primaryLanguage {\n                      name\n                      color\n                    }\n                    createdAt\n                    updatedAt\n                  }\n                }\n                ` : ''}\n              }\n            `).join('\\n');\n\n            const query = `\n              query BatchUserQuery {\n                ${userQueries}\n              }\n            `;\n\n            const result: any = await (octokit as any).graphqlWithComplexity ? \n              await (octokit as any).graphqlWithComplexity(query) :\n              await octokit.graphql(query);\n\n            if (!result) {\n              throw new Error('Batch user query returned no results');\n            }\n\n            // Process results - combine user and organization results\n            const entities = [];\n            for (let i = 0; i < params.usernames.length; i++) {\n              const user = result[`user${i}`];\n              const org = result[`org${i}`];\n              \n              if (user) {\n                entities.push({\n                  ...user,\n                  type: 'user',\n                  totalRepositories: user.repositories?.totalCount,\n                  repositories: user.repositories?.nodes,\n                });\n              } else if (org) {\n                entities.push({\n                  ...org,\n                  type: 'organization',\n                  totalMembers: org.membersWithRole?.totalCount,\n                  totalRepositories: org.repositories?.totalCount,\n                  repositories: org.repositories?.nodes,\n                });\n              } else {\n                entities.push({\n                  login: params.usernames[i],\n                  error: 'User or organization not found',\n                });\n              }\n            }\n\n            return {\n              totalQueried: params.usernames.length,\n              found: entities.filter(e => !e.error).length,\n              notFound: entities.filter(e => e.error).length,\n              entities,\n              summary: {\n                totalUsers: entities.filter(e => e.type === 'user').length,\n                totalOrganizations: entities.filter(e => e.type === 'organization').length,\n                totalRepositories: entities.reduce((sum: number, entity: any) => \n                  sum + (entity.totalRepositories || 0), 0),\n                topLanguages: [...new Set(entities.flatMap((entity: any) => \n                  entity.repositories?.map((repo: any) => repo.primaryLanguage?.name).filter(Boolean) || []\n                ))],\n              },\n            };\n          },\n          { tool: 'batch_query_users', totalUsernames: params.usernames.length }\n        );\n      },\n      'batch_query_users'\n    ),\n  });\n\n  // Generic batch GraphQL query builder\n  tools.push({\n    tool: {\n      name: 'batch_graphql_query',\n      description: 'Execute a custom batch GraphQL query with multiple operations',\n      inputSchema: {\n        type: 'object',\n        properties: {\n          queries: {\n            type: 'array',\n            items: {\n              type: 'object',\n              properties: {\n                alias: {\n                  type: 'string',\n                  description: 'Alias for this query result',\n                },\n                query: {\n                  type: 'string',\n                  description: 'GraphQL query fragment (without query wrapper)',\n                },\n                variables: {\n                  type: 'object',\n                  description: 'Variables for this specific query',\n                },\n              },\n              required: ['alias', 'query'],\n            },\n            description: 'List of queries to batch together (max 10)',\n            maxItems: 10,\n          },\n        },\n        required: ['queries'],\n      },\n    },\n    handler: createTypeSafeHandler(\n      BatchGraphQLQuerySchema,\n      async (params: BatchGraphQLQueryParams) => {\n        return withErrorHandling(\n          'batch_graphql_query',\n          async () => {\n            // Build the combined query with all variables\n            const allVariables: any = {};\n            const queryFragments = [];\n\n            for (let i = 0; i < params.queries.length; i++) {\n              const queryDef = params.queries[i];\n              queryFragments.push(`${queryDef.alias}: ${queryDef.query}`);\n              \n              // Add variables with prefixed names to avoid conflicts\n              if (queryDef.variables) {\n                for (const [key, value] of Object.entries(queryDef.variables)) {\n                  allVariables[`${queryDef.alias}_${key}`] = value;\n                }\n              }\n            }\n\n            // Build variable declarations for the query\n            const variableDeclarations = Object.keys(allVariables).map(key => {\n              const value = allVariables[key];\n              let type = 'String';\n              if (typeof value === 'number') type = 'Int';\n              if (typeof value === 'boolean') type = 'Boolean';\n              return `$${key}: ${type}`;\n            }).join(', ');\n\n            const fullQuery = `\n              query BatchQuery${variableDeclarations ? `(${variableDeclarations})` : ''} {\n                ${queryFragments.join('\\n')}\n              }\n            `;\n\n            try {\n              const result: any = await (octokit as any).graphqlWithComplexity ? \n                await (octokit as any).graphqlWithComplexity(fullQuery, allVariables) :\n                await octokit.graphql(fullQuery, allVariables);\n              \n              if (!result) {\n                throw new Error('Batch GraphQL query returned no results');\n              }\n              \n              return {\n                successful: true,\n                totalQueries: params.queries.length,\n                results: result,\n                executedQuery: fullQuery,\n                variables: allVariables,\n              };\n            } catch (error: any) {\n              console.error('Batch GraphQL operation failed:', error); // Log for debugging\n              return {\n                successful: false,\n                error: 'Batch operation failed',\n                executedQuery: fullQuery,\n                variables: allVariables,\n              };\n            }\n          },\n          { tool: 'batch_graphql_query', totalQueries: params.queries.length }\n        );\n      },\n      'batch_graphql_query'\n    ),\n  });\n\n  return tools;\n}"
+import { Octokit } from '@octokit/rest';
+import { z } from 'zod';
+import { ToolConfig } from '../types.js';
+import { createTypeSafeHandler } from '../utils/type-safety.js';
+import {
+  validateGraphQLInput,
+  validateGraphQLVariableValue,
+  BatchRepositoryQuerySchema,
+  BatchUserQuerySchema,
+  BatchGraphQLQuerySchema as ImportedBatchGraphQLQuerySchema,
+  GraphQLValidationError
+} from '../graphql-validation.js';
+import { withErrorHandling } from '../errors.js';
+
+// Type definitions for batch operations
+interface RepositoryRef {
+  owner: string;
+  repo: string;
+  alias?: string;
+}
+
+interface BatchQueryRepositoriesParams {
+  repositories: RepositoryRef[];
+  includeLanguages?: boolean;
+  includeContributors?: boolean;
+  includeIssuesSummary?: boolean;
+  includeRecentCommits?: boolean;
+}
+
+interface BatchQueryUsersParams {
+  usernames: string[];
+  includeRepositories?: boolean;
+  includeFollowers?: boolean;
+  repositoryLimit?: number;
+}
+
+interface GraphQLQueryDef {
+  alias: string;
+  query: string;
+  variables?: Record<string, any>;
+}
+
+interface BatchGraphQLQueryParams {
+  queries: GraphQLQueryDef[];
+}
+
+// Zod schemas for validation
+const RepositoryRefSchema = z.object({
+  owner: z.string().min(1, 'Owner is required'),
+  repo: z.string().min(1, 'Repository name is required'),
+  alias: z.string().optional(),
+});
+
+const BatchQueryRepositoriesSchema = z.object({
+  repositories: z.array(RepositoryRefSchema).min(1, 'At least one repository is required').max(10, 'Maximum 10 repositories allowed'),
+  includeLanguages: z.boolean().optional(),
+  includeContributors: z.boolean().optional(),
+  includeIssuesSummary: z.boolean().optional(),
+  includeRecentCommits: z.boolean().optional(),
+});
+
+const BatchQueryUsersSchema = z.object({
+  usernames: z.array(z.string().min(1, 'Username cannot be empty')).min(1, 'At least one username is required').max(10, 'Maximum 10 usernames allowed'),
+  includeRepositories: z.boolean().optional(),
+  includeFollowers: z.boolean().optional(),
+  repositoryLimit: z.number().int().min(1).max(10).optional(),
+});
+
+const GraphQLQueryDefSchema = z.object({
+  alias: z.string().min(1, 'Alias is required'),
+  query: z.string().min(1, 'Query is required'),
+  variables: z.record(z.string(), z.any()).optional(),
+});
+
+const BatchGraphQLQuerySchema = z.object({
+  queries: z.array(GraphQLQueryDefSchema).min(1, 'At least one query is required').max(10, 'Maximum 10 queries allowed'),
+});
+
+export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
+  const tools: ToolConfig[] = [];
+
+  // Batch query multiple repositories
+  tools.push({
+    tool: {
+      name: 'batch_query_repositories',
+      description: 'Query multiple repositories in a single GraphQL request for improved performance',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          repositories: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                owner: { type: 'string' },
+                repo: { type: 'string' },
+                alias: { type: 'string', description: 'Optional alias for the query result' },
+              },
+              required: ['owner', 'repo'],
+            },
+            description: 'List of repositories to query (max 10)',
+            maxItems: 10,
+          },
+          includeLanguages: {
+            type: 'boolean',
+            description: 'Include language statistics',
+          },
+          includeContributors: {
+            type: 'boolean',
+            description: 'Include contributor information',
+          },
+          includeIssuesSummary: {
+            type: 'boolean',
+            description: 'Include issues and PRs summary',
+          },
+          includeRecentCommits: {
+            type: 'boolean',
+            description: 'Include recent commit information',
+          },
+        },
+        required: ['repositories'],
+      },
+    },
+    handler: createTypeSafeHandler(
+      BatchQueryRepositoriesSchema,
+      async (params: BatchQueryRepositoriesParams) => {
+        return withErrorHandling(
+          'batch_query_repositories',
+          async () => {
+            // Build dynamic GraphQL query for multiple repositories
+            const repositoryQueries = params.repositories.map((repo: RepositoryRef, index: number) => {
+              const alias = repo.alias || `repo${index}`;
+              return `
+                ${alias}: repository(owner: \"${repo.owner}\", name: \"${repo.repo}\") {
+                  id
+                  name
+                  nameWithOwner
+                  description
+                  url
+                  stargazerCount
+                  forkCount
+                  watchers {
+                    totalCount
+                  }
+                  createdAt
+                  updatedAt
+                  pushedAt
+                  primaryLanguage {
+                    name
+                    color
+                  }
+                  licenseInfo {
+                    name
+                    spdxId
+                  }
+                  ${params.includeLanguages ? `
+                  languages(first: 10, orderBy: {field: SIZE, direction: DESC}) {
+                    edges {
+                      size
+                      node {
+                        name
+                        color
+                      }
+                    }
+                    totalSize
+                  }
+                  ` : ''}
+                  ${params.includeContributors ? `
+                  collaborators(first: 10) {
+                    totalCount
+                    nodes {
+                      login
+                      name
+                      avatarUrl
+                      contributionsCollection {
+                        totalCommitContributions
+                      }
+                    }
+                  }
+                  ` : ''}
+                  ${params.includeIssuesSummary ? `
+                  issues {
+                    totalCount
+                  }
+                  openIssues: issues(states: OPEN) {
+                    totalCount
+                  }
+                  pullRequests {
+                    totalCount
+                  }
+                  openPullRequests: pullRequests(states: OPEN) {
+                    totalCount
+                  }
+                  ` : ''}
+                  ${params.includeRecentCommits ? `
+                  defaultBranchRef {
+                    name
+                    target {
+                      ... on Commit {
+                        history(first: 5) {
+                          nodes {
+                            committedDate
+                            messageHeadline
+                            author {
+                              user {
+                                login
+                              }
+                            }
+                            additions
+                            deletions
+                          }
+                        }
+                      }
+                    }
+                  }
+                  ` : ''}
+                  repositoryTopics(first: 10) {
+                    nodes {
+                      topic {
+                        name
+                      }
+                    }
+                  }
+                }
+              `;
+            }).join('\
+');
+
+            const query = `
+              query BatchRepositoryQuery {
+                ${repositoryQueries}
+              }
+            `;
+
+            const result: any = await (octokit as any).graphqlWithComplexity ? 
+              await (octokit as any).graphqlWithComplexity(query) :
+              await octokit.graphql(query);
+
+            if (!result) {
+              throw new Error('Batch repository query returned no results');
+            }
+
+            // Process results
+            const repositories = Object.keys(result).map(key => {
+              const repo = result[key];
+              if (!repo) return null;
+
+              const processed: any = {
+                id: repo.id,
+                name: repo.name,
+                fullName: repo.nameWithOwner,
+                description: repo.description,
+                url: repo.url,
+                statistics: {
+                  stars: repo.stargazerCount,
+                  forks: repo.forkCount,
+                  watchers: repo.watchers.totalCount,
+                },
+                primaryLanguage: repo.primaryLanguage,
+                license: repo.licenseInfo,
+                topics: repo.repositoryTopics.nodes.map((node: any) => node.topic.name),
+                dates: {
+                  created: repo.createdAt,
+                  updated: repo.updatedAt,
+                  pushed: repo.pushedAt,
+                },
+              };
+
+              if (params.includeLanguages && repo.languages) {
+                processed.languages = {
+                  totalSize: repo.languages.totalSize,
+                  breakdown: repo.languages.edges.map((edge: any) => ({
+                    name: edge.node.name,
+                    color: edge.node.color,
+                    size: edge.size,
+                    percentage: Math.round((edge.size / repo.languages.totalSize) * 100 * 100) / 100,
+                  })),
+                };
+              }
+
+              if (params.includeContributors && repo.collaborators) {
+                processed.contributors = {
+                  totalCount: repo.collaborators.totalCount,
+                  top: repo.collaborators.nodes.map((contributor: any) => ({
+                    login: contributor.login,
+                    name: contributor.name,
+                    avatarUrl: contributor.avatarUrl,
+                    commits: contributor.contributionsCollection.totalCommitContributions,
+                  })),
+                };
+              }
+
+              if (params.includeIssuesSummary) {
+                processed.issues = {
+                  total: repo.issues?.totalCount || 0,
+                  open: repo.openIssues?.totalCount || 0,
+                  closed: (repo.issues?.totalCount || 0) - (repo.openIssues?.totalCount || 0),
+                };
+                processed.pullRequests = {
+                  total: repo.pullRequests?.totalCount || 0,
+                  open: repo.openPullRequests?.totalCount || 0,
+                  closed: (repo.pullRequests?.totalCount || 0) - (repo.openPullRequests?.totalCount || 0),
+                };
+              }
+
+              if (params.includeRecentCommits && repo.defaultBranchRef?.target?.history) {
+                processed.recentCommits = {
+                  branch: repo.defaultBranchRef.name,
+                  commits: repo.defaultBranchRef.target.history.nodes.map((commit: any) => ({
+                    date: commit.committedDate,
+                    message: commit.messageHeadline,
+                    author: commit.author?.user?.login,
+                    additions: commit.additions,
+                    deletions: commit.deletions,
+                  })),
+                };
+              }
+
+              return processed;
+            }).filter(Boolean);
+
+            return {
+              totalQueried: params.repositories.length,
+              successful: repositories.length,
+              failed: params.repositories.length - repositories.length,
+              repositories,
+              summary: {
+                totalStars: repositories.reduce((sum: number, repo: any) => sum + (repo.statistics?.stars || 0), 0),
+                totalForks: repositories.reduce((sum: number, repo: any) => sum + (repo.statistics?.forks || 0), 0),
+                languages: [...new Set(repositories.flatMap((repo: any) => 
+                  repo.languages?.breakdown?.map((lang: any) => lang.name) || 
+                  (repo.primaryLanguage ? [repo.primaryLanguage.name] : [])
+                ))],
+                licenses: [...new Set(repositories.map((repo: any) => repo.license?.name).filter(Boolean))],
+              },
+            };
+          },
+          { tool: 'batch_query_repositories', totalRepositories: params.repositories.length }
+        );
+      },
+      'batch_query_repositories'
+    ),
+  });
+
+  // Batch user/organization information
+  tools.push({
+    tool: {
+      name: 'batch_query_users',
+      description: 'Query multiple users or organizations in a single request',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          usernames: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'List of usernames to query (max 10)',
+            maxItems: 10,
+          },
+          includeRepositories: {
+            type: 'boolean',
+            description: 'Include top repositories for each user',
+          },
+          includeFollowers: {
+            type: 'boolean',
+            description: 'Include follower/following counts',
+          },
+          repositoryLimit: {
+            type: 'number',
+            description: 'Number of top repositories to include per user (max 10)',
+            minimum: 1,
+            maximum: 10,
+          },
+        },
+        required: ['usernames'],
+      },
+    },
+    handler: createTypeSafeHandler(
+      BatchQueryUsersSchema,
+      async (params: BatchQueryUsersParams) => {
+        return withErrorHandling(
+          'batch_query_users',
+          async () => {
+            // Build dynamic GraphQL query for multiple users
+            const userQueries = params.usernames.map((username: string, index: number) => `
+              user${index}: user(login: \"${username}\") {
+                id
+                login
+                name
+                email
+                bio
+                company
+                location
+                url
+                avatarUrl
+                createdAt
+                updatedAt
+                ${params.includeFollowers ? `
+                followers {
+                  totalCount
+                }
+                following {
+                  totalCount
+                }
+                ` : ''}
+                ${params.includeRepositories ? `
+                repositories(first: ${params.repositoryLimit || 5}, orderBy: {field: STARGAZERS, direction: DESC}) {
+                  totalCount
+                  nodes {
+                    name
+                    nameWithOwner
+                    description
+                    url
+                    stargazerCount
+                    forkCount
+                    primaryLanguage {
+                      name
+                      color
+                    }
+                    createdAt
+                    updatedAt
+                  }
+                }
+                ` : ''}
+              }
+              org${index}: organization(login: \"${username}\") {
+                id
+                login
+                name
+                email
+                description
+                location
+                url
+                avatarUrl
+                createdAt
+                updatedAt
+                membersWithRole {
+                  totalCount
+                }
+                ${params.includeRepositories ? `
+                repositories(first: ${params.repositoryLimit || 5}, orderBy: {field: STARGAZERS, direction: DESC}) {
+                  totalCount
+                  nodes {
+                    name
+                    nameWithOwner
+                    description
+                    url
+                    stargazerCount
+                    forkCount
+                    primaryLanguage {
+                      name
+                      color
+                    }
+                    createdAt
+                    updatedAt
+                  }
+                }
+                ` : ''}
+              }
+            `).join('\
+');
+
+            const query = `
+              query BatchUserQuery {
+                ${userQueries}
+              }
+            `;
+
+            const result: any = await (octokit as any).graphqlWithComplexity ? 
+              await (octokit as any).graphqlWithComplexity(query) :
+              await octokit.graphql(query);
+
+            if (!result) {
+              throw new Error('Batch user query returned no results');
+            }
+
+            // Process results - combine user and organization results
+            const entities = [];
+            for (let i = 0; i < params.usernames.length; i++) {
+              const user = result[`user${i}`];
+              const org = result[`org${i}`];
+              
+              if (user) {
+                entities.push({
+                  ...user,
+                  type: 'user',
+                  totalRepositories: user.repositories?.totalCount,
+                  repositories: user.repositories?.nodes,
+                });
+              } else if (org) {
+                entities.push({
+                  ...org,
+                  type: 'organization',
+                  totalMembers: org.membersWithRole?.totalCount,
+                  totalRepositories: org.repositories?.totalCount,
+                  repositories: org.repositories?.nodes,
+                });
+              } else {
+                entities.push({
+                  login: params.usernames[i],
+                  error: 'User or organization not found',
+                });
+              }
+            }
+
+            return {
+              totalQueried: params.usernames.length,
+              found: entities.filter(e => !e.error).length,
+              notFound: entities.filter(e => e.error).length,
+              entities,
+              summary: {
+                totalUsers: entities.filter(e => e.type === 'user').length,
+                totalOrganizations: entities.filter(e => e.type === 'organization').length,
+                totalRepositories: entities.reduce((sum: number, entity: any) => 
+                  sum + (entity.totalRepositories || 0), 0),
+                topLanguages: [...new Set(entities.flatMap((entity: any) => 
+                  entity.repositories?.map((repo: any) => repo.primaryLanguage?.name).filter(Boolean) || []
+                ))],
+              },
+            };
+          },
+          { tool: 'batch_query_users', totalUsernames: params.usernames.length }
+        );
+      },
+      'batch_query_users'
+    ),
+  });
+
+  // Generic batch GraphQL query builder
+  tools.push({
+    tool: {
+      name: 'batch_graphql_query',
+      description: 'Execute a custom batch GraphQL query with multiple operations',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          queries: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                alias: {
+                  type: 'string',
+                  description: 'Alias for this query result',
+                },
+                query: {
+                  type: 'string',
+                  description: 'GraphQL query fragment (without query wrapper)',
+                },
+                variables: {
+                  type: 'object',
+                  description: 'Variables for this specific query',
+                },
+              },
+              required: ['alias', 'query'],
+            },
+            description: 'List of queries to batch together (max 10)',
+            maxItems: 10,
+          },
+        },
+        required: ['queries'],
+      },
+    },
+    handler: createTypeSafeHandler(
+      BatchGraphQLQuerySchema,
+      async (params: BatchGraphQLQueryParams) => {
+        return withErrorHandling(
+          'batch_graphql_query',
+          async () => {
+            // Build the combined query with all variables
+            const allVariables: any = {};
+            const queryFragments = [];
+
+            for (let i = 0; i < params.queries.length; i++) {
+              const queryDef = params.queries[i];
+              queryFragments.push(`${queryDef.alias}: ${queryDef.query}`);
+              
+              // Add variables with prefixed names to avoid conflicts
+              if (queryDef.variables) {
+                for (const [key, value] of Object.entries(queryDef.variables)) {
+                  allVariables[`${queryDef.alias}_${key}`] = value;
+                }
+              }
+            }
+
+            // Build variable declarations for the query
+            const variableDeclarations = Object.keys(allVariables).map(key => {
+              const value = allVariables[key];
+              let type = 'String';
+              if (typeof value === 'number') type = 'Int';
+              if (typeof value === 'boolean') type = 'Boolean';
+              return `$${key}: ${type}`;
+            }).join(', ');
+
+            const fullQuery = `
+              query BatchQuery${variableDeclarations ? `(${variableDeclarations})` : ''} {
+                ${queryFragments.join('\
+')}
+              }
+            `;
+
+            try {
+              const result: any = await (octokit as any).graphqlWithComplexity ? 
+                await (octokit as any).graphqlWithComplexity(fullQuery, allVariables) :
+                await octokit.graphql(fullQuery, allVariables);
+              
+              if (!result) {
+                throw new Error('Batch GraphQL query returned no results');
+              }
+              
+              return {
+                successful: true,
+                totalQueries: params.queries.length,
+                results: result,
+                executedQuery: fullQuery,
+                variables: allVariables,
+              };
+            } catch (error: any) {
+              console.error('Batch GraphQL operation failed:', error); // Log for debugging
+              return {
+                successful: false,
+                error: 'Batch operation failed',
+                executedQuery: fullQuery,
+                variables: allVariables,
+              };
+            }
+          },
+          { tool: 'batch_graphql_query', totalQueries: params.queries.length }
+        );
+      },
+      'batch_graphql_query'
+    ),
+  });
+
+  return tools;
+}

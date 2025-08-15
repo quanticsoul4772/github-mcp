@@ -6,6 +6,7 @@
 import { Octokit } from '@octokit/rest';
 import { RateLimitError, withRetry } from './errors.js';
 import { estimateGraphQLPoints, isQueryComplexitySafe, githubComplexityCalculator } from './graphql-complexity.js';
+import { logger } from './logger.js';
 
 interface RateLimitInfo {
   limit: number;
@@ -226,7 +227,7 @@ export class GitHubRateLimiter {
     
     // Log warnings if query is complex
     if (complexity.warnings.length > 0) {
-      console.warn('GraphQL query complexity warnings:', complexity.warnings);
+      logger.warn('GraphQL query complexity warnings:', { warnings: complexity.warnings });
     }
 
     return new Promise((resolve, reject) => {
@@ -234,7 +235,7 @@ export class GitHubRateLimiter {
         const throttleCheck = this.shouldThrottle('graphql', estimatedPoints);
 
         if (throttleCheck.shouldWait && throttleCheck.waitTime > 0) {
-          console.log(`GraphQL rate limit throttling: ${throttleCheck.reason}, waiting ${Math.ceil(throttleCheck.waitTime / 1000)}s`);
+          logger.info(`GraphQL rate limit throttling: ${throttleCheck.reason}, waiting ${Math.ceil(throttleCheck.waitTime / 1000)}s`);
           await new Promise(resolve => setTimeout(resolve, throttleCheck.waitTime));
         }
 
@@ -247,14 +248,11 @@ export class GitHubRateLimiter {
               backoffMs: 1000,
               maxBackoffMs: 30000,
               onRetry: (attempt, error) => {
-                console.error(`GraphQL retry attempt ${attempt}:`, error.message);
+                logger.error(`GraphQL retry attempt ${attempt}:`, { attempt, errorMessage: error.message });
               }
             }
           );
 
-          // Extract rate limit headers if available
-          if (result && typeof result === 'object' && 'headers' in result) {
-            this.updateRateLimit((result as any).headers, 'graphql');
           // Extract rate limit headers if available (GraphQL often lacks headers in response objects)
           if (result && typeof result === 'object' && (result as any).headers) {
             this.updateRateLimit((result as any).headers, 'graphql');
@@ -306,7 +304,7 @@ export class GitHubRateLimiter {
 
         if (throttleCheck.shouldWait && throttleCheck.waitTime > 0) {
           if (throttleCheck.reason) {
-            console.log(`Rate limit throttling (${resource}): ${throttleCheck.reason}, waiting ${Math.ceil(throttleCheck.waitTime / 1000)}s`);
+            logger.info(`Rate limit throttling (${resource}): ${throttleCheck.reason}, waiting ${Math.ceil(throttleCheck.waitTime / 1000)}s`);
           }
           await new Promise(resolve => setTimeout(resolve, throttleCheck.waitTime));
         }
@@ -320,7 +318,7 @@ export class GitHubRateLimiter {
               backoffMs: 1000,
               maxBackoffMs: 30000,
               onRetry: (attempt, error) => {
-                console.error(`Retry attempt ${attempt} for GitHub API request:`, error.message);
+                logger.error(`Retry attempt ${attempt} for GitHub API request:`, { attempt, errorMessage: error.message });
               }
             }
           );
@@ -465,7 +463,7 @@ export class GitHubRateLimiter {
     const waitTime = Math.max(0, rateLimitInfo.reset.getTime() - now.getTime());
     
     if (waitTime > 0) {
-      console.log(`Waiting ${Math.ceil(waitTime / 1000)}s for ${resource} rate limit to reset`);
+      logger.info(`Waiting ${Math.ceil(waitTime / 1000)}s for ${resource} rate limit to reset`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
   }
@@ -491,7 +489,7 @@ export class ResponseSizeLimiter {
 
         // Limit number of items
         if (data.length > maxItems) {
-          limitedData = data.slice(0, maxItems) as T;
+          limitedData = data.slice(0, maxItems) as T & any[];
           truncated = true;
         }
 
@@ -552,7 +550,7 @@ export class ResponseSizeLimiter {
         originalSize: sizeBytes
       };
     } catch (error) {
-      console.error('Error limiting response size:', error);
+      logger.error('Error limiting response size:', {}, error instanceof Error ? error : new Error(String(error)));
       return { data, truncated: false };
     }
   }
@@ -613,7 +611,7 @@ export function createRateLimitedOctokit(token: string): {
             query = body?.query || '';
             variables = body?.variables || {};
           } catch (e) {
-            console.warn('Could not parse GraphQL request body for complexity analysis');
+            logger.warn('Could not parse GraphQL request body for complexity analysis', { error: e instanceof Error ? e.message : String(e) });
           }
 
           // If we have a query, use complexity-aware wrapper; otherwise still wrap with conservative handling

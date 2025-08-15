@@ -3,6 +3,10 @@
  * Enhanced with better isolation and stability features
  */
 import { beforeEach, afterEach, vi } from 'vitest';
+import { config } from 'dotenv';
+
+// Load .env file for integration tests
+config();
 
 // Store original environment
 const originalEnv = { ...process.env };
@@ -11,6 +15,9 @@ const originalDate = Date;
 
 // Environment isolation
 beforeEach(() => {
+  // Save GITHUB_TEST_TOKEN if it exists (for integration tests)
+  const testToken = process.env.GITHUB_TEST_TOKEN;
+  
   // Reset environment to clean state
   Object.keys(process.env).forEach(key => {
     if (key.startsWith('GITHUB_') || key.startsWith('NODE_')) {
@@ -24,6 +31,11 @@ beforeEach(() => {
   process.env.GITHUB_TOOLSETS = 'all';
   process.env.NODE_ENV = 'test';
   process.env.GITHUB_TELEMETRY_DISABLE = 'true'; // Disable telemetry in tests
+  
+  // Restore GITHUB_TEST_TOKEN if it was provided (for integration tests)
+  if (testToken) {
+    process.env.GITHUB_TEST_TOKEN = testToken;
+  }
   
   // Mock console to avoid noise
   global.console = {

@@ -63,8 +63,8 @@ describe('Type Safety Utilities', () => {
         await typeSafeHandler({});
       } catch (error) {
         expect(error).toBeInstanceOf(ParameterValidationError);
-        expect(error.message).toContain('my_test_tool');
-        expect(error.toolName).toBe('my_test_tool');
+        expect((error as any).message).toContain('my_test_tool');
+        expect((error as any).toolName).toBe('my_test_tool');
       }
     });
 
@@ -449,8 +449,8 @@ describe('Type Safety Utilities', () => {
         });
       } catch (error) {
         expect(error).toBeInstanceOf(ParameterValidationError);
-        expect(error.message).toContain('get_issue');
-        expect(error.errors.issues).toHaveLength(2); // Two validation errors
+        expect((error as any).message).toContain('get_issue');
+        expect((error as any).errors.issues).toHaveLength(2); // Two validation errors
       }
     });
 
@@ -470,10 +470,10 @@ describe('Type Safety Utilities', () => {
         });
       } catch (error) {
         expect(error).toBeInstanceOf(ParameterValidationError);
-        expect(error.errors.issues).toHaveLength(2);
+        expect((error as any).errors.issues).toHaveLength(2);
         
-        const emailError = error.errors.issues.find((issue: any) => issue.path[0] === 'email');
-        const ageError = error.errors.issues.find((issue: any) => issue.path[0] === 'age');
+        const emailError = (error as any).errors.issues.find((issue: any) => issue.path[0] === 'email');
+        const ageError = (error as any).errors.issues.find((issue: any) => issue.path[0] === 'age');
         
         expect(emailError.code).toBe('invalid_format');
         expect(ageError.code).toBe('too_big');

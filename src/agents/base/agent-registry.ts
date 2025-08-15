@@ -1,4 +1,5 @@
 import { BaseAgent, AgentRegistry } from '../types/agent-interfaces.js';
+import { logger } from '../../logger.js';
 
 /**
  * Registry for managing analysis agents
@@ -15,7 +16,7 @@ export class DefaultAgentRegistry implements AgentRegistry {
     }
     
     this.agents.set(agent.name, agent);
-    console.log(`Registered agent: ${agent.name} v${agent.version}`);
+    logger.info(`Registered agent: ${agent.name} v${agent.version}`);
   }
 
   /**
@@ -27,7 +28,7 @@ export class DefaultAgentRegistry implements AgentRegistry {
     }
     
     this.agents.delete(agentName);
-    console.log(`Unregistered agent: ${agentName}`);
+    logger.info(`Unregistered agent: ${agentName}`);
   }
 
   /**
@@ -70,7 +71,7 @@ export class DefaultAgentRegistry implements AgentRegistry {
    */
   public clear(): void {
     this.agents.clear();
-    console.log('Cleared all agents from registry');
+    logger.info('Cleared all agents from registry');
   }
 
   /**

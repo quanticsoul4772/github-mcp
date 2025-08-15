@@ -176,11 +176,14 @@ describe('GraphQLCache', () => {
       const variables = {};
       const staleData = { test: 'stale' };
 
-      // First populate cache
+      // First populate cache with very short TTL
       const successFetcher = vi.fn().mockResolvedValue(staleData);
-      await cache.get(query, variables, successFetcher);
+      await cache.get(query, variables, successFetcher, { ttl: 1 }); // 1ms TTL
 
-      // Then simulate error with fresh fetcher
+      // Wait for cache to expire
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Then simulate error with fresh fetcher - should return stale data
       const errorFetcher = vi.fn().mockRejectedValue(new Error('API Error'));
       
       const result = await cache.get(query, variables, errorFetcher);

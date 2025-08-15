@@ -31,17 +31,24 @@ describe('Repository Insights Tools', () => {
     it('should get repository insights successfully', async () => {
       const mockGraphQLResponse = {
         repository: {
+          id: '1',
           name: 'test-repo',
+          nameWithOwner: 'test-owner/test-repo',
           description: 'A test repository',
+          url: 'https://github.com/test-owner/test-repo',
           stargazerCount: 100,
           forkCount: 25,
           watchers: { totalCount: 50 },
           issues: { totalCount: 15 },
+          openIssues: { totalCount: 10 },
           pullRequests: { totalCount: 8 },
+          openPullRequests: { totalCount: 3 },
           releases: { totalCount: 3 },
           collaborators: { totalCount: 5 },
           diskUsage: 1024,
+          primaryLanguage: { name: 'TypeScript', color: '#2b7489' },
           languages: {
+            totalSize: 10000,
             edges: [
               { size: 5000, node: { name: 'TypeScript', color: '#2b7489' } },
               { size: 3000, node: { name: 'JavaScript', color: '#f1e05a' } },
@@ -59,11 +66,20 @@ describe('Repository Insights Tools', () => {
             name: 'MIT License',
             spdxId: 'MIT',
           },
+          defaultBranchRef: {
+            name: 'main',
+            target: {
+              history: {
+                totalCount: 150,
+                nodes: [],
+              },
+            },
+          },
           createdAt: '2024-01-01T00:00:00Z',
           updatedAt: '2024-01-15T12:00:00Z',
           pushedAt: '2024-01-15T12:00:00Z',
+          isPrivate: false,
           isArchived: false,
-          isDisabled: false,
           isFork: false,
           isTemplate: false,
           visibility: 'PUBLIC',
@@ -86,35 +102,57 @@ describe('Repository Insights Tools', () => {
       );
 
       expect(result).toEqual({
-        name: 'test-repo',
-        description: 'A test repository',
+        basic: {
+          id: '1',
+          name: 'test-repo',
+          fullName: 'test-owner/test-repo',
+          description: 'A test repository',
+          url: 'https://github.com/test-owner/test-repo',
+          primaryLanguage: { name: 'TypeScript', color: '#2b7489' },
+          license: {
+            name: 'MIT License',
+            spdxId: 'MIT',
+          },
+          topics: ['typescript', 'github', 'api'],
+          diskUsage: 1024,
+        },
         statistics: {
           stars: 100,
           forks: 25,
           watchers: 50,
-          issues: 15,
-          pullRequests: 8,
-          releases: 3,
           collaborators: 5,
-          diskUsage: 1024,
+          issues: {
+            total: 15,
+            open: 10,
+            closed: 5,
+          },
+          pullRequests: {
+            total: 8,
+            open: 3,
+            closed: 5,
+          },
+          releases: 3,
+          commits: 150,
         },
-        languages: [
-          { name: 'TypeScript', color: '#2b7489', size: 5000, percentage: 50 },
-          { name: 'JavaScript', color: '#f1e05a', size: 3000, percentage: 30 },
-          { name: 'CSS', color: '#563d7c', size: 2000, percentage: 20 },
-        ],
-        topics: ['typescript', 'github', 'api'],
-        license: {
-          name: 'MIT License',
-          spdxId: 'MIT',
+        languages: {
+          totalSize: 10000,
+          breakdown: [
+            { name: 'TypeScript', color: '#2b7489', size: 5000, percentage: 50 },
+            { name: 'JavaScript', color: '#f1e05a', size: 3000, percentage: 30 },
+            { name: 'CSS', color: '#563d7c', size: 2000, percentage: 20 },
+          ],
+        },
+        activity: {
+          recentCommits: [],
         },
         metadata: {
           createdAt: '2024-01-01T00:00:00Z',
           updatedAt: '2024-01-15T12:00:00Z',
           pushedAt: '2024-01-15T12:00:00Z',
-          isArchived: false,
-          isDisabled: false,
+          defaultBranch: 'main',
+          isPrivate: false,
           isFork: false,
+          isArchived: false,
           isTemplate: false,
           visibility: 'PUBLIC',
         },
@@ -136,24 +174,31 @@ describe('Repository Insights Tools', () => {
     it('should handle empty language data', async () => {
       const mockGraphQLResponse = {
         repository: {
+          id: '2',
           name: 'empty-repo',
+          nameWithOwner: 'test-owner/empty-repo',
           description: null,
+          url: 'https://github.com/test-owner/empty-repo',
           stargazerCount: 0,
           forkCount: 0,
           watchers: { totalCount: 0 },
           issues: { totalCount: 0 },
+          openIssues: { totalCount: 0 },
           pullRequests: { totalCount: 0 },
+          openPullRequests: { totalCount: 0 },
           releases: { totalCount: 0 },
           collaborators: { totalCount: 1 },
           diskUsage: 0,
-          languages: { edges: [] },
+          primaryLanguage: null,
+          languages: { totalSize: 0, edges: [] },
           repositoryTopics: { nodes: [] },
           licenseInfo: null,
+          defaultBranchRef: null,
           createdAt: '2024-01-01T00:00:00Z',
           updatedAt: '2024-01-01T00:00:00Z',
           pushedAt: '2024-01-01T00:00:00Z',
+          isPrivate: true,
           isArchived: false,
-          isDisabled: false,
           isFork: false,
           isTemplate: false,
           visibility: 'PRIVATE',
@@ -167,9 +212,9 @@ describe('Repository Insights Tools', () => {
         repo: 'empty-repo',
       });
 
-      expect(result.languages).toEqual([]);
-      expect(result.topics).toEqual([]);
-      expect(result.license).toBeNull();
+      expect(result.languages.breakdown).toEqual([]);
+      expect(result.basic.topics).toEqual([]);
+      expect(result.basic.license).toBeNull();
     });
   });
 
@@ -183,7 +228,7 @@ describe('Repository Insights Tools', () => {
     it('should be registered', () => {
       expect(getContributions).toBeDefined();
       expect(getContributions.tool.name).toBe('get_contribution_stats');
-      expect(getContributions.tool.description).toContain('contributor statistics');
+      expect(getContributions.tool.description).toContain('contribution statistics');
     });
 
     it('should get contribution statistics successfully', async () => {
@@ -195,12 +240,7 @@ describe('Repository Insights Tools', () => {
               {
                 login: 'user1',
                 name: 'User One',
-                email: 'user1@example.com',
                 avatarUrl: 'https://github.com/user1.png',
-                url: 'https://github.com/user1',
-                company: 'Test Company',
-                location: 'Test City',
-                bio: 'Test bio',
                 contributionsCollection: {
                   totalCommitContributions: 50,
                   totalIssueContributions: 10,
@@ -211,17 +251,23 @@ describe('Repository Insights Tools', () => {
               {
                 login: 'user2',
                 name: 'User Two',
-                email: 'user2@example.com',
                 avatarUrl: 'https://github.com/user2.png',
-                url: 'https://github.com/user2',
-                company: null,
-                location: null,
-                bio: null,
                 contributionsCollection: {
                   totalCommitContributions: 25,
                   totalIssueContributions: 5,
                   totalPullRequestContributions: 8,
                   totalPullRequestReviewContributions: 3,
+                },
+              },
+              {
+                login: 'user3',
+                name: 'User Three',
+                avatarUrl: 'https://github.com/user3.png',
+                contributionsCollection: {
+                  totalCommitContributions: 25,
+                  totalIssueContributions: 2,
+                  totalPullRequestContributions: 7,
+                  totalPullRequestReviewContributions: 1,
                 },
               },
             ],
@@ -275,17 +321,13 @@ describe('Repository Insights Tools', () => {
 
       expect(result).toEqual({
         totalContributors: 3,
-        totalCommits: 100,
         contributors: [
           {
-            login: 'user1',
-            name: 'User One',
-            email: 'user1@example.com',
-            avatarUrl: 'https://github.com/user1.png',
-            url: 'https://github.com/user1',
-            company: 'Test Company',
-            location: 'Test City',
-            bio: 'Test bio',
+            user: {
+              login: 'user1',
+              name: 'User One',
+              avatarUrl: 'https://github.com/user1.png',
+            },
             contributions: {
               commits: 50,
               issues: 10,
@@ -299,14 +341,11 @@ describe('Repository Insights Tools', () => {
             },
           },
           {
-            login: 'user2',
-            name: 'User Two',
-            email: 'user2@example.com',
-            avatarUrl: 'https://github.com/user2.png',
-            url: 'https://github.com/user2',
-            company: null,
-            location: null,
-            bio: null,
+            user: {
+              login: 'user2',
+              name: 'User Two',
+              avatarUrl: 'https://github.com/user2.png',
+            },
             contributions: {
               commits: 25,
               issues: 5,
@@ -317,6 +356,24 @@ describe('Repository Insights Tools', () => {
               commits: 1,
               additions: 30,
               deletions: 5,
+            },
+          },
+          {
+            user: {
+              login: 'user3',
+              name: 'User Three',
+              avatarUrl: 'https://github.com/user3.png',
+            },
+            contributions: {
+              commits: 25,
+              issues: 2,
+              pullRequests: 7,
+              reviews: 1,
+            },
+            commitStats: {
+              commits: 0,
+              additions: 0,
+              deletions: 0,
             },
           },
         ],
@@ -363,7 +420,8 @@ describe('Repository Insights Tools', () => {
         repo: 'empty-repo',
       });
 
-      expect(result.totalCommits).toBe(0);
+      expect(result.totalContributors).toBe(1);
+      expect(result.contributors).toEqual([]);
     });
   });
 
@@ -442,9 +500,8 @@ describe('Repository Insights Tools', () => {
       );
 
       expect(result).toEqual({
-        totalCommits: 50,
-        analyzedCommits: 3,
         summary: {
+          totalCommits: 50,
           totalAdditions: 80,
           totalDeletions: 15,
           totalFilesChanged: 9,
@@ -453,21 +510,24 @@ describe('Repository Insights Tools', () => {
           averageFilesPerCommit: 3,
         },
         patterns: {
-          hourlyActivity: [
+          byDay: [
+            { date: '2024-01-14', commits: 1 },
+            { date: '2024-01-15', commits: 2 },
+          ],
+          byHour: [
             { hour: 10, commits: 1 },
             { hour: 14, commits: 1 },
             { hour: 16, commits: 1 },
           ],
-          dailyActivity: [
-            { date: '2024-01-14', commits: 1 },
-            { date: '2024-01-15', commits: 2 },
-          ],
-          topAuthors: [
+          byWeekday: expect.arrayContaining([
+            expect.objectContaining({ weekday: expect.any(String), commits: expect.any(Number) })
+          ]),
+          byAuthor: [
             { author: 'user1', commits: 2 },
             { author: 'user2', commits: 1 },
           ],
         },
-        recentCommits: [
+        commits: [
           {
             date: '2024-01-15T14:30:00Z',
             author: 'user1',
@@ -527,7 +587,7 @@ describe('Repository Insights Tools', () => {
         branch: 'feature-branch',
       });
 
-      expect(result.totalCommits).toBe(25); // Should use branch data, not default branch
+      expect(result.summary.totalCommits).toBe(25); // Should use branch data, not default branch
     });
 
     it('should throw error when no commit history available', async () => {
@@ -588,7 +648,7 @@ describe('Repository Insights Tools', () => {
         repo: 'test-repo',
       });
 
-      expect(result.patterns.topAuthors).toEqual([
+      expect(result.patterns.byAuthor).toEqual([
         { author: 'unknown', commits: 2 },
       ]);
     });

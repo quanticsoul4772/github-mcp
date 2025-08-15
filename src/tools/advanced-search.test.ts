@@ -7,11 +7,20 @@ import { createMockOctokit } from '../__tests__/mocks/octokit.js';
 
 describe('Advanced Search Tools', () => {
   let mockOctokit: any;
+  let mockClient: any;
   let tools: any[];
 
   beforeEach(() => {
     mockOctokit = createMockOctokit();
-    tools = createAdvancedSearchTools(mockOctokit, false);
+    
+    // Create a mock OptimizedAPIClient
+    mockClient = {
+      getOctokit: () => mockOctokit,
+      graphql: mockOctokit.graphql,  // Forward graphql calls to the mock
+      // Add other methods if needed
+    };
+    
+    tools = createAdvancedSearchTools(mockClient, false);
   });
 
   describe('search_across_repos', () => {
@@ -662,6 +671,11 @@ describe('Advanced Search Tools', () => {
             },
             followers: { totalCount: 150 },
             following: { totalCount: 75 },
+            type: 'user',
+            totalFollowers: 150,
+            totalFollowing: 75,
+            totalRepositories: 25,
+            totalGists: 10,
           },
         ],
       });

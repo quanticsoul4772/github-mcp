@@ -4,16 +4,20 @@
  */
 
 import { Octokit } from '@octokit/rest';
-import { GitHubAPICache, CACHE_CONFIG } from './cache.js';
-import { GraphQLCache } from './graphql-cache.js';
-import { RequestDeduplicator } from './request-deduplication.js';
-import { PerformanceMonitor } from './performance-monitor.js';
 import { GitHubAPICache, CACHE_CONFIG, type CacheMetrics } from './cache.js';
+import { GraphQLCache, type GraphQLCacheMetrics } from './graphql-cache.js';
 import { RequestDeduplicator, type DeduplicationMetrics } from './request-deduplication.js';
 import { PerformanceMonitor, type AggregatedMetrics, type SystemMetrics } from './performance-monitor.js';
 import { PaginationHandler } from './pagination-handler.js';
 
-export type { CacheMetrics, DeduplicationMetrics, AggregatedMetrics, SystemMetrics };
+export type { CacheMetrics, DeduplicationMetrics, AggregatedMetrics, SystemMetrics, GraphQLCacheMetrics };
+
+export interface GraphQLDetailedStats {
+  general: GraphQLCacheMetrics;
+  topQueries: Array<{ query: string; hits: number; misses: number; hitRate: number; avgResponseTime: number }>;
+  cacheEfficiency: { overall: number; byQuery: Record<string, number> };
+  memorySummary: { entries: number; estimatedSize: string };
+}
 
 interface OptimizedClientOptions {
   octokit: Octokit;
@@ -90,6 +94,13 @@ export class OptimizedAPIClient {
     }
 
     this.paginationHandler = new PaginationHandler();
+  }
+
+  /**
+   * Get the underlying Octokit instance
+   */
+  getOctokit(): Octokit {
+    return this.octokit;
   }
 
   /**
@@ -363,6 +374,8 @@ export class OptimizedAPIClient {
       skipCache?: boolean;
       skipDeduplication?: boolean;
       operation?: string;
+    } = {}
+  ): Promise<T> {
     const fetcher = async (): Promise<T> => {
       const sortedVars = Object.keys(variables || {})
         .sort()
@@ -371,10 +384,6 @@ export class OptimizedAPIClient {
       if (this.enableDeduplication && !options.skipDeduplication && this.deduplicator) {
         const deduplicatedCall = async () => this.octokit.graphql(query, variables) as Promise<T>;
         return this.deduplicator.deduplicate(dedupeKey, sortedVars, deduplicatedCall);
-      }
-      return this.octokit.graphql(query, variables) as Promise<T>;
-          deduplicatedCall
-        );
       }
       
       return this.octokit.graphql(query, variables) as Promise<T>;
@@ -397,7 +406,8 @@ export class OptimizedAPIClient {
 
       // Apply performance monitoring if enabled
       if (this.enablePerformanceMonitoring && this.performanceMonitor) {
-        return this.performanceMonitor.measure(operation, cachedExecutor);
+        const operationName = options.operation || 'graphql';
+        return this.performanceMonitor.measure(operationName, cachedExecutor);
       }
 
       return cachedExecutor();
@@ -405,7 +415,8 @@ export class OptimizedAPIClient {
 
     // Apply performance monitoring if enabled (fallback)
     if (this.enablePerformanceMonitoring && this.performanceMonitor) {
-      return this.performanceMonitor.measure(operation, fetcher);
+      const operationName = options.operation || 'graphql';
+      return this.performanceMonitor.measure(operationName, fetcher);
     }
 
     return fetcher();
@@ -467,7 +478,7 @@ export class OptimizedAPIClient {
   /**
    * Get comprehensive GraphQL cache statistics
    */
-  getGraphQLCacheStats() {
+  getGraphQLCacheStats(): GraphQLDetailedStats | null {
     return this.graphqlCache?.getDetailedStats() || null;
   }
 
