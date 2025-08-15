@@ -25,7 +25,7 @@
     "declarationMap": true,
     "sourceMap": true,
     "moduleResolution": "node16",
-    "types": ["vitest/globals"]
+    "types": ["node", "vitest/globals"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "build", "src/index-refactored-example.ts"]
