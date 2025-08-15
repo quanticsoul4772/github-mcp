@@ -24,7 +24,7 @@ const envSchema = z.object({
   GITHUB_TOKEN: z.string().min(1, 'GitHub Token is required').optional(),
   
   // GitHub optional configuration
-  GITHUB_READ_ONLY: z.string().optional().transform((val) => val === '1' || val === 'true').default(false),
+  GITHUB_READ_ONLY: z.string().optional().default('false').transform((val) => val === '1' || val === 'true'),
   GITHUB_TOOLSETS: z.string().default('all'),
   GITHUB_HOST: z.string().url().optional(),
   
