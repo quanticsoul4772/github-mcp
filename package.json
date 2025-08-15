@@ -62,7 +62,18 @@
     "analyze:types": "npm run agents:cli -- --agents type-safety",
     "analyze:tests": "npm run agents:cli -- --agents testing",
     "analyze:all": "npm run agents:cli -- --format html --output analysis-report.html",
-    "ci:agents": "npm run build && npm run agents:quick-scan"
+    "ci:agents": "npm run build && npm run agents:quick-scan",
+    "team:analyze": "tsx src/agents/team/team-cli.ts analyze",
+    "team:workflow": "tsx src/agents/team/team-cli.ts workflow",
+    "team:agents": "tsx src/agents/team/team-cli.ts agents",
+    "team:demo": "tsx src/agents/team/team-demo.ts full",
+    "team:demo:overview": "tsx src/agents/team/team-demo.ts overview",
+    "team:security": "tsx src/agents/team/team-cli.ts analyze --agents security-audit",
+    "team:quality": "tsx src/agents/team/team-cli.ts analyze --agents code-quality",
+    "team:tests": "tsx src/agents/team/team-cli.ts analyze --agents test-coverage",
+    "team:performance": "tsx src/agents/team/team-cli.ts analyze --agents performance",
+    "team:docs": "tsx src/agents/team/team-cli.ts analyze --agents documentation",
+    "team:report": "tsx src/agents/team/team-cli.ts analyze --format html --output team-analysis-report.html"
   },
   "keywords": [
     "mcp",
