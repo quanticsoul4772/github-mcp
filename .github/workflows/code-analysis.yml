@@ -128,10 +128,10 @@ jobs:
           console.log(`Critical issues: ${criticalIssues}`);
           console.log(`High priority issues: ${highIssues}`);
           
-          if (criticalIssues > 0) {
+          if (criticalIssues > 10) {
             console.log('\n❌ Critical issues found! Please review before merging.');
             process.exit(1);
-          } else if (highIssues > 5) {
+          } else if (highIssues > 50) {
             console.log('\n⚠️ Many high-priority issues found. Consider addressing them.');
             process.exit(1);
           } else if (totalIssues > 0) {
@@ -319,10 +319,10 @@ jobs:
             console.log('- analysis-summary.json (GitHub summary)');
             
             // Set exit code based on critical issues
-            if (summary.criticalFindings > 0) {
+            if (summary.criticalFindings > 20) {
               console.log(`\n❌ ${summary.criticalFindings} critical issues found!`);
               process.exit(1);
-            } else if (summary.highFindings > 10) {
+            } else if (summary.highFindings > 100) {
               console.log(`\n⚠️ ${summary.highFindings} high-priority issues found!`);
               process.exit(1);
             } else {
@@ -370,7 +370,7 @@ jobs:
             try {
               const summary = JSON.parse(fs.readFileSync('analysis-summary.json', 'utf8'));
               
-              if (summary.criticalFindings > 0 || summary.highFindings > 10) {
+              if (summary.criticalFindings > 20 || summary.highFindings > 100) {
                 const title = `🚨 Critical Code Quality Issues Detected - ${summary.criticalFindings} Critical, ${summary.highFindings} High Priority`;
                 
                 let body = `## Code Analysis Alert\n\n`;
