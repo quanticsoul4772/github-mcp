@@ -39,6 +39,7 @@ import { CodeAnalysisAgent } from './analysis/code-analysis-agent.js';
 import { TypeSafetyAgent } from './analysis/type-safety-agent.js';
 import { TestingAgent } from './testing/testing-agent.js';
 import { SecurityAgent } from './security/security-agent.js';
+import { ReportGenerator } from './reporting/report-generator.js';
 
 /**
  * Convenience function to create a fully configured agent system
@@ -46,6 +47,7 @@ import { SecurityAgent } from './security/security-agent.js';
 export function createAgentSystem() {
   const registry = new DefaultAgentRegistry();
   const coordinator = new DefaultAgentCoordinator(registry);
+  const reportGenerator = new ReportGenerator();
   
   // Register all available agents
   registry.register(new CodeAnalysisAgent());
@@ -56,6 +58,7 @@ export function createAgentSystem() {
   return {
     registry,
     coordinator,
+    reportGenerator,
     agents: registry.getAllAgents()
   };
 }
@@ -66,8 +69,10 @@ export function createAgentSystem() {
 export async function quickAnalyze(
   projectPath: string,
   options: {
-    agents?: string[];
+    type?: 'file' | 'directory' | 'project';
+    depth?: 'shallow' | 'deep';
     format?: 'json' | 'text' | 'html';
+    agents?: string[];
     output?: string;
     exclude?: string[];
     include?: string[];
@@ -89,14 +94,40 @@ export async function quickAnalyze(
     ? await coordinator.runSelectedAgents(options.agents, context)
     : await coordinator.runFullAnalysis(context);
   
-  // Format output
-  if (options.format === 'json') {
-    return JSON.stringify(report, null, 2);
-  } else if (options.format === 'html') {
-    return generateHtmlReport(report);
-  } else {
-    return generateTextReport(report);
-  }
+  // Add null-safe defaults to prevent runtime crashes
+  const summary = report.summary ?? {
+    totalFindings: (report.findings ?? []).length,
+    criticalFindings: 0,
+    highFindings: 0,
+    mediumFindings: 0,
+    lowFindings: 0,
+    infoFindings: 0
+  };
+  
+  const findings = report.findings ?? [];
+  
+  // Create safe report object for formatting functions
+  const safeReport = { ...report, summary, findings };
+  
+  // Return in the format expected by workflow
+  return {
+    analysis: {
+      summary: {
+        totalFindings: summary.totalFindings,
+        findingsBySeverity: {
+          critical: summary.criticalFindings,
+          high: summary.highFindings,
+          medium: summary.mediumFindings,
+          low: summary.lowFindings,
+          info: summary.infoFindings
+        }
+      },
+      findings,
+      report: options.format === 'json' ? JSON.stringify(safeReport, null, 2) :
+              options.format === 'html' ? generateHtmlReport(safeReport) :
+              generateTextReport(safeReport)
+    }
+  };
 }
 
 // Helper functions

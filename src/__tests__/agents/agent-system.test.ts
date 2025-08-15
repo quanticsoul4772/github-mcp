@@ -153,6 +153,180 @@ describe('Agent System', () => {
       expect(events).toContain('agent-complete');
       expect(events).toContain('analysis-complete');
     });
+
+    describe('coordinate() method', () => {
+      test('should transform AnalysisReport to CoordinationResult format', async () => {
+        await createTestFiles(tempDir);
+
+        const options = {
+          target: {
+            type: 'project' as const,
+            path: tempDir,
+            exclude: ['*.log']
+          },
+          parallel: false,
+          config: {
+            enabled: true,
+            depth: 'deep',
+            minSeverity: 'medium',
+            maxFindings: 100,
+            includeCategories: ['security', 'code-quality']
+          }
+        };
+
+        const result = await coordinator.coordinate(options);
+
+        // Verify the structure matches CoordinationResult interface
+        expect(result).toHaveProperty('summary');
+        expect(result).toHaveProperty('reports');
+        expect(result).toHaveProperty('consolidatedFindings');
+
+        // Verify summary structure
+        expect(result.summary).toHaveProperty('totalFindings');
+        expect(result.summary).toHaveProperty('agentsUsed');
+        expect(result.summary).toHaveProperty('totalDuration');
+        expect(result.summary).toHaveProperty('findingsBySeverity');
+        expect(result.summary).toHaveProperty('findingsByCategory');
+
+        // Verify findingsBySeverity structure
+        expect(result.summary.findingsBySeverity).toHaveProperty('critical');
+        expect(result.summary.findingsBySeverity).toHaveProperty('high');
+        expect(result.summary.findingsBySeverity).toHaveProperty('medium');
+        expect(result.summary.findingsBySeverity).toHaveProperty('low');
+        expect(result.summary.findingsBySeverity).toHaveProperty('info');
+
+        // Verify reports array structure
+        expect(Array.isArray(result.reports)).toBe(true);
+        if (result.reports.length > 0) {
+          const firstReport = result.reports[0];
+          expect(firstReport).toHaveProperty('agentName');
+          expect(firstReport).toHaveProperty('summary');
+          expect(firstReport).toHaveProperty('findings');
+          expect(firstReport).toHaveProperty('duration');
+          
+          expect(firstReport.summary).toHaveProperty('filesAnalyzed');
+          expect(firstReport.summary).toHaveProperty('totalFindings');
+          expect(firstReport.summary).toHaveProperty('duration');
+        }
+
+        // Verify data types
+        expect(typeof result.summary.totalFindings).toBe('number');
+        expect(Array.isArray(result.summary.agentsUsed)).toBe(true);
+        expect(typeof result.summary.totalDuration).toBe('number');
+        expect(Array.isArray(result.consolidatedFindings)).toBe(true);
+      });
+
+      test('should handle empty findings gracefully', async () => {
+        // Create empty directory with no analysis-worthy content
+        const emptyDir = path.join(tempDir, 'empty');
+        await fs.mkdir(emptyDir);
+
+        const options = {
+          target: {
+            type: 'directory' as const,
+            path: emptyDir
+          }
+        };
+
+        const result = await coordinator.coordinate(options);
+
+        // Should still return valid CoordinationResult structure
+        expect(result.summary.totalFindings).toBe(0);
+        expect(result.consolidatedFindings).toHaveLength(0);
+        expect(result.summary.findingsBySeverity.critical).toBe(0);
+        expect(result.summary.findingsBySeverity.high).toBe(0);
+        expect(result.summary.findingsBySeverity.medium).toBe(0);
+        expect(result.summary.findingsBySeverity.low).toBe(0);
+        expect(result.summary.findingsBySeverity.info).toBe(0);
+      });
+
+      test('should populate findingsByCategory correctly', async () => {
+        await createTestFiles(tempDir);
+
+        const options = {
+          target: {
+            type: 'project' as const,
+            path: tempDir
+          }
+        };
+
+        const result = await coordinator.coordinate(options);
+
+        // findingsByCategory should be an object
+        expect(typeof result.summary.findingsByCategory).toBe('object');
+        expect(result.summary.findingsByCategory).not.toBeNull();
+
+        // If there are findings, categories should be populated
+        if (result.summary.totalFindings > 0) {
+          const categoryKeys = Object.keys(result.summary.findingsByCategory);
+          expect(categoryKeys.length).toBeGreaterThan(0);
+          
+          // Category counts should be positive numbers
+          categoryKeys.forEach(category => {
+            expect(result.summary.findingsByCategory[category]).toBeGreaterThan(0);
+          });
+        }
+      });
+
+      test('should handle missing exclude patterns gracefully', async () => {
+        await createTestFiles(tempDir);
+
+        const options = {
+          target: {
+            type: 'project' as const,
+            path: tempDir
+            // exclude is undefined
+          }
+        };
+
+        const result = await coordinator.coordinate(options);
+
+        // Should not throw and should return valid result
+        expect(result).toHaveProperty('summary');
+        expect(result).toHaveProperty('reports');
+        expect(result).toHaveProperty('consolidatedFindings');
+      });
+
+      test('should calculate agent summaries correctly', async () => {
+        await createTestFiles(tempDir);
+
+        const options = {
+          target: {
+            type: 'project' as const,
+            path: tempDir
+          }
+        };
+
+        const result = await coordinator.coordinate(options);
+
+        // Each report should have correct summary calculations
+        result.reports.forEach(report => {
+          expect(typeof report.summary.filesAnalyzed).toBe('number');
+          expect(typeof report.summary.totalFindings).toBe('number');
+          expect(typeof report.summary.duration).toBe('number');
+          
+          expect(report.summary.filesAnalyzed).toBeGreaterThanOrEqual(0);
+          expect(report.summary.totalFindings).toBeGreaterThanOrEqual(0);
+          expect(report.summary.duration).toBeGreaterThanOrEqual(0);
+          
+          // Total findings should match actual findings array length
+          expect(report.summary.totalFindings).toBe(report.findings.length);
+        });
+      });
+    });
+
+    test('should provide getAgents method', () => {
+      const agents = coordinator.getAgents();
+      expect(Array.isArray(agents)).toBe(true);
+      expect(agents.length).toBeGreaterThan(0);
+      
+      // All returned items should have agent-like properties
+      agents.forEach(agent => {
+        expect(agent).toHaveProperty('name');
+        expect(agent).toHaveProperty('version');
+        expect(agent).toHaveProperty('description');
+      });
+    });
   });
 
   describe('Code Analysis Agent', () => {
