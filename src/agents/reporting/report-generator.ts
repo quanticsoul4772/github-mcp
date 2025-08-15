@@ -141,10 +141,14 @@ export class ReportGenerator {
       title: data.title || 'Security Analysis Report',
       summary: data.summary || 'Analysis completed',
       sections: data.sections || [],
-      metadata: data.metadata || {
-        generatedAt: new Date(),
-        generatedBy: 'Security Analysis Agent (Safe Mode)',
-        version: '1.0.0',
+      metadata: {
+          generatedAt: (() => {
+            const v = data.metadata?.generatedAt;
+            const d = v instanceof Date ? v : (v ? new Date(v as any) : undefined);
+            return (d && !isNaN(d.getTime())) ? d : new Date();
+          })(),
+          generatedBy: data.metadata?.generatedBy ?? 'Security Analysis Agent (Safe Mode)',
+        version: data.metadata?.version ?? '1.0.0',
         repository: data.metadata?.repository ?? 'Unknown',
         branch: data.metadata?.branch ?? 'Unknown'
       }
