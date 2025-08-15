@@ -81,9 +81,10 @@ class Calculator {
     return price * 0.05; // Magic number
   }
 
-  // Security vulnerability
+  // Security vulnerability - intentionally unsafe for testing security analysis
   evaluateExpression(expr: string): any {
-    return eval(expr); // Dangerous!
+    // eslint-disable-next-line no-eval
+    return eval(expr); // Dangerous! - intentional for demo/testing purposes
   }
 
   // Resource leak

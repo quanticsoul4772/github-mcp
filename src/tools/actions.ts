@@ -1,5 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
+import { logger } from '../logger.js';
 
 interface GetWorkflowRunParams {
   owner: string;
@@ -525,7 +526,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
               logs: params.return_content ? logContent : response.url,
             });
           } catch (error) {
-            console.error('Failed to get logs for job:', job.id, error); // Log for debugging
+            logger.error('Failed to get logs for job', { jobId: job.id, jobName: job.name, error: error instanceof Error ? error.message : String(error) });
             results.push({
               job_id: job.id,
               job_name: job.name,
