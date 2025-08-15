@@ -4,56 +4,71 @@ A comprehensive Model Context Protocol (MCP) server for GitHub integration, enab
 
 ## Features
 
-This MCP server provides tools for:
+This MCP server provides comprehensive GitHub integration with 100+ tools organized into specialized modules:
 
 ### Repository Management
 - Browse and search repositories
 - Get file contents and directory listings
 - Create, update, and delete files
-- Manage branches and tags
+- Manage branches, tags, and releases
 - Fork repositories
 - Search code across GitHub
+- Batch operations for efficiency
 
 ### Issues & Pull Requests
 - List, create, and update issues
 - Manage issue comments and labels
 - Create and review pull requests
-- Merge pull requests
+- Merge pull requests with various strategies
 - Get PR diffs and files
 - Search issues and PRs
+- Automated PR review workflows
 
 ### GitHub Actions
 - List and trigger workflows
-- Monitor workflow runs
-- Get job logs
-- Manage artifacts
+- Monitor workflow runs with real-time status
+- Get job logs and artifacts
+- Manage secrets and variables
 - Cancel and rerun workflows
+- Download and manage artifacts
 
-### Security & Dependabot
-- Code scanning alerts
-- Secret scanning alerts
+### Security & Compliance
+- Code scanning alerts and SARIF uploads
+- Secret scanning alerts and management
 - Dependabot vulnerability alerts
-- Security advisories
-- Manage security settings
+- Security advisories and policy enforcement
+- Branch protection rules
+- Security settings management
 
 ### Organizations & Users
 - Search users and organizations
-- Manage organization members
-- List user repositories
+- Manage organization members and teams
+- List user repositories and activity
 - Follow/unfollow users
 - Update profiles
+- Team collaboration features
 
 ### Notifications & Discussions
 - List and manage notifications
 - Watch/unwatch repositories
 - Create and participate in discussions
 - Manage discussion comments
+- Thread subscriptions
+
+### Performance Features
+- **Smart Caching**: LRU cache with TTL for API responses
+- **Request Deduplication**: Prevents duplicate concurrent API calls
+- **Batch Operations**: Process multiple items efficiently
+- **Streaming Pagination**: Memory-efficient handling of large datasets
+- **Circuit Breaker**: Prevents cascading failures
+- **Rate Limit Management**: Proactive rate limit tracking
 
 ### GraphQL-Powered Features
 - **GitHub Discussions**: Full discussion management with GraphQL
 - **Projects V2**: Advanced project management and tracking
 - **Repository Insights**: Comprehensive repository analytics and statistics
 - **Advanced Search**: Enhanced search with nested data and relationships
+- **Custom Field Queries**: Efficient data fetching with field selection
 ## Deployment
 
 The GitHub MCP Server supports multiple deployment options:
@@ -96,9 +111,15 @@ For detailed deployment instructions, see [docs/deployment/DEPLOYMENT.md](docs/d
 
 ## Installation
 
+### Prerequisites
+- Node.js 18.0.0 or later
+- npm 8.0.0 or later
+- GitHub Personal Access Token with appropriate scopes
+
 1. Clone the repository:
 ```bash
-cd /Users/russellsmith/Projects/mcp-servers/github-mcp
+git clone https://github.com/quanticsoul4772/github-mcp.git
+cd github-mcp
 ```
 
 2. Install dependencies:
@@ -319,11 +340,79 @@ npm run dev
 npm run build
 ```
 
-### Type Checking
+### Testing
 
 ```bash
-npx tsc --noEmit
+# Run all tests
+npm test
+
+# Run with coverage
+npm run test:coverage
+
+# Run specific test suites
+npm run test:unit        # Unit tests only
+npm run test:integration # Integration tests only
+npm run test:performance # Performance tests
+
+# Watch mode for development
+npm run test:watch
 ```
+
+### Code Quality
+
+```bash
+# Type checking
+npm run typecheck
+
+# Linting
+npm run lint
+npm run lint:fix
+
+# Formatting
+npm run format
+npm run format:check
+
+# Full quality check
+npm run quality:check
+```
+
+### Security Scanning
+
+```bash
+# Security audit
+npm run security:scan
+
+# Secret detection
+npm run security:secrets
+```
+
+## Documentation
+
+### Getting Started
+- 🚀 [Quick Start Guide](docs/QUICK_START.md) - Get running in 5 minutes
+- 📋 [Installation Guide](#installation) - Detailed setup instructions
+- ⚙️ [Configuration Guide](docs/CONFIGURATION.md) - All configuration options
+
+### Development
+- 🧪 [Testing Guide](docs/TESTING.md) - Testing strategy and instructions
+- 📝 [CLAUDE.md](CLAUDE.md) - Guide for Claude Code development
+- 🔨 [Contributing](CONTRIBUTING.md) - How to contribute
+
+### Reference
+- 📚 [Tool Reference](docs/tool-reference.md) - Complete tool documentation
+- 🔄 [Migration Guide](docs/migration-guide.md) - Upgrading from previous versions
+- 📊 [Performance Guide](docs/performance.md) - Performance optimization
+- 🔍 [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
+
+### Advanced Topics
+- 🎯 [GraphQL Tools](docs/graphql-tools.md) - GraphQL-specific features
+- 🚢 [Deployment Guide](docs/deployment/DEPLOYMENT.md) - Production deployment
+- 🔐 [Security Guide](docs/guides/AUTHENTICATION_SECURITY.md) - Security best practices
+- 🤖 [Agent System](docs/guides/AGENT_SYSTEM_GUIDE.md) - Code analysis agents
+
+### API Documentation
+- 📖 [API Reference](docs/api/API_REFERENCE.md) - Complete API documentation
+- 💡 [Examples](docs/EXAMPLES.md) - Usage examples and patterns
 
 ## Resources
 
@@ -373,14 +462,28 @@ The server includes helpful prompts for common workflows:
    - **Rate Limits**: GraphQL has different rate limiting (5,000 points/hour)
    - **Permissions**: Some GraphQL features need specific scopes
 
+## What's New
+
+See [CHANGELOG.md](CHANGELOG.md) for recent updates and version history.
+
 ## License
 
-MIT
+MIT - See [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
 ## Support
 
-For issues and questions, please create an issue in the GitHub repository.
+- 📋 **Issues**: [GitHub Issues](https://github.com/quanticsoul4772/github-mcp/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/quanticsoul4772/github-mcp/discussions)
+- 📚 **Documentation**: [Full Documentation](docs/)
+- 🚀 **Quick Start**: [Get started in 5 minutes](docs/QUICK_START.md)
+
+## Acknowledgments
+
+- Built with [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
+- Powered by [Octokit](https://github.com/octokit/octokit.js)
+- Testing with [Vitest](https://vitest.dev/)
+- Type safety with [TypeScript](https://www.typescriptlang.org/)
