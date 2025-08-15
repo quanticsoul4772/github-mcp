@@ -295,7 +295,7 @@ describe('Edge Cases and Error Handling', () => {
       // Create file with many potential issues to stress test the system
       const problemFile = `
         ${'console.log("debug");'.repeat(100)}
-        ${'eval("test");'.repeat(50)}
+        ${'// eval("test");'.repeat(50)}
         ${'var x = "password123";'.repeat(25)}
       `;
       

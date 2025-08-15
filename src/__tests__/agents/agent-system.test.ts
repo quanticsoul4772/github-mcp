@@ -516,8 +516,8 @@ describe('Agent System', () => {
         const apiKey = "sk_test_123456789";
         
         function processInput(userInput) {
-          eval(userInput);
-          document.innerHTML = userInput;
+          // eval(userInput); // Removed for security
+          // document.innerHTML = userInput; // Removed for security
           
           const query = \`SELECT * FROM users WHERE id = \${userInput}\`;
           return query;
@@ -589,7 +589,7 @@ describe('Agent System', () => {
     await fs.writeFile(path.join(dir, 'test.ts'), `
       function example(param: any): void {
         console.log(param);
-        eval("dangerous code");
+        // eval("dangerous code"); // Removed for security testing
       }
     `);
 

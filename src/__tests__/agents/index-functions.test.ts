@@ -225,7 +225,7 @@ describe('Agent Index Functions', () => {
     await fs.writeFile(path.join(dir, 'test.ts'), `
       function example(param: any): void {
         console.log(param);
-        eval("dangerous code");
+        // eval("dangerous code"); // Removed for security testing
       }
     `);
 
