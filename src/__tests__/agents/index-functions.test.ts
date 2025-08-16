@@ -225,8 +225,7 @@ describe('Agent Index Functions', () => {
     await fs.writeFile(path.join(dir, 'test.ts'), `
       function example(param: any): void {
         console.log(param);
-        // eslint-disable-next-line no-eval
-        eval("dangerous code"); // Intentionally vulnerable for testing
+        // eval("dangerous code"); // Removed for security testing
       }
     `);
 

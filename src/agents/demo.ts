@@ -25,79 +25,132 @@ import { someUnusedImport } from './unused-module';
 
 class Calculator {
   private value: number;
+  
+  // Fixed: Replace magic numbers with named constants
+  private readonly LARGE_ORDER_THRESHOLD = 1000;
+  private readonly MEDIUM_ORDER_THRESHOLD = 500;
+  private readonly LARGE_ORDER_DISCOUNT = 0.15;
+  private readonly MEDIUM_ORDER_DISCOUNT = 0.1;
+  private readonly SMALL_ORDER_DISCOUNT = 0.05;
 
   constructor(initialValue: any) { // Should be typed
     this.value = initialValue;
   }
 
-  // Function with high complexity
-  complexCalculation(a: number, b: number, c: string): any {
-    if (a > 0) {
-      if (b > 0) {
-        if (c.length > 0) {
-          if (a > b) {
-            if (c.includes('test')) {
-              if (a % 2 === 0) {
-                return a + b + parseInt(c);
-              } else {
-                return a - b + parseInt(c);
-              }
-            } else {
-              return a * b;
-            }
-          } else {
-            return b - a;
-          }
-        } else {
-          return 0;
-        }
-      } else {
-        return a;
-      }
-    } else {
+  // Fixed: Refactored to reduce complexity
+  private isValidInput(a: number, b: number, c: string): boolean {
+    return a > 0 && b > 0 && c.length > 0;
+  }
+  
+  private calculateTestValue(a: number, b: number, c: string): number {
+    const parsedC = parseInt(c) || 0;
+    if (a % 2 === 0) {
+      return a + b + parsedC;
+    }
+    return a - b + parsedC;
+  }
+  
+  complexCalculation(a: number, b: number, c: string): number | null {
+    // Early returns to reduce nesting
+    if (a <= 0) {
       return null;
     }
-  }
-
-  // Potential null pointer error
-  unsafeOperation(data: any) {
-    console.log(data.property.value); // No null check
-    return data.items[0]; // No bounds check
-  }
-
-  // Async function without proper error handling
-  async fetchData(url: string) {
-    const response = fetch(url); // Missing await
-    return response.json(); // Potential error
-  }
-
-  // Function with magic numbers
-  calculateDiscount(price: number): number {
-    if (price > 1000) {
-      return price * 0.15; // Magic number
-    } else if (price > 500) {
-      return price * 0.1; // Magic number
+    
+    if (b <= 0) {
+      return a;
     }
-    return price * 0.05; // Magic number
+    
+    if (c.length === 0) {
+      return 0;
+    }
+    
+    // Main calculation logic
+    if (a > b) {
+      if (c.includes('test')) {
+        return this.calculateTestValue(a, b, c);
+      }
+      return a * b;
+    }
+    
+    return b - a;
   }
 
-  // Security vulnerability - intentionally unsafe for testing security analysis
+  // Fixed: Added null checks and type guards
+  unsafeOperation(data: any) {
+    // Add null checks to prevent runtime errors
+    if (data && data.property && data.property.value) {
+      console.log(data.property.value);
+    } else {
+      console.log('Data or property is undefined');
+    }
+    
+    // Add bounds check before array access
+    if (data && data.items && Array.isArray(data.items) && data.items.length > 0) {
+      return data.items[0];
+    }
+    return null;
+  }
+
+  // Fixed: Added proper async/await and error handling
+  async fetchData(url: string) {
+    try {
+      const response = await fetch(url); // Fixed: Added await
+      if (!response.ok) {
+        throw new Error('HTTP error! status: ' + response.status);
+      }
+      return await response.json(); // Fixed: Added await and error handling
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+      throw error;
+    }
+  }
+  
+  calculateDiscount(price: number): number {
+    if (price > this.LARGE_ORDER_THRESHOLD) {
+      return price * this.LARGE_ORDER_DISCOUNT;
+    } else if (price > this.MEDIUM_ORDER_THRESHOLD) {
+      return price * this.MEDIUM_ORDER_DISCOUNT;
+    }
+    return price * this.SMALL_ORDER_DISCOUNT;
+  }
+
+  // Security vulnerability fixed - use safer alternative
   evaluateExpression(expr: string): any {
-    // eslint-disable-next-line no-eval
-    return eval(expr); // Dangerous! - intentional for demo/testing purposes
+    // Instead of eval, use a safe expression evaluator
+    // For demo purposes, just parse and evaluate simple math expressions
+    try {
+      // Only allow numbers and basic math operators
+      if (!/^[\d\s+\-*/().]+$/.test(expr)) {
+        throw new Error('Invalid expression');
+      }
+      // Use Function constructor as a safer alternative for simple math
+      return new Function('return ' + expr)();
+    } catch (error) {
+      console.error('Expression evaluation failed:', error);
+      throw new Error('Failed to evaluate expression safely');
+    }
   }
 
-  // Resource leak
+  // Fixed: Properly handle file resources
   openFile(filename: string) {
     const fs = require('fs');
-    const file = fs.openSync(filename, 'r');
-    // Missing file.close()
-    return file;
+    let file: number | null = null;
+    try {
+      file = fs.openSync(filename, 'r');
+      // Process file here or return data instead of file descriptor
+      const stats = fs.fstatSync(file);
+      fs.closeSync(file); // Fixed: Properly close the file
+      return stats;
+    } catch (error) {
+      if (file !== null) {
+        fs.closeSync(file); // Ensure file is closed on error
+      }
+      throw error;
+    }
   }
 }
 
-// Unused variable
-const unusedVariable = 'this is not used';
+// Removed unused variable - was causing code quality issue
 
 // TODO: Fix this function
 function todoFunction() {

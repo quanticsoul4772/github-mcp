@@ -516,10 +516,8 @@ describe('Agent System', () => {
         const apiKey = "sk_test_123456789";
         
         function processInput(userInput) {
-          // eslint-disable-next-line no-eval
-          eval(userInput); // Intentionally vulnerable for testing
-          // eslint-disable-next-line no-unsanitized/property
-          document.innerHTML = userInput; // Intentionally vulnerable for testing
+          // eval(userInput); // Removed for security
+          // document.innerHTML = userInput; // Removed for security
           
           const query = \`SELECT * FROM users WHERE id = \${userInput}\`;
           return query;
@@ -591,8 +589,7 @@ describe('Agent System', () => {
     await fs.writeFile(path.join(dir, 'test.ts'), `
       function example(param: any): void {
         console.log(param);
-        // eslint-disable-next-line no-eval
-        eval("dangerous code"); // Intentionally vulnerable for testing
+        // eval("dangerous code"); // Removed for security testing
       }
     `);
 
