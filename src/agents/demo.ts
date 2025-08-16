@@ -182,7 +182,7 @@ async function cleanupSampleFile(filePath: string): Promise<void> {
   try {
     const tempDir = path.dirname(filePath);
     await fs.rm(tempDir, { recursive: true, force: true });
-    logger.info('Cleaned up demo files', { tempDir });
+    logger.info('Cleaned up demo files', { filePath });
   } catch (error) {
     logger.error('Failed to cleanup demo files', { tempDir }, error as Error);
   }
