@@ -15,6 +15,7 @@ import {
 } from './examples/basic-usage.js';
 import { AnalysisContext } from './types/agent-interfaces.js';
 import { ReportData, ReportGenerator } from './reporting/report-generator.js';
+import { logger } from '../logger.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -79,9 +80,10 @@ class Calculator {
   unsafeOperation(data: any) {
     // Add null checks to prevent runtime errors
     if (data && data.property && data.property.value) {
-      console.log(data.property.value);
+      // Use structured logging instead of console.log
+      logger.info('Data property accessed', { value: data.property.value });
     } else {
-      console.log('Data or property is undefined');
+      logger.warn('Data or property is undefined', { data: typeof data });
     }
     
     // Add bounds check before array access
@@ -100,7 +102,7 @@ class Calculator {
       }
       return await response.json(); // Fixed: Added await and error handling
     } catch (error) {
-      console.error('Failed to fetch data:', error);
+      logger.error('Failed to fetch data', { url }, error as Error);
       throw error;
     }
   }
@@ -126,7 +128,7 @@ class Calculator {
       // Use Function constructor as a safer alternative for simple math
       return new Function('return ' + expr)();
     } catch (error) {
-      console.error('Expression evaluation failed:', error);
+      logger.error('Expression evaluation failed', { expr }, error as Error);
       throw new Error('Failed to evaluate expression safely');
     }
   }
@@ -168,10 +170,10 @@ async function createSampleFile(): Promise<string> {
   try {
     await fs.mkdir(tempDir, { recursive: true });
     await fs.writeFile(sampleFile, SAMPLE_CODE);
-    console.log(`📝 Created sample file: ${sampleFile}`);
+    logger.info('Created sample file', { filePath: sampleFile });
     return sampleFile;
   } catch (error) {
-    console.error('Failed to create sample file:', error);
+    logger.error('Failed to create sample file', {}, error as Error);
     throw error;
   }
 }
@@ -180,15 +182,14 @@ async function cleanupSampleFile(filePath: string): Promise<void> {
   try {
     const tempDir = path.dirname(filePath);
     await fs.rm(tempDir, { recursive: true, force: true });
-    console.log(`🧹 Cleaned up: ${tempDir}`);
+    logger.info('Cleaned up demo files', { tempDir });
   } catch (error) {
-    console.error('Failed to cleanup:', error);
+    logger.error('Failed to cleanup demo files', { tempDir }, error as Error);
   }
 }
 
 async function runDemo() {
-  console.log('🚀 Code Analysis Agent System Demo');
-  console.log('═'.repeat(60));
+  logger.info('Starting Code Analysis Agent System Demo');
   
   let sampleFile: string | null = null;
   
@@ -196,68 +197,65 @@ async function runDemo() {
     // Create sample file
     sampleFile = await createSampleFile();
     
-    console.log('\\n1️⃣ Quick Analysis Demo');
-    console.log('─'.repeat(40));
+    logger.info('Running Quick Analysis Demo');
     
     // Quick analysis
     const quickResult = await quickAnalyze(sampleFile, {
-      format: 'text'
+      format: 'text',
     });
     
-    console.log('Quick analysis completed!');
-    console.log(`Found ${(quickResult as any).analysis.summary.totalFindings} issues`);
+    logger.info('Quick analysis completed', {
+      totalFindings: (quickResult as any).analysis.summary.totalFindings,
+    });
     
-    console.log('\\n2️⃣ Detailed Single File Analysis');
-    console.log('─'.repeat(40));
+    logger.info('Running Detailed Single File Analysis');
     
     // Detailed analysis
     await analyzeFile(sampleFile);
     
-    console.log('\\n3️⃣ Test Generation Demo');
-    console.log('─'.repeat(40));
+    logger.info('Running Test Generation Demo');
     
     // Generate tests
     await generateTestsForFile(sampleFile);
     
-    console.log('\\n4️⃣ Security Scan Demo');
-    console.log('─'.repeat(40));
+    logger.info('Running Security Scan Demo');
     
     // Security scan
     const tempDir = path.dirname(sampleFile);
     await quickSecurityScan(tempDir);
     
-    console.log('\\n5️⃣ Agent Health Monitoring');
-    console.log('─'.repeat(40));
+    logger.info('Running Agent Health Monitoring');
     
     // Health monitoring
     await monitorAgentHealth();
     
-    console.log('\\n6️⃣ Report Generation Demo');
-    console.log('─'.repeat(40));
+    logger.info('Running Report Generation Demo');
     
     // Generate markdown report
     const reportPath = path.join(path.dirname(sampleFile), 'analysis-report.md');
     await generateAnalysisReport(tempDir, 'markdown', reportPath);
     
-    console.log('\\n7️⃣ Agent System API Demo');
-    console.log('─'.repeat(40));
+    logger.info('Running Agent System API Demo');
     
     // Demonstrate the agent system API
     const { coordinator, registry, agents } = createAgentSystem();
     
-    console.log(`🤖 Available agents: ${agents.map((a: any) => a.name).join(', ')}`);
+    logger.info('Agent System initialized', {
+      availableAgents: agents.map((a: any) => a.name),
+    });
     
     // Run coordinated analysis
     const context: AnalysisContext = {
       projectPath: path.dirname(sampleFile),
-      files: [sampleFile]
+      files: [sampleFile],
     };
     const result = await coordinator.runFullAnalysis(context);
     
-    console.log(`\\n📊 Coordinated Analysis Results:`);
-    console.log(`   Total Findings: ${result.summary.totalFindings}`);
-    console.log(`   Agents Run: ${result.summary.agentsRun}`);
-    console.log(`   Analysis Time: ${Math.round(result.summary.totalExecutionTime)}ms`);
+    logger.info('Coordinated Analysis Results', {
+      totalFindings: result.summary.totalFindings,
+      agentsRun: result.summary.agentsRun,
+      analysisTime: Math.round(result.summary.totalExecutionTime),
+    });
     
     // Generate JSON report
     const reportData: ReportData = {
@@ -267,29 +265,32 @@ async function runDemo() {
       metadata: {
         generatedAt: new Date(),
         generatedBy: 'demo',
-        version: '1.0.0'
-      }
+        version: '1.0.0',
+      },
     };
     const reportGenerator = new ReportGenerator();
     const jsonReport = await reportGenerator.generateReport(reportData);
     
     const summary = JSON.parse(jsonReport).summary;
-    console.log(`\\n📈 Summary Statistics:`);
-    console.log(`   Critical: ${summary.criticalFindings}`);
-    console.log(`   High: ${summary.highFindings}`);
-    console.log(`   Medium: ${summary.mediumFindings}`);
-    console.log(`   Low: ${summary.lowFindings}`);
-    console.log(`   Info: ${summary.infoFindings}`);
+    logger.info('Analysis Summary Statistics', {
+      critical: summary.criticalFindings,
+      high: summary.highFindings,
+      medium: summary.mediumFindings,
+      low: summary.lowFindings,
+      info: summary.infoFindings,
+    });
     
-    console.log('\\n✅ Demo completed successfully!');
-    console.log('\\n💡 Next Steps:');
-    console.log('   - Integrate agents into your CI/CD pipeline');
-    console.log('   - Customize agent configurations for your project');
-    console.log('   - Create custom agents for specific analysis needs');
-    console.log('   - Set up automated reporting and monitoring');
+    logger.info('Demo completed successfully', {
+      nextSteps: [
+        'Integrate agents into your CI/CD pipeline',
+        'Customize agent configurations for your project',
+        'Create custom agents for specific analysis needs',
+        'Set up automated reporting and monitoring',
+      ],
+    });
     
   } catch (error) {
-    console.error('\\n❌ Demo failed:', error);
+    logger.error('Demo failed', {}, error as Error);
     process.exit(1);
   } finally {
     // Cleanup
@@ -301,7 +302,7 @@ async function runDemo() {
 
 // Run demo if this file is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-  runDemo().catch(console.error);
+  runDemo().catch((error) => logger.error('Failed to run demo', {}, error));
 }
 
 export { runDemo };
