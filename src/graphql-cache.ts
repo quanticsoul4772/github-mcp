@@ -5,6 +5,7 @@
  */
 
 import { GitHubAPICache } from './cache.js';
+import { logger } from './logger.js';
 
 interface GraphQLCacheEntry<T> {
   data: T;
@@ -273,7 +274,7 @@ export class GraphQLCache {
       // On error, return stale data if available (graceful degradation)
       const entry = this.cache.get(key);
       if (entry) {
-        console.warn('GraphQL query failed, returning stale cached data:', error);
+        logger.warn('GraphQL query failed, returning stale cached data', { error: error instanceof Error ? error.message : String(error) });
         return entry.data as T;
       }
       throw error;
