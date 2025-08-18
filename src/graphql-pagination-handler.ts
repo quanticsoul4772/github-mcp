@@ -4,6 +4,7 @@
  */
 
 import { Octokit } from '@octokit/rest';
+import { logger } from './logger.js';
 
 export interface GraphQLPaginationOptions {
   first?: number;
@@ -149,7 +150,7 @@ export class GraphQLPaginationHandler {
 
         page++;
       } catch (error) {
-        console.error(`Error fetching page ${page}:`, error);
+        logger.error(`Error fetching page ${page}`, { page, error: error instanceof Error ? error.message : String(error) });
         break;
       }
     }

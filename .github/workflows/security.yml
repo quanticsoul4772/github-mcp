@@ -30,7 +30,7 @@ jobs:
           fetch-depth: 0  # Fetch all history for scanning
       
       - name: TruffleHog OSS
-        uses: trufflesecurity/trufflehog@main
+        uses: trufflesecurity/trufflehog@v3.92.0
         with:
           path: ./
           base: ${{ github.event.repository.default_branch }}
@@ -69,7 +69,7 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
-          category: "/language:${{matrix.language}}"
+          category: "/language:${{ matrix.language }}"
   
   # Dependency Review (only on PRs)
   dependency-review:
@@ -226,13 +226,13 @@ jobs:
   container-scan:
     name: Container Security Scan
     runs-on: ubuntu-latest
-    if: hashFiles('**/Dockerfile') != ''
+    if: ${{ hashFiles('**/Dockerfile') != '' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           scan-type: 'fs'
           scan-ref: '.'

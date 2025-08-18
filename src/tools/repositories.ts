@@ -18,6 +18,7 @@ import {
   ListUserRepositoriesParams,
   GetRepositoryParams,
 } from '../tool-types.js';
+import { logger } from '../logger.js';
 
 interface GetCommitParams {
   owner: string;
@@ -1014,7 +1015,7 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
               sha: data.content?.sha,
             });
           } catch (error) {
-            console.error('Failed to push file:', file.path, error); // Log for debugging
+            logger.error('Failed to push file', { filePath: file.path, error: error instanceof Error ? error.message : String(error) });
             results.push({
               path: file.path,
               success: false,
