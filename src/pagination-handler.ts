@@ -55,12 +55,12 @@ export class PaginationHandler {
 
       try {
         const response = await fetcher(page, perPage);
-        
+
         for (const item of response.data) {
           if (maxItems && totalYielded >= maxItems) {
             return;
           }
-          
+
           yield item;
           totalYielded++;
         }
@@ -78,12 +78,19 @@ export class PaginationHandler {
           // Cap backoff to a reasonable upper limit (e.g., 5 seconds) to avoid stalling
           const backoffMs = Math.min(untilResetMs, 5000);
           if (backoffMs > 0) {
-            logger.warn(`Rate limit low (${response.rateLimit.remaining}), backing off for ${backoffMs}ms`, { remaining: response.rateLimit.remaining, backoffMs });
+            logger.warn(
+              `Rate limit low (${response.rateLimit.remaining}), backing off for ${backoffMs}ms`,
+              { remaining: response.rateLimit.remaining, backoffMs }
+            );
             await new Promise(resolve => setTimeout(resolve, backoffMs));
           }
         }
       } catch (error) {
-        logger.error(`Error fetching page ${page}`, { page }, error instanceof Error ? error : new Error(String(error)));
+        logger.error(
+          `Error fetching page ${page}`,
+          { page },
+          error instanceof Error ? error : new Error(String(error))
+        );
         break;
       }
     }
@@ -97,11 +104,11 @@ export class PaginationHandler {
     options: PaginationOptions = {}
   ): Promise<T[]> {
     const results: T[] = [];
-    
+
     for await (const item of this.paginateAll(fetcher, options)) {
       results.push(item);
     }
-    
+
     return results;
   }
 
@@ -131,8 +138,10 @@ export class PaginationHandler {
     }
 
     // Calculate remaining pages to fetch
-    const remainingPages = Math.min(maxPages - 1, firstPage.totalCount ? 
-      Math.ceil(firstPage.totalCount / perPage) - 1 : maxPages - 1);
+    const remainingPages = Math.min(
+      maxPages - 1,
+      firstPage.totalCount ? Math.ceil(firstPage.totalCount / perPage) - 1 : maxPages - 1
+    );
 
     if (remainingPages <= 0) {
       return results;
@@ -141,14 +150,14 @@ export class PaginationHandler {
     // Create batches of pages to fetch concurrently
     const pagesToFetch = Array.from({ length: remainingPages }, (_, i) => i + 2);
     const batches: number[][] = [];
-    
+
     for (let i = 0; i < pagesToFetch.length; i += concurrency) {
       batches.push(pagesToFetch.slice(i, i + concurrency));
     }
 
     // Fetch each batch concurrently
     for (const batch of batches) {
-      const batchPromises = batch.map(page => 
+      const batchPromises = batch.map(page =>
         fetcher(page, perPage).catch(error => {
           logger.error(`Error fetching page ${page}`, { page }, error);
           return { data: [], hasNext: false };
@@ -156,7 +165,7 @@ export class PaginationHandler {
       );
 
       const batchResults = await Promise.all(batchPromises);
-      
+
       for (const result of batchResults) {
         results.push(...result.data);
       }
@@ -181,10 +190,7 @@ export class PaginationHandler {
     fetcher: (page: number, perPage: number) => Promise<PaginatedResponse<T>>,
     options: PaginationOptions = {}
   ): Promise<T[]> {
-    const {
-      maxPages = this.defaultMaxPages,
-      concurrent = true,
-    } = options;
+    const { maxPages = this.defaultMaxPages, concurrent = true } = options;
 
     // Use concurrent pagination for smaller datasets
     if (concurrent && maxPages <= 10) {
@@ -216,7 +222,7 @@ export class PaginationHandler {
       // Parse GitHub pagination headers
       const linkHeader = headers.link || '';
       const hasNext = linkHeader.includes('rel="next"');
-      
+
       // Try to extract total count from headers if available
       const totalCountHeader = headers['x-total-count'];
       const totalCount = totalCountHeader ? parseInt(totalCountHeader, 10) : undefined;
@@ -282,14 +288,14 @@ export class PaginationHandler {
     return async (page: number, perPage: number): Promise<PaginatedResponse<T>> => {
       const key = `${page}:${perPage}`;
       const cached = cache.get(key);
-      
+
       if (cached && Date.now() - cached.timestamp < ttl) {
         return cached.data;
       }
 
       const data = await originalFetcher(page, perPage);
       cache.set(key, { data, timestamp: Date.now() });
-      
+
       return data;
     };
   }
@@ -315,10 +321,10 @@ export const GitHubPaginationUtils = {
   ) {
     const { state = 'open', ...paginationOptions } = options;
     const fetcher = globalPaginationHandler.createGitHubFetcher(
-      (params) => octokit.issues.listForRepo(params),
+      params => octokit.issues.listForRepo(params),
       { owner, repo, state }
     );
-    
+
     return globalPaginationHandler.paginateSmart(fetcher, paginationOptions);
   },
 
@@ -333,10 +339,10 @@ export const GitHubPaginationUtils = {
   ) {
     const { state = 'open', ...paginationOptions } = options;
     const fetcher = globalPaginationHandler.createGitHubFetcher(
-      (params) => octokit.pulls.list(params),
+      params => octokit.pulls.list(params),
       { owner, repo, state }
     );
-    
+
     return globalPaginationHandler.paginateSmart(fetcher, paginationOptions);
   },
 
@@ -351,10 +357,10 @@ export const GitHubPaginationUtils = {
   ) {
     const { sha, since, until, ...paginationOptions } = options;
     const fetcher = globalPaginationHandler.createGitHubFetcher(
-      (params) => octokit.repos.listCommits(params),
+      params => octokit.repos.listCommits(params),
       { owner, repo, sha, since, until }
     );
-    
+
     return globalPaginationHandler.paginateSmart(fetcher, paginationOptions);
   },
 };

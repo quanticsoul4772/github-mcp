@@ -7,6 +7,7 @@ This directory contains **example and demonstration code** for an agent-based co
 ## Purpose
 
 The agent system demonstrates:
+
 - How to build modular code analysis tools
 - Agent-based architecture patterns
 - Coordination between multiple analysis agents
@@ -27,6 +28,7 @@ agents/
 ## Usage
 
 These modules are intended for:
+
 - Learning about agent-based architectures
 - Understanding code analysis patterns
 - Reference for building similar systems
@@ -35,6 +37,7 @@ These modules are intended for:
 ## Production Readiness
 
 **These modules are NOT production-ready** and contain:
+
 - Type inconsistencies that may trigger TypeScript errors
 - Simplified implementations for demonstration purposes
 - Mock data and example scenarios
@@ -57,6 +60,7 @@ Due to the experimental nature of this code, some TypeScript errors are expected
 ## Contributing
 
 If you'd like to improve these examples:
+
 1. Maintain their educational value
 2. Keep implementations simple and understandable
 3. Document any complex patterns

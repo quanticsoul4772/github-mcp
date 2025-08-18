@@ -81,9 +81,7 @@ describe('Repository Tools', () => {
     });
 
     it('should handle API errors', async () => {
-      mockOctokit.rest.repos.getContent.mockRejectedValue(
-        new Error('File not found')
-      );
+      mockOctokit.rest.repos.getContent.mockRejectedValue(new Error('File not found'));
 
       await expect(
         getFileContents.handler({
@@ -176,13 +174,13 @@ describe('Repository Tools', () => {
     });
 
     it('should validate input parameters', async () => {
-      await expect(
-        getRepo.handler({ owner: '', repo: 'test-repo' })
-      ).rejects.toThrow(ValidationError);
+      await expect(getRepo.handler({ owner: '', repo: 'test-repo' })).rejects.toThrow(
+        ValidationError
+      );
 
-      await expect(
-        getRepo.handler({ owner: 'test-owner', repo: '' })
-      ).rejects.toThrow(ValidationError);
+      await expect(getRepo.handler({ owner: 'test-owner', repo: '' })).rejects.toThrow(
+        ValidationError
+      );
     });
   });
 
@@ -300,9 +298,11 @@ describe('Repository Tools', () => {
       mockOctokit.rest.repos.getContent.mockResolvedValue({
         data: { type: 'file', sha: 'file-sha-123' },
       });
-      
+
       mockOctokit.rest.repos.deleteFile.mockResolvedValue({
-        data: { commit: { sha: 'delete123', message: 'Delete file', html_url: 'https://github.com' } },
+        data: {
+          commit: { sha: 'delete123', message: 'Delete file', html_url: 'https://github.com' },
+        },
       });
 
       const result = await deleteFile.handler({

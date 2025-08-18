@@ -76,9 +76,7 @@ describe('GraphQLPaginationHandler', () => {
         },
       };
 
-      mockOctokit.graphql
-        .mockResolvedValueOnce(page1Response)
-        .mockResolvedValueOnce(page2Response);
+      mockOctokit.graphql.mockResolvedValueOnce(page1Response).mockResolvedValueOnce(page2Response);
 
       const queryBuilder = handler.createDiscussionsQuery('owner', 'repo');
       const result = await handler.paginate(queryBuilder, {
@@ -126,9 +124,7 @@ describe('GraphQLPaginationHandler', () => {
         },
       };
 
-      mockOctokit.graphql
-        .mockResolvedValueOnce(page1Response)
-        .mockResolvedValueOnce(page2Response);
+      mockOctokit.graphql.mockResolvedValueOnce(page1Response).mockResolvedValueOnce(page2Response);
 
       const queryBuilder = handler.createDiscussionsQuery('owner', 'repo');
       const result = await handler.paginate(queryBuilder, {
@@ -140,8 +136,11 @@ describe('GraphQLPaginationHandler', () => {
       expect(result.data).toHaveLength(12);
       expect(mockOctokit.graphql).toHaveBeenCalledTimes(2);
       // Second call should request only 2 items (12 - 10)
-      expect(mockOctokit.graphql).toHaveBeenNthCalledWith(2, expect.any(String), 
-        expect.objectContaining({ first: 2 }));
+      expect(mockOctokit.graphql).toHaveBeenNthCalledWith(
+        2,
+        expect.any(String),
+        expect.objectContaining({ first: 2 })
+      );
     });
 
     it('should handle GraphQL errors gracefully', async () => {
@@ -149,9 +148,10 @@ describe('GraphQLPaginationHandler', () => {
       mockOctokit.graphql.mockRejectedValue(error);
 
       const queryBuilder = handler.createDiscussionsQuery('owner', 'repo');
-      
-      await expect(handler.paginate(queryBuilder, { first: 10 }))
-        .rejects.toThrow('GraphQL error: Rate limit exceeded');
+
+      await expect(handler.paginate(queryBuilder, { first: 10 })).rejects.toThrow(
+        'GraphQL error: Rate limit exceeded'
+      );
     });
 
     it('should call progress callback during auto-pagination', async () => {
@@ -189,9 +189,7 @@ describe('GraphQLPaginationHandler', () => {
         },
       };
 
-      mockOctokit.graphql
-        .mockResolvedValueOnce(page1Response)
-        .mockResolvedValueOnce(page2Response);
+      mockOctokit.graphql.mockResolvedValueOnce(page1Response).mockResolvedValueOnce(page2Response);
 
       const queryBuilder = handler.createDiscussionsQuery('owner', 'repo');
       const result = await handler.paginate(queryBuilder, {
@@ -209,8 +207,10 @@ describe('GraphQLPaginationHandler', () => {
   describe('query builders', () => {
     it('should create discussions query builder', () => {
       const queryBuilder = handler.createDiscussionsQuery('owner', 'repo', 'category123');
-      
-      expect(queryBuilder.query).toContain('discussions(first: $first, after: $after, categoryId: $categoryId)');
+
+      expect(queryBuilder.query).toContain(
+        'discussions(first: $first, after: $after, categoryId: $categoryId)'
+      );
       expect(queryBuilder.variables).toEqual({
         owner: 'owner',
         repo: 'repo',
@@ -220,7 +220,7 @@ describe('GraphQLPaginationHandler', () => {
 
     it('should create discussion comments query builder', () => {
       const queryBuilder = handler.createDiscussionCommentsQuery('owner', 'repo', 42);
-      
+
       expect(queryBuilder.query).toContain('discussion(number: $number)');
       expect(queryBuilder.query).toContain('comments(first: $first, after: $after)');
       expect(queryBuilder.variables).toEqual({
@@ -233,7 +233,7 @@ describe('GraphQLPaginationHandler', () => {
     it('should create project items query builder', () => {
       const projectId = 'project_123';
       const queryBuilder = handler.createProjectItemsQuery(projectId);
-      
+
       expect(queryBuilder.query).toContain('node(id: $projectId)');
       expect(queryBuilder.query).toContain('items(first: $first, after: $after)');
       expect(queryBuilder.variables).toEqual({
@@ -243,8 +243,10 @@ describe('GraphQLPaginationHandler', () => {
 
     it('should create collaborators query builder', () => {
       const queryBuilder = handler.createCollaboratorsQuery('owner', 'repo', 'ALL');
-      
-      expect(queryBuilder.query).toContain('collaborators(first: $first, after: $after, affiliation: $affiliation)');
+
+      expect(queryBuilder.query).toContain(
+        'collaborators(first: $first, after: $after, affiliation: $affiliation)'
+      );
       expect(queryBuilder.variables).toEqual({
         owner: 'owner',
         repo: 'repo',
@@ -260,8 +262,10 @@ describe('GraphQLPaginationHandler', () => {
         '2023-01-01T00:00:00Z',
         '2023-12-31T23:59:59Z'
       );
-      
-      expect(queryBuilder.query).toContain('history(first: $first, after: $after, since: $since, until: $until)');
+
+      expect(queryBuilder.query).toContain(
+        'history(first: $first, after: $after, since: $since, until: $until)'
+      );
       expect(queryBuilder.variables).toEqual({
         owner: 'owner',
         repo: 'repo',
@@ -273,8 +277,10 @@ describe('GraphQLPaginationHandler', () => {
 
     it('should create search query builder', () => {
       const queryBuilder = handler.createSearchQuery('test query', 'REPOSITORY');
-      
-      expect(queryBuilder.query).toContain('search(query: $searchQuery, type: $type, first: $first, after: $after)');
+
+      expect(queryBuilder.query).toContain(
+        'search(query: $searchQuery, type: $type, first: $first, after: $after)'
+      );
       expect(queryBuilder.variables).toEqual({
         searchQuery: 'test query',
         type: 'REPOSITORY',
@@ -300,13 +306,13 @@ describe('GraphQLPaginationHandler', () => {
       mockOctokit.graphql.mockResolvedValue(mockResponse);
 
       const queryBuilder = handler.createDiscussionsQuery('owner', 'repo');
-      
+
       // First call
       const result1 = await cachedHandler(queryBuilder, { first: 10 });
-      
+
       // Second call should use cache
       const result2 = await cachedHandler(queryBuilder, { first: 10 });
-      
+
       expect(mockOctokit.graphql).toHaveBeenCalledTimes(1);
       expect(result1).toEqual(result2);
       expect(cache.size).toBe(1);
@@ -330,16 +336,16 @@ describe('GraphQLPaginationHandler', () => {
       mockOctokit.graphql.mockResolvedValue(mockResponse);
 
       const queryBuilder = handler.createDiscussionsQuery('owner', 'repo');
-      
+
       // First call
       await cachedHandler(queryBuilder, { first: 10 });
-      
+
       // Wait for cache to expire
       await new Promise(resolve => setTimeout(resolve, 20));
-      
+
       // Second call should make new request
       await cachedHandler(queryBuilder, { first: 10 });
-      
+
       expect(mockOctokit.graphql).toHaveBeenCalledTimes(2);
     });
   });
@@ -348,36 +354,41 @@ describe('GraphQLPaginationHandler', () => {
 describe('GraphQLPaginationUtils', () => {
   describe('validatePaginationParams', () => {
     it('should validate first parameter', () => {
-      expect(() => GraphQLPaginationUtils.validatePaginationParams({ first: 0 }))
-        .toThrow('first parameter must be between 1 and 100');
-        
-      expect(() => GraphQLPaginationUtils.validatePaginationParams({ first: 101 }))
-        .toThrow('first parameter must be between 1 and 100');
-        
-      expect(() => GraphQLPaginationUtils.validatePaginationParams({ first: 50 }))
-        .not.toThrow();
+      expect(() => GraphQLPaginationUtils.validatePaginationParams({ first: 0 })).toThrow(
+        'first parameter must be between 1 and 100'
+      );
+
+      expect(() => GraphQLPaginationUtils.validatePaginationParams({ first: 101 })).toThrow(
+        'first parameter must be between 1 and 100'
+      );
+
+      expect(() => GraphQLPaginationUtils.validatePaginationParams({ first: 50 })).not.toThrow();
     });
 
     it('should validate maxPages parameter', () => {
-      expect(() => GraphQLPaginationUtils.validatePaginationParams({ maxPages: 0 }))
-        .toThrow('maxPages must be positive');
-        
-      expect(() => GraphQLPaginationUtils.validatePaginationParams({ maxPages: -1 }))
-        .toThrow('maxPages must be positive');
-        
-      expect(() => GraphQLPaginationUtils.validatePaginationParams({ maxPages: 5 }))
-        .not.toThrow();
+      expect(() => GraphQLPaginationUtils.validatePaginationParams({ maxPages: 0 })).toThrow(
+        'maxPages must be positive'
+      );
+
+      expect(() => GraphQLPaginationUtils.validatePaginationParams({ maxPages: -1 })).toThrow(
+        'maxPages must be positive'
+      );
+
+      expect(() => GraphQLPaginationUtils.validatePaginationParams({ maxPages: 5 })).not.toThrow();
     });
 
     it('should validate maxItems parameter', () => {
-      expect(() => GraphQLPaginationUtils.validatePaginationParams({ maxItems: 0 }))
-        .toThrow('maxItems must be positive');
-        
-      expect(() => GraphQLPaginationUtils.validatePaginationParams({ maxItems: -1 }))
-        .toThrow('maxItems must be positive');
-        
-      expect(() => GraphQLPaginationUtils.validatePaginationParams({ maxItems: 100 }))
-        .not.toThrow();
+      expect(() => GraphQLPaginationUtils.validatePaginationParams({ maxItems: 0 })).toThrow(
+        'maxItems must be positive'
+      );
+
+      expect(() => GraphQLPaginationUtils.validatePaginationParams({ maxItems: -1 })).toThrow(
+        'maxItems must be positive'
+      );
+
+      expect(() =>
+        GraphQLPaginationUtils.validatePaginationParams({ maxItems: 100 })
+      ).not.toThrow();
     });
   });
 
@@ -387,11 +398,7 @@ describe('GraphQLPaginationUtils', () => {
       const pageInfo = { hasNextPage: true, endCursor: 'cursor123' };
       const totalCount = 50;
 
-      const response = GraphQLPaginationUtils.createPaginationResponse(
-        data,
-        pageInfo,
-        totalCount
-      );
+      const response = GraphQLPaginationUtils.createPaginationResponse(data, pageInfo, totalCount);
 
       expect(response).toEqual({
         data,

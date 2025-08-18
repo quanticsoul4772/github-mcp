@@ -4,7 +4,7 @@ import {
   SearchCodeParams,
   SearchReposParams,
   SearchIssuesParams,
-  SearchUsersParams
+  SearchUsersParams,
 } from '../tool-types.js';
 
 export function createSearchTools(octokit: Octokit): ToolConfig[] {
@@ -24,7 +24,7 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
           },
           sort: {
             type: 'string',
-            description: 'Sort field (\'indexed\' only)',
+            description: "Sort field ('indexed' only)",
             enum: ['indexed'],
           },
           order: {
@@ -60,7 +60,7 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
       return {
         total_count: data.total_count,
         incomplete_results: data.incomplete_results,
-        items: data.items.map((item) => ({
+        items: data.items.map(item => ({
           name: item.name,
           path: item.path,
           sha: item.sha,
@@ -133,30 +133,34 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
       return {
         total_count: data.total_count,
         incomplete_results: data.incomplete_results,
-        items: data.items.map((item) => ({
+        items: data.items.map(item => ({
           sha: item.sha,
           commit: {
             message: item.commit.message,
             author: {
-        name: item.commit.author?.name || "",
-        email: item.commit.author?.email || "",
-        date: item.commit.author?.date || "",
-      },
+              name: item.commit.author?.name || '',
+              email: item.commit.author?.email || '',
+              date: item.commit.author?.date || '',
+            },
             committer: {
-              name: item.commit.committer?.name || "",
-              email: item.commit.committer?.email || "",
-              date: item.commit.committer?.date || "",
+              name: item.commit.committer?.name || '',
+              email: item.commit.committer?.email || '',
+              date: item.commit.committer?.date || '',
             },
             comment_count: item.commit.comment_count,
           },
-          author: item.author ? {
-            login: (item.author as any).login,
-            type: (item.author as any).type,
-          } : null,
-          committer: item.committer ? {
-            login: (item.committer as any).login,
-            type: (item.committer as any).type,
-          } : null,
+          author: item.author
+            ? {
+                login: (item.author as any).login,
+                type: (item.author as any).type,
+              }
+            : null,
+          committer: item.committer
+            ? {
+                login: (item.committer as any).login,
+                type: (item.committer as any).type,
+              }
+            : null,
           repository: {
             name: item.repository.name,
             full_name: item.repository.full_name,
@@ -211,7 +215,7 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
       return {
         total_count: data.total_count,
         incomplete_results: data.incomplete_results,
-        items: data.items.map((item) => ({
+        items: data.items.map(item => ({
           name: item.name,
           display_name: item.display_name,
           short_description: item.short_description,
@@ -283,7 +287,7 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
       return {
         total_count: data.total_count,
         incomplete_results: data.incomplete_results,
-        items: data.items.map((item) => ({
+        items: data.items.map(item => ({
           id: item.id,
           node_id: item.node_id,
           url: item.url,

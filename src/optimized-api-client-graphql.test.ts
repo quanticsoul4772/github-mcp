@@ -23,7 +23,8 @@ describe('OptimizedAPIClient GraphQL Features', () => {
 
   describe('GraphQL caching', () => {
     it('should cache GraphQL responses', async () => {
-      const query = 'query GetRepo($owner: String!, $repo: String!) { repository(owner: $owner, name: $repo) { name } }';
+      const query =
+        'query GetRepo($owner: String!, $repo: String!) { repository(owner: $owner, name: $repo) { name } }';
       const variables = { owner: 'test', repo: 'test-repo' };
       const mockResponse = { repository: { name: 'test-repo' } };
 
@@ -31,7 +32,7 @@ describe('OptimizedAPIClient GraphQL Features', () => {
 
       // First call
       const result1 = await optimizedClient.graphql(query, variables);
-      
+
       // Second call - should use cache
       const result2 = await optimizedClient.graphql(query, variables);
 
@@ -88,13 +89,16 @@ describe('OptimizedAPIClient GraphQL Features', () => {
       // First populate cache
       const readQuery = 'query GetDiscussion { repository { discussion { title } } }';
       mockOctokit.graphql.mockResolvedValue({ repository: { discussion: { title: 'Test' } } });
-      
+
       await optimizedClient.graphql(readQuery);
       expect(mockOctokit.graphql).toHaveBeenCalledTimes(1);
 
       // Perform mutation - should invalidate related cache
       const mutation = 'mutation CreateDiscussion { createDiscussion { id } }';
-      const invalidated = optimizedClient.invalidateGraphQLCacheForMutation(mutation, { owner: 'test', repo: 'test' });
+      const invalidated = optimizedClient.invalidateGraphQLCacheForMutation(mutation, {
+        owner: 'test',
+        repo: 'test',
+      });
 
       expect(invalidated).toBeGreaterThanOrEqual(0);
 
@@ -114,8 +118,8 @@ describe('OptimizedAPIClient GraphQL Features', () => {
       const query = 'query GetRepo { repository { name } }';
       const mockResponse = { repository: { name: 'test' } };
 
-      mockOctokit.graphql.mockImplementation(() => 
-        new Promise(resolve => setTimeout(() => resolve(mockResponse), 100))
+      mockOctokit.graphql.mockImplementation(
+        () => new Promise(resolve => setTimeout(() => resolve(mockResponse), 100))
       );
 
       // Start multiple concurrent requests
@@ -129,7 +133,7 @@ describe('OptimizedAPIClient GraphQL Features', () => {
 
       // All should return same result
       results.forEach(result => expect(result).toEqual(mockResponse));
-      
+
       // But API should only be called once due to deduplication
       expect(mockOctokit.graphql).toHaveBeenCalledTimes(1);
     });
@@ -138,8 +142,8 @@ describe('OptimizedAPIClient GraphQL Features', () => {
       const query = 'query GetRepo { repository { name } }';
       const mockResponse = { repository: { name: 'test' } };
 
-      mockOctokit.graphql.mockImplementation(() => 
-        new Promise(resolve => setTimeout(() => resolve(mockResponse), 50))
+      mockOctokit.graphql.mockImplementation(
+        () => new Promise(resolve => setTimeout(() => resolve(mockResponse), 50))
       );
 
       // Start concurrent requests with deduplication disabled
@@ -165,7 +169,7 @@ describe('OptimizedAPIClient GraphQL Features', () => {
       await optimizedClient.graphql(query); // hit
 
       const metrics = optimizedClient.getMetrics();
-      
+
       expect(metrics).toHaveProperty('cache');
       expect(metrics).toHaveProperty('graphqlCache');
       expect(metrics).toHaveProperty('deduplication');
@@ -179,7 +183,7 @@ describe('OptimizedAPIClient GraphQL Features', () => {
       await optimizedClient.graphql(query, {}, { operation: 'test_query' });
 
       const stats = optimizedClient.getGraphQLCacheStats();
-      
+
       expect(stats).toHaveProperty('general');
       expect(stats).toHaveProperty('topQueries');
       expect(stats).toHaveProperty('cacheEfficiency');
@@ -207,7 +211,7 @@ describe('OptimizedAPIClient GraphQL Features', () => {
 
       // Second call fails but should return cached data
       mockOctokit.graphql.mockRejectedValueOnce(new Error('Network error'));
-      
+
       const result = await optimizedClient.graphql(query);
       expect(result).toEqual(cachedResponse);
     });
@@ -265,7 +269,7 @@ describe('OptimizedAPIClient GraphQL Features', () => {
 
       // Verify cache is empty by checking if next call hits API
       await optimizedClient.graphql(query);
-      
+
       expect(mockOctokit.graphql).toHaveBeenCalledTimes(2); // Initial + after clear
     });
   });

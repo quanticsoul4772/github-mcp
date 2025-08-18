@@ -102,7 +102,8 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         owned_private_repos: data.owned_private_repos,
         disk_usage: data.disk_usage,
         collaborators: data.collaborators,
-        two_factor_authentication: 'two_factor_authentication' in data ? (data as any).two_factor_authentication : undefined,
+        two_factor_authentication:
+          'two_factor_authentication' in data ? (data as any).two_factor_authentication : undefined,
         plan: data.plan,
       };
     },
@@ -207,7 +208,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
       return {
         total_count: data.total_count,
         incomplete_results: data.incomplete_results,
-        items: data.items.map((user) => ({
+        items: data.items.map(user => ({
           login: user.login,
           id: user.id,
           node_id: user.node_id,
@@ -267,7 +268,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
     handler: async (args: unknown) => {
       const params = args as ListUserReposParams;
       let data;
-      
+
       if (params.username) {
         const response = await octokit.repos.listForUser({
           username: params.username,
@@ -289,7 +290,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         data = response.data;
       }
 
-      return data.map((repo) => ({
+      return data.map(repo => ({
         id: repo.id,
         name: repo.name,
         full_name: repo.full_name,
@@ -346,7 +347,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
     handler: async (args: unknown) => {
       const params = args as ListFollowersParams;
       let data;
-      
+
       if (params.username) {
         const response = await octokit.users.listFollowersForUser({
           username: params.username,
@@ -362,7 +363,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         data = response.data;
       }
 
-      return data.map((user) => ({
+      return data.map(user => ({
         login: user.login,
         id: user.id,
         node_id: user.node_id,
@@ -405,7 +406,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
     handler: async (args: unknown) => {
       const params = args as ListFollowingParams;
       let data;
-      
+
       if (params.username) {
         const response = await octokit.users.listFollowingForUser({
           username: params.username,
@@ -421,7 +422,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         data = response.data;
       }
 
-      return data.map((user) => ({
+      return data.map(user => ({
         login: user.login,
         id: user.id,
         node_id: user.node_id,
@@ -468,10 +469,10 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
             username: params.target_user,
           });
         }
-        
+
         return {
           following: true,
-          message: params.username 
+          message: params.username
             ? `${params.username} is following ${params.target_user}`
             : `You are following ${params.target_user}`,
         };
@@ -508,7 +509,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         },
       },
       handler: async (args: unknown) => {
-      const params = args as FollowUserParams;
+        const params = args as FollowUserParams;
         await octokit.users.follow({
           username: params.username,
         });
@@ -537,7 +538,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         },
       },
       handler: async (args: unknown) => {
-      const params = args as UnfollowUserParams;
+        const params = args as UnfollowUserParams;
         await octokit.users.unfollow({
           username: params.username,
         });
@@ -593,7 +594,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         },
       },
       handler: async (args: unknown) => {
-      const params = args as UpdateMeParams;
+        const params = args as UpdateMeParams;
         const { data } = await octokit.users.updateAuthenticated({
           name: params.name,
           email: params.email,

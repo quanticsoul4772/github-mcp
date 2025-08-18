@@ -56,32 +56,32 @@ export interface BaseAgent {
   name: string;
   version: string;
   description: string;
-  
+
   /**
    * Analyze the given context and return results
    */
   analyze(context: AnalysisContext): Promise<AnalysisResult>;
-  
+
   /**
    * Check if this agent can handle the given file type
    */
   canHandle(fileType: string): boolean;
-  
+
   /**
    * Get list of other agents this agent depends on
    */
   getDependencies(): string[];
-  
+
   /**
    * Get execution priority (lower numbers run first)
    */
   getPriority(): number;
-  
+
   /**
    * Validate configuration for this agent
    */
   validateConfiguration(config: AgentConfiguration): boolean;
-  
+
   /**
    * Get default configuration for this agent
    */
@@ -121,24 +121,29 @@ export interface AgentCoordinator {
    * Run analysis with all registered agents
    */
   runFullAnalysis(context: AnalysisContext): Promise<AnalysisReport>;
-  
+
   /**
    * Run analysis with specific agents
    */
   runSelectedAgents(agentNames: string[], context: AnalysisContext): Promise<AnalysisReport>;
-  
+
   /**
    * Run a single agent
    */
   runSingleAgent(agentName: string, context: AnalysisContext): Promise<AnalysisResult>;
-  
+
   /**
    * Get analysis report from previous results
    */
   generateReport(results: AnalysisResult[], context: AnalysisContext): AnalysisReport;
 }
 
-export type AgentEventType = 'agent-start' | 'agent-complete' | 'agent-error' | 'analysis-start' | 'analysis-complete';
+export type AgentEventType =
+  | 'agent-start'
+  | 'agent-complete'
+  | 'agent-error'
+  | 'analysis-start'
+  | 'analysis-complete';
 
 export interface AgentEvent {
   type: AgentEventType;

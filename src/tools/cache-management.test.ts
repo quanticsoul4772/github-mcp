@@ -24,13 +24,13 @@ describe('Cache Management Tools', () => {
   describe('Tool registration', () => {
     it('should register all cache management tools', () => {
       const toolNames = tools.map(tool => tool.tool.name);
-      
+
       expect(toolNames).toContain('get_cache_metrics');
       expect(toolNames).toContain('get_graphql_cache_stats');
       expect(toolNames).toContain('clear_cache');
       expect(toolNames).toContain('cache_health_check');
       expect(toolNames).toContain('warmup_cache');
-      
+
       expect(tools.length).toBe(5);
     });
 
@@ -78,7 +78,9 @@ describe('Cache Management Tools', () => {
 
       const mockDetailedStats = {
         general: { hits: 8, misses: 2, size: 5, evictions: 0, queryTypes: {} },
-        topQueries: [{ query: 'GetRepo', hits: 5, misses: 1, hitRate: 83.33, avgResponseTime: 150 }],
+        topQueries: [
+          { query: 'GetRepo', hits: 5, misses: 1, hitRate: 83.33, avgResponseTime: 150 },
+        ],
         cacheEfficiency: { overall: 80, byQuery: {} },
         memorySummary: { entries: 5, estimatedSize: '2.5 KB' },
       };
@@ -151,7 +153,9 @@ describe('Cache Management Tools', () => {
     });
 
     it('should clear REST cache only', async () => {
-      const invalidateCacheSpy = vi.spyOn(mockOptimizedClient, 'invalidateCache').mockReturnValue(5);
+      const invalidateCacheSpy = vi
+        .spyOn(mockOptimizedClient, 'invalidateCache')
+        .mockReturnValue(5);
 
       const result = await clearCacheTool.handler({ cacheType: 'rest' });
 
@@ -161,7 +165,9 @@ describe('Cache Management Tools', () => {
     });
 
     it('should clear GraphQL cache only', async () => {
-      const invalidateGraphQLCacheSpy = vi.spyOn(mockOptimizedClient, 'invalidateGraphQLCache').mockReturnValue(3);
+      const invalidateGraphQLCacheSpy = vi
+        .spyOn(mockOptimizedClient, 'invalidateGraphQLCache')
+        .mockReturnValue(3);
 
       const result = await clearCacheTool.handler({ cacheType: 'graphql' });
 
@@ -172,8 +178,12 @@ describe('Cache Management Tools', () => {
 
     it('should clear caches matching pattern', async () => {
       const pattern = 'repository.*discussion';
-      const invalidateCacheSpy = vi.spyOn(mockOptimizedClient, 'invalidateCache').mockReturnValue(2);
-      const invalidateGraphQLCacheSpy = vi.spyOn(mockOptimizedClient, 'invalidateGraphQLCache').mockReturnValue(3);
+      const invalidateCacheSpy = vi
+        .spyOn(mockOptimizedClient, 'invalidateCache')
+        .mockReturnValue(2);
+      const invalidateGraphQLCacheSpy = vi
+        .spyOn(mockOptimizedClient, 'invalidateGraphQLCache')
+        .mockReturnValue(3);
 
       const result = await clearCacheTool.handler({ pattern });
 
@@ -264,7 +274,8 @@ describe('Cache Management Tools', () => {
         { owner: 'test2', repo: 'repo2' },
       ];
 
-      const graphqlSpy = vi.spyOn(mockOptimizedClient, 'graphql')
+      const graphqlSpy = vi
+        .spyOn(mockOptimizedClient, 'graphql')
         .mockResolvedValue({ repository: { name: 'test' } });
 
       const result = await warmupCacheTool.handler({
@@ -275,7 +286,7 @@ describe('Cache Management Tools', () => {
       expect(result.warmedQueries).toBe(4); // 2 repos * 2 query types
       expect(result.totalAttempts).toBe(4);
       expect(graphqlSpy).toHaveBeenCalledTimes(4);
-      
+
       // Verify all results were successful
       expect(result.results.every((r: any) => r.success)).toBe(true);
     });
@@ -310,7 +321,8 @@ describe('Cache Management Tools', () => {
     it('should use default query types if not specified', async () => {
       const repositories = [{ owner: 'test', repo: 'repo' }];
 
-      const graphqlSpy = vi.spyOn(mockOptimizedClient, 'graphql')
+      const graphqlSpy = vi
+        .spyOn(mockOptimizedClient, 'graphql')
         .mockResolvedValue({ repository: { name: 'test' } });
 
       const result = await warmupCacheTool.handler({ repositories });
@@ -324,7 +336,8 @@ describe('Cache Management Tools', () => {
       const repositories = [{ owner: 'test', repo: 'repo' }];
       const queryTypes = ['insights', 'contributors', 'discussions', 'categories'];
 
-      const graphqlSpy = vi.spyOn(mockOptimizedClient, 'graphql')
+      const graphqlSpy = vi
+        .spyOn(mockOptimizedClient, 'graphql')
         .mockResolvedValue({ repository: { name: 'test' } });
 
       const result = await warmupCacheTool.handler({ repositories, queryTypes });
@@ -351,7 +364,7 @@ describe('Cache Management Tools', () => {
 
     it('should accept optional parameters correctly', async () => {
       const clearCacheTool = tools.find(tool => tool.tool.name === 'clear_cache');
-      
+
       // Should work without any parameters
       vi.spyOn(mockOptimizedClient, 'clearAll');
       await expect(clearCacheTool.handler({})).resolves.toBeTruthy();

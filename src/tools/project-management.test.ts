@@ -318,7 +318,9 @@ describe('Project Management Tools', () => {
     it('should be registered', () => {
       expect(getMilestonesWithIssues).toBeDefined();
       expect(getMilestonesWithIssues.tool.name).toBe('get_milestones_with_issues');
-      expect(getMilestonesWithIssues.tool.description).toContain('repository milestones with their associated issues');
+      expect(getMilestonesWithIssues.tool.description).toContain(
+        'repository milestones with their associated issues'
+      );
     });
 
     it('should get milestones with issues and PRs successfully', async () => {
@@ -360,9 +362,7 @@ describe('Project Management Tools', () => {
                         ],
                       },
                       assignees: {
-                        nodes: [
-                          { login: 'dev1', avatarUrl: 'https://github.com/dev1.png' },
-                        ],
+                        nodes: [{ login: 'dev1', avatarUrl: 'https://github.com/dev1.png' }],
                       },
                     },
                     {
@@ -421,7 +421,9 @@ describe('Project Management Tools', () => {
       });
 
       expect(mockOctokit.graphql).toHaveBeenCalledWith(
-        expect.stringContaining('query($owner: String!, $repo: String!, $first: Int!, $state: MilestoneState)'),
+        expect.stringContaining(
+          'query($owner: String!, $repo: String!, $first: Int!, $state: MilestoneState)'
+        ),
         {
           owner: 'test-owner',
           repo: 'test-repo',
@@ -466,9 +468,7 @@ describe('Project Management Tools', () => {
                     ],
                   },
                   assignees: {
-                    nodes: [
-                      { login: 'dev1', avatarUrl: 'https://github.com/dev1.png' },
-                    ],
+                    nodes: [{ login: 'dev1', avatarUrl: 'https://github.com/dev1.png' }],
                   },
                 },
                 {
@@ -601,13 +601,17 @@ describe('Project Management Tools', () => {
     let getCrossRepoProjectView: any;
 
     beforeEach(() => {
-      getCrossRepoProjectView = tools.find(tool => tool.tool.name === 'get_cross_repo_project_view');
+      getCrossRepoProjectView = tools.find(
+        tool => tool.tool.name === 'get_cross_repo_project_view'
+      );
     });
 
     it('should be registered', () => {
       expect(getCrossRepoProjectView).toBeDefined();
       expect(getCrossRepoProjectView.tool.name).toBe('get_cross_repo_project_view');
-      expect(getCrossRepoProjectView.tool.description).toContain('unified view of issues and PRs across multiple repositories');
+      expect(getCrossRepoProjectView.tool.description).toContain(
+        'unified view of issues and PRs across multiple repositories'
+      );
     });
 
     it('should get cross-repository project view successfully', async () => {

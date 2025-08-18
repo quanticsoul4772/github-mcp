@@ -489,7 +489,9 @@ describe('Repository Insights Tools', () => {
       });
 
       expect(mockOctokit.graphql).toHaveBeenCalledWith(
-        expect.stringContaining('query($owner: String!, $repo: String!, $branch: String, $since: GitTimestamp, $until: GitTimestamp)'),
+        expect.stringContaining(
+          'query($owner: String!, $repo: String!, $branch: String, $since: GitTimestamp, $until: GitTimestamp)'
+        ),
         {
           owner: 'test-owner',
           repo: 'test-repo',
@@ -520,7 +522,7 @@ describe('Repository Insights Tools', () => {
             { hour: 16, commits: 1 },
           ],
           byWeekday: expect.arrayContaining([
-            expect.objectContaining({ weekday: expect.any(String), commits: expect.any(Number) })
+            expect.objectContaining({ weekday: expect.any(String), commits: expect.any(Number) }),
           ]),
           byAuthor: [
             { author: 'user1', commits: 2 },
@@ -648,9 +650,7 @@ describe('Repository Insights Tools', () => {
         repo: 'test-repo',
       });
 
-      expect(result.patterns.byAuthor).toEqual([
-        { author: 'unknown', commits: 2 },
-      ]);
+      expect(result.patterns.byAuthor).toEqual([{ author: 'unknown', commits: 2 }]);
     });
   });
 });

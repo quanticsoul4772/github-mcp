@@ -5,7 +5,11 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { Octokit } from '@octokit/rest';
 import { z } from 'zod';
 import { JSONSchema, JSONSchemaProperty, ToolConfig } from './types.js';
-import { createRateLimitedOctokit, GitHubRateLimiter, ResponseSizeLimiter } from './rate-limiter.js';
+import {
+  createRateLimitedOctokit,
+  GitHubRateLimiter,
+  ResponseSizeLimiter,
+} from './rate-limiter.js';
 
 // Environment configuration
 import { env, getGitHubToken, getEnabledToolsets, displayConfig } from './env.js';
@@ -37,12 +41,12 @@ import { OptimizedAPIClient } from './optimized-api-client.js';
 import { globalPerformanceMonitor } from './performance-monitor.js';
 
 // Reliability and health monitoring
-import { 
-  ReliabilityManager, 
-  RetryManager, 
-  ConsoleTelemetry, 
+import {
+  ReliabilityManager,
+  RetryManager,
+  ConsoleTelemetry,
   NoOpTelemetry,
-  DEFAULT_RETRY_CONFIG 
+  DEFAULT_RETRY_CONFIG,
 } from './reliability.js';
 import { HealthManager, createHealthTools } from './health.js';
 import { formatErrorResponse } from './errors.js';
@@ -57,7 +61,7 @@ const SERVER_VERSION = '1.0.0';
 
 /**
  * GitHub MCP Server - Provides GitHub API integration for the Model Context Protocol
- * 
+ *
  * This server enables AI assistants to interact with GitHub repositories, issues,
  * pull requests, actions, and more through a comprehensive set of tools.
  */
@@ -85,52 +89,54 @@ export class GitHubMCPServer {
 
   /**
    * Initialize the GitHub MCP Server
-   * 
+   *
    * Sets up the MCP server, configures GitHub authentication,
    * parses environment variables, and registers tools.
    */
   constructor(testMode: boolean = false) {
     // Initialize monitoring first
-    logger.info('Starting GitHub MCP Server', { 
+    logger.info('Starting GitHub MCP Server', {
       version: SERVER_VERSION,
       node: process.version,
-      platform: process.platform
+      platform: process.platform,
     });
     // Initialize MCP server
     this.server = new McpServer({
       name: SERVER_NAME,
       version: SERVER_VERSION,
-      description: 'GitHub API integration for MCP'
+      description: 'GitHub API integration for MCP',
     });
 
     // Validate environment configuration for security
     const envValidation = validateEnvironmentConfiguration();
     if (!envValidation.isValid) {
-      logger.error('Environment configuration validation failed', { 
-        errors: envValidation.errors 
+      logger.error('Environment configuration validation failed', {
+        errors: envValidation.errors,
       });
-      
+
       // Environment validation errors are already logged via logger.error above
       // Removed console.error statements to avoid breaking MCP protocol
-      
+
       // Don't exit in test environment
       if (!testMode && process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
         process.exit(1);
       } else if (testMode) {
         // In test mode, throw an error instead of exiting
-        logger.warn('Environment validation failed (test mode): ' + envValidation.errors.join(', '));
+        logger.warn(
+          'Environment validation failed (test mode): ' + envValidation.errors.join(', ')
+        );
         throw new Error('Environment validation failed: ' + envValidation.errors.join(', '));
       }
     }
 
     // Get token from environment configuration
     const token = getGitHubToken() || envValidation.sanitizedValues.GITHUB_TOKEN;
-    
+
     // Create rate-limited Octokit instance with logging
     const rateLimitedSetup = createRateLimitedOctokit(token);
     this.octokit = rateLimitedSetup.octokit;
     this.rateLimiter = rateLimitedSetup.rateLimiter;
-    
+
     // Configure base URL if using GitHub Enterprise
     if (env.GITHUB_HOST) {
       this.octokit = new Octokit({
@@ -138,28 +144,28 @@ export class GitHubMCPServer {
         baseUrl: env.GITHUB_HOST,
       });
     }
-    
+
     // Add logging to Octokit
-    this.octokit.hook.before('request', async (options) => {
+    this.octokit.hook.before('request', async options => {
       logger.debug('API request', {
         method: options.method,
-        url: options.url
+        url: options.url,
       });
     });
-    
+
     this.octokit.hook.after('request', async (response, options) => {
       logger.debug('API response', {
         method: options.method,
         url: options.url,
-        status: response.status
+        status: response.status,
       });
     });
-    
+
     this.octokit.hook.error('request', async (error, options) => {
       logger.error('API error', {
         method: options.method,
         url: options.url,
-        error: error.message
+        error: error.message,
       });
       throw error;
     });
@@ -182,10 +188,11 @@ export class GitHubMCPServer {
 
     // Initialize reliability infrastructure
     const enableVerboseTelemetry = process.env.GITHUB_TELEMETRY_VERBOSE === 'true';
-    const telemetry = process.env.GITHUB_TELEMETRY_DISABLE === 'true' 
-      ? new NoOpTelemetry() 
-      : new ConsoleTelemetry(enableVerboseTelemetry);
-    
+    const telemetry =
+      process.env.GITHUB_TELEMETRY_DISABLE === 'true'
+        ? new NoOpTelemetry()
+        : new ConsoleTelemetry(enableVerboseTelemetry);
+
     const retryManager = new RetryManager(DEFAULT_RETRY_CONFIG, telemetry);
     this.reliabilityManager = new ReliabilityManager(retryManager, telemetry);
     this.healthManager = new HealthManager(this.octokit, this.reliabilityManager);
@@ -199,7 +206,7 @@ export class GitHubMCPServer {
     logger.info('GitHub MCP Server initialized', {
       readOnly: this.readOnly,
       toolsets: Array.from(this.enabledToolsets),
-      toolCount: this.toolCount
+      toolCount: this.toolCount,
     });
   }
 
@@ -208,11 +215,11 @@ export class GitHubMCPServer {
    */
   private setupRequestInterception() {
     // Hook into Octokit's request lifecycle
-    this.octokit.hook.before('request', async (options) => {
+    this.octokit.hook.before('request', async options => {
       metrics.recordApiCall({ method: options.method, url: options.url } as any);
       logger.debug('API request', {
         method: options.method,
-        url: options.url
+        url: options.url,
       });
     });
 
@@ -220,7 +227,7 @@ export class GitHubMCPServer {
       logger.debug('API response', {
         method: options.method,
         url: options.url,
-        status: response.status
+        status: response.status,
       });
     });
 
@@ -229,7 +236,7 @@ export class GitHubMCPServer {
       logger.error('API error', {
         method: options.method,
         url: options.url,
-        error: error.message
+        error: error.message,
       });
       throw error;
     });
@@ -237,7 +244,7 @@ export class GitHubMCPServer {
 
   /**
    * Convert a JSON Schema to a Zod schema for validation
-   * 
+   *
    * @param schema - The JSON schema to convert
    * @returns A Zod schema object for input validation
    */
@@ -250,7 +257,7 @@ export class GitHubMCPServer {
     for (const [key, value] of Object.entries(schema.properties)) {
       const prop = value as JSONSchemaProperty;
       let zodType: z.ZodType;
-      
+
       if (prop.type === 'string') {
         zodType = z.string();
       } else if (prop.type === 'number') {
@@ -297,7 +304,7 @@ export class GitHubMCPServer {
 
   /**
    * Register a tool configuration with the MCP server
-   * 
+   *
    * @param config - Tool configuration object containing tool definition and handler
    */
   private registerTool(config: ToolConfig<unknown, unknown>): void {
@@ -321,19 +328,23 @@ export class GitHubMCPServer {
         try {
           logger.debug(`Tool invoked: ${toolName}`, { args });
           metrics.recordApiCall({ method: 'TOOL', url: toolName } as any);
-          
+
           // Execute the tool handler
           const result = await config.handler(args);
-          
+
           const duration = Date.now() - startTime;
-          logger.info(`Tool completed: ${toolName}`, { 
-            duration, 
-            success: true 
+          logger.info(`Tool completed: ${toolName}`, {
+            duration,
+            success: true,
           });
-          
+
           // Apply response size limiting
-          const { data: limitedResult, truncated, originalSize } = ResponseSizeLimiter.limitResponseSize(result);
-          
+          const {
+            data: limitedResult,
+            truncated,
+            originalSize,
+          } = ResponseSizeLimiter.limitResponseSize(result);
+
           let responseText: string;
           if (typeof limitedResult === 'string') {
             responseText = limitedResult;
@@ -345,7 +356,7 @@ export class GitHubMCPServer {
               responseText += warningMsg;
             }
           }
-          
+
           return {
             content: [
               {
@@ -357,20 +368,20 @@ export class GitHubMCPServer {
         } catch (error: any) {
           const duration = Date.now() - startTime;
           metrics.recordError({ name: 'TOOL_ERROR', message: error.message } as any);
-          
+
           // Log error details for debugging
           logger.error(`Tool error: ${toolName}`, {
             error: error.message,
             duration,
-            args
+            args,
           });
-          
+
           // Return standardized error response with proper formatting
           const errorResponse = formatErrorResponse(error);
           const errorMessage = errorResponse.error.message;
           const errorCode = errorResponse.error.code;
           const errorDetails = errorResponse.error.details;
-          
+
           // Build a helpful error message
           let errorText = `Error: ${errorMessage}`;
           if (errorCode && errorCode !== 'UNKNOWN_ERROR') {
@@ -379,7 +390,7 @@ export class GitHubMCPServer {
           if (errorDetails?.statusCode) {
             errorText += `\nStatus: ${errorDetails.statusCode}`;
           }
-          
+
           return {
             content: [
               {
@@ -400,7 +411,7 @@ export class GitHubMCPServer {
 
   /**
    * Register all available GitHub tools with the server
-   * 
+   *
    * Conditionally registers tools based on enabled toolsets
    * and read-only mode configuration.
    */
@@ -412,7 +423,7 @@ export class GitHubMCPServer {
       tool: {
         name: 'get_rate_limit_status',
         description: 'Get current GitHub API rate limit status',
-        inputSchema: { type: "object" as const, properties: {} }
+        inputSchema: { type: 'object' as const, properties: {} },
       },
       handler: async () => {
         const status = this.rateLimiter.getStatus();
@@ -450,7 +461,7 @@ export class GitHubMCPServer {
           tool: {
             name: 'get_me',
             description: 'Get my GitHub user profile',
-            inputSchema: { type: "object" as const, properties: {} }
+            inputSchema: { type: 'object' as const, properties: {} },
           },
           handler: async () => {
             const { data } = await this.reliabilityManager.executeWithReliability(
@@ -458,8 +469,8 @@ export class GitHubMCPServer {
               () => this.octokit.users.getAuthenticated()
             );
             return data;
-          }
-        }
+          },
+        },
       ];
       contextTools.forEach(tool => this.registerTool(tool));
       // Context tools registered
@@ -537,7 +548,10 @@ export class GitHubMCPServer {
 
     // Register discussion tools
     if (this.enabledToolsets.has('discussions')) {
-      const discussionTools = createDiscussionTools(this.optimizedClient.getOctokit(), this.readOnly);
+      const discussionTools = createDiscussionTools(
+        this.optimizedClient.getOctokit(),
+        this.readOnly
+      );
       discussionTools.forEach(tool => this.registerTool(tool));
       // Discussion tools registered
     }
@@ -558,7 +572,10 @@ export class GitHubMCPServer {
 
     // GraphQL repository insights tools
     if (this.enabledToolsets.has('graphql_insights')) {
-      const insightsTools = createRepositoryInsightsTools(this.optimizedClient.getOctokit(), this.readOnly);
+      const insightsTools = createRepositoryInsightsTools(
+        this.optimizedClient.getOctokit(),
+        this.readOnly
+      );
       insightsTools.forEach(tool => this.registerTool(tool));
       // Repository Insights tools registered
     }
@@ -608,29 +625,29 @@ export class GitHubMCPServer {
         tool: {
           name: 'get_performance_metrics',
           description: 'Get current performance metrics and statistics',
-          inputSchema: { type: "object" as const, properties: {} }
+          inputSchema: { type: 'object' as const, properties: {} },
         },
-        handler: async () => globalPerformanceMonitor.getMetrics()
+        handler: async () => globalPerformanceMonitor.getMetrics(),
       },
       {
         tool: {
           name: 'get_performance_report',
           description: 'Generate a comprehensive performance report',
-          inputSchema: { type: "object" as const, properties: {} }
+          inputSchema: { type: 'object' as const, properties: {} },
         },
-        handler: async () => globalPerformanceMonitor.generateReport()
+        handler: async () => globalPerformanceMonitor.generateReport(),
       },
       {
         tool: {
           name: 'clear_api_cache',
           description: 'Clear all API response caches',
-          inputSchema: { type: "object" as const, properties: {} }
+          inputSchema: { type: 'object' as const, properties: {} },
         },
         handler: async () => {
           this.optimizedClient.clearCache();
           return { success: true, message: 'All caches cleared' };
-        }
-      }
+        },
+      },
     ];
     perfTools.forEach(tool => this.registerTool(tool));
     // Performance monitoring tools registered
@@ -645,19 +662,19 @@ export class GitHubMCPServer {
 
   /**
    * Start the MCP server
-   * 
+   *
    * Establishes a stdio connection for communication with the MCP client
    */
   public async start() {
     try {
       const transport = new StdioServerTransport();
       await this.server.connect(transport);
-      
+
       logger.info('GitHub MCP server started', {
         version: SERVER_VERSION,
-        transport: 'stdio'
+        transport: 'stdio',
       });
-      
+
       // Server started successfully - avoid console output to not break MCP protocol
       // displayConfig(); // Disabled to avoid console output
     } catch (error) {
@@ -673,4 +690,3 @@ export class GitHubMCPServer {
 
 // Export for testing and external usage
 // GitHubMCPServer is already exported above
-

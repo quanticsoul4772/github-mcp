@@ -16,15 +16,15 @@ describe('Performance Tests', () => {
         repos: {
           get: vi.fn(),
           listForAuthenticatedUser: vi.fn(),
-        }
-      }
+        },
+      },
     };
   });
 
   describe('API Response Times', () => {
     it('should complete user authentication within 1 second', async () => {
       mockOctokit.rest.users.getAuthenticated.mockResolvedValue({
-        data: { login: 'testuser' }
+        data: { login: 'testuser' },
       });
 
       const start = Date.now();
@@ -39,10 +39,10 @@ describe('Performance Tests', () => {
       mockOctokit.rest.users.getAuthenticated.mockResolvedValue(mockResponse);
 
       const start = Date.now();
-      const promises = Array(10).fill(null).map(() => 
-        mockOctokit.rest.users.getAuthenticated()
-      );
-      
+      const promises = Array(10)
+        .fill(null)
+        .map(() => mockOctokit.rest.users.getAuthenticated());
+
       await Promise.all(promises);
       const duration = Date.now() - start;
 
@@ -54,11 +54,11 @@ describe('Performance Tests', () => {
   describe('Memory Usage', () => {
     it('should not leak memory during repeated API calls', async () => {
       mockOctokit.rest.users.getAuthenticated.mockResolvedValue({
-        data: { login: 'testuser' }
+        data: { login: 'testuser' },
       });
 
       const initialMemory = process.memoryUsage();
-      
+
       // Simulate repeated API calls
       for (let i = 0; i < 100; i++) {
         await mockOctokit.rest.users.getAuthenticated();
@@ -66,7 +66,7 @@ describe('Performance Tests', () => {
 
       const finalMemory = process.memoryUsage();
       const memoryIncrease = finalMemory.heapUsed - initialMemory.heapUsed;
-      
+
       // Memory increase should be reasonable (less than 50MB)
       expect(memoryIncrease).toBeLessThan(50 * 1024 * 1024);
     });
@@ -80,17 +80,17 @@ describe('Performance Tests', () => {
           headers: {
             'x-ratelimit-limit': '5000',
             'x-ratelimit-remaining': '0',
-            'x-ratelimit-reset': '1640995200'
-          }
+            'x-ratelimit-reset': '1640995200',
+          },
         },
-        message: 'API rate limit exceeded'
+        message: 'API rate limit exceeded',
       };
 
       mockOctokit.rest.users.getAuthenticated.mockRejectedValue(rateLimitError);
 
       await expect(mockOctokit.rest.users.getAuthenticated()).rejects.toMatchObject({
         status: 403,
-        message: 'API rate limit exceeded'
+        message: 'API rate limit exceeded',
       });
     });
 
@@ -98,7 +98,7 @@ describe('Performance Tests', () => {
       const headers = {
         'x-ratelimit-limit': '5000',
         'x-ratelimit-remaining': '4999',
-        'x-ratelimit-reset': '1640995200'
+        'x-ratelimit-reset': '1640995200',
       };
 
       const limit = parseInt(headers['x-ratelimit-limit'], 10);
@@ -115,20 +115,22 @@ describe('Performance Tests', () => {
   describe('Throughput Tests', () => {
     it('should maintain stable throughput under load', async () => {
       mockOctokit.rest.repos.listForAuthenticatedUser.mockResolvedValue({
-        data: Array(30).fill(null).map((_, i) => ({ id: i, name: `repo-${i}` }))
+        data: Array(30)
+          .fill(null)
+          .map((_, i) => ({ id: i, name: `repo-${i}` })),
       });
 
       const start = Date.now();
       const batchSize = 5;
       const totalBatches = 10;
-      
+
       for (let batch = 0; batch < totalBatches; batch++) {
-        const promises = Array(batchSize).fill(null).map(() =>
-          mockOctokit.rest.repos.listForAuthenticatedUser()
-        );
+        const promises = Array(batchSize)
+          .fill(null)
+          .map(() => mockOctokit.rest.repos.listForAuthenticatedUser());
         await Promise.all(promises);
       }
-      
+
       const duration = Date.now() - start;
       const totalCalls = batchSize * totalBatches;
       const callsPerSecond = (totalCalls / duration) * 1000;

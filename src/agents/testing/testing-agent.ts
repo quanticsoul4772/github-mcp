@@ -14,7 +14,7 @@ export class TestingAgent extends AbstractBaseAgent {
   private readonly testFilePatterns = [
     /\.test\.(ts|js|tsx|jsx)$/,
     /\.spec\.(ts|js|tsx|jsx)$/,
-    /__tests__\/.*\.(ts|js|tsx|jsx)$/
+    /__tests__\/.*\.(ts|js|tsx|jsx)$/,
   ];
 
   private readonly sourceExtensions = ['ts', 'js', 'tsx', 'jsx'];
@@ -38,7 +38,7 @@ export class TestingAgent extends AbstractBaseAgent {
       testFiles: 0,
       testCoverage: 0,
       missingTests: 0,
-      testQualityScore: 0
+      testQualityScore: 0,
     };
 
     try {
@@ -49,21 +49,24 @@ export class TestingAgent extends AbstractBaseAgent {
       metrics.sourceFiles = sourceFiles.length;
       metrics.testFiles = testFiles.length;
 
-      this.log('info', `Analyzing ${sourceFiles.length} source files and ${testFiles.length} test files`);
+      this.log(
+        'info',
+        `Analyzing ${sourceFiles.length} source files and ${testFiles.length} test files`
+      );
 
       // Analyze test coverage
-      findings.push(...await this.analyzeTestCoverage(sourceFiles, testFiles, context));
+      findings.push(...(await this.analyzeTestCoverage(sourceFiles, testFiles, context)));
 
       // Analyze test quality
       for (const testFile of testFiles) {
-        findings.push(...await this.analyzeTestQuality(testFile, context));
+        findings.push(...(await this.analyzeTestQuality(testFile, context)));
       }
 
       // Analyze missing tests
-      findings.push(...await this.analyzeMissingTests(sourceFiles, testFiles, context));
+      findings.push(...(await this.analyzeMissingTests(sourceFiles, testFiles, context)));
 
       // Check for test configuration
-      findings.push(...await this.analyzeTestConfiguration(context));
+      findings.push(...(await this.analyzeTestConfiguration(context)));
 
       // Calculate metrics
       metrics.testCoverage = this.calculateTestCoverage(sourceFiles, testFiles);
@@ -73,7 +76,6 @@ export class TestingAgent extends AbstractBaseAgent {
       const recommendations = this.generateRecommendations(findings, metrics);
 
       return this.createResult('success', findings, metrics, recommendations);
-      
     } catch (error) {
       this.log('error', 'Testing analysis failed', error);
       return this.createResult('error', [
@@ -81,7 +83,7 @@ export class TestingAgent extends AbstractBaseAgent {
           'critical',
           'analysis-error',
           `Testing analysis failed: ${error instanceof Error ? error.message : String(error)}`
-        )
+        ),
       ]);
     }
   }
@@ -101,15 +103,17 @@ export class TestingAgent extends AbstractBaseAgent {
    * Get test files
    */
   private getTestFiles(files: string[]): string[] {
-    return files.filter(file => 
-      this.testFilePatterns.some(pattern => pattern.test(file))
-    );
+    return files.filter(file => this.testFilePatterns.some(pattern => pattern.test(file)));
   }
 
   /**
    * Analyze test coverage
    */
-  private async analyzeTestCoverage(sourceFiles: string[], testFiles: string[], context: AnalysisContext): Promise<Finding[]> {
+  private async analyzeTestCoverage(
+    sourceFiles: string[],
+    testFiles: string[],
+    context: AnalysisContext
+  ): Promise<Finding[]> {
     const findings: Finding[] = [];
     const testedFiles = new Set<string>();
 
@@ -124,15 +128,17 @@ export class TestingAgent extends AbstractBaseAgent {
     // Find untested source files
     for (const sourceFile of sourceFiles) {
       if (!testedFiles.has(sourceFile) && !this.isUtilityFile(sourceFile)) {
-        findings.push(this.createFinding(
-          'medium',
-          'missing-test',
-          `Source file has no corresponding test file`,
-          { 
-            file: sourceFile,
-            fix: `Create test file for ${sourceFile}`
-          }
-        ));
+        findings.push(
+          this.createFinding(
+            'medium',
+            'missing-test',
+            `Source file has no corresponding test file`,
+            {
+              file: sourceFile,
+              fix: `Create test file for ${sourceFile}`,
+            }
+          )
+        );
       }
     }
 
@@ -140,15 +146,12 @@ export class TestingAgent extends AbstractBaseAgent {
     for (const testFile of testFiles) {
       const correspondingSource = this.findCorrespondingSourceFile(testFile, sourceFiles);
       if (!correspondingSource) {
-        findings.push(this.createFinding(
-          'low',
-          'orphaned-test',
-          'Test file has no corresponding source file',
-          { 
+        findings.push(
+          this.createFinding('low', 'orphaned-test', 'Test file has no corresponding source file', {
             file: testFile,
-            fix: 'Remove orphaned test file or create corresponding source file'
-          }
-        ));
+            fix: 'Remove orphaned test file or create corresponding source file',
+          })
+        );
       }
     }
 
@@ -171,13 +174,13 @@ export class TestingAgent extends AbstractBaseAgent {
 
     // Test structure analysis
     findings.push(...this.analyzeTestStructure(testFile, content));
-    
+
     // Test assertions analysis
     findings.push(...this.analyzeTestAssertions(testFile, content));
-    
+
     // Test isolation analysis
     findings.push(...this.analyzeTestIsolation(testFile, content));
-    
+
     // Test naming analysis
     findings.push(...this.analyzeTestNaming(testFile, content));
 
@@ -211,87 +214,86 @@ export class TestingAgent extends AbstractBaseAgent {
       }
 
       // Check for empty test cases
-      if ((line.includes('test(') || line.includes('it(')) && 
-          lines[i + 1]?.trim() === '' && 
-          lines[i + 2]?.trim() === '});') {
-        findings.push(this.createFinding(
-          'medium',
-          'empty-test',
-          'Empty test case found',
-          { 
-            file, 
+      if (
+        (line.includes('test(') || line.includes('it(')) &&
+        lines[i + 1]?.trim() === '' &&
+        lines[i + 2]?.trim() === '});'
+      ) {
+        findings.push(
+          this.createFinding('medium', 'empty-test', 'Empty test case found', {
+            file,
             line: lineNumber,
-            fix: 'Implement test logic or remove empty test'
-          }
-        ));
+            fix: 'Implement test logic or remove empty test',
+          })
+        );
       }
 
       // Check for skipped tests
-      if (line.includes('test.skip') || line.includes('it.skip') || line.includes('xtest') || line.includes('xit')) {
-        findings.push(this.createFinding(
-          'medium',
-          'skipped-test',
-          'Skipped test found',
-          { 
-            file, 
+      if (
+        line.includes('test.skip') ||
+        line.includes('it.skip') ||
+        line.includes('xtest') ||
+        line.includes('xit')
+      ) {
+        findings.push(
+          this.createFinding('medium', 'skipped-test', 'Skipped test found', {
+            file,
             line: lineNumber,
             evidence: line.trim(),
-            fix: 'Implement or remove skipped test'
-          }
-        ));
+            fix: 'Implement or remove skipped test',
+          })
+        );
       }
 
       // Check for focused tests (only)
       if (line.includes('test.only') || line.includes('it.only') || line.includes('fdescribe')) {
-        findings.push(this.createFinding(
-          'high',
-          'focused-test',
-          'Focused test found - may skip other tests',
-          { 
-            file, 
+        findings.push(
+          this.createFinding('high', 'focused-test', 'Focused test found - may skip other tests', {
+            file,
             line: lineNumber,
             evidence: line.trim(),
-            fix: 'Remove .only to run all tests'
-          }
-        ));
+            fix: 'Remove .only to run all tests',
+          })
+        );
       }
     }
 
     // Check overall structure
     if (!hasDescribe) {
-      findings.push(this.createFinding(
-        'low',
-        'test-structure',
-        'Test file missing describe block for organization',
-        { 
-          file,
-          fix: 'Add describe block to organize tests'
-        }
-      ));
+      findings.push(
+        this.createFinding(
+          'low',
+          'test-structure',
+          'Test file missing describe block for organization',
+          {
+            file,
+            fix: 'Add describe block to organize tests',
+          }
+        )
+      );
     }
 
     if (!hasTest) {
-      findings.push(this.createFinding(
-        'high',
-        'test-structure',
-        'Test file contains no test cases',
-        { 
+      findings.push(
+        this.createFinding('high', 'test-structure', 'Test file contains no test cases', {
           file,
-          fix: 'Add test cases or remove empty test file'
-        }
-      ));
+          fix: 'Add test cases or remove empty test file',
+        })
+      );
     }
 
     if (testCount > 20) {
-      findings.push(this.createFinding(
-        'medium',
-        'test-structure',
-        `Large number of tests in single file (${testCount})`,
-        { 
-          file,
-          fix: 'Consider splitting into multiple test files'
-        }
-      ));
+      findings.push(
+        this.createFinding(
+          'medium',
+          'test-structure',
+          `Large number of tests in single file (${testCount})`,
+          {
+            file,
+            fix: 'Consider splitting into multiple test files',
+          }
+        )
+      );
     }
 
     return findings;
@@ -328,46 +330,52 @@ export class TestingAgent extends AbstractBaseAgent {
 
         // Check for weak assertions
         if (line.includes('toBeTruthy()') || line.includes('toBeFalsy()')) {
-          findings.push(this.createFinding(
-            'low',
-            'weak-assertion',
-            'Weak assertion - consider more specific matcher',
-            { 
-              file, 
-              line: lineNumber,
-              evidence: line.trim(),
-              fix: 'Use more specific assertion like toBe(), toEqual(), etc.'
-            }
-          ));
+          findings.push(
+            this.createFinding(
+              'low',
+              'weak-assertion',
+              'Weak assertion - consider more specific matcher',
+              {
+                file,
+                line: lineNumber,
+                evidence: line.trim(),
+                fix: 'Use more specific assertion like toBe(), toEqual(), etc.',
+              }
+            )
+          );
         }
 
         // Check for missing assertions
         if (line.includes('});') && assertionCount === 0) {
-          findings.push(this.createFinding(
-            'high',
-            'missing-assertion',
-            `Test '${testName}' has no assertions`,
-            { 
-              file, 
-              line: lineNumber,
-              fix: 'Add assertions to verify test behavior'
-            }
-          ));
+          findings.push(
+            this.createFinding(
+              'high',
+              'missing-assertion',
+              `Test '${testName}' has no assertions`,
+              {
+                file,
+                line: lineNumber,
+                fix: 'Add assertions to verify test behavior',
+              }
+            )
+          );
           inTest = false;
         }
 
         // Check for too many assertions
         if (line.includes('});') && assertionCount > 5) {
-          findings.push(this.createFinding(
-            'medium',
-            'too-many-assertions',
-            `Test '${testName}' has many assertions (${assertionCount})`,
-            { 
-              file, 
-              line: lineNumber,
-              fix: 'Consider splitting into multiple focused tests'
-            }
-          ));
+          findings.push(
+            this.createFinding(
+              'medium',
+              'too-many-assertions',
+              `Test '${testName}' has many assertions (${assertionCount})`,
+              {
+                file,
+                line: lineNumber,
+                fix: 'Consider splitting into multiple focused tests',
+              }
+            )
+          );
           inTest = false;
         }
 
@@ -404,45 +412,36 @@ export class TestingAgent extends AbstractBaseAgent {
 
       // Check for shared state
       if (line.includes('let ') && !line.includes('const ') && !line.includes('function')) {
-        findings.push(this.createFinding(
-          'medium',
-          'shared-state',
-          'Potential shared state between tests',
-          { 
-            file, 
+        findings.push(
+          this.createFinding('medium', 'shared-state', 'Potential shared state between tests', {
+            file,
             line: lineNumber,
             evidence: line.trim(),
-            fix: 'Initialize state in beforeEach or use const for immutable values'
-          }
-        ));
+            fix: 'Initialize state in beforeEach or use const for immutable values',
+          })
+        );
       }
 
       // Check for setTimeout/setInterval without cleanup
       if (line.includes('setTimeout') || line.includes('setInterval')) {
-        findings.push(this.createFinding(
-          'medium',
-          'async-cleanup',
-          'Async operation without cleanup',
-          { 
-            file, 
+        findings.push(
+          this.createFinding('medium', 'async-cleanup', 'Async operation without cleanup', {
+            file,
             line: lineNumber,
-            fix: 'Ensure timers are cleared in afterEach'
-          }
-        ));
+            fix: 'Ensure timers are cleared in afterEach',
+          })
+        );
       }
     }
 
     // Check for proper setup/teardown
     if (content.includes('mock') && !hasAfterEach) {
-      findings.push(this.createFinding(
-        'medium',
-        'mock-cleanup',
-        'Mocks used without afterEach cleanup',
-        { 
+      findings.push(
+        this.createFinding('medium', 'mock-cleanup', 'Mocks used without afterEach cleanup', {
           file,
-          fix: 'Add afterEach to restore mocks'
-        }
-      ));
+          fix: 'Add afterEach to restore mocks',
+        })
+      );
     }
 
     return findings;
@@ -464,33 +463,38 @@ export class TestingAgent extends AbstractBaseAgent {
         const testName = testMatch[1];
 
         // Check for vague test names
-        if (testName.length < 10 || 
-            testName.toLowerCase().includes('works') ||
-            testName.toLowerCase().includes('test')) {
-          findings.push(this.createFinding(
-            'low',
-            'test-naming',
-            `Vague test name: "${testName}"`,
-            { 
-              file, 
+        if (
+          testName.length < 10 ||
+          testName.toLowerCase().includes('works') ||
+          testName.toLowerCase().includes('test')
+        ) {
+          findings.push(
+            this.createFinding('low', 'test-naming', `Vague test name: "${testName}"`, {
+              file,
               line: lineNumber,
-              fix: 'Use descriptive test names that explain what is being tested'
-            }
-          ));
+              fix: 'Use descriptive test names that explain what is being tested',
+            })
+          );
         }
 
         // Check for test names that don't follow convention
-        if (!testName.startsWith('should ') && !testName.includes('when ') && !testName.includes('given ')) {
-          findings.push(this.createFinding(
-            'info',
-            'test-naming',
-            'Consider using BDD-style test naming (should/when/given)',
-            { 
-              file, 
-              line: lineNumber,
-              evidence: testName
-            }
-          ));
+        if (
+          !testName.startsWith('should ') &&
+          !testName.includes('when ') &&
+          !testName.includes('given ')
+        ) {
+          findings.push(
+            this.createFinding(
+              'info',
+              'test-naming',
+              'Consider using BDD-style test naming (should/when/given)',
+              {
+                file,
+                line: lineNumber,
+                evidence: testName,
+              }
+            )
+          );
         }
       }
     }
@@ -501,7 +505,11 @@ export class TestingAgent extends AbstractBaseAgent {
   /**
    * Analyze missing tests for source files
    */
-  private async analyzeMissingTests(sourceFiles: string[], testFiles: string[], context: AnalysisContext): Promise<Finding[]> {
+  private async analyzeMissingTests(
+    sourceFiles: string[],
+    testFiles: string[],
+    context: AnalysisContext
+  ): Promise<Finding[]> {
     const findings: Finding[] = [];
 
     for (const sourceFile of sourceFiles) {
@@ -517,19 +525,23 @@ export class TestingAgent extends AbstractBaseAgent {
       const correspondingTest = this.findCorrespondingTestFile(sourceFile, testFiles);
 
       if (correspondingTest) {
-        const testContent = await this.readFile(path.resolve(context.projectPath, correspondingTest));
+        const testContent = await this.readFile(
+          path.resolve(context.projectPath, correspondingTest)
+        );
         if (testContent) {
           for (const exportName of exports) {
             if (!testContent.includes(exportName)) {
-              findings.push(this.createFinding(
-                'medium',
-                'untested-export',
-                `Exported function/class '${exportName}' is not tested`,
-                { 
-                  file: sourceFile,
-                  fix: `Add tests for ${exportName} in ${correspondingTest}`
-                }
-              ));
+              findings.push(
+                this.createFinding(
+                  'medium',
+                  'untested-export',
+                  `Exported function/class '${exportName}' is not tested`,
+                  {
+                    file: sourceFile,
+                    fix: `Add tests for ${exportName} in ${correspondingTest}`,
+                  }
+                )
+              );
             }
           }
         }
@@ -570,14 +582,16 @@ export class TestingAgent extends AbstractBaseAgent {
     }
 
     if (!hasJestConfig) {
-      findings.push(this.createFinding(
-        'medium',
-        'test-configuration',
-        'No test framework configuration found',
-        { 
-          fix: 'Configure Jest or another test framework'
-        }
-      ));
+      findings.push(
+        this.createFinding(
+          'medium',
+          'test-configuration',
+          'No test framework configuration found',
+          {
+            fix: 'Configure Jest or another test framework',
+          }
+        )
+      );
     }
 
     return findings;
@@ -600,13 +614,13 @@ export class TestingAgent extends AbstractBaseAgent {
 
   private findCorrespondingTestFile(sourceFile: string, testFiles: string[]): string | undefined {
     const sourceBaseName = sourceFile.replace(/\.(ts|js|tsx|jsx)$/, '');
-    
+
     return testFiles.find(testFile => {
       const testBaseName = testFile
         .replace(/\.test\.(ts|js|tsx|jsx)$/, '')
         .replace(/\.spec\.(ts|js|tsx|jsx)$/, '')
         .replace(/__tests__\//, '');
-      
+
       return testBaseName === sourceBaseName || testBaseName.endsWith(`/${sourceBaseName}`);
     });
   }
@@ -616,7 +630,7 @@ export class TestingAgent extends AbstractBaseAgent {
       /types?\.(ts|js)$/,
       /constants?\.(ts|js)$/,
       /config\.(ts|js)$/,
-      /index\.(ts|js)$/
+      /index\.(ts|js)$/,
     ];
 
     return utilityPatterns.some(pattern => pattern.test(file));
@@ -648,18 +662,18 @@ export class TestingAgent extends AbstractBaseAgent {
 
   private calculateTestCoverage(sourceFiles: string[], testFiles: string[]): number {
     if (sourceFiles.length === 0) return 100;
-    
+
     const testedFiles = testFiles.length;
     const totalFiles = sourceFiles.filter(f => !this.isUtilityFile(f)).length;
-    
+
     return Math.round((testedFiles / totalFiles) * 100);
   }
 
   private calculateTestQualityScore(findings: Finding[]): number {
-    const qualityIssues = findings.filter(f => 
+    const qualityIssues = findings.filter(f =>
       ['empty-test', 'missing-assertion', 'weak-assertion', 'focused-test'].includes(f.category)
     ).length;
-    
+
     return Math.max(0, 100 - qualityIssues * 5);
   }
 

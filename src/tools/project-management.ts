@@ -8,7 +8,7 @@ import {
   ProjectBoardsSchema,
   MilestonesWithIssuesSchema,
   CrossRepoProjectViewSchema,
-  GraphQLValidationError
+  GraphQLValidationError,
 } from '../graphql-validation.js';
 import { withErrorHandling } from '../errors.js';
 
@@ -59,7 +59,10 @@ const RepositoryRefSchema = z.object({
 });
 
 const GetCrossRepoProjectViewSchema = z.object({
-  repositories: z.array(RepositoryRefSchema).min(1, 'At least one repository is required').max(5, 'Maximum 5 repositories allowed'),
+  repositories: z
+    .array(RepositoryRefSchema)
+    .min(1, 'At least one repository is required')
+    .max(5, 'Maximum 5 repositories allowed'),
   labels: z.array(z.string()).optional(),
   assignee: z.string().optional(),
   state: z.enum(['OPEN', 'CLOSED']).optional(),
@@ -68,21 +71,21 @@ const GetCrossRepoProjectViewSchema = z.object({
 
 /**
  * Creates project management tools using GraphQL API for enhanced project tracking capabilities.
- * 
+ *
  * These tools provide sophisticated project management functionality that leverages GraphQL's
  * ability to fetch nested relationships and contextual data in single queries,
  * offering performance and feature advantages over REST-based project management.
- * 
+ *
  * @param octokit - Configured Octokit instance with GraphQL support
  * @param readOnly - Whether to exclude write operations (all project tools are read-only)
  * @returns Array of project management tool configurations
- * 
+ *
  * @example
  * ```typescript
  * const tools = createProjectManagementTools(octokit, true);
  * // Returns tools: get_project_boards, get_milestones_with_issues, etc.
  * ```
- * 
+ *
  * @see https://docs.github.com/en/graphql/reference/objects#project
  */
 export function createProjectManagementTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
@@ -120,7 +123,8 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
         return withErrorHandling(
           'get_project_boards',
           async () => {
-            const query = params.repo ? `
+            const query = params.repo
+              ? `
               query($owner: String!, $repo: String!, $first: Int!) {
                 repository(owner: $owner, name: $repo) {
                   projectsV2(first: $first) {
@@ -186,7 +190,8 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
                   }
                 }
               }
-            ` : `
+            `
+              : `
               query($owner: String!, $first: Int!) {
                 user(login: $owner) {
                   projectsV2(first: $first) {
@@ -336,9 +341,9 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
               first: validateGraphQLVariableValue(params.first || 25, 'first'),
             };
 
-            const result: any = await (octokit as any).graphqlWithComplexity ? 
-              await (octokit as any).graphqlWithComplexity(query, variables) :
-              await octokit.graphql(query, variables);
+            const result: any = (await (octokit as any).graphqlWithComplexity)
+              ? await (octokit as any).graphqlWithComplexity(query, variables)
+              : await octokit.graphql(query, variables);
 
             let projects;
             if (params.repo) {
@@ -487,9 +492,9 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
               state: params.state ? validateGraphQLVariableValue(params.state, 'state') : undefined,
             };
 
-            const result: any = await (octokit as any).graphqlWithComplexity ? 
-              await (octokit as any).graphqlWithComplexity(query, variables) :
-              await octokit.graphql(query, variables);
+            const result: any = (await (octokit as any).graphqlWithComplexity)
+              ? await (octokit as any).graphqlWithComplexity(query, variables)
+              : await octokit.graphql(query, variables);
 
             if (!result.repository) {
               throw new Error('Repository not found or milestones query failed');
@@ -498,16 +503,21 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
             const milestones = result.repository.milestones.nodes.map((milestone: any) => {
               const allIssues = milestone.issues.nodes;
               const allPullRequests = milestone.pullRequests.nodes;
-              
+
               // Calculate progress
               const openIssues = allIssues.filter((issue: any) => issue.state === 'OPEN').length;
-              const closedIssues = allIssues.filter((issue: any) => issue.state === 'CLOSED').length;
+              const closedIssues = allIssues.filter(
+                (issue: any) => issue.state === 'CLOSED'
+              ).length;
               const openPRs = allPullRequests.filter((pr: any) => pr.state === 'OPEN').length;
-              const closedPRs = allPullRequests.filter((pr: any) => ['CLOSED', 'MERGED'].includes(pr.state)).length;
-              
+              const closedPRs = allPullRequests.filter((pr: any) =>
+                ['CLOSED', 'MERGED'].includes(pr.state)
+              ).length;
+
               const totalItems = allIssues.length + allPullRequests.length;
               const completedItems = closedIssues + closedPRs;
-              const progressPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+              const progressPercentage =
+                totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
               return {
                 ...milestone,
@@ -545,7 +555,8 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
   tools.push({
     tool: {
       name: 'get_cross_repo_project_view',
-      description: 'Get a unified view of issues and PRs across multiple repositories for project management',
+      description:
+        'Get a unified view of issues and PRs across multiple repositories for project management',
       inputSchema: {
         type: 'object',
         properties: {
@@ -694,15 +705,19 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
               const variables = {
                 owner: validateGraphQLVariableValue(repoInfo.owner, 'owner'),
                 repo: validateGraphQLVariableValue(repoInfo.repo, 'repo'),
-                states: params.state ? [validateGraphQLVariableValue(params.state, 'state')] : ['OPEN'],
+                states: params.state
+                  ? [validateGraphQLVariableValue(params.state, 'state')]
+                  : ['OPEN'],
               };
 
-              const result: any = await (octokit as any).graphqlWithComplexity ? 
-                await (octokit as any).graphqlWithComplexity(query, variables) :
-                await octokit.graphql(query, variables);
+              const result: any = (await (octokit as any).graphqlWithComplexity)
+                ? await (octokit as any).graphqlWithComplexity(query, variables)
+                : await octokit.graphql(query, variables);
 
               if (!result.repository) {
-                console.warn(`Repository ${repoInfo.owner}/${repoInfo.repo} not found or inaccessible`);
+                console.warn(
+                  `Repository ${repoInfo.owner}/${repoInfo.repo} not found or inaccessible`
+                );
                 continue;
               }
 
@@ -747,34 +762,38 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
 
               // Filter by milestone
               if (params.milestone) {
-                filteredIssues = filteredIssues.filter((issue: any) => 
-                  issue.milestone?.title === params.milestone
+                filteredIssues = filteredIssues.filter(
+                  (issue: any) => issue.milestone?.title === params.milestone
                 );
-                filteredPRs = filteredPRs.filter((pr: any) => 
-                  pr.milestone?.title === params.milestone
+                filteredPRs = filteredPRs.filter(
+                  (pr: any) => pr.milestone?.title === params.milestone
                 );
               }
 
               // Add repository context to each item
-              allIssues.push(...filteredIssues.map((issue: any) => ({
-                ...issue,
-                repository: {
-                  name: repoResult.repository.name,
-                  nameWithOwner: repoResult.repository.nameWithOwner,
-                  url: repoResult.repository.url,
-                },
-                type: 'issue',
-              })));
+              allIssues.push(
+                ...filteredIssues.map((issue: any) => ({
+                  ...issue,
+                  repository: {
+                    name: repoResult.repository.name,
+                    nameWithOwner: repoResult.repository.nameWithOwner,
+                    url: repoResult.repository.url,
+                  },
+                  type: 'issue',
+                }))
+              );
 
-              allPullRequests.push(...filteredPRs.map((pr: any) => ({
-                ...pr,
-                repository: {
-                  name: repoResult.repository.name,
-                  nameWithOwner: repoResult.repository.nameWithOwner,
-                  url: repoResult.repository.url,
-                },
-                type: 'pullRequest',
-              })));
+              allPullRequests.push(
+                ...filteredPRs.map((pr: any) => ({
+                  ...pr,
+                  repository: {
+                    name: repoResult.repository.name,
+                    nameWithOwner: repoResult.repository.nameWithOwner,
+                    url: repoResult.repository.url,
+                  },
+                  type: 'pullRequest',
+                }))
+              );
             }
 
             // Combine and sort by updated date
@@ -789,8 +808,12 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
               totalPullRequests: allPullRequests.length,
               byRepository: results.map(r => ({
                 repository: r.repository.nameWithOwner,
-                issues: allIssues.filter(i => i.repository.nameWithOwner === r.repository.nameWithOwner).length,
-                pullRequests: allPullRequests.filter(pr => pr.repository.nameWithOwner === r.repository.nameWithOwner).length,
+                issues: allIssues.filter(
+                  i => i.repository.nameWithOwner === r.repository.nameWithOwner
+                ).length,
+                pullRequests: allPullRequests.filter(
+                  pr => pr.repository.nameWithOwner === r.repository.nameWithOwner
+                ).length,
               })),
               byState: {
                 open: allItems.filter(item => item.state === 'OPEN').length,
@@ -803,7 +826,8 @@ export function createProjectManagementTools(octokit: Octokit, readOnly: boolean
                   }
                   return acc;
                 }, {})
-              ).map(([login, count]) => ({ login, count }))
+              )
+                .map(([login, count]) => ({ login, count }))
                 .sort((a: any, b: any) => b.count - a.count),
             };
 

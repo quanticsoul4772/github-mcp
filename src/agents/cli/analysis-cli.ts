@@ -80,7 +80,7 @@ export class AnalysisCLI {
     try {
       // Validate project path
       const projectPath = path.resolve(options.projectPath);
-      if (!await this.directoryExists(projectPath)) {
+      if (!(await this.directoryExists(projectPath))) {
         throw new Error(`Project path does not exist: ${projectPath}`);
       }
 
@@ -89,16 +89,16 @@ export class AnalysisCLI {
       console.log(`📁 Found ${files.length} files to analyze`);
 
       // Load configuration
-      const configuration = options.config ? 
-        await this.loadConfiguration(options.config) : 
-        new Map();
+      const configuration = options.config
+        ? await this.loadConfiguration(options.config)
+        : new Map();
 
       // Create analysis context
       const context: AnalysisContext = {
         projectPath,
         files,
         configuration,
-        excludePatterns: options.exclude
+        excludePatterns: options.exclude,
       };
 
       // Run analysis
@@ -115,7 +115,6 @@ export class AnalysisCLI {
       // Exit with appropriate code
       const exitCode = report.summary.criticalFindings > 0 ? 1 : 0;
       process.exit(exitCode);
-
     } catch (error) {
       console.error('❌ Analysis failed:', error instanceof Error ? error.message : String(error));
       process.exit(1);
@@ -126,19 +125,19 @@ export class AnalysisCLI {
    * Discover files in project directory
    */
   private async discoverFiles(
-    projectPath: string, 
-    include?: string[], 
+    projectPath: string,
+    include?: string[],
     exclude?: string[]
   ): Promise<string[]> {
     const files: string[] = [];
-    
+
     const walk = async (dir: string): Promise<void> => {
       const entries = await fs.readdir(dir, { withFileTypes: true });
-      
+
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
         const relativePath = path.relative(projectPath, fullPath);
-        
+
         if (entry.isDirectory()) {
           // Skip common directories that shouldn't be analyzed
           if (!this.shouldSkipDirectory(entry.name)) {
@@ -161,9 +160,17 @@ export class AnalysisCLI {
    */
   private shouldSkipDirectory(dirName: string): boolean {
     const skipDirs = [
-      'node_modules', '.git', '.svn', '.hg',
-      'dist', 'build', 'coverage', '.nyc_output',
-      '.next', '.nuxt', '.vuepress'
+      'node_modules',
+      '.git',
+      '.svn',
+      '.hg',
+      'dist',
+      'build',
+      'coverage',
+      '.nyc_output',
+      '.next',
+      '.nuxt',
+      '.vuepress',
     ];
     return skipDirs.includes(dirName);
   }
@@ -210,7 +217,7 @@ export class AnalysisCLI {
    */
   private async outputReport(report: AnalysisReport, options: CliOptions): Promise<void> {
     const format = options.format || 'text';
-    
+
     let output: string;
     switch (format) {
       case 'json':
@@ -244,7 +251,7 @@ export class AnalysisCLI {
    */
   private formatHtmlReport(report: AnalysisReport): string {
     const { summary, findings } = report;
-    
+
     return `
 <!DOCTYPE html>
 <html>
@@ -280,7 +287,9 @@ export class AnalysisCLI {
     </div>
 
     <h2>Findings</h2>
-    ${findings.map(finding => `
+    ${findings
+      .map(
+        finding => `
         <div class="finding ${finding.severity}">
             <div class="severity">${finding.severity}</div>
             <div><strong>${finding.message}</strong></div>
@@ -288,7 +297,9 @@ export class AnalysisCLI {
             ${finding.evidence ? `<div class="evidence">${finding.evidence}</div>` : ''}
             ${finding.fix ? `<div><strong>Fix:</strong> ${finding.fix}</div>` : ''}
         </div>
-    `).join('')}
+    `
+      )
+      .join('')}
 </body>
 </html>`;
   }
@@ -298,7 +309,7 @@ export class AnalysisCLI {
    */
   private formatTextReport(report: AnalysisReport, verbose?: boolean): string {
     const { summary, findings, recommendations } = report;
-    
+
     let output = '\n📊 ANALYSIS SUMMARY\n';
     output += '═'.repeat(50) + '\n';
     output += `Total Findings: ${summary.totalFindings}\n`;
@@ -315,12 +326,12 @@ export class AnalysisCLI {
       output += '═'.repeat(50) + '\n';
 
       const groupedFindings = this.groupFindingsBySeverity(findings);
-      
+
       for (const [severity, severityFindings] of Object.entries(groupedFindings)) {
         if (severityFindings.length > 0) {
           output += `\n${this.getSeverityIcon(severity)} ${severity.toUpperCase()} (${severityFindings.length})\n`;
           output += '─'.repeat(30) + '\n';
-          
+
           for (const finding of severityFindings) {
             output += `• ${finding.message}\n`;
             if (finding.file) {
@@ -373,7 +384,7 @@ export class AnalysisCLI {
       high: '🟠',
       medium: '🟡',
       low: '🟢',
-      info: 'ℹ️'
+      info: 'ℹ️',
     };
     return icons[severity] || '❓';
   }
@@ -397,12 +408,12 @@ export class AnalysisCLI {
 function parseArgs(): CliOptions {
   const args = process.argv.slice(2);
   const options: CliOptions = {
-    projectPath: process.cwd()
+    projectPath: process.cwd(),
   };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    
+
     switch (arg) {
       case '--path':
       case '-p':
@@ -493,4 +504,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const options = parseArgs();
   cli.run(options).catch(console.error);
 }
-

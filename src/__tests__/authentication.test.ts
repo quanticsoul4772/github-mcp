@@ -13,7 +13,7 @@ describe('Authentication Security Tests', () => {
   beforeEach(() => {
     // Backup original environment
     originalEnv = { ...process.env };
-    
+
     // Clear authentication-related env vars
     delete process.env.GITHUB_PERSONAL_ACCESS_TOKEN;
     delete process.env.GITHUB_TOKEN;
@@ -82,7 +82,7 @@ describe('Authentication Security Tests', () => {
       it('should validate legacy 40-character hex tokens', () => {
         const legacyToken = 'a'.repeat(40);
         expect(validateGitHubToken(legacyToken)).toBe(true);
-        
+
         const mixedCaseToken = 'AbCdEf1234567890aBcDeF1234567890AbCdEf12';
         expect(validateGitHubToken(mixedCaseToken)).toBe(true);
       });
@@ -128,7 +128,7 @@ describe('Authentication Security Tests', () => {
 
     it('should mask tokens in logging context', () => {
       const token = 'ghp_' + 'A'.repeat(36);
-      
+
       // Function to mask sensitive data (should be used in real logging)
       const maskSensitiveData = (data: any): any => {
         if (typeof data === 'string') {
@@ -154,13 +154,13 @@ describe('Authentication Security Tests', () => {
         auth: 'Bearer ' + token,
         message: `Authentication failed with token ${token}`,
         config: {
-          authToken: token
-        }
+          authToken: token,
+        },
       };
 
       const maskedData = maskSensitiveData(testData);
       const maskedString = JSON.stringify(maskedData);
-      
+
       expect(maskedString).not.toContain(token);
       expect(maskedString).not.toContain('ghp_');
       expect(maskedData.token).toBe('****');
@@ -172,11 +172,11 @@ describe('Authentication Security Tests', () => {
     it('should handle token validation without exposing tokens', () => {
       const validToken = 'ghp_' + 'A'.repeat(36);
       const invalidToken = 'invalid-token';
-      
+
       // Token validation should only return boolean, never the token
       expect(validateGitHubToken(validToken)).toBe(true);
       expect(validateGitHubToken(invalidToken)).toBe(false);
-      
+
       // Validation should not throw errors that could leak tokens
       expect(() => validateGitHubToken(validToken)).not.toThrow();
       expect(() => validateGitHubToken(invalidToken)).not.toThrow();
@@ -186,9 +186,9 @@ describe('Authentication Security Tests', () => {
   describe('Environment Configuration Validation', () => {
     it('should validate environment with valid token', () => {
       process.env.GITHUB_PERSONAL_ACCESS_TOKEN = 'ghp_' + 'A'.repeat(36);
-      
+
       const result = validateEnvironmentConfiguration();
-      
+
       expect(result.isValid).toBe(true);
       expect(result.errors).toHaveLength(0);
       expect(result.sanitizedValues.GITHUB_TOKEN).toBeDefined();
@@ -196,29 +196,31 @@ describe('Authentication Security Tests', () => {
 
     it('should reject environment with invalid token', () => {
       process.env.GITHUB_TOKEN = 'invalid-token';
-      
+
       const result = validateEnvironmentConfiguration();
-      
+
       expect(result.isValid).toBe(false);
       expect(result.errors).toContain('Unrecognized token format');
     });
 
     it('should handle missing token', () => {
       const result = validateEnvironmentConfiguration();
-      
+
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN environment variable is required');
+      expect(result.errors).toContain(
+        'GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN environment variable is required'
+      );
     });
 
     it('should prioritize GITHUB_PERSONAL_ACCESS_TOKEN over GITHUB_TOKEN', () => {
       const patToken = 'ghp_' + 'A'.repeat(36);
       const githubToken = 'gho_' + 'B'.repeat(36);
-      
+
       process.env.GITHUB_PERSONAL_ACCESS_TOKEN = patToken;
       process.env.GITHUB_TOKEN = githubToken;
-      
+
       const result = validateEnvironmentConfiguration();
-      
+
       expect(result.isValid).toBe(true);
       expect(result.sanitizedValues.GITHUB_TOKEN).toBe(patToken);
     });
@@ -227,9 +229,9 @@ describe('Authentication Security Tests', () => {
       // Test with control characters that should be removed
       const tokenWithControlChars = 'ghp_' + 'A'.repeat(35) + '\x00';
       process.env.GITHUB_TOKEN = tokenWithControlChars + 'B';
-      
+
       const result = validateEnvironmentConfiguration();
-      
+
       expect(result.isValid).toBe(true);
       // Control chars should be stripped, resulting in valid token
       expect(result.sanitizedValues.GITHUB_TOKEN).toBe('ghp_' + 'A'.repeat(35) + 'B');
@@ -242,12 +244,12 @@ describe('Authentication Security Tests', () => {
         status: 401,
         message: 'Bad credentials',
         response: {
-          headers: {}
-        }
+          headers: {},
+        },
       };
 
       const authError = new AuthenticationError(mockError.message);
-      
+
       expect(authError).toBeInstanceOf(AuthenticationError);
       expect(authError.statusCode).toBe(401);
       expect(authError.code).toBe('AUTHENTICATION_ERROR');
@@ -259,12 +261,12 @@ describe('Authentication Security Tests', () => {
         status: 403,
         message: 'Insufficient permissions',
         response: {
-          headers: {}
-        }
+          headers: {},
+        },
       };
 
       const authzError = new AuthorizationError(mockError.message);
-      
+
       expect(authzError).toBeInstanceOf(AuthorizationError);
       expect(authzError.statusCode).toBe(403);
       expect(authzError.code).toBe('AUTHORIZATION_ERROR');
@@ -276,18 +278,18 @@ describe('Authentication Security Tests', () => {
     it('should not store tokens in plain text in memory dumps', () => {
       const token = 'ghp_' + 'A'.repeat(36);
       process.env.GITHUB_TOKEN = token;
-      
+
       // Simulate environment configuration
       const config = validateEnvironmentConfiguration();
-      
+
       // Check that sensitive data is properly handled
       expect(config.sanitizedValues.GITHUB_TOKEN).toBe(token);
-      
+
       // In a real implementation, we would want to:
       // 1. Clear the token from process.env after reading
       // 2. Store it in a secure manner (encrypted, limited access)
       // 3. Ensure it doesn't appear in heap dumps or logs
-      
+
       // For testing purposes, we verify the validation works correctly
       expect(validateGitHubToken(config.sanitizedValues.GITHUB_TOKEN)).toBe(true);
     });
@@ -296,19 +298,19 @@ describe('Authentication Security Tests', () => {
       // Simulate token rotation scenario
       const oldToken = 'ghp_' + 'A'.repeat(36);
       const newToken = 'ghp_' + 'B'.repeat(36);
-      
+
       // Old token validation
       process.env.GITHUB_TOKEN = oldToken;
       let config = validateEnvironmentConfiguration();
       expect(config.isValid).toBe(true);
       expect(config.sanitizedValues.GITHUB_TOKEN).toBe(oldToken);
-      
+
       // New token after rotation
       process.env.GITHUB_TOKEN = newToken;
       config = validateEnvironmentConfiguration();
       expect(config.isValid).toBe(true);
       expect(config.sanitizedValues.GITHUB_TOKEN).toBe(newToken);
-      
+
       // Both should be valid format
       expect(validateGitHubToken(oldToken)).toBe(true);
       expect(validateGitHubToken(newToken)).toBe(true);
@@ -325,7 +327,7 @@ describe('Authentication Security Tests', () => {
       const testToken = createTestToken();
       expect(validateGitHubToken(testToken)).toBe(true);
       expect(testToken).toMatch(/^ghp_T{36}$/);
-      
+
       const oauthTestToken = createTestToken('gho');
       expect(validateGitHubToken(oauthTestToken)).toBe(true);
       expect(oauthTestToken).toMatch(/^gho_T{36}$/);
@@ -336,16 +338,16 @@ describe('Authentication Security Tests', () => {
       // 1. Use a test token with minimal required scopes
       // 2. Test against actual GitHub API endpoints
       // 3. Verify proper error handling for insufficient permissions
-      
+
       const testToken = 'ghp_' + 'T'.repeat(36);
-      
+
       // Mock a scenario where we test with limited scope token
       const mockOctokitWithLimitedToken = new Octokit({
         auth: testToken,
       });
-      
+
       expect(mockOctokitWithLimitedToken).toBeDefined();
-      
+
       // This would be expanded to actual API calls in integration tests
       // For now, we verify the token is properly formatted
       expect(validateGitHubToken(testToken)).toBe(true);
@@ -358,16 +360,15 @@ describe('Authentication Security Tests', () => {
         message: 'Token has expired',
         response: {
           headers: {
-            'x-github-media-type': 'github.v3; format=json'
-          }
-        }
+            'x-github-media-type': 'github.v3; format=json',
+          },
+        },
       };
 
-      const authError = new AuthenticationError(
-        expiredTokenError.message,
-        { reason: 'token_expired' }
-      );
-      
+      const authError = new AuthenticationError(expiredTokenError.message, {
+        reason: 'token_expired',
+      });
+
       expect(authError.message).toBe('Token has expired');
       expect(authError.statusCode).toBe(401);
       expect(authError.context?.reason).toBe('token_expired');
@@ -381,18 +382,18 @@ describe('Authentication Security Tests', () => {
       // 2. Code exchange for access token
       // 3. Token refresh flow
       // 4. Scope validation
-      
+
       const mockOAuthConfig = {
         clientId: 'test-client-id',
         clientSecret: 'test-client-secret', // Would be env var in real usage
         scopes: ['repo', 'user'],
-        redirectUri: 'http://localhost:3000/callback'
+        redirectUri: 'http://localhost:3000/callback',
       };
-      
+
       // Validate OAuth token format
       const oauthToken = 'gho_' + 'O'.repeat(36);
       expect(validateGitHubToken(oauthToken)).toBe(true);
-      
+
       // Test that config is structured correctly
       expect(mockOAuthConfig.scopes).toContain('repo');
       expect(mockOAuthConfig.scopes).toContain('user');
@@ -400,13 +401,13 @@ describe('Authentication Security Tests', () => {
 
     it('should handle OAuth error scenarios', () => {
       // Common OAuth errors that should be tested:
-      
+
       // Invalid client credentials
       const invalidClientError = {
         status: 401,
-        message: 'Invalid client credentials'
+        message: 'Invalid client credentials',
       };
-      
+
       // Insufficient scope
       const insufficientScopeError = {
         status: 403,
@@ -414,18 +415,18 @@ describe('Authentication Security Tests', () => {
         response: {
           headers: {
             'x-oauth-scopes': 'user',
-            'x-accepted-oauth-scopes': 'repo, user'
-          }
-        }
+            'x-accepted-oauth-scopes': 'repo, user',
+          },
+        },
       };
-      
+
       expect(invalidClientError.status).toBe(401);
       expect(insufficientScopeError.status).toBe(403);
-      
+
       // These would be handled by proper error normalization
       const authError = new AuthenticationError(invalidClientError.message);
       const authzError = new AuthorizationError(insufficientScopeError.message);
-      
+
       expect(authError).toBeInstanceOf(AuthenticationError);
       expect(authzError).toBeInstanceOf(AuthorizationError);
     });
@@ -434,7 +435,7 @@ describe('Authentication Security Tests', () => {
   describe('Security Vulnerability Prevention', () => {
     it('should prevent token injection in URL parameters', () => {
       const maliciousToken = 'ghp_' + 'M'.repeat(36);
-      
+
       // URL construction should never include raw tokens
       const constructSafeUrl = (baseUrl: string, params: Record<string, string>) => {
         const url = new URL(baseUrl);
@@ -446,13 +447,13 @@ describe('Authentication Security Tests', () => {
         });
         return url.toString();
       };
-      
+
       const safeUrl = constructSafeUrl('https://api.github.com/repos/test/test', {
         token: maliciousToken, // Should be filtered out
         page: '1',
-        per_page: '100'
+        per_page: '100',
       });
-      
+
       expect(safeUrl).not.toContain(maliciousToken);
       expect(safeUrl).toContain('page=1');
       expect(safeUrl).toContain('per_page=100');
@@ -464,10 +465,10 @@ describe('Authentication Security Tests', () => {
         token: 'ghp_' + 'S'.repeat(36),
         config: {
           authToken: 'gho_' + 'C'.repeat(36),
-          apiUrl: 'https://api.github.com'
-        }
+          apiUrl: 'https://api.github.com',
+        },
       };
-      
+
       // Safe serialization function
       const safeSerialize = (obj: any): string => {
         const replacer = (key: string, value: any) => {
@@ -481,9 +482,9 @@ describe('Authentication Security Tests', () => {
         };
         return JSON.stringify(obj, replacer, 2);
       };
-      
+
       const serialized = safeSerialize(sensitiveData);
-      
+
       expect(serialized).not.toContain('ghp_');
       expect(serialized).not.toContain('gho_');
       expect(serialized).toContain('[REDACTED]');

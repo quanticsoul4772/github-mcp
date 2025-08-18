@@ -9,7 +9,7 @@ import {
   MergePullRequestParams,
   GetPullRequestDiffParams,
   DismissPullRequestReviewParams,
-  CreatePullRequestReviewCommentParams
+  CreatePullRequestReviewCommentParams,
 } from '../tool-types.js';
 
 interface GetPullRequestParams {
@@ -74,7 +74,18 @@ interface RequestPullRequestReviewersParams {
 
 interface SearchPullRequestsParams {
   query: string;
-  sort?: 'comments' | 'reactions' | 'reactions-+1' | 'reactions--1' | 'reactions-smile' | 'reactions-thinking_face' | 'reactions-heart' | 'reactions-tada' | 'interactions' | 'created' | 'updated';
+  sort?:
+    | 'comments'
+    | 'reactions'
+    | 'reactions-+1'
+    | 'reactions--1'
+    | 'reactions-smile'
+    | 'reactions-thinking_face'
+    | 'reactions-heart'
+    | 'reactions-tada'
+    | 'interactions'
+    | 'created'
+    | 'updated';
   order?: 'asc' | 'desc';
   owner?: string;
   repo?: string;
@@ -85,7 +96,21 @@ interface SearchPullRequestsParams {
 // Zod schema for search pull requests validation
 const SearchPullRequestsSchema = z.object({
   query: z.string().min(1, 'Search query is required'),
-  sort: z.enum(['comments', 'reactions', 'reactions-+1', 'reactions--1', 'reactions-smile', 'reactions-thinking_face', 'reactions-heart', 'reactions-tada', 'interactions', 'created', 'updated']).optional(),
+  sort: z
+    .enum([
+      'comments',
+      'reactions',
+      'reactions-+1',
+      'reactions--1',
+      'reactions-smile',
+      'reactions-thinking_face',
+      'reactions-heart',
+      'reactions-tada',
+      'interactions',
+      'created',
+      'updated',
+    ])
+    .optional(),
   order: z.enum(['asc', 'desc']).optional(),
   owner: z.string().optional(),
   repo: z.string().optional(),
@@ -150,9 +175,11 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         merged: data.merged,
         mergeable: data.mergeable,
         mergeable_state: data.mergeable_state,
-        merged_by: data.merged_by ? {
-          login: data.merged_by.login,
-        } : null,
+        merged_by: data.merged_by
+          ? {
+              login: data.merged_by.login,
+            }
+          : null,
         commits: data.commits,
         additions: data.additions,
         deletions: data.deletions,
@@ -238,7 +265,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         per_page: params.perPage,
       });
 
-      return data.map((pr) => ({
+      return data.map(pr => ({
         number: pr.number,
         title: pr.title,
         state: pr.state,
@@ -306,7 +333,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         per_page: params.perPage,
       });
 
-      return data.map((file) => ({
+      return data.map(file => ({
         filename: file.filename,
         status: file.status,
         additions: file.additions,
@@ -394,7 +421,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         pull_number: params.pull_number,
       });
 
-      return data.map((comment) => ({
+      return data.map(comment => ({
         id: comment.id,
         body: comment.body,
         path: comment.path,
@@ -444,7 +471,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         pull_number: params.pull_number,
       });
 
-      return data.map((review) => ({
+      return data.map(review => ({
         id: review.id,
         user: {
           login: review.user?.login,
@@ -499,7 +526,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
 
       return {
         state: status.state,
-        statuses: status.statuses.map((s) => ({
+        statuses: status.statuses.map(s => ({
           state: s.state,
           description: s.description,
           context: s.context,
@@ -528,7 +555,19 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
           sort: {
             type: 'string',
             description: 'Sort field',
-            enum: ['comments', 'reactions', 'reactions-+1', 'reactions--1', 'reactions-smile', 'reactions-thinking_face', 'reactions-heart', 'reactions-tada', 'interactions', 'created', 'updated'],
+            enum: [
+              'comments',
+              'reactions',
+              'reactions-+1',
+              'reactions--1',
+              'reactions-smile',
+              'reactions-thinking_face',
+              'reactions-heart',
+              'reactions-tada',
+              'interactions',
+              'created',
+              'updated',
+            ],
           },
           order: {
             type: 'string',
@@ -562,7 +601,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
       SearchPullRequestsSchema,
       async (params: SearchPullRequestsParams) => {
         let query = `is:pr ${params.query}`;
-        
+
         // Add repo filter if provided
         if (params.owner && params.repo) {
           query = `repo:${params.owner}/${params.repo} ${query}`;
@@ -579,7 +618,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
         return {
           total_count: data.total_count,
           incomplete_results: data.incomplete_results,
-          items: data.items.map((item) => ({
+          items: data.items.map(item => ({
             number: item.number,
             title: item.title,
             state: item.state,

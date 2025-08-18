@@ -10,7 +10,7 @@ export enum Severity {
   LOW = 'low',
   MEDIUM = 'medium',
   HIGH = 'high',
-  CRITICAL = 'critical'
+  CRITICAL = 'critical',
 }
 
 /**
@@ -26,7 +26,7 @@ export enum FindingCategory {
   BEST_PRACTICE = 'best_practice',
   MAINTAINABILITY = 'maintainability',
   TESTING = 'testing',
-  DOCUMENTATION = 'documentation'
+  DOCUMENTATION = 'documentation',
 }
 
 /**
@@ -336,16 +336,16 @@ export interface FixSuggestion {
 export interface AgentRegistry {
   /** Register an agent */
   register(agent: CodeAnalysisAgent): void;
-  
+
   /** Unregister an agent */
   unregister(name: string): void;
-  
+
   /** Get agent by name */
   get(name: string): CodeAnalysisAgent | undefined;
-  
+
   /** Get all registered agents */
   getAll(): CodeAnalysisAgent[];
-  
+
   /** Get agents by capability */
   getByCapability(capability: keyof AgentCapabilities): CodeAnalysisAgent[];
 }

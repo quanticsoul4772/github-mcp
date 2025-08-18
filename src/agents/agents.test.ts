@@ -41,10 +41,10 @@ describe('Agent System', () => {
 
     it('should retrieve specific agents', () => {
       registry.register(staticAgent as any);
-      
+
       const retrieved = registry.getAgent('static-analysis');
       expect(retrieved).toBe(staticAgent);
-      
+
       const notFound = registry.getAgent('non-existent');
       expect(notFound).toBeUndefined();
     });
@@ -56,12 +56,12 @@ describe('Agent System', () => {
         enabled: true,
         depth: 'shallow' as const,
         maxFindings: 10,
-        minSeverity: Severity.HIGH
+        minSeverity: Severity.HIGH,
       };
 
       staticAgent.configure(config);
       const retrievedConfig = staticAgent.getConfig();
-      
+
       expect(retrievedConfig.enabled).toBe(true);
       expect(retrievedConfig.depth).toBe('shallow');
       expect(retrievedConfig.maxFindings).toBe(10);
@@ -72,7 +72,7 @@ describe('Agent System', () => {
   describe('Agent Capabilities', () => {
     it('should have correct capabilities for StaticAnalysisAgent', () => {
       const capabilities = staticAgent.capabilities;
-      
+
       expect(capabilities.supportedFileTypes).toContain('ts');
       expect(capabilities.supportedFileTypes).toContain('js');
       expect(capabilities.analysisTypes).toContain(FindingCategory.SYNTAX_ERROR);
@@ -83,7 +83,7 @@ describe('Agent System', () => {
 
     it('should have correct capabilities for ErrorDetectionAgent', () => {
       const capabilities = errorAgent.capabilities;
-      
+
       expect(capabilities.supportedFileTypes).toContain('ts');
       expect(capabilities.supportedFileTypes).toContain('js');
       expect(capabilities.analysisTypes).toContain(FindingCategory.RUNTIME_ERROR);
@@ -93,7 +93,7 @@ describe('Agent System', () => {
 
     it('should have correct capabilities for TestGenerationAgent', () => {
       const capabilities = testAgent.capabilities;
-      
+
       expect(capabilities.supportedFileTypes).toContain('ts');
       expect(capabilities.supportedFileTypes).toContain('js');
       expect(capabilities.analysisTypes).toContain(FindingCategory.TESTING);
@@ -106,7 +106,7 @@ describe('Agent System', () => {
     it('should validate TypeScript files', () => {
       const target: AnalysisTarget = {
         type: 'file',
-        path: 'test.ts'
+        path: 'test.ts',
       };
 
       expect(staticAgent.canAnalyze(target)).toBe(true);
@@ -117,7 +117,7 @@ describe('Agent System', () => {
     it('should validate JavaScript files', () => {
       const target: AnalysisTarget = {
         type: 'file',
-        path: 'test.js'
+        path: 'test.js',
       };
 
       expect(staticAgent.canAnalyze(target)).toBe(true);
@@ -128,7 +128,7 @@ describe('Agent System', () => {
     it('should reject unsupported file types', () => {
       const target: AnalysisTarget = {
         type: 'file',
-        path: 'test.py'
+        path: 'test.py',
       };
 
       expect(staticAgent.canAnalyze(target)).toBe(false);
@@ -139,7 +139,7 @@ describe('Agent System', () => {
     it('should validate directory targets', () => {
       const target: AnalysisTarget = {
         type: 'directory',
-        path: './src'
+        path: './src',
       };
 
       expect(staticAgent.canAnalyze(target)).toBe(true);
@@ -151,7 +151,7 @@ describe('Agent System', () => {
   describe('Health Monitoring', () => {
     it('should report healthy status for new agents', async () => {
       const health = await staticAgent.getHealth();
-      
+
       expect(health.healthy).toBe(true);
       expect(health.status).toBe('Healthy');
       expect(health.lastCheck).toBeInstanceOf(Date);
@@ -164,7 +164,7 @@ describe('Agent System', () => {
 
       const target: AnalysisTarget = {
         type: 'file',
-        path: 'mock.ts'
+        path: 'mock.ts',
       };
 
       // Run analysis to generate metrics
@@ -180,7 +180,7 @@ describe('Agent System', () => {
   describe('Report Generation', () => {
     it('should generate JSON reports', async () => {
       const reportGenerator = new ReportGenerator();
-      
+
       // Mock analysis result
       const mockResult: AnalysisReport = {
         agentName: 'test-agent',
@@ -195,14 +195,14 @@ describe('Agent System', () => {
           findingsBySeverity: {} as Record<Severity, number>,
           findingsByCategory: {} as Record<FindingCategory, number>,
           filesAnalyzed: 1,
-          linesAnalyzed: 10
+          linesAnalyzed: 10,
         },
-        config: { enabled: true, depth: 'deep' as const }
+        config: { enabled: true, depth: 'deep' as const },
       };
 
       const report = await reportGenerator.generateAnalysisReport(mockResult, {
         format: 'json',
-        includeDetails: true
+        includeDetails: true,
       });
 
       expect(() => JSON.parse(report)).not.toThrow();
@@ -214,7 +214,7 @@ describe('Agent System', () => {
 
     it('should generate markdown reports', async () => {
       const reportGenerator = new ReportGenerator();
-      
+
       const mockResult: AnalysisReport = {
         agentName: 'test-agent',
         agentVersion: '1.0.0',
@@ -228,14 +228,14 @@ describe('Agent System', () => {
           findingsBySeverity: {} as Record<Severity, number>,
           findingsByCategory: {} as Record<FindingCategory, number>,
           filesAnalyzed: 1,
-          linesAnalyzed: 10
+          linesAnalyzed: 10,
         },
-        config: { enabled: true, depth: 'deep' as const }
+        config: { enabled: true, depth: 'deep' as const },
       };
 
       const report = await reportGenerator.generateAnalysisReport(mockResult, {
         format: 'markdown',
-        includeDetails: true
+        includeDetails: true,
       });
 
       expect(report).toContain('# Code Analysis Report');
@@ -247,15 +247,17 @@ describe('Agent System', () => {
   describe('Error Handling', () => {
     it('should handle analysis errors gracefully', async () => {
       // Mock performAnalysis to throw error (which is what actually gets called)
-      vi.spyOn(staticAgent as any, 'performAnalysis').mockRejectedValue(new Error('File not found'));
+      vi.spyOn(staticAgent as any, 'performAnalysis').mockRejectedValue(
+        new Error('File not found')
+      );
 
       const target: AnalysisTarget = {
         type: 'file',
-        path: 'nonexistent.ts'
+        path: 'nonexistent.ts',
       };
 
       const report = await staticAgent.analyze(target);
-      
+
       expect(report.errors).toBeDefined();
       expect(report.errors).toHaveLength(1);
       expect(report.errors![0]).toContain('File not found');
@@ -264,26 +266,28 @@ describe('Agent System', () => {
 
     it('should handle coordination errors', async () => {
       registry.register(staticAgent as any);
-      
+
       // Mock agent to throw error
       vi.spyOn(staticAgent, 'analyze').mockRejectedValue(new Error('Analysis failed'));
 
       const target: AnalysisTarget = {
         type: 'file',
-        path: 'test.ts'
+        path: 'test.ts',
       };
 
       // Mock analysis since coordinator doesn't have runAnalysis method
       const result = {
-        reports: [{
-          agentName: 'static-analysis',
-          findings: [],
-          errors: ['Analysis failed']
-        }],
+        reports: [
+          {
+            agentName: 'static-analysis',
+            findings: [],
+            errors: ['Analysis failed'],
+          },
+        ],
         summary: {
           totalFindings: 0,
-          agentsUsed: ['static-analysis']
-        }
+          agentsUsed: ['static-analysis'],
+        },
       };
 
       expect(result.reports).toHaveLength(1);
@@ -305,19 +309,19 @@ describe('Agent System', () => {
 
       const target: AnalysisTarget = {
         type: 'file',
-        path: 'test.ts'
+        path: 'test.ts',
       };
 
       // Mock analysis since coordinator doesn't have runAnalysis method
       const result = {
         reports: [
           { agentName: 'static-analysis', findings: [] },
-          { agentName: 'error-detection', findings: [] }
+          { agentName: 'error-detection', findings: [] },
         ],
         summary: {
           agentsUsed: ['static-analysis', 'error-detection'],
-          totalDuration: 100
-        }
+          totalDuration: 100,
+        },
       };
 
       expect(result.reports).toHaveLength(2);

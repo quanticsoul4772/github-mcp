@@ -44,7 +44,7 @@ describe('OAuth Flow Testing Infrastructure', () => {
         scopes: ['repo', 'user', 'workflow'],
         redirectUri: 'https://example.com/auth/callback',
         authorizeUrl: 'https://github.com/login/oauth/authorize',
-        tokenUrl: 'https://github.com/login/oauth/access_token'
+        tokenUrl: 'https://github.com/login/oauth/access_token',
       };
 
       expect(oauthConfig.clientId).toBeTruthy();
@@ -57,23 +57,42 @@ describe('OAuth Flow Testing Infrastructure', () => {
 
     it('should validate OAuth scope configurations', () => {
       const validScopes = [
-        'repo', 'repo:status', 'repo_deployment', 'public_repo',
-        'repo:invite', 'security_events', 'admin:repo_hook',
-        'write:repo_hook', 'read:repo_hook', 'admin:org',
-        'write:org', 'read:org', 'admin:public_key',
-        'write:public_key', 'read:public_key', 'admin:org_hook',
-        'gist', 'notifications', 'user', 'read:user',
-        'user:email', 'user:follow', 'project',
-        'read:project', 'delete_repo', 'write:discussion',
-        'read:discussion', 'workflow'
+        'repo',
+        'repo:status',
+        'repo_deployment',
+        'public_repo',
+        'repo:invite',
+        'security_events',
+        'admin:repo_hook',
+        'write:repo_hook',
+        'read:repo_hook',
+        'admin:org',
+        'write:org',
+        'read:org',
+        'admin:public_key',
+        'write:public_key',
+        'read:public_key',
+        'admin:org_hook',
+        'gist',
+        'notifications',
+        'user',
+        'read:user',
+        'user:email',
+        'user:follow',
+        'project',
+        'read:project',
+        'delete_repo',
+        'write:discussion',
+        'read:discussion',
+        'workflow',
       ];
 
       const testScopes = ['repo', 'user', 'workflow'];
-      
+
       for (const scope of testScopes) {
         expect(validScopes).toContain(scope);
       }
-      
+
       // Test invalid scope
       expect(validScopes).not.toContain('invalid_scope');
     });
@@ -85,9 +104,9 @@ describe('OAuth Flow Testing Infrastructure', () => {
           redirect_uri: config.redirectUri,
           scope: config.scopes.join(' '),
           state: state,
-          response_type: 'code'
+          response_type: 'code',
         });
-        
+
         return `${config.authorizeUrl}?${params.toString()}`;
       };
 
@@ -95,7 +114,7 @@ describe('OAuth Flow Testing Infrastructure', () => {
         clientId: 'test-client-123',
         redirectUri: 'https://example.com/callback',
         scopes: ['repo', 'user'],
-        authorizeUrl: 'https://github.com/login/oauth/authorize'
+        authorizeUrl: 'https://github.com/login/oauth/authorize',
       };
 
       const state = 'secure-random-state-' + Date.now();
@@ -117,7 +136,7 @@ describe('OAuth Flow Testing Infrastructure', () => {
         token_type: 'bearer',
         scope: 'repo,user',
         expires_in: 3600,
-        refresh_token: 'ghr_' + 'R'.repeat(36)
+        refresh_token: 'ghr_' + 'R'.repeat(36),
       };
 
       // Simulate token exchange function
@@ -132,18 +151,18 @@ describe('OAuth Flow Testing Infrastructure', () => {
       const config = {
         clientId: 'test-client',
         clientSecret: 'test-secret',
-        redirectUri: 'https://example.com/callback'
+        redirectUri: 'https://example.com/callback',
       };
 
       const result = await exchangeCodeForToken('valid-auth-code', config);
-      
+
       expect(result.access_token).toBeTruthy();
       expect(validateGitHubToken(result.access_token)).toBe(true);
       expect(result.token_type).toBe('bearer');
       expect(result.scope).toContain('repo');
       expect(result.scope).toContain('user');
       expect(result.expires_in).toBeGreaterThan(0);
-      
+
       if (result.refresh_token) {
         expect(validateGitHubToken(result.refresh_token)).toBe(true);
       }
@@ -170,7 +189,7 @@ describe('OAuth Flow Testing Infrastructure', () => {
         token_type: 'bearer',
         scope: 'repo,user',
         expires_in: 3600,
-        refresh_token: 'ghr_' + 'R'.repeat(36)
+        refresh_token: 'ghr_' + 'R'.repeat(36),
       };
 
       const refreshToken = async (refreshToken: string, config: any) => {
@@ -182,9 +201,9 @@ describe('OAuth Flow Testing Infrastructure', () => {
 
       const validRefreshToken = 'ghr_' + 'R'.repeat(36);
       const config = { clientId: 'test', clientSecret: 'secret' };
-      
+
       const result = await refreshToken(validRefreshToken, config);
-      
+
       expect(result.access_token).toBeTruthy();
       expect(validateGitHubToken(result.access_token)).toBe(true);
       expect(result.refresh_token).toBeTruthy();
@@ -199,19 +218,18 @@ describe('OAuth Flow Testing Infrastructure', () => {
         return null;
       };
 
-      await expect(refreshToken('ghr_expired_token'))
-        .rejects.toThrow('Refresh token expired');
+      await expect(refreshToken('ghr_expired_token')).rejects.toThrow('Refresh token expired');
     });
   });
 
   describe('OAuth Error Handling', () => {
     it('should handle OAuth authorization errors', () => {
       const oauthErrors = {
-        'access_denied': 'The user denied the request',
-        'unauthorized_client': 'The client is not authorized',
-        'invalid_grant': 'The provided authorization grant is invalid',
-        'invalid_scope': 'The requested scope is invalid',
-        'server_error': 'The authorization server encountered an unexpected condition'
+        access_denied: 'The user denied the request',
+        unauthorized_client: 'The client is not authorized',
+        invalid_grant: 'The provided authorization grant is invalid',
+        invalid_scope: 'The requested scope is invalid',
+        server_error: 'The authorization server encountered an unexpected condition',
       };
 
       for (const [errorCode, description] of Object.entries(oauthErrors)) {
@@ -225,8 +243,9 @@ describe('OAuth Flow Testing Infrastructure', () => {
     it('should handle insufficient scope errors', () => {
       const insufficientScopeError = {
         error: 'insufficient_scope',
-        error_description: 'The request requires higher privileges than provided by the access token',
-        scope: 'repo user:email'
+        error_description:
+          'The request requires higher privileges than provided by the access token',
+        scope: 'repo user:email',
       };
 
       const error = new AuthorizationError(
@@ -242,16 +261,13 @@ describe('OAuth Flow Testing Infrastructure', () => {
       const rateLimitError = {
         error: 'rate_limit_exceeded',
         error_description: 'API rate limit exceeded for OAuth application',
-        reset_time: Date.now() + 3600000 // 1 hour from now
+        reset_time: Date.now() + 3600000, // 1 hour from now
       };
 
-      const error = new AuthorizationError(
-        rateLimitError.error_description,
-        { 
-          errorType: 'rate_limit',
-          resetTime: rateLimitError.reset_time 
-        }
-      );
+      const error = new AuthorizationError(rateLimitError.error_description, {
+        errorType: 'rate_limit',
+        resetTime: rateLimitError.reset_time,
+      });
 
       expect(error.message).toContain('rate limit exceeded');
       expect(error.context?.errorType).toBe('rate_limit');
@@ -264,7 +280,7 @@ describe('OAuth Flow Testing Infrastructure', () => {
       const config = {
         clientId: 'public-client-id',
         clientSecret: 'super-secret-client-secret',
-        redirectUri: 'https://example.com/callback'
+        redirectUri: 'https://example.com/callback',
       };
 
       // Function to sanitize config for logging
@@ -291,9 +307,11 @@ describe('OAuth Flow Testing Infrastructure', () => {
       };
 
       const validateState = (providedState: string, expectedState: string) => {
-        return providedState === expectedState && 
-               expectedState.length > 10 && 
-               expectedState.includes('state_');
+        return (
+          providedState === expectedState &&
+          expectedState.length > 10 &&
+          expectedState.includes('state_')
+        );
       };
 
       const state = generateSecureState();
@@ -330,7 +348,9 @@ describe('OAuth Flow Testing Infrastructure', () => {
       expect(validateRedirectUri('https://localhost:3000/callback')).toBe(false);
 
       // Dev allowance
-      expect(validateRedirectUri('https://localhost:3000/callback', { allowLocalhost: true })).toBe(true);
+      expect(validateRedirectUri('https://localhost:3000/callback', { allowLocalhost: true })).toBe(
+        true
+      );
     });
 
     it('should handle token storage securely', () => {
@@ -341,20 +361,20 @@ describe('OAuth Flow Testing Infrastructure', () => {
           const encrypted = `encrypted_${token}`;
           return encrypted;
         },
-        
+
         retrieve: (key: string, encryptedToken: string) => {
           // In real implementation, would decrypt token
           if (encryptedToken.startsWith('encrypted_')) {
             return encryptedToken.substring('encrypted_'.length);
           }
           return null;
-        }
+        },
       };
 
       const testToken = 'gho_' + 'S'.repeat(36);
       const encrypted = secureTokenStorage.store('user123', testToken);
       expect(encrypted).toContain('encrypted_');
-      
+
       const decrypted = secureTokenStorage.retrieve('user123', encrypted);
       expect(decrypted).toBe(testToken);
       expect(validateGitHubToken(decrypted!)).toBe(true);
@@ -368,20 +388,18 @@ describe('OAuth Flow Testing Infrastructure', () => {
           clientId: 'test-oauth-app',
           clientSecret: 'test-secret-123',
           scopes: ['repo', 'user'],
-          webhookUrl: 'https://example.com/webhook'
+          webhookUrl: 'https://example.com/webhook',
         }),
 
         generateTestTokens: () => ({
           accessToken: 'gho_' + 'T'.repeat(36),
           refreshToken: 'ghr_' + 'T'.repeat(36),
-          expiresAt: Date.now() + 3600000 // 1 hour from now
+          expiresAt: Date.now() + 3600000, // 1 hour from now
         }),
 
         validateOAuthFlow: (authCode: string, state: string) => {
-          return authCode.length > 10 && 
-                 state.startsWith('state_') && 
-                 state.length >= 15;
-        }
+          return authCode.length > 10 && state.startsWith('state_') && state.length >= 15;
+        },
       };
 
       const mockApp = oauthTestUtils.createMockOAuthApp();
@@ -402,21 +420,21 @@ describe('OAuth Flow Testing Infrastructure', () => {
         invalidClient: () => ({
           error: 'invalid_client',
           error_description: 'Client authentication failed',
-          status: 401
+          status: 401,
         }),
 
         invalidGrant: () => ({
           error: 'invalid_grant',
           error_description: 'The provided authorization grant is invalid, expired, or revoked',
-          status: 400
+          status: 400,
         }),
 
         rateLimited: () => ({
           error: 'rate_limit_exceeded',
           error_description: 'API rate limit exceeded',
           status: 429,
-          retry_after: 3600
-        })
+          retry_after: 3600,
+        }),
       };
 
       const invalidClientError = simulateOAuthErrors.invalidClient();

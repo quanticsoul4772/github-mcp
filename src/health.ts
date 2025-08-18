@@ -52,7 +52,7 @@ export class HealthManager {
    */
   async getSystemHealth(): Promise<SystemHealth> {
     const components: ComponentHealth[] = [];
-    
+
     // Check GitHub API connectivity
     const githubHealth = await this.checkGitHubAPI();
     components.push(githubHealth);
@@ -63,7 +63,7 @@ export class HealthManager {
 
     // Determine overall status
     const overallStatus = this.determineOverallStatus(components);
-    
+
     const health: SystemHealth = {
       status: overallStatus,
       timestamp: new Date().toISOString(),
@@ -91,11 +91,12 @@ export class HealthManager {
   async getQuickHealth(): Promise<{ status: HealthStatus; timestamp: string; uptime: number }> {
     // Use cached GitHub check if recent (< 30 seconds old)
     const now = new Date();
-    const useCache = this.lastGitHubCheck && 
-      (now.getTime() - new Date(this.lastGitHubCheck.lastChecked).getTime()) < 30000;
+    const useCache =
+      this.lastGitHubCheck &&
+      now.getTime() - new Date(this.lastGitHubCheck.lastChecked).getTime() < 30000;
 
     let status: HealthStatus = 'healthy';
-    
+
     if (!useCache) {
       const githubHealth = await this.checkGitHubAPI();
       if (githubHealth.status !== 'healthy') {
@@ -117,11 +118,11 @@ export class HealthManager {
    */
   private async checkGitHubAPI(): Promise<ComponentHealth> {
     const startTime = Date.now();
-    
+
     try {
       // Simple API call to check connectivity and auth
       await this.octokit.rest.users.getAuthenticated();
-      
+
       const responseTime = Date.now() - startTime;
       const health: ComponentHealth = {
         name: 'github_api',
@@ -130,7 +131,7 @@ export class HealthManager {
         lastChecked: new Date().toISOString(),
         responseTime,
       };
-      
+
       this.lastGitHubCheck = health;
       return health;
     } catch (error) {
@@ -179,19 +180,20 @@ export class HealthManager {
     try {
       const response = await this.octokit.rest.rateLimit.get();
       const responseTime = Date.now() - startTime;
-      
+
       const core = response.data.rate;
       const remaining = core.remaining;
       const limit = core.limit;
       const resetTime = new Date(core.reset * 1000);
-      
+
       let status: HealthStatus = 'healthy';
       let message = `Rate limit: ${remaining}/${limit} remaining`;
 
       if (remaining === 0) {
         status = 'degraded';
         message = `Rate limit exhausted. Resets at ${resetTime.toISOString()}`;
-      } else if (remaining < limit * 0.1) { // Less than 10% remaining
+      } else if (remaining < limit * 0.1) {
+        // Less than 10% remaining
         status = 'degraded';
         message = `Rate limit low: ${remaining}/${limit} remaining`;
       }
@@ -212,7 +214,7 @@ export class HealthManager {
       };
     } catch (error) {
       const responseTime = Date.now() - startTime;
-      
+
       return {
         name: 'rate_limit',
         status: 'unhealthy',
@@ -231,15 +233,15 @@ export class HealthManager {
    */
   private determineOverallStatus(components: ComponentHealth[]): HealthStatus {
     const statuses = components.map(c => c.status);
-    
+
     if (statuses.some(s => s === 'unhealthy')) {
       return 'unhealthy';
     }
-    
+
     if (statuses.some(s => s === 'degraded')) {
       return 'degraded';
     }
-    
+
     return 'healthy';
   }
 
@@ -268,7 +270,8 @@ export function createHealthTools(healthManager: HealthManager): ToolConfig[] {
     {
       tool: {
         name: 'get_system_health',
-        description: 'Get comprehensive system health status including GitHub API connectivity and rate limits',
+        description:
+          'Get comprehensive system health status including GitHub API connectivity and rate limits',
         inputSchema: {
           type: 'object',
           properties: {},

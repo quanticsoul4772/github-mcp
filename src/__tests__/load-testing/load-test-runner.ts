@@ -62,7 +62,7 @@ export class LoadTestRunner extends EventEmitter {
 
     for (let i = 0; i < workersToAdd; i++) {
       const delay = i * rampUpInterval;
-      
+
       promises.push(
         this.createWorker(operation, startTime + delay, endTime, config.requestsPerSecond)
       );
@@ -114,18 +114,18 @@ export class LoadTestRunner extends EventEmitter {
     } catch (err) {
       success = false;
       error = err as Error;
-      
+
       const errorKey = error.message || 'Unknown Error';
       this.errorCounts.set(errorKey, (this.errorCounts.get(errorKey) || 0) + 1);
     }
 
     const endTime = performance.now();
-    
+
     this.metrics.push({
       startTime,
       endTime,
       success,
-      error
+      error,
     });
 
     // Emit progress events
@@ -141,16 +141,17 @@ export class LoadTestRunner extends EventEmitter {
 
     const errors = Array.from(this.errorCounts.entries()).map(([message, count]) => ({
       error: new Error(message),
-      count
+      count,
     }));
 
     return {
       totalRequests: this.metrics.length,
       successfulRequests,
       failedRequests,
-      averageResponseTime: responseTimes.length > 0 
-        ? responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length 
-        : 0,
+      averageResponseTime:
+        responseTimes.length > 0
+          ? responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length
+          : 0,
       minResponseTime: responseTimes[0] || 0,
       maxResponseTime: responseTimes[responseTimes.length - 1] || 0,
       requestsPerSecond: this.metrics.length / (totalDuration / 1000),
@@ -161,7 +162,7 @@ export class LoadTestRunner extends EventEmitter {
         p99: this.calculatePercentile(responseTimes, 0.99),
       },
       errors,
-      duration: totalDuration
+      duration: totalDuration,
     };
   }
 
@@ -189,7 +190,7 @@ export class MemoryMonitor {
     this.intervalId = setInterval(() => {
       this.samples.push({
         timestamp: Date.now(),
-        usage: process.memoryUsage()
+        usage: process.memoryUsage(),
       });
     }, intervalMs);
   }
@@ -212,7 +213,7 @@ export class MemoryMonitor {
         peakHeapUsed: 0,
         averageHeapUsed: 0,
         memoryGrowth: 0,
-        samples: 0
+        samples: 0,
       };
     }
 
@@ -225,7 +226,7 @@ export class MemoryMonitor {
       peakHeapUsed: peakHeapUsed / (1024 * 1024), // MB
       averageHeapUsed: averageHeapUsed / (1024 * 1024), // MB
       memoryGrowth: memoryGrowth / (1024 * 1024), // MB
-      samples: this.samples.length
+      samples: this.samples.length,
     };
   }
 
@@ -249,19 +250,19 @@ export class CircuitBreakerTester {
   }> {
     let circuitBreakerTrips = 0;
     let recoveryAttempts = 0;
-    
+
     const wrappedOperation = async (): Promise<T> => {
       // Simulate failures based on failure rate
       if (Math.random() < failureRate) {
         const error = new Error('Simulated failure for circuit breaker testing');
         throw error;
       }
-      
+
       return await operation();
     };
 
     const runner = new LoadTestRunner();
-    
+
     runner.on('request', ({ success, error }) => {
       if (!success && error?.message.includes('Circuit breaker is open')) {
         circuitBreakerTrips++;
@@ -276,7 +277,7 @@ export class CircuitBreakerTester {
     return {
       loadTestResult,
       circuitBreakerTrips,
-      recoveryAttempts
+      recoveryAttempts,
     };
   }
 }
@@ -291,7 +292,10 @@ export class RegressionDetector {
     this.baselineMetrics = { ...metrics };
   }
 
-  detectRegression(currentMetrics: LoadTestResult, threshold: number = 0.2): {
+  detectRegression(
+    currentMetrics: LoadTestResult,
+    threshold: number = 0.2
+  ): {
     hasRegression: boolean;
     regressions: Array<{
       metric: string;
@@ -308,7 +312,7 @@ export class RegressionDetector {
       { key: 'averageResponseTime', name: 'Average Response Time' },
       { key: 'maxResponseTime', name: 'Max Response Time' },
       { key: 'percentiles.p95', name: '95th Percentile Response Time' },
-      { key: 'percentiles.p99', name: '99th Percentile Response Time' }
+      { key: 'percentiles.p99', name: '99th Percentile Response Time' },
     ];
 
     const regressions: Array<{
@@ -321,16 +325,16 @@ export class RegressionDetector {
     for (const metric of metricsToCheck) {
       const baselineValue = this.getNestedProperty(this.baselineMetrics, metric.key);
       const currentValue = this.getNestedProperty(currentMetrics, metric.key);
-      
+
       if (baselineValue > 0) {
         const percentageIncrease = (currentValue - baselineValue) / baselineValue;
-        
+
         if (percentageIncrease > threshold) {
           regressions.push({
             metric: metric.name,
             baselineValue,
             currentValue,
-            percentageIncrease
+            percentageIncrease,
           });
         }
       }
@@ -338,7 +342,7 @@ export class RegressionDetector {
 
     return {
       hasRegression: regressions.length > 0,
-      regressions
+      regressions,
     };
   }
 

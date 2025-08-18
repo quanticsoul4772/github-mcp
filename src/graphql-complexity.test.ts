@@ -3,7 +3,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { GraphQLComplexityCalculator, estimateGraphQLPoints, isQueryComplexitySafe } from './graphql-complexity.js';
+import {
+  GraphQLComplexityCalculator,
+  estimateGraphQLPoints,
+  isQueryComplexitySafe,
+} from './graphql-complexity.js';
 
 describe('GraphQL Complexity', () => {
   describe('Basic complexity calculation', () => {
@@ -18,7 +22,7 @@ describe('GraphQL Complexity', () => {
           }
         }
       `;
-      
+
       const analysis = calculator.calculateQueryComplexity(query);
       expect(analysis.estimatedPoints).toBeGreaterThan(0);
       expect(analysis.breakdown.totalFields).toBeGreaterThan(0);
@@ -45,7 +49,7 @@ describe('GraphQL Complexity', () => {
           }
         }
       `;
-      
+
       const analysis = calculator.calculateQueryComplexity(query);
       expect(analysis.breakdown.connections).toBeGreaterThan(0);
       expect(analysis.breakdown.nestedQueries).toBeGreaterThan(0);
@@ -66,7 +70,7 @@ describe('GraphQL Complexity', () => {
           }
         }
       `;
-      
+
       const analysis = calculator.calculateQueryComplexity(query);
       // Pagination contributes to connections count
       expect(analysis.breakdown.connections).toBeGreaterThan(0);
@@ -85,7 +89,7 @@ describe('GraphQL Complexity', () => {
           }
         }
       `;
-      
+
       const nestedQuery = `
         query {
           repository(owner: "test", name: "test") {
@@ -105,12 +109,14 @@ describe('GraphQL Complexity', () => {
           }
         }
       `;
-      
+
       const simpleAnalysis = calculator.calculateQueryComplexity(simpleQuery);
       const nestedAnalysis = calculator.calculateQueryComplexity(nestedQuery);
-      
+
       expect(nestedAnalysis.estimatedPoints).toBeGreaterThan(simpleAnalysis.estimatedPoints);
-      expect(nestedAnalysis.breakdown.nestedQueries).toBeGreaterThanOrEqual(simpleAnalysis.breakdown.nestedQueries);
+      expect(nestedAnalysis.breakdown.nestedQueries).toBeGreaterThanOrEqual(
+        simpleAnalysis.breakdown.nestedQueries
+      );
     });
   });
 
@@ -124,7 +130,7 @@ describe('GraphQL Complexity', () => {
           }
         }
       `;
-      
+
       const complexQuery = `
         query {
           search(query: "language:javascript", type: REPOSITORY, first: 100) {
@@ -144,11 +150,11 @@ describe('GraphQL Complexity', () => {
           }
         }
       `;
-      
+
       const simpleResult = isQueryComplexitySafe(simpleQuery);
       expect(simpleResult.safe).toBe(true);
       expect(simpleResult.points).toBeGreaterThan(0);
-      
+
       // Complex query might still be safe, depending on thresholds
       const complexResult = isQueryComplexitySafe(complexQuery);
       expect(typeof complexResult.safe).toBe('boolean');
@@ -166,7 +172,7 @@ describe('GraphQL Complexity', () => {
           }
         }
       `;
-      
+
       const points = estimateGraphQLPoints(query);
       expect(points).toBeGreaterThan(0);
       expect(typeof points).toBe('number');
@@ -176,10 +182,10 @@ describe('GraphQL Complexity', () => {
   describe('Pattern complexity estimation', () => {
     it('should estimate pattern complexity', () => {
       const calculator = new GraphQLComplexityCalculator();
-      
+
       const basicRepo = calculator.estimatePatternComplexity('repository_basic');
       const detailedRepo = calculator.estimatePatternComplexity('repository_detailed');
-      
+
       expect(basicRepo).toBeGreaterThan(0);
       expect(detailedRepo).toBeGreaterThan(0);
       expect(detailedRepo).toBeGreaterThan(basicRepo);
@@ -208,10 +214,10 @@ describe('GraphQL Complexity', () => {
           }
         }
       `;
-      
+
       const analysis = calculator.calculateQueryComplexity(complexQuery);
       const suggestions = calculator.getOptimizationSuggestions(analysis);
-      
+
       expect(suggestions.length).toBeGreaterThan(0);
       expect(typeof suggestions[0]).toBe('string');
       expect(suggestions[0].length).toBeGreaterThan(0);

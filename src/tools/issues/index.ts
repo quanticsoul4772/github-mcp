@@ -10,7 +10,11 @@ import { createListIssuesTool } from './list-issues-tool.js';
  * 2. Tools use dependency injection to get services
  * 3. Common patterns are extracted to base classes
  */
-export function createIssueToolsModular(octokit: any, issueService: IIssueService, readOnly: boolean): ToolConfig[] {
+export function createIssueToolsModular(
+  octokit: any,
+  issueService: IIssueService,
+  readOnly: boolean
+): ToolConfig[] {
   const tools: ToolConfig[] = [];
 
   // Read-only tools (always available)

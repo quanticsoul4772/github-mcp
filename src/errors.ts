@@ -36,7 +36,7 @@ export class GitHubMCPError extends Error {
     this.correlationId = correlationId || logger.generateCorrelationId();
     this.timestamp = new Date();
     this.isRetryable = this.determineRetryability();
-    
+
     // Maintain proper stack trace
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, GitHubMCPError);
@@ -107,12 +107,7 @@ export class RateLimitError extends GitHubMCPError {
   public readonly limit?: number | undefined;
   public readonly remaining?: number | undefined;
 
-  constructor(
-    message: string,
-    resetTime?: number,
-    limit?: number,
-    remaining?: number
-  ) {
+  constructor(message: string, resetTime?: number, limit?: number, remaining?: number) {
     const context = { resetTime, limit, remaining };
     super(message, 'RATE_LIMIT', 429, context);
     this.name = 'RateLimitError';
@@ -137,12 +132,10 @@ export class NetworkError extends GitHubMCPError {
  */
 export class TimeoutError extends GitHubMCPError {
   constructor(operation: string, timeout: number) {
-    super(
-      `Operation '${operation}' timed out after ${timeout}ms`,
-      'TIMEOUT',
-      undefined,
-      { operation, timeout }
-    );
+    super(`Operation '${operation}' timed out after ${timeout}ms`, 'TIMEOUT', undefined, {
+      operation,
+      timeout,
+    });
     this.name = 'TimeoutError';
   }
 }
@@ -180,7 +173,7 @@ export async function withErrorHandling<T>(
   const operationLogger = logger.child({
     correlationId,
     operation,
-    ...context
+    ...context,
   });
 
   operationLogger.debug('Operation started', { context });
@@ -188,34 +181,38 @@ export async function withErrorHandling<T>(
   try {
     const result = await fn();
     const duration = Date.now() - startTime;
-    
+
     operationLogger.info('Operation completed successfully', {
       duration,
-      success: true
+      success: true,
     });
 
     return result;
   } catch (error) {
     const duration = Date.now() - startTime;
     const normalizedError = normalizeError(error, operation, context);
-    
+
     // Record error metrics
     metrics.recordError({
       tool: context?.tool || 'unknown',
       operation,
       errorType: normalizedError.name,
       message: normalizedError.message,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
-    operationLogger.error('Operation failed', {
-      duration,
-      success: false,
-      errorType: normalizedError.name,
-      errorCode: normalizedError.code,
-      statusCode: normalizedError.statusCode,
-      isRetryable: normalizedError.isRetryable
-    }, normalizedError);
+    operationLogger.error(
+      'Operation failed',
+      {
+        duration,
+        success: false,
+        errorType: normalizedError.name,
+        errorCode: normalizedError.code,
+        statusCode: normalizedError.statusCode,
+        isRetryable: normalizedError.isRetryable,
+      },
+      normalizedError
+    );
 
     throw normalizedError;
   }
@@ -238,7 +235,7 @@ export function normalizeError(
   if (error.status) {
     const message = error.message || 'GitHub API error';
     const statusCode = error.status;
-    
+
     // Check for specific error types
     if (statusCode === 401) {
       return new AuthenticationError(message, { ...context, operation });
@@ -283,10 +280,7 @@ export function normalizeError(
 
   // Network errors
   if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
-    return new NetworkError(
-      `Network error during ${operation}: ${error.message}`,
-      error
-    );
+    return new NetworkError(`Network error during ${operation}: ${error.message}`, error);
   }
 
   // Timeout errors
@@ -327,62 +321,63 @@ export async function withRetry<T>(
     onRetry,
   } = options;
 
-  const retryLogger = logger.child({ 
-    ...context, 
+  const retryLogger = logger.child({
+    ...context,
     operation,
-    maxAttempts 
+    maxAttempts,
   });
 
   let lastError: Error | undefined;
-  
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       if (attempt > 1) {
         retryLogger.info('Retrying operation', { attempt, maxAttempts });
       }
-      
+
       return await fn();
     } catch (error) {
       lastError = error as Error;
-      
-      const normalizedError = error instanceof GitHubMCPError 
-        ? error 
-        : normalizeError(error, operation, context);
-      
+
+      const normalizedError =
+        error instanceof GitHubMCPError ? error : normalizeError(error, operation, context);
+
       // Log retry attempt
       retryLogger.warn('Operation failed, checking retry eligibility', {
         attempt,
         maxAttempts,
         errorType: normalizedError.name,
-        isRetryable: normalizedError.isRetryable
+        isRetryable: normalizedError.isRetryable,
       });
-      
+
       // Don't retry if not retryable or last attempt
       if (!normalizedError.isRetryable || attempt === maxAttempts) {
         retryLogger.error('Operation failed permanently', {
           attempt,
           maxAttempts,
-          reason: !normalizedError.isRetryable ? 'not_retryable' : 'max_attempts_reached'
+          reason: !normalizedError.isRetryable ? 'not_retryable' : 'max_attempts_reached',
         });
-        
+
         // Record retry failure metric
-        metrics.incrementCounter(`retry_failures_total{operation="${operation}",reason="${!normalizedError.isRetryable ? 'not_retryable' : 'max_attempts'}"}`); 
-        
+        metrics.incrementCounter(
+          `retry_failures_total{operation="${operation}",reason="${!normalizedError.isRetryable ? 'not_retryable' : 'max_attempts'}"}`
+        );
+
         throw normalizedError;
       }
 
       // Calculate backoff with exponential increase
       const delay = Math.min(backoffMs * Math.pow(2, attempt - 1), maxBackoffMs);
-      
+
       retryLogger.info('Will retry operation', {
         attempt,
         nextAttempt: attempt + 1,
-        delayMs: delay
+        delayMs: delay,
       });
-      
+
       // Record retry attempt metric
       metrics.incrementCounter(`retry_attempts_total{operation="${operation}"}`);
-      
+
       // Call retry callback if provided
       if (onRetry) {
         onRetry(attempt, normalizedError);

@@ -32,13 +32,16 @@ class MemoryProfiler {
     if (global.gc) {
       global.gc();
     }
-    
+
     const memory = process.memoryUsage();
     this.snapshots.push({ label, memory });
     return memory;
   }
 
-  getMemoryIncrease(fromLabel: string, toLabel: string): {
+  getMemoryIncrease(
+    fromLabel: string,
+    toLabel: string
+  ): {
     rss: number;
     heapTotal: number;
     heapUsed: number;
@@ -47,7 +50,7 @@ class MemoryProfiler {
   } {
     const fromSnapshot = this.snapshots.find(s => s.label === fromLabel);
     const toSnapshot = this.snapshots.find(s => s.label === toLabel);
-    
+
     if (!fromSnapshot || !toSnapshot) {
       throw new Error('Snapshots not found');
     }
@@ -57,7 +60,8 @@ class MemoryProfiler {
       heapTotal: (toSnapshot.memory.heapTotal - fromSnapshot.memory.heapTotal) / (1024 * 1024),
       heapUsed: (toSnapshot.memory.heapUsed - fromSnapshot.memory.heapUsed) / (1024 * 1024),
       external: (toSnapshot.memory.external - fromSnapshot.memory.external) / (1024 * 1024),
-      arrayBuffers: (toSnapshot.memory.arrayBuffers - fromSnapshot.memory.arrayBuffers) / (1024 * 1024),
+      arrayBuffers:
+        (toSnapshot.memory.arrayBuffers - fromSnapshot.memory.arrayBuffers) / (1024 * 1024),
     };
   }
 
@@ -79,11 +83,11 @@ describe('Memory Profiling Tests', () => {
     issueTools = createIssueTools(mockOctokit, false);
     repoTools = createRepositoryTools(mockOctokit, false);
     prTools = createPullRequestTools(mockOctokit, false);
-    
+
     const telemetry = new ConsoleTelemetry(false);
     const retryManager = new RetryManager();
     reliabilityManager = new ReliabilityManager(retryManager, telemetry);
-    
+
     profiler = new MemoryProfiler();
     profiler.takeSnapshot('start');
   });
@@ -169,15 +173,17 @@ describe('Memory Profiling Tests', () => {
   describe('Large Data Handling', () => {
     it('should handle large responses without excessive memory usage', async () => {
       const listIssues = issueTools.find(tool => tool.tool.name === 'list_issues');
-      
+
       // Generate large response data
-      const largeIssueList = Array(5000).fill(null).map((_, index) => ({
-        ...testFixtures.issues.open,
-        id: index,
-        number: index,
-        title: `Issue ${index}`,
-        body: 'Large issue body content '.repeat(100), // ~2KB per issue
-      }));
+      const largeIssueList = Array(5000)
+        .fill(null)
+        .map((_, index) => ({
+          ...testFixtures.issues.open,
+          id: index,
+          number: index,
+          title: `Issue ${index}`,
+          body: 'Large issue body content '.repeat(100), // ~2KB per issue
+        }));
 
       mockOctokit.issues.listForRepo.mockResolvedValue({ data: largeIssueList });
 
@@ -201,18 +207,20 @@ describe('Memory Profiling Tests', () => {
 
     it('should efficiently process paginated results', async () => {
       const listIssues = issueTools.find(tool => tool.tool.name === 'list_issues');
-      
+
       // Simulate paginated responses
       const pageSize = 100;
       const totalPages = 50;
-      
+
       let currentPage = 1;
       mockOctokit.issues.listForRepo.mockImplementation(() => {
-        const pageData = Array(pageSize).fill(null).map((_, index) => ({
-          ...testFixtures.issues.open,
-          id: (currentPage - 1) * pageSize + index,
-          number: (currentPage - 1) * pageSize + index,
-        }));
+        const pageData = Array(pageSize)
+          .fill(null)
+          .map((_, index) => ({
+            ...testFixtures.issues.open,
+            id: (currentPage - 1) * pageSize + index,
+            number: (currentPage - 1) * pageSize + index,
+          }));
         currentPage = (currentPage % totalPages) + 1;
         return Promise.resolve({ data: pageData });
       });
@@ -239,7 +247,7 @@ describe('Memory Profiling Tests', () => {
   describe('Error Handling Memory Impact', () => {
     it('should not leak memory when handling errors', async () => {
       const listIssues = issueTools.find(tool => tool.tool.name === 'list_issues');
-      
+
       // Mock to throw errors
       mockOctokit.issues.listForRepo.mockRejectedValue(new Error('API Error'));
 
@@ -268,7 +276,7 @@ describe('Memory Profiling Tests', () => {
 
     it('should handle retry scenarios without memory leaks', async () => {
       const listIssues = issueTools.find(tool => tool.tool.name === 'list_issues');
-      
+
       let attemptCount = 0;
       mockOctokit.issues.listForRepo.mockImplementation(() => {
         attemptCount++;
@@ -285,9 +293,8 @@ describe('Memory Profiling Tests', () => {
       // Use reliability manager for retries
       for (let i = 0; i < 100; i++) {
         try {
-          await reliabilityManager.executeWithReliability(
-            'memory_test_operation',
-            () => listIssues.handler({
+          await reliabilityManager.executeWithReliability('memory_test_operation', () =>
+            listIssues.handler({
               owner: 'test-owner',
               repo: 'test-repo',
               state: 'all',
@@ -308,17 +315,19 @@ describe('Memory Profiling Tests', () => {
   describe('Garbage Collection Efficiency', () => {
     it('should allow effective garbage collection', async () => {
       const listIssues = issueTools.find(tool => tool.tool.name === 'list_issues');
-      
+
       // Generate varied responses to create garbage
       let requestCount = 0;
       mockOctokit.issues.listForRepo.mockImplementation(() => {
         requestCount++;
-        return Promise.resolve({ 
-          data: Array(100).fill(null).map((_, i) => ({
-            ...testFixtures.issues.open,
-            id: requestCount * 100 + i,
-            body: `Request ${requestCount} Issue ${i} - ${new Array(1000).fill('x').join('')}`, // Large strings
-          }))
+        return Promise.resolve({
+          data: Array(100)
+            .fill(null)
+            .map((_, i) => ({
+              ...testFixtures.issues.open,
+              id: requestCount * 100 + i,
+              body: `Request ${requestCount} Issue ${i} - ${new Array(1000).fill('x').join('')}`, // Large strings
+            })),
         });
       });
 
@@ -344,9 +353,10 @@ describe('Memory Profiling Tests', () => {
       const memoryAfterGC = process.memoryUsage();
 
       // Calculate GC efficiency
-      const gcEfficiency = memoryBeforeGC.heapUsed > 0 
-        ? (memoryBeforeGC.heapUsed - memoryAfterGC.heapUsed) / memoryBeforeGC.heapUsed 
-        : 0;
+      const gcEfficiency =
+        memoryBeforeGC.heapUsed > 0
+          ? (memoryBeforeGC.heapUsed - memoryAfterGC.heapUsed) / memoryBeforeGC.heapUsed
+          : 0;
 
       if (global.gc) {
         expect(gcEfficiency).toBeGreaterThan(0.1); // Some garbage should be collected
@@ -364,12 +374,14 @@ describe('Memory Profiling Tests', () => {
       // Rapidly allocate and deallocate through operations
       for (let cycle = 0; cycle < 10; cycle++) {
         // Allocation phase
-        const largeData = Array(1000).fill(null).map((_, i) => ({
-          ...testFixtures.issues.open,
-          id: cycle * 1000 + i,
-          body: new Array(500).fill('data').join(''), // Large data
-        }));
-        
+        const largeData = Array(1000)
+          .fill(null)
+          .map((_, i) => ({
+            ...testFixtures.issues.open,
+            id: cycle * 1000 + i,
+            body: new Array(500).fill('data').join(''), // Large data
+          }));
+
         mockOctokit.issues.listForRepo.mockResolvedValue({ data: largeData });
 
         // Process data
@@ -405,20 +417,22 @@ describe('Memory Profiling Tests', () => {
       profiler.takeSnapshot('before_concurrent');
 
       // Run concurrent operations
-      const concurrentPromises = Array(100).fill(null).map(async (_, i) => {
-        if (i % 2 === 0) {
-          return await listIssues.handler({
-            owner: 'test-owner',
-            repo: 'test-repo',
-            state: 'all',
-          });
-        } else {
-          return await getRepo.handler({
-            owner: 'test-owner',
-            repo: 'test-repo',
-          });
-        }
-      });
+      const concurrentPromises = Array(100)
+        .fill(null)
+        .map(async (_, i) => {
+          if (i % 2 === 0) {
+            return await listIssues.handler({
+              owner: 'test-owner',
+              repo: 'test-repo',
+              state: 'all',
+            });
+          } else {
+            return await getRepo.handler({
+              owner: 'test-owner',
+              repo: 'test-repo',
+            });
+          }
+        });
 
       await Promise.all(concurrentPromises);
 
@@ -460,7 +474,7 @@ describe('Memory Profiling Tests', () => {
       if (memoryReadings.length >= 3) {
         const firstThird = memoryReadings.slice(0, Math.floor(memoryReadings.length / 3));
         const lastThird = memoryReadings.slice(-Math.floor(memoryReadings.length / 3));
-        
+
         const avgFirst = firstThird.reduce((a, b) => a + b, 0) / firstThird.length;
         const avgLast = lastThird.reduce((a, b) => a + b, 0) / lastThird.length;
         const memoryGrowth = (avgLast - avgFirst) / (1024 * 1024);

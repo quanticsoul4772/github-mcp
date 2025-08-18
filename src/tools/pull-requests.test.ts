@@ -78,7 +78,6 @@ describe('Pull Request Tools', () => {
         per_page: undefined,
       });
     });
-
   });
 
   describe('get_pull_request', () => {
@@ -114,7 +113,6 @@ describe('Pull Request Tools', () => {
       expect(result.state).toBe('open');
       expect(result.head.ref).toBe('feature-branch');
     });
-
   });
 
   describe('create_pull_request', () => {
@@ -187,7 +185,6 @@ describe('Pull Request Tools', () => {
         maintainer_can_modify: undefined,
       });
     });
-
   });
 
   describe('update_pull_request', () => {
@@ -203,7 +200,11 @@ describe('Pull Request Tools', () => {
     });
 
     it('should update pull request successfully', async () => {
-      const updatedPR = { ...testFixtures.pullRequests.open, title: 'Updated Title', state: 'closed' };
+      const updatedPR = {
+        ...testFixtures.pullRequests.open,
+        title: 'Updated Title',
+        state: 'closed',
+      };
       mockOctokit.pulls.update.mockResolvedValue({ data: updatedPR });
 
       const result = await updatePR.handler({
@@ -414,7 +415,7 @@ describe('Pull Request Tools', () => {
         event: 'COMMENT',
         commit_id: undefined,
       });
-      
+
       expect(result.id).toBe(123);
       expect(result.state).toBe('COMMENTED');
     });
@@ -519,7 +520,9 @@ describe('Pull Request Tools', () => {
     let createReviewComment: any;
 
     beforeEach(() => {
-      createReviewComment = tools.find(tool => tool.tool.name === 'create_pull_request_review_comment');
+      createReviewComment = tools.find(
+        tool => tool.tool.name === 'create_pull_request_review_comment'
+      );
     });
 
     it('should be registered when not in read-only mode', () => {

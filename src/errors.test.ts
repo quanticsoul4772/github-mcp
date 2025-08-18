@@ -21,7 +21,7 @@ describe('Error Classes', () => {
   describe('GitHubMCPError', () => {
     it('should create error with basic properties', () => {
       const error = new GitHubMCPError('Test error', 'TEST_CODE', 400);
-      
+
       expect(error.message).toBe('Test error');
       expect(error.code).toBe('TEST_CODE');
       expect(error.statusCode).toBe(400);
@@ -41,12 +41,7 @@ describe('Error Classes', () => {
     });
 
     it('should serialize to JSON correctly', () => {
-      const error = new GitHubMCPError(
-        'Test error',
-        'TEST_CODE',
-        400,
-        { resource: 'test' }
-      );
+      const error = new GitHubMCPError('Test error', 'TEST_CODE', 400, { resource: 'test' });
 
       const json = error.toJSON();
       expect(json).toMatchObject({
@@ -65,7 +60,7 @@ describe('Error Classes', () => {
   describe('AuthenticationError', () => {
     it('should create authentication error correctly', () => {
       const error = new AuthenticationError('Invalid token');
-      
+
       expect(error.name).toBe('AuthenticationError');
       expect(error.message).toBe('Invalid token');
       expect(error.code).toBe('AUTHENTICATION_ERROR');
@@ -77,7 +72,7 @@ describe('Error Classes', () => {
   describe('AuthorizationError', () => {
     it('should create authorization error correctly', () => {
       const error = new AuthorizationError('Insufficient permissions');
-      
+
       expect(error.name).toBe('AuthorizationError');
       expect(error.message).toBe('Insufficient permissions');
       expect(error.code).toBe('AUTHORIZATION_ERROR');
@@ -89,7 +84,7 @@ describe('Error Classes', () => {
   describe('NotFoundError', () => {
     it('should create not found error correctly', () => {
       const error = new NotFoundError('Repository');
-      
+
       expect(error.name).toBe('NotFoundError');
       expect(error.message).toBe('Resource not found: Repository');
       expect(error.code).toBe('NOT_FOUND');
@@ -102,7 +97,7 @@ describe('Error Classes', () => {
     it('should create rate limit error correctly', () => {
       const resetTime = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
       const error = new RateLimitError('Rate limited', resetTime, 5000, 0);
-      
+
       expect(error.name).toBe('RateLimitError');
       expect(error.message).toBe('Rate limited');
       expect(error.code).toBe('RATE_LIMIT');
@@ -115,7 +110,7 @@ describe('Error Classes', () => {
 
     it('should handle missing rate limit data', () => {
       const error = new RateLimitError('Rate limited');
-      
+
       expect(error.resetTime).toBeUndefined();
       expect(error.limit).toBeUndefined();
       expect(error.remaining).toBeUndefined();
@@ -126,7 +121,7 @@ describe('Error Classes', () => {
     it('should create network error correctly', () => {
       const originalError = new Error('Connection refused');
       const error = new NetworkError('Network failed', originalError);
-      
+
       expect(error.name).toBe('NetworkError');
       expect(error.message).toBe('Network failed');
       expect(error.code).toBe('NETWORK_ERROR');
@@ -138,9 +133,9 @@ describe('Error Classes', () => {
   describe('TimeoutError', () => {
     it('should create timeout error correctly', () => {
       const error = new TimeoutError('API call', 30000);
-      
+
       expect(error.name).toBe('TimeoutError');
-      expect(error.message).toBe('Operation \'API call\' timed out after 30000ms');
+      expect(error.message).toBe("Operation 'API call' timed out after 30000ms");
       expect(error.code).toBe('TIMEOUT');
       expect(error.isRetryable).toBe(true);
       expect(error.context).toEqual({ operation: 'API call', timeout: 30000 });
@@ -150,7 +145,7 @@ describe('Error Classes', () => {
   describe('ConfigurationError', () => {
     it('should create configuration error correctly', () => {
       const error = new ConfigurationError('Missing token', ['GITHUB_TOKEN']);
-      
+
       expect(error.name).toBe('ConfigurationError');
       expect(error.message).toBe('Missing token');
       expect(error.code).toBe('CONFIGURATION_ERROR');
@@ -165,7 +160,7 @@ describe('Error Handling Utilities', () => {
     it('should execute function successfully', async () => {
       const fn = vi.fn().mockResolvedValue('success');
       const result = await withErrorHandling('test-operation', fn);
-      
+
       expect(result).toBe('success');
       expect(fn).toHaveBeenCalledTimes(1);
     });
@@ -173,7 +168,7 @@ describe('Error Handling Utilities', () => {
     it('should normalize errors', async () => {
       const originalError = new Error('Test error');
       const fn = vi.fn().mockRejectedValue(originalError);
-      
+
       await expect(withErrorHandling('test-operation', fn)).rejects.toThrow(GitHubMCPError);
     });
   });
@@ -182,7 +177,7 @@ describe('Error Handling Utilities', () => {
     it('should return GitHubMCPError as-is', () => {
       const original = new GitHubMCPError('Test', 'TEST_CODE');
       const normalized = normalizeError(original);
-      
+
       expect(normalized).toBe(original);
     });
 
@@ -191,9 +186,9 @@ describe('Error Handling Utilities', () => {
         status: 401,
         message: 'Bad credentials',
       };
-      
+
       const normalized = normalizeError(apiError, 'get-user');
-      
+
       expect(normalized).toBeInstanceOf(AuthenticationError);
       expect(normalized.message).toBe('Bad credentials');
       expect(normalized.context).toEqual({ operation: 'get-user' });
@@ -204,9 +199,9 @@ describe('Error Handling Utilities', () => {
         status: 403,
         message: 'Forbidden',
       };
-      
+
       const normalized = normalizeError(apiError);
-      
+
       expect(normalized).toBeInstanceOf(AuthorizationError);
       expect(normalized.message).toBe('Forbidden');
     });
@@ -223,9 +218,9 @@ describe('Error Handling Utilities', () => {
           },
         },
       };
-      
+
       const normalized = normalizeError(apiError);
-      
+
       expect(normalized).toBeInstanceOf(RateLimitError);
       expect(normalized.message).toBe('GitHub API rate limit exceeded');
     });
@@ -235,9 +230,9 @@ describe('Error Handling Utilities', () => {
         status: 404,
         message: 'Not Found',
       };
-      
+
       const normalized = normalizeError(apiError, 'get-repo');
-      
+
       expect(normalized).toBeInstanceOf(NotFoundError);
       expect(normalized.message).toBe('Resource not found: get-repo');
     });
@@ -254,9 +249,9 @@ describe('Error Handling Utilities', () => {
           },
         },
       };
-      
+
       const normalized = normalizeError(apiError) as RateLimitError;
-      
+
       expect(normalized).toBeInstanceOf(RateLimitError);
       expect(normalized.limit).toBe(5000);
       expect(normalized.remaining).toBe(0);
@@ -267,9 +262,9 @@ describe('Error Handling Utilities', () => {
         code: 'ECONNREFUSED',
         message: 'Connection refused',
       };
-      
+
       const normalized = normalizeError(networkError, 'api-call');
-      
+
       expect(normalized).toBeInstanceOf(NetworkError);
       expect(normalized.message).toContain('Network error during api-call');
     });
@@ -279,18 +274,18 @@ describe('Error Handling Utilities', () => {
         name: 'TimeoutError',
         message: 'Request timed out',
       };
-      
+
       const normalized = normalizeError(timeoutError, 'api-request');
-      
+
       expect(normalized).toBeInstanceOf(TimeoutError);
       expect(normalized.message).toContain('api-request');
     });
 
     it('should normalize generic errors', () => {
       const genericError = new Error('Unknown error');
-      
+
       const normalized = normalizeError(genericError, 'operation');
-      
+
       expect(normalized).toBeInstanceOf(GitHubMCPError);
       expect(normalized.code).toBe('UNKNOWN_ERROR');
       expect(normalized.originalError).toBe(genericError);
@@ -301,20 +296,21 @@ describe('Error Handling Utilities', () => {
     it('should succeed on first attempt', async () => {
       const fn = vi.fn().mockResolvedValue('success');
       const result = await withRetry(fn);
-      
+
       expect(result).toBe('success');
       expect(fn).toHaveBeenCalledTimes(1);
     });
 
     it('should retry on retryable errors', async () => {
-      const fn = vi.fn()
+      const fn = vi
+        .fn()
         .mockRejectedValueOnce(new RateLimitError('Rate limited'))
         .mockRejectedValueOnce(new NetworkError('Network error'))
         .mockResolvedValue('success');
-      
+
       const onRetry = vi.fn();
       const result = await withRetry(fn, { maxAttempts: 3, onRetry });
-      
+
       expect(result).toBe('success');
       expect(fn).toHaveBeenCalledTimes(3);
       expect(onRetry).toHaveBeenCalledTimes(2);
@@ -322,7 +318,7 @@ describe('Error Handling Utilities', () => {
 
     it('should not retry on non-retryable errors', async () => {
       const fn = vi.fn().mockRejectedValue(new NotFoundError('Not found'));
-      
+
       await expect(withRetry(fn)).rejects.toThrow(NotFoundError);
       expect(fn).toHaveBeenCalledTimes(1);
     });
@@ -330,20 +326,21 @@ describe('Error Handling Utilities', () => {
     it('should give up after max attempts', async () => {
       const error = new RateLimitError('Rate limited');
       const fn = vi.fn().mockRejectedValue(error);
-      
+
       await expect(withRetry(fn, { maxAttempts: 2 })).rejects.toThrow(RateLimitError);
       expect(fn).toHaveBeenCalledTimes(2);
     });
 
     it('should apply exponential backoff', async () => {
-      const fn = vi.fn()
+      const fn = vi
+        .fn()
         .mockRejectedValueOnce(new NetworkError('Network error'))
         .mockResolvedValue('success');
-      
+
       const startTime = Date.now();
       await withRetry(fn, { maxAttempts: 2, backoffMs: 100 });
       const duration = Date.now() - startTime;
-      
+
       expect(duration).toBeGreaterThanOrEqual(100);
       expect(fn).toHaveBeenCalledTimes(2);
     });
@@ -351,15 +348,10 @@ describe('Error Handling Utilities', () => {
 
   describe('formatErrorResponse', () => {
     it('should format GitHubMCPError correctly', () => {
-      const error = new GitHubMCPError(
-        'Test error',
-        'TEST_CODE',
-        400,
-        { resource: 'test' }
-      );
-      
+      const error = new GitHubMCPError('Test error', 'TEST_CODE', 400, { resource: 'test' });
+
       const formatted = formatErrorResponse(error);
-      
+
       expect(formatted).toEqual({
         error: {
           code: 'TEST_CODE',
@@ -375,9 +367,9 @@ describe('Error Handling Utilities', () => {
 
     it('should format generic error correctly', () => {
       const error = new Error('Generic error');
-      
+
       const formatted = formatErrorResponse(error);
-      
+
       expect(formatted).toEqual({
         error: {
           code: 'UNKNOWN_ERROR',
@@ -388,9 +380,9 @@ describe('Error Handling Utilities', () => {
 
     it('should handle error without message', () => {
       const error = {} as Error;
-      
+
       const formatted = formatErrorResponse(error);
-      
+
       expect(formatted).toEqual({
         error: {
           code: 'UNKNOWN_ERROR',

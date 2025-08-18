@@ -7,16 +7,38 @@ export interface IGitHubClient {
   // Repository operations
   getRepository(owner: string, repo: string): Promise<any>;
   getFileContents(owner: string, repo: string, path: string, ref?: string): Promise<any>;
-  createFile(owner: string, repo: string, path: string, content: string, message: string, branch?: string): Promise<any>;
-  updateFile(owner: string, repo: string, path: string, content: string, message: string, sha: string, branch?: string): Promise<any>;
-  deleteFile(owner: string, repo: string, path: string, message: string, sha: string, branch?: string): Promise<any>;
-  
+  createFile(
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    branch?: string
+  ): Promise<any>;
+  updateFile(
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    sha: string,
+    branch?: string
+  ): Promise<any>;
+  deleteFile(
+    owner: string,
+    repo: string,
+    path: string,
+    message: string,
+    sha: string,
+    branch?: string
+  ): Promise<any>;
+
   // Issue operations
   listIssues(owner: string, repo: string, options?: any): Promise<any>;
   getIssue(owner: string, repo: string, issueNumber: number): Promise<any>;
   createIssue(owner: string, repo: string, data: any): Promise<any>;
   updateIssue(owner: string, repo: string, issueNumber: number, data: any): Promise<any>;
-  
+
   // Pull request operations
   listPullRequests(owner: string, repo: string, options?: any): Promise<any>;
   getPullRequest(owner: string, repo: string, pullNumber: number): Promise<any>;
@@ -30,9 +52,31 @@ export interface IGitHubClient {
 export interface IRepositoryRepository {
   get(owner: string, repo: string): Promise<any>;
   getFileContents(owner: string, repo: string, path: string, ref?: string): Promise<any>;
-  createFile(owner: string, repo: string, path: string, content: string, message: string, branch?: string): Promise<any>;
-  updateFile(owner: string, repo: string, path: string, content: string, message: string, sha: string, branch?: string): Promise<any>;
-  deleteFile(owner: string, repo: string, path: string, message: string, sha: string, branch?: string): Promise<any>;
+  createFile(
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    branch?: string
+  ): Promise<any>;
+  updateFile(
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    sha: string,
+    branch?: string
+  ): Promise<any>;
+  deleteFile(
+    owner: string,
+    repo: string,
+    path: string,
+    message: string,
+    sha: string,
+    branch?: string
+  ): Promise<any>;
 }
 
 export interface IIssueRepository {
@@ -55,9 +99,31 @@ export interface IPullRequestRepository {
 export interface IRepositoryService {
   getRepository(owner: string, repo: string): Promise<any>;
   getFileContents(owner: string, repo: string, path: string, ref?: string): Promise<any>;
-  createFile(owner: string, repo: string, path: string, content: string, message: string, branch?: string): Promise<any>;
-  updateFile(owner: string, repo: string, path: string, content: string, message: string, sha: string, branch?: string): Promise<any>;
-  deleteFile(owner: string, repo: string, path: string, message: string, sha: string, branch?: string): Promise<any>;
+  createFile(
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    branch?: string
+  ): Promise<any>;
+  updateFile(
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    sha: string,
+    branch?: string
+  ): Promise<any>;
+  deleteFile(
+    owner: string,
+    repo: string,
+    path: string,
+    message: string,
+    sha: string,
+    branch?: string
+  ): Promise<any>;
 }
 
 export interface IIssueService {

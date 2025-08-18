@@ -1,6 +1,6 @@
 /**
  * Type Safety Utilities for Tool Handlers
- * 
+ *
  * This module provides runtime validation and type safety for tool handlers,
  * converting JSON schemas to Zod schemas for proper validation.
  */
@@ -22,7 +22,7 @@ export class ParameterValidationError extends Error {
 
 /**
  * Creates a type-safe handler wrapper that validates parameters at runtime
- * 
+ *
  * @param schema - Zod schema for parameter validation
  * @param handler - The actual handler function
  * @param toolName - Name of the tool for error reporting
@@ -37,7 +37,7 @@ export function createTypeSafeHandler<T>(
     try {
       // Validate and parse the parameters
       const validatedParams = schema.parse(args);
-      
+
       // Call the handler with validated, typed parameters
       return await handler(validatedParams);
     } catch (error) {
@@ -90,9 +90,7 @@ export function jsonSchemaToZod(jsonSchema: any): z.ZodSchema<any> {
       return z.boolean();
 
     case 'array':
-      let arraySchema = z.array(
-        jsonSchema.items ? jsonSchemaToZod(jsonSchema.items) : z.unknown()
-      );
+      let arraySchema = z.array(jsonSchema.items ? jsonSchemaToZod(jsonSchema.items) : z.unknown());
       if (jsonSchema.minItems !== undefined) {
         arraySchema = arraySchema.min(jsonSchema.minItems);
       }
@@ -118,11 +116,11 @@ export function jsonSchemaToZod(jsonSchema: any): z.ZodSchema<any> {
         // Zod objects are strict by default, so we need to make optional fields optional
         const requiredFields = new Set(jsonSchema.required);
         const newShape: Record<string, z.ZodSchema<any>> = {};
-        
+
         for (const [key, schema] of Object.entries(shape)) {
           newShape[key] = requiredFields.has(key) ? schema : schema.optional();
         }
-        
+
         objectSchema = z.object(newShape);
       } else {
         // If no required fields specified, make all optional
@@ -221,7 +219,7 @@ export function combineSchemas<T extends Record<string, z.ZodSchema<any>>>(
 ): z.ZodSchema<any> {
   // Extract all properties from the schemas and combine them into a single object schema
   const combinedShape: Record<string, z.ZodSchema<any>> = {};
-  
+
   for (const schema of Object.values(schemas)) {
     if (schema instanceof z.ZodObject) {
       // Access the shape property correctly
@@ -229,7 +227,7 @@ export function combineSchemas<T extends Record<string, z.ZodSchema<any>>>(
       Object.assign(combinedShape, shape);
     }
   }
-  
+
   return z.object(combinedShape);
 }
 
@@ -441,7 +439,11 @@ export class TypeSafeHandlerFactory {
   static createListUserRepositoriesHandler(
     handler: (params: z.infer<typeof GitHubSchemas.listUserRepositories>) => Promise<any>
   ) {
-    return createTypeSafeHandler(GitHubSchemas.listUserRepositories, handler, 'list_user_repositories');
+    return createTypeSafeHandler(
+      GitHubSchemas.listUserRepositories,
+      handler,
+      'list_user_repositories'
+    );
   }
 
   /**

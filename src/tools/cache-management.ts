@@ -28,7 +28,7 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
     handler: async (args: unknown) => {
       const params = args as { includeDetails?: boolean };
       const metrics = optimizedClient.getMetrics();
-      
+
       const result: any = {
         timestamp: new Date().toISOString(),
         rest_cache: metrics.cache,
@@ -61,7 +61,7 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
     },
     handler: async () => {
       const stats = optimizedClient.getGraphQLCacheStats();
-      
+
       if (!stats) {
         return {
           message: 'GraphQL caching is not enabled or no statistics available',
@@ -102,18 +102,18 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
       const params = args as { cacheType?: string; pattern?: string };
       const cacheType = params.cacheType || 'all';
       let clearedEntries = 0;
-      
+
       if (params.pattern) {
         const pattern = new RegExp(params.pattern, 'i');
-        
+
         if (cacheType === 'all' || cacheType === 'rest') {
           clearedEntries += optimizedClient.invalidateCache(pattern);
         }
-        
+
         if (cacheType === 'all' || cacheType === 'graphql') {
           clearedEntries += optimizedClient.invalidateGraphQLCache(pattern);
         }
-        
+
         return {
           message: `Cleared ${clearedEntries} cache entries matching pattern: ${params.pattern}`,
           cacheType,
@@ -142,7 +142,7 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
           };
         }
       }
-      
+
       // Default return if no conditions match
       return {
         message: 'No cache cleared',
@@ -164,67 +164,79 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
     handler: async () => {
       const metrics = optimizedClient.getMetrics();
       const graphqlStats = optimizedClient.getGraphQLCacheStats();
-      
+
       const recommendations: string[] = [];
       let overallHealth: 'healthy' | 'warning' | 'critical' = 'healthy';
-      
+
       // Analyze REST cache
       if (metrics.cache) {
-        const restHitRate = metrics.cache.hits + metrics.cache.misses > 0 
-          ? (metrics.cache.hits / (metrics.cache.hits + metrics.cache.misses)) * 100 
-          : 0;
-        
+        const restHitRate =
+          metrics.cache.hits + metrics.cache.misses > 0
+            ? (metrics.cache.hits / (metrics.cache.hits + metrics.cache.misses)) * 100
+            : 0;
+
         if (restHitRate < 30) {
           overallHealth = 'warning';
-          recommendations.push('REST cache hit rate is low (<30%). Consider adjusting TTL values or cache size.');
+          recommendations.push(
+            'REST cache hit rate is low (<30%). Consider adjusting TTL values or cache size.'
+          );
         }
-        
+
         if (metrics.cache.evictions > metrics.cache.hits * 0.1) {
           overallHealth = 'warning';
           recommendations.push('High eviction rate detected. Consider increasing cache size.');
         }
       }
-      
+
       // Analyze GraphQL cache
       if (graphqlStats && graphqlStats.general) {
         const graphqlHitRate = graphqlStats.cacheEfficiency.overall;
-        
+
         if (graphqlHitRate < 40) {
           overallHealth = 'warning';
-          recommendations.push('GraphQL cache hit rate is low (<40%). Review query patterns and TTL configuration.');
+          recommendations.push(
+            'GraphQL cache hit rate is low (<40%). Review query patterns and TTL configuration.'
+          );
         }
-        
+
         // Check for queries with very low hit rates
         const lowHitRateQueries = Object.entries(graphqlStats.cacheEfficiency.byQuery)
           .filter(([, hitRate]) => (hitRate as number) < 20)
           .map(([query]) => query);
-        
+
         if (lowHitRateQueries.length > 0) {
           recommendations.push(`Queries with low hit rates: ${lowHitRateQueries.join(', ')}`);
         }
       }
-      
+
       if (recommendations.length === 0) {
         recommendations.push('Cache performance looks good! No immediate optimizations needed.');
       }
-      
+
       return {
         timestamp: new Date().toISOString(),
         overallHealth,
         recommendations,
         summary: {
-          restCache: metrics.cache ? {
-            hitRate: metrics.cache.hits + metrics.cache.misses > 0 
-              ? Math.round((metrics.cache.hits / (metrics.cache.hits + metrics.cache.misses)) * 100) 
-              : 0,
-            size: metrics.cache.size,
-            evictions: metrics.cache.evictions,
-          } : null,
-          graphqlCache: graphqlStats ? {
-            hitRate: Math.round(graphqlStats.cacheEfficiency.overall),
-            size: graphqlStats.memorySummary.entries,
-            estimatedMemory: graphqlStats.memorySummary.estimatedSize,
-          } : null,
+          restCache: metrics.cache
+            ? {
+                hitRate:
+                  metrics.cache.hits + metrics.cache.misses > 0
+                    ? Math.round(
+                        (metrics.cache.hits / (metrics.cache.hits + metrics.cache.misses)) * 100
+                      )
+                    : 0,
+                size: metrics.cache.size,
+                evictions: metrics.cache.evictions,
+              }
+            : null,
+          graphqlCache: graphqlStats
+            ? {
+                hitRate: Math.round(graphqlStats.cacheEfficiency.overall),
+                size: graphqlStats.memorySummary.entries,
+                estimatedMemory: graphqlStats.memorySummary.estimatedSize,
+              }
+            : null,
         },
       };
     },
@@ -273,17 +285,19 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
           warmedQueries: 0,
         };
       }
-      
+
       const queryTypes = params.queryTypes || ['insights', 'contributors'];
       let warmedQueries = 0;
-      const results: Array<{ repo: string; queryType: string; success: boolean; error?: string }> = [];
-      
+      const results: Array<{ repo: string; queryType: string; success: boolean; error?: string }> =
+        [];
+
       for (const { owner, repo } of params.repositories) {
         for (const queryType of queryTypes) {
           try {
             switch (queryType) {
               case 'insights':
-                await optimizedClient.graphql(`
+                await optimizedClient.graphql(
+                  `
                   query GetRepositoryInsights($owner: String!, $repo: String!) {
                     repository(owner: $owner, name: $repo) {
                       name stargazerCount forkCount
@@ -295,11 +309,15 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
                       }
                     }
                   }
-                `, { owner, repo }, { operation: 'cache_warmup_insights' });
+                `,
+                  { owner, repo },
+                  { operation: 'cache_warmup_insights' }
+                );
                 break;
-                
+
               case 'contributors':
-                await optimizedClient.graphql(`
+                await optimizedClient.graphql(
+                  `
                   query GetContributorStats($owner: String!, $repo: String!) {
                     repository(owner: $owner, name: $repo) {
                       collaborators(first: 10, affiliation: ALL) {
@@ -308,11 +326,15 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
                       }
                     }
                   }
-                `, { owner, repo }, { operation: 'cache_warmup_contributors' });
+                `,
+                  { owner, repo },
+                  { operation: 'cache_warmup_contributors' }
+                );
                 break;
-                
+
               case 'discussions':
-                await optimizedClient.graphql(`
+                await optimizedClient.graphql(
+                  `
                   query ListDiscussions($owner: String!, $repo: String!) {
                     repository(owner: $owner, name: $repo) {
                       discussions(first: 10) {
@@ -321,11 +343,15 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
                       }
                     }
                   }
-                `, { owner, repo }, { operation: 'cache_warmup_discussions' });
+                `,
+                  { owner, repo },
+                  { operation: 'cache_warmup_discussions' }
+                );
                 break;
-                
+
               case 'categories':
-                await optimizedClient.graphql(`
+                await optimizedClient.graphql(
+                  `
                   query ListDiscussionCategories($owner: String!, $repo: String!) {
                     repository(owner: $owner, name: $repo) {
                       discussionCategories(first: 10) {
@@ -333,24 +359,26 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
                       }
                     }
                   }
-                `, { owner, repo }, { operation: 'cache_warmup_categories' });
+                `,
+                  { owner, repo },
+                  { operation: 'cache_warmup_categories' }
+                );
                 break;
             }
-            
+
             results.push({ repo: `${owner}/${repo}`, queryType, success: true });
             warmedQueries++;
-            
           } catch (error: any) {
-            results.push({ 
-              repo: `${owner}/${repo}`, 
-              queryType, 
-              success: false, 
-              error: error.message 
+            results.push({
+              repo: `${owner}/${repo}`,
+              queryType,
+              success: false,
+              error: error.message,
             });
           }
         }
       }
-      
+
       return {
         message: `Cache warmup completed. Warmed ${warmedQueries} queries.`,
         warmedQueries,

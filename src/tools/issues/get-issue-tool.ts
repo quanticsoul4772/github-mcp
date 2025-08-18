@@ -57,10 +57,16 @@ class GetIssueHandler extends BaseToolHandler<GetIssueParams, GetIssueResult> {
       throw ErrorHandler.createValidationError('owner', 'Owner is required and must be a string');
     }
     if (!params.repo || typeof params.repo !== 'string') {
-      throw ErrorHandler.createValidationError('repo', 'Repository name is required and must be a string');
+      throw ErrorHandler.createValidationError(
+        'repo',
+        'Repository name is required and must be a string'
+      );
     }
     if (!Number.isInteger(params.issue_number) || params.issue_number <= 0) {
-      throw ErrorHandler.createValidationError('issue_number', 'Issue number must be a positive integer');
+      throw ErrorHandler.createValidationError(
+        'issue_number',
+        'Issue number must be a positive integer'
+      );
     }
   }
 
@@ -73,22 +79,27 @@ class GetIssueHandler extends BaseToolHandler<GetIssueParams, GetIssueResult> {
         title: data.title,
         state: data.state,
         body: data.body,
-        user: data.user ? {
-          login: data.user.login,
-          type: data.user.type,
-        } : null,
+        user: data.user
+          ? {
+              login: data.user.login,
+              type: data.user.type,
+            }
+          : null,
         labels: (data.labels ?? []).map((label: any) =>
           typeof label === 'string' ? label : label?.name
         ),
-        assignees: data.assignees?.map((user: any) => ({
-          login: user.login,
-          type: user.type,
-        })) || [],
-        milestone: data.milestone ? {
-          title: data.milestone.title,
-          number: data.milestone.number,
-          state: data.milestone.state,
-        } : null,
+        assignees:
+          data.assignees?.map((user: any) => ({
+            login: user.login,
+            type: user.type,
+          })) || [],
+        milestone: data.milestone
+          ? {
+              title: data.milestone.title,
+              number: data.milestone.number,
+              state: data.milestone.state,
+            }
+          : null,
         comments: data.comments,
         created_at: data.created_at,
         updated_at: data.updated_at,

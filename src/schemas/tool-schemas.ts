@@ -5,11 +5,14 @@
 
 export interface ToolSchema {
   name: string;
-  properties: Record<string, {
-    type: string;
-    description: string;
-    optional?: boolean;
-  }>;
+  properties: Record<
+    string,
+    {
+      type: string;
+      description: string;
+      optional?: boolean;
+    }
+  >;
   required: string[];
   examples: Array<Record<string, any>>;
 }
@@ -23,62 +26,62 @@ export const ISSUE_TOOL_SCHEMAS: Record<string, ToolSchema> = {
     properties: {
       owner: {
         type: 'string',
-        description: 'The owner of the repository'
+        description: 'The owner of the repository',
       },
       repo: {
         type: 'string',
-        description: 'The name of the repository'
+        description: 'The name of the repository',
       },
       issue_number: {
         type: 'number',
-        description: 'The number of the issue'
-      }
+        description: 'The number of the issue',
+      },
     },
     required: ['owner', 'repo', 'issue_number'],
     examples: [
       { owner: 'quanticsoul4772', repo: 'github-mcp', issue_number: 38 },
-      { owner: 'microsoft', repo: 'vscode', issue_number: 123 }
-    ]
+      { owner: 'microsoft', repo: 'vscode', issue_number: 123 },
+    ],
   },
-  
+
   list_issues: {
     name: 'list_issues',
     properties: {
       owner: {
         type: 'string',
-        description: 'The owner of the repository'
+        description: 'The owner of the repository',
       },
       repo: {
         type: 'string',
-        description: 'The name of the repository'
+        description: 'The name of the repository',
       },
       state: {
         type: 'string',
         description: 'State of issues to return (open, closed, all)',
-        optional: true
+        optional: true,
       },
       labels: {
         type: 'string',
         description: 'Comma-separated list of labels',
-        optional: true
+        optional: true,
       },
       page: {
         type: 'number',
         description: 'Page number for pagination',
-        optional: true
+        optional: true,
       },
       per_page: {
         type: 'number',
         description: 'Number of issues per page (max 100)',
-        optional: true
-      }
+        optional: true,
+      },
     },
     required: ['owner', 'repo'],
     examples: [
       { owner: 'quanticsoul4772', repo: 'github-mcp' },
       { owner: 'quanticsoul4772', repo: 'github-mcp', state: 'open' },
-      { owner: 'quanticsoul4772', repo: 'github-mcp', state: 'all', labels: 'bug,critical' }
-    ]
+      { owner: 'quanticsoul4772', repo: 'github-mcp', state: 'all', labels: 'bug,critical' },
+    ],
   },
 
   create_issue: {
@@ -86,37 +89,43 @@ export const ISSUE_TOOL_SCHEMAS: Record<string, ToolSchema> = {
     properties: {
       owner: {
         type: 'string',
-        description: 'The owner of the repository'
+        description: 'The owner of the repository',
       },
       repo: {
         type: 'string',
-        description: 'The name of the repository'
+        description: 'The name of the repository',
       },
       title: {
         type: 'string',
-        description: 'The title of the issue'
+        description: 'The title of the issue',
       },
       body: {
         type: 'string',
         description: 'The body/description of the issue',
-        optional: true
+        optional: true,
       },
       labels: {
         type: 'array',
         description: 'Array of label names',
-        optional: true
+        optional: true,
       },
       assignees: {
         type: 'array',
         description: 'Array of usernames to assign',
-        optional: true
-      }
+        optional: true,
+      },
     },
     required: ['owner', 'repo', 'title'],
     examples: [
       { owner: 'quanticsoul4772', repo: 'github-mcp', title: 'Bug: Parameter validation failing' },
-      { owner: 'quanticsoul4772', repo: 'github-mcp', title: 'Feature request', body: 'Add new feature', labels: ['enhancement'] }
-    ]
+      {
+        owner: 'quanticsoul4772',
+        repo: 'github-mcp',
+        title: 'Feature request',
+        body: 'Add new feature',
+        labels: ['enhancement'],
+      },
+    ],
   },
 
   update_issue: {
@@ -124,37 +133,37 @@ export const ISSUE_TOOL_SCHEMAS: Record<string, ToolSchema> = {
     properties: {
       owner: {
         type: 'string',
-        description: 'The owner of the repository'
+        description: 'The owner of the repository',
       },
       repo: {
         type: 'string',
-        description: 'The name of the repository'
+        description: 'The name of the repository',
       },
       issue_number: {
         type: 'number',
-        description: 'The number of the issue'
+        description: 'The number of the issue',
       },
       title: {
         type: 'string',
         description: 'New title for the issue',
-        optional: true
+        optional: true,
       },
       body: {
         type: 'string',
         description: 'New body for the issue',
-        optional: true
+        optional: true,
       },
       state: {
         type: 'string',
         description: 'New state (open or closed)',
-        optional: true
-      }
+        optional: true,
+      },
     },
     required: ['owner', 'repo', 'issue_number'],
     examples: [
       { owner: 'quanticsoul4772', repo: 'github-mcp', issue_number: 38, state: 'closed' },
-      { owner: 'quanticsoul4772', repo: 'github-mcp', issue_number: 38, title: 'Updated title' }
-    ]
+      { owner: 'quanticsoul4772', repo: 'github-mcp', issue_number: 38, title: 'Updated title' },
+    ],
   },
 
   list_issue_comments: {
@@ -162,33 +171,33 @@ export const ISSUE_TOOL_SCHEMAS: Record<string, ToolSchema> = {
     properties: {
       owner: {
         type: 'string',
-        description: 'The owner of the repository'
+        description: 'The owner of the repository',
       },
       repo: {
         type: 'string',
-        description: 'The name of the repository'
+        description: 'The name of the repository',
       },
       issue_number: {
         type: 'number',
-        description: 'The number of the issue'
+        description: 'The number of the issue',
       },
       page: {
         type: 'number',
         description: 'Page number for pagination',
-        optional: true
+        optional: true,
       },
       per_page: {
         type: 'number',
         description: 'Number of comments per page',
-        optional: true
-      }
+        optional: true,
+      },
     },
     required: ['owner', 'repo', 'issue_number'],
     examples: [
       { owner: 'quanticsoul4772', repo: 'github-mcp', issue_number: 38 },
-      { owner: 'quanticsoul4772', repo: 'github-mcp', issue_number: 38, per_page: 50 }
-    ]
-  }
+      { owner: 'quanticsoul4772', repo: 'github-mcp', issue_number: 38, per_page: 50 },
+    ],
+  },
 };
 
 /**
@@ -200,22 +209,22 @@ export const PR_TOOL_SCHEMAS: Record<string, ToolSchema> = {
     properties: {
       owner: {
         type: 'string',
-        description: 'The owner of the repository'
+        description: 'The owner of the repository',
       },
       repo: {
         type: 'string',
-        description: 'The name of the repository'
+        description: 'The name of the repository',
       },
       pull_number: {
         type: 'number',
-        description: 'The number of the pull request'
-      }
+        description: 'The number of the pull request',
+      },
     },
     required: ['owner', 'repo', 'pull_number'],
     examples: [
       { owner: 'quanticsoul4772', repo: 'github-mcp', pull_number: 18 },
-      { owner: 'microsoft', repo: 'vscode', pull_number: 1234 }
-    ]
+      { owner: 'microsoft', repo: 'vscode', pull_number: 1234 },
+    ],
   },
 
   list_pull_requests: {
@@ -223,45 +232,45 @@ export const PR_TOOL_SCHEMAS: Record<string, ToolSchema> = {
     properties: {
       owner: {
         type: 'string',
-        description: 'The owner of the repository'
+        description: 'The owner of the repository',
       },
       repo: {
         type: 'string',
-        description: 'The name of the repository'
+        description: 'The name of the repository',
       },
       state: {
         type: 'string',
         description: 'State of PRs to return (open, closed, all)',
-        optional: true
+        optional: true,
       },
       head: {
         type: 'string',
         description: 'Filter by head branch',
-        optional: true
+        optional: true,
       },
       base: {
         type: 'string',
         description: 'Filter by base branch',
-        optional: true
+        optional: true,
       },
       page: {
         type: 'number',
         description: 'Page number for pagination',
-        optional: true
+        optional: true,
       },
       per_page: {
         type: 'number',
         description: 'Number of PRs per page',
-        optional: true
-      }
+        optional: true,
+      },
     },
     required: ['owner', 'repo'],
     examples: [
       { owner: 'quanticsoul4772', repo: 'github-mcp' },
       { owner: 'quanticsoul4772', repo: 'github-mcp', state: 'open' },
-      { owner: 'quanticsoul4772', repo: 'github-mcp', state: 'all', base: 'main' }
-    ]
-  }
+      { owner: 'quanticsoul4772', repo: 'github-mcp', state: 'all', base: 'main' },
+    ],
+  },
 };
 
 /**
@@ -273,18 +282,18 @@ export const REPO_TOOL_SCHEMAS: Record<string, ToolSchema> = {
     properties: {
       owner: {
         type: 'string',
-        description: 'The owner of the repository'
+        description: 'The owner of the repository',
       },
       repo: {
         type: 'string',
-        description: 'The name of the repository'
-      }
+        description: 'The name of the repository',
+      },
     },
     required: ['owner', 'repo'],
     examples: [
       { owner: 'quanticsoul4772', repo: 'github-mcp' },
-      { owner: 'microsoft', repo: 'vscode' }
-    ]
+      { owner: 'microsoft', repo: 'vscode' },
+    ],
   },
 
   list_repositories: {
@@ -293,40 +302,40 @@ export const REPO_TOOL_SCHEMAS: Record<string, ToolSchema> = {
       username: {
         type: 'string',
         description: 'Username to list repos for (optional, defaults to authenticated user)',
-        optional: true
+        optional: true,
       },
       type: {
         type: 'string',
         description: 'Type of repositories (all, owner, public, private, member)',
-        optional: true
+        optional: true,
       },
       sort: {
         type: 'string',
         description: 'Sort field (created, updated, pushed, full_name)',
-        optional: true
+        optional: true,
       },
       direction: {
         type: 'string',
         description: 'Sort direction (asc or desc)',
-        optional: true
+        optional: true,
       },
       page: {
         type: 'number',
         description: 'Page number for pagination',
-        optional: true
+        optional: true,
       },
       per_page: {
         type: 'number',
         description: 'Number of repos per page',
-        optional: true
-      }
+        optional: true,
+      },
     },
     required: [],
     examples: [
       {},
       { username: 'quanticsoul4772' },
-      { type: 'public', sort: 'updated', direction: 'desc' }
-    ]
+      { type: 'public', sort: 'updated', direction: 'desc' },
+    ],
   },
 
   create_repository: {
@@ -334,40 +343,40 @@ export const REPO_TOOL_SCHEMAS: Record<string, ToolSchema> = {
     properties: {
       name: {
         type: 'string',
-        description: 'The name of the repository'
+        description: 'The name of the repository',
       },
       description: {
         type: 'string',
         description: 'A short description of the repository',
-        optional: true
+        optional: true,
       },
       private: {
         type: 'boolean',
         description: 'Whether the repository is private',
-        optional: true
+        optional: true,
       },
       auto_init: {
         type: 'boolean',
         description: 'Initialize with README',
-        optional: true
+        optional: true,
       },
       gitignore_template: {
         type: 'string',
         description: 'Gitignore template name',
-        optional: true
+        optional: true,
       },
       license_template: {
         type: 'string',
         description: 'License template name',
-        optional: true
-      }
+        optional: true,
+      },
     },
     required: ['name'],
     examples: [
       { name: 'my-new-repo' },
-      { name: 'my-private-repo', private: true, description: 'A private repository' }
-    ]
-  }
+      { name: 'my-private-repo', private: true, description: 'A private repository' },
+    ],
+  },
 };
 
 /**
@@ -376,7 +385,7 @@ export const REPO_TOOL_SCHEMAS: Record<string, ToolSchema> = {
 export const ALL_TOOL_SCHEMAS: Record<string, ToolSchema> = {
   ...ISSUE_TOOL_SCHEMAS,
   ...PR_TOOL_SCHEMAS,
-  ...REPO_TOOL_SCHEMAS
+  ...REPO_TOOL_SCHEMAS,
 };
 
 /**
@@ -396,7 +405,7 @@ export function getToolHelp(toolName: string): string {
   }
 
   const lines = [`Tool: ${schema.name}`, ''];
-  
+
   // Required parameters
   if (schema.required.length > 0) {
     lines.push('Required parameters:');
@@ -408,9 +417,10 @@ export function getToolHelp(toolName: string): string {
   }
 
   // Optional parameters
-  const optional = Object.entries(schema.properties)
-    .filter(([key]) => !schema.required.includes(key));
-  
+  const optional = Object.entries(schema.properties).filter(
+    ([key]) => !schema.required.includes(key)
+  );
+
   if (optional.length > 0) {
     lines.push('Optional parameters:');
     for (const [key, prop] of optional) {
@@ -442,19 +452,19 @@ export function listAllTools(): string[] {
  */
 export function generateToolDocumentation(): string {
   const lines = ['# GitHub MCP Tool Reference', ''];
-  
+
   const categories = [
     { name: 'Issues', schemas: ISSUE_TOOL_SCHEMAS },
     { name: 'Pull Requests', schemas: PR_TOOL_SCHEMAS },
-    { name: 'Repositories', schemas: REPO_TOOL_SCHEMAS }
+    { name: 'Repositories', schemas: REPO_TOOL_SCHEMAS },
   ];
 
   for (const category of categories) {
     lines.push(`## ${category.name}`, '');
-    
+
     for (const [toolName, schema] of Object.entries(category.schemas)) {
       lines.push(`### ${toolName}`, '');
-      
+
       // Required parameters
       if (schema.required.length > 0) {
         lines.push('**Required parameters:**');
@@ -466,9 +476,10 @@ export function generateToolDocumentation(): string {
       }
 
       // Optional parameters
-      const optional = Object.entries(schema.properties)
-        .filter(([key]) => !schema.required.includes(key));
-      
+      const optional = Object.entries(schema.properties).filter(
+        ([key]) => !schema.required.includes(key)
+      );
+
       if (optional.length > 0) {
         lines.push('**Optional parameters:**');
         for (const [key, prop] of optional) {

@@ -30,10 +30,7 @@ describe('Actions Tools', () => {
     });
 
     it('should list workflows successfully', async () => {
-      const workflows = [
-        testFixtures.workflows.active,
-        testFixtures.workflows.disabled,
-      ];
+      const workflows = [testFixtures.workflows.active, testFixtures.workflows.disabled];
 
       mockOctokit.actions.listRepoWorkflows.mockResolvedValue({
         data: { workflows },
@@ -60,22 +57,14 @@ describe('Actions Tools', () => {
 
     it('should validate input parameters', async () => {
       // Empty owner should cause an error
-      mockOctokit.actions.listRepoWorkflows.mockRejectedValue(
-        new Error('owner is required')
-      );
-      
-      await expect(
-        listWorkflows.handler({ owner: '', repo: 'test-repo' })
-      ).rejects.toThrow();
+      mockOctokit.actions.listRepoWorkflows.mockRejectedValue(new Error('owner is required'));
+
+      await expect(listWorkflows.handler({ owner: '', repo: 'test-repo' })).rejects.toThrow();
 
       // Empty repo should cause an error
-      mockOctokit.actions.listRepoWorkflows.mockRejectedValue(
-        new Error('repo is required')
-      );
-      
-      await expect(
-        listWorkflows.handler({ owner: 'test-owner', repo: '' })
-      ).rejects.toThrow();
+      mockOctokit.actions.listRepoWorkflows.mockRejectedValue(new Error('repo is required'));
+
+      await expect(listWorkflows.handler({ owner: 'test-owner', repo: '' })).rejects.toThrow();
     });
   });
 
@@ -132,10 +121,8 @@ describe('Actions Tools', () => {
     });
 
     it('should validate input parameters', async () => {
-      mockOctokit.actions.getWorkflow.mockRejectedValue(
-        new Error('Invalid parameters')
-      );
-      
+      mockOctokit.actions.getWorkflow.mockRejectedValue(new Error('Invalid parameters'));
+
       await expect(
         getWorkflow.handler({
           owner: '',
@@ -296,10 +283,8 @@ describe('Actions Tools', () => {
     });
 
     it('should validate input parameters', async () => {
-      mockOctokit.actions.getWorkflowRun.mockRejectedValue(
-        new Error('Invalid parameters')
-      );
-      
+      mockOctokit.actions.getWorkflowRun.mockRejectedValue(new Error('Invalid parameters'));
+
       await expect(
         getRun.handler({
           owner: '',
@@ -358,10 +343,8 @@ describe('Actions Tools', () => {
     });
 
     it('should validate input parameters', async () => {
-      mockOctokit.actions.cancelWorkflowRun.mockRejectedValue(
-        new Error('Invalid parameters')
-      );
-      
+      mockOctokit.actions.cancelWorkflowRun.mockRejectedValue(new Error('Invalid parameters'));
+
       await expect(
         cancelRun.handler({
           owner: '',
@@ -510,7 +493,9 @@ describe('Actions Tools', () => {
         run_id: 123,
       });
 
-      expect(result.logs_url).toBe('https://api.github.com/repos/test-owner/test-repo/actions/runs/123/logs');
+      expect(result.logs_url).toBe(
+        'https://api.github.com/repos/test-owner/test-repo/actions/runs/123/logs'
+      );
     });
 
     it('should handle download URL response', async () => {
@@ -534,7 +519,7 @@ describe('Actions Tools', () => {
       mockOctokit.actions.downloadWorkflowRunLogs.mockRejectedValue(
         new Error('Invalid parameters')
       );
-      
+
       await expect(
         downloadLogs.handler({
           owner: '',
@@ -559,9 +544,10 @@ describe('Actions Tools', () => {
     beforeEach(() => {
       // This would be a separate tool for listing all runs in a repository
       // without specifying a workflow_id - checking if it exists
-      listRepoRuns = tools.find(tool => 
-        tool.tool.name === 'list_repository_workflow_runs' ||
-        tool.tool.name === 'list_workflow_runs_for_repo'
+      listRepoRuns = tools.find(
+        tool =>
+          tool.tool.name === 'list_repository_workflow_runs' ||
+          tool.tool.name === 'list_workflow_runs_for_repo'
       );
     });
 
@@ -608,9 +594,8 @@ describe('Actions Tools', () => {
     let rerunWorkflow: any;
 
     beforeEach(() => {
-      rerunWorkflow = tools.find(tool => 
-        tool.tool.name === 'rerun_workflow' ||
-        tool.tool.name === 'rerun_workflow_run'
+      rerunWorkflow = tools.find(
+        tool => tool.tool.name === 'rerun_workflow' || tool.tool.name === 'rerun_workflow_run'
       );
     });
 

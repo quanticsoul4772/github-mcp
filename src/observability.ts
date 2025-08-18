@@ -1,6 +1,6 @@
 /**
  * Observability utilities for GitHub MCP Server
- * 
+ *
  * Provides utilities to wrap tool handlers and API calls
  * with logging, metrics, and error tracking.
  */
@@ -22,7 +22,7 @@ export function withObservability<T extends (...args: any[]) => Promise<any>>(
     const toolLogger = logger.child({
       correlationId,
       tool: toolName,
-      operation
+      operation,
     });
 
     toolLogger.debug('Operation started', { args: args[0] });
@@ -30,34 +30,34 @@ export function withObservability<T extends (...args: any[]) => Promise<any>>(
     try {
       const result = await handler(...args);
       const duration = Date.now() - startTime;
-      
+
       // Record successful metric
       const apiMetric: ApiCallMetric = {
         tool: toolName,
         operation,
         success: true,
         duration,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
       metrics.recordApiCall(apiMetric);
 
       toolLogger.info('Operation completed successfully', {
         duration,
-        success: true
+        success: true,
       });
 
       return result;
     } catch (error) {
       const duration = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      
+
       // Record failed metric
       const apiMetric: ApiCallMetric = {
         tool: toolName,
         operation,
         success: false,
         duration,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
       metrics.recordApiCall(apiMetric);
 
@@ -67,15 +67,19 @@ export function withObservability<T extends (...args: any[]) => Promise<any>>(
         operation,
         errorType: error instanceof Error ? error.name : 'UnknownError',
         message: errorMessage,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
       metrics.recordError(errorMetric);
 
-      toolLogger.error('Operation failed', {
-        duration,
-        success: false,
-        errorType: error instanceof Error ? error.name : 'UnknownError'
-      }, error instanceof Error ? error : undefined);
+      toolLogger.error(
+        'Operation failed',
+        {
+          duration,
+          success: false,
+          errorType: error instanceof Error ? error.name : 'UnknownError',
+        },
+        error instanceof Error ? error : undefined
+      );
 
       throw error;
     }
@@ -92,13 +96,13 @@ export function withRateLimitTracking<T extends (...args: any[]) => Promise<any>
   return (async (...args: any[]) => {
     try {
       const result = await apiCall(...args);
-      
+
       // Extract rate limit headers if available
       if (result && typeof result === 'object' && 'headers' in result) {
         const headers = (result as any).headers;
         const rateLimit = headers['x-ratelimit-remaining'];
         const rateLimitReset = headers['x-ratelimit-reset'];
-        
+
         if (rateLimit !== undefined) {
           metrics.setGauge('github_rate_limit_remaining', parseInt(rateLimit));
         }
@@ -111,29 +115,33 @@ export function withRateLimitTracking<T extends (...args: any[]) => Promise<any>
           logger.warn('GitHub rate limit running low', {
             remaining: parseInt(rateLimit),
             resetTimestamp: rateLimitReset ? parseInt(rateLimitReset) : undefined,
-            apiCall: apiName
+            apiCall: apiName,
           });
         }
       }
-      
+
       return result;
     } catch (error) {
       // Check if this is a rate limit error
       if (error instanceof Error && error.message.includes('rate limit')) {
-        logger.error('GitHub rate limit exceeded', {
-          apiCall: apiName,
-          error: error.message
-        }, error);
-        
+        logger.error(
+          'GitHub rate limit exceeded',
+          {
+            apiCall: apiName,
+            error: error.message,
+          },
+          error
+        );
+
         metrics.recordError({
           tool: 'github-api',
           operation: apiName,
           errorType: 'RateLimitError',
           message: error.message,
-          timestamp: Date.now()
+          timestamp: Date.now(),
         });
       }
-      
+
       throw error;
     }
   }) as T;
@@ -158,19 +166,19 @@ export class PerformanceTimer {
    */
   public end(additionalContext: LogContext = {}): number {
     const duration = Date.now() - this.startTime;
-    
+
     metrics.recordPerformance({
       operation: this.operation,
       duration,
       memoryUsage: process.memoryUsage(),
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     logger.debug('Performance measurement', {
       ...this.context,
       ...additionalContext,
       operation: this.operation,
-      duration
+      duration,
     });
 
     return duration;
@@ -182,8 +190,8 @@ export class PerformanceTimer {
  */
 export function monitorMemoryUsage(): void {
   const memory = process.memoryUsage();
-  const heapUsedMB = Math.round(memory.heapUsed / 1024 / 1024 * 100) / 100;
-  const heapTotalMB = Math.round(memory.heapTotal / 1024 / 1024 * 100) / 100;
+  const heapUsedMB = Math.round((memory.heapUsed / 1024 / 1024) * 100) / 100;
+  const heapTotalMB = Math.round((memory.heapTotal / 1024 / 1024) * 100) / 100;
   const usagePercent = Math.round((memory.heapUsed / memory.heapTotal) * 100);
 
   // Update memory metrics
@@ -198,14 +206,14 @@ export function monitorMemoryUsage(): void {
       heapUsedMB,
       heapTotalMB,
       usagePercent,
-      external: Math.round(memory.external / 1024 / 1024 * 100) / 100,
-      rss: Math.round(memory.rss / 1024 / 1024 * 100) / 100
+      external: Math.round((memory.external / 1024 / 1024) * 100) / 100,
+      rss: Math.round((memory.rss / 1024 / 1024) * 100) / 100,
     });
   } else if (usagePercent > 80) {
     logger.warn('High memory usage detected', {
       heapUsedMB,
       heapTotalMB,
-      usagePercent
+      usagePercent,
     });
   }
 }

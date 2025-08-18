@@ -7,11 +7,11 @@ import {
   CreateIssueCommentParams,
   SearchIssuesParams,
   UpdateIssueCommentParams,
-  DeleteIssueCommentParams, 
+  DeleteIssueCommentParams,
   AddLabelsToIssueParams,
   RemoveLabelFromIssueParams,
   LockIssueParams,
-  UnlockIssueParams
+  UnlockIssueParams,
 } from '../tool-types.js';
 
 interface GetIssueParams {
@@ -78,18 +78,18 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           login: data.user?.login,
           type: data.user?.type,
         },
-        labels: data.labels.map((label) => 
-          typeof label === 'string' ? label : label.name
-        ),
-        assignees: data.assignees?.map((user) => ({
+        labels: data.labels.map(label => (typeof label === 'string' ? label : label.name)),
+        assignees: data.assignees?.map(user => ({
           login: user.login,
           type: user.type,
         })),
-        milestone: data.milestone ? {
-          title: data.milestone.title,
-          number: data.milestone.number,
-          state: data.milestone.state,
-        } : null,
+        milestone: data.milestone
+          ? {
+              title: data.milestone.title,
+              number: data.milestone.number,
+              state: data.milestone.state,
+            }
+          : null,
         comments: data.comments,
         created_at: data.created_at,
         updated_at: data.updated_at,
@@ -160,9 +160,11 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
         owner: params.owner,
         repo: params.repo,
         state: params.state as any,
-        labels: Array.isArray(params.labels) 
+        labels: Array.isArray(params.labels)
           ? params.labels.join(',')
-          : (params.labels ? [params.labels].join(',') : undefined),
+          : params.labels
+            ? [params.labels].join(',')
+            : undefined,
         sort: params.sort as any,
         direction: params.direction as any,
         since: params.since,
@@ -170,7 +172,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
         per_page: params.perPage,
       });
 
-      return data.map((issue) => ({
+      return data.map(issue => ({
         number: issue.number,
         title: issue.title,
         state: issue.state,
@@ -178,10 +180,8 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           login: issue.user?.login,
           type: issue.user?.type,
         },
-        labels: issue.labels.map((label) => 
-          typeof label === 'string' ? label : label.name
-        ),
-        assignees: issue.assignees?.map((user) => ({
+        labels: issue.labels.map(label => (typeof label === 'string' ? label : label.name)),
+        assignees: issue.assignees?.map(user => ({
           login: user.login,
         })),
         comments: issue.comments,
@@ -238,7 +238,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
         per_page: params.perPage,
       });
 
-      return data.map((comment) => ({
+      return data.map(comment => ({
         id: comment.id,
         body: comment.body,
         user: {
@@ -267,7 +267,19 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           sort: {
             type: 'string',
             description: 'Sort field by number of matches',
-            enum: ['comments', 'reactions', 'reactions-+1', 'reactions--1', 'reactions-smile', 'reactions-thinking_face', 'reactions-heart', 'reactions-tada', 'interactions', 'created', 'updated'],
+            enum: [
+              'comments',
+              'reactions',
+              'reactions-+1',
+              'reactions--1',
+              'reactions-smile',
+              'reactions-thinking_face',
+              'reactions-heart',
+              'reactions-tada',
+              'interactions',
+              'created',
+              'updated',
+            ],
           },
           order: {
             type: 'string',
@@ -300,7 +312,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
     handler: async (args: unknown) => {
       const params = args as SearchIssuesWithRepoParams;
       let query = params.query;
-      
+
       // Add repo filter if provided
       if (params.owner && params.repo) {
         query = `repo:${params.owner}/${params.repo} ${query}`;
@@ -317,15 +329,15 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
       return {
         total_count: data.total_count,
         incomplete_results: data.incomplete_results,
-        items: data.items.map((item) => ({
+        items: data.items.map(item => ({
           number: item.number,
           title: item.title,
           state: item.state,
           user: {
             login: item.user?.login,
           },
-          labels: item.labels.map((label) => label.name),
-          assignees: item.assignees?.map((user) => ({
+          labels: item.labels.map(label => label.name),
+          assignees: item.assignees?.map(user => ({
             login: user.login,
           })),
           comments: item.comments,
@@ -660,7 +672,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           labels: params.labels,
         });
 
-        return data.map((label) => ({
+        return data.map(label => ({
           name: label.name,
           color: label.color,
           description: label.description,

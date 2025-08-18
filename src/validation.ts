@@ -64,7 +64,7 @@ const DEFAULT_RETRY_CONFIG: RetryConfig = {
   maxAttempts: 3,
   baseDelayMs: 1000,
   maxDelayMs: 10000,
-  backoffMultiplier: 2
+  backoffMultiplier: 2,
 };
 
 /**
@@ -75,7 +75,10 @@ const circuitBreakers = new Map<string, CircuitBreakerState>();
 /**
  * Validation result cache with TTL
  */
-const validationCache = new Map<string, { result: ValidationResult; timestamp: number; ttl: number }>();
+const validationCache = new Map<
+  string,
+  { result: ValidationResult; timestamp: number; ttl: number }
+>();
 
 /**
  * Cache cleanup interval (5 minutes)
@@ -119,7 +122,7 @@ if (typeof process !== 'undefined' && typeof setInterval !== 'undefined') {
       cleanupValidation();
       process.exit(0);
     });
-    process.on('uncaughtException', (error) => {
+    process.on('uncaughtException', error => {
       logger.error('Uncaught exception:', error);
       cleanupValidation();
       process.exit(1);
@@ -136,45 +139,65 @@ function shouldBypassValidation(): boolean {
     return false;
   }
   // Only allow bypass in development mode with explicit flag
-  return (process.env.NODE_ENV === 'development' && process.env.SKIP_VALIDATION === 'true');
+  return process.env.NODE_ENV === 'development' && process.env.SKIP_VALIDATION === 'true';
 }
 
 /**
  * Creates a validation result with success
  */
-function createSuccessResult<T>(value: T, warnings: ValidationWarning[] = [], suggestions: string[] = []): ValidationResult<T> {
+function createSuccessResult<T>(
+  value: T,
+  warnings: ValidationWarning[] = [],
+  suggestions: string[] = []
+): ValidationResult<T> {
   return {
     valid: true,
     value,
     errors: [],
     warnings,
-    suggestions
+    suggestions,
   };
 }
 
 /**
  * Creates a validation result with errors
  */
-function createErrorResult<T>(errors: ValidationErrorDetail[], warnings: ValidationWarning[] = [], suggestions: string[] = []): ValidationResult<T> {
+function createErrorResult<T>(
+  errors: ValidationErrorDetail[],
+  warnings: ValidationWarning[] = [],
+  suggestions: string[] = []
+): ValidationResult<T> {
   return {
     valid: false,
     errors,
     warnings,
-    suggestions
+    suggestions,
   };
 }
 
 /**
  * Creates a validation error
  */
-function createValidationError(code: string, message: string, field: string, severity: 'error' | 'warning' | 'info' = 'error', recoverable = false, suggestion?: string): ValidationErrorDetail {
+function createValidationError(
+  code: string,
+  message: string,
+  field: string,
+  severity: 'error' | 'warning' | 'info' = 'error',
+  recoverable = false,
+  suggestion?: string
+): ValidationErrorDetail {
   return { code, message, field, severity, recoverable, suggestion };
 }
 
 /**
  * Creates a validation warning
  */
-function createValidationWarning(code: string, message: string, field: string, suggestion?: string): ValidationWarning {
+function createValidationWarning(
+  code: string,
+  message: string,
+  field: string,
+  suggestion?: string
+): ValidationWarning {
   return { code, message, field, suggestion };
 }
 
@@ -186,7 +209,7 @@ function getCircuitBreaker(type: string): CircuitBreakerState {
     circuitBreakers.set(type, {
       failures: 0,
       lastFailureTime: 0,
-      state: 'closed'
+      state: 'closed',
     });
   }
   return circuitBreakers.get(type)!;
@@ -249,18 +272,20 @@ async function withRetry<T>(
     try {
       // Check circuit breaker if specified
       if (circuitBreakerType && isCircuitBreakerOpen(circuitBreakerType)) {
-        return createErrorResult([createValidationError(
-          'CIRCUIT_BREAKER_OPEN',
-          `Validation circuit breaker is open for ${circuitBreakerType}. Service may be experiencing issues.`,
-          circuitBreakerType,
-          'warning',
-          true,
-          'Wait a few minutes and try again, or check service status'
-        )]);
+        return createErrorResult([
+          createValidationError(
+            'CIRCUIT_BREAKER_OPEN',
+            `Validation circuit breaker is open for ${circuitBreakerType}. Service may be experiencing issues.`,
+            circuitBreakerType,
+            'warning',
+            true,
+            'Wait a few minutes and try again, or check service status'
+          ),
+        ]);
       }
 
       const result = await validationFn();
-      
+
       // Update circuit breaker on success
       if (circuitBreakerType) {
         updateCircuitBreaker(circuitBreakerType, result.valid);
@@ -284,7 +309,6 @@ async function withRetry<T>(
         await sleep(Math.min(delay, config.maxDelayMs));
         delay *= config.backoffMultiplier;
       }
-
     } catch (error) {
       // Update circuit breaker on exception
       if (circuitBreakerType) {
@@ -293,14 +317,16 @@ async function withRetry<T>(
 
       // On last attempt, return the error
       if (attempt === config.maxAttempts) {
-        return createErrorResult([createValidationError(
-          'VALIDATION_EXCEPTION',
-          `Validation failed with exception: ${error instanceof Error ? error.message : String(error)}`,
-          'unknown',
-          'error',
-          true,
-          'Check input format and try again'
-        )]);
+        return createErrorResult([
+          createValidationError(
+            'VALIDATION_EXCEPTION',
+            `Validation failed with exception: ${error instanceof Error ? error.message : String(error)}`,
+            'unknown',
+            'error',
+            true,
+            'Check input format and try again'
+          ),
+        ]);
       }
 
       // Wait before retry
@@ -309,13 +335,18 @@ async function withRetry<T>(
     }
   }
 
-  return lastResult || createErrorResult([createValidationError(
-    'VALIDATION_FAILED',
-    'Validation failed after all retry attempts',
-    'unknown',
-    'error',
-    true
-  )]);
+  return (
+    lastResult ||
+    createErrorResult([
+      createValidationError(
+        'VALIDATION_FAILED',
+        'Validation failed after all retry attempts',
+        'unknown',
+        'error',
+        true
+      ),
+    ])
+  );
 }
 
 /**
@@ -339,11 +370,15 @@ function getCachedValidationResult<T>(cacheKey: string): ValidationResult<T> | n
 /**
  * Caches validation result with TTL
  */
-function setCachedValidationResult<T>(cacheKey: string, result: ValidationResult<T>, ttlMs = 60000): void {
+function setCachedValidationResult<T>(
+  cacheKey: string,
+  result: ValidationResult<T>,
+  ttlMs = 60000
+): void {
   validationCache.set(cacheKey, {
     result,
     timestamp: Date.now(),
-    ttl: ttlMs
+    ttl: ttlMs,
   });
 }
 
@@ -355,22 +390,22 @@ export function validateRepoName(name: string): boolean {
   if (!name || typeof name !== 'string') {
     return false;
   }
-  
+
   // Check length - minimum 2 characters
   if (name.length < 2 || name.length > 100) {
     return false;
   }
-  
+
   // Cannot start or end with a dot
   if (name.startsWith('.') || name.endsWith('.')) {
     return false;
   }
-  
+
   // Cannot contain consecutive dots
   if (name.includes('..')) {
     return false;
   }
-  
+
   // Only allow alphanumeric, hyphen, underscore, and dot
   const validPattern = /^[a-zA-Z0-9._-]+$/;
   return validPattern.test(name);
@@ -386,9 +421,17 @@ export function validateRepoName(name: string): boolean {
 export function validateRepoNameWithResult(name: string): ValidationResult<string> {
   // Development mode bypass with safe check
   if (shouldBypassValidation()) {
-    return createSuccessResult(name, [
-      createValidationWarning('DEV_BYPASS', 'Validation bypassed in development mode', 'repoName')
-    ], ['Set NODE_ENV=production to enable full validation']);
+    return createSuccessResult(
+      name,
+      [
+        createValidationWarning(
+          'DEV_BYPASS',
+          'Validation bypassed in development mode',
+          'repoName'
+        ),
+      ],
+      ['Set NODE_ENV=production to enable full validation']
+    );
   }
 
   // Check cache first
@@ -403,114 +446,139 @@ export function validateRepoNameWithResult(name: string): ValidationResult<strin
   const suggestions: string[] = [];
 
   if (!name || typeof name !== 'string') {
-    const result = createErrorResult<string>([
-      createValidationError(
-        'INVALID_TYPE',
-        'Repository name must be a non-empty string',
-        'repoName',
-        'error',
-        false,
-        'Provide a valid repository name as a string'
-      )
-    ], [], ['Repository names must be strings']);
+    const result = createErrorResult<string>(
+      [
+        createValidationError(
+          'INVALID_TYPE',
+          'Repository name must be a non-empty string',
+          'repoName',
+          'error',
+          false,
+          'Provide a valid repository name as a string'
+        ),
+      ],
+      [],
+      ['Repository names must be strings']
+    );
     setCachedValidationResult(cacheKey, result, 30000); // Cache errors for 30 seconds
     return result;
   }
 
   // Check length
   if (name.length === 0) {
-    const result = createErrorResult<string>([
-      createValidationError(
-        'EMPTY_NAME',
-        'Repository name cannot be empty',
-        'repoName',
-        'error',
-        false,
-        'Provide a repository name'
-      )
-    ], [], ['Repository names must be at least 1 character']);
+    const result = createErrorResult<string>(
+      [
+        createValidationError(
+          'EMPTY_NAME',
+          'Repository name cannot be empty',
+          'repoName',
+          'error',
+          false,
+          'Provide a repository name'
+        ),
+      ],
+      [],
+      ['Repository names must be at least 1 character']
+    );
     setCachedValidationResult(cacheKey, result, 30000);
     return result;
   }
 
   if (name.length > 100) {
-    const result = createErrorResult<string>([
-      createValidationError(
-        'NAME_TOO_LONG',
-        `Repository name is ${name.length} characters, maximum is 100`,
-        'repoName',
-        'error',
-        false,
-        'Shorten the repository name to 100 characters or less'
-      )
-    ], [], ['Repository names have a maximum length of 100 characters']);
+    const result = createErrorResult<string>(
+      [
+        createValidationError(
+          'NAME_TOO_LONG',
+          `Repository name is ${name.length} characters, maximum is 100`,
+          'repoName',
+          'error',
+          false,
+          'Shorten the repository name to 100 characters or less'
+        ),
+      ],
+      [],
+      ['Repository names have a maximum length of 100 characters']
+    );
     setCachedValidationResult(cacheKey, result, 30000);
     return result;
   }
 
   // Cannot start or end with a dot
   if (name.startsWith('.')) {
-    errors.push(createValidationError(
-      'STARTS_WITH_DOT',
-      'Repository name cannot start with a dot',
-      'repoName',
-      'error',
-      false,
-      'Remove the leading dot from the repository name'
-    ));
+    errors.push(
+      createValidationError(
+        'STARTS_WITH_DOT',
+        'Repository name cannot start with a dot',
+        'repoName',
+        'error',
+        false,
+        'Remove the leading dot from the repository name'
+      )
+    );
   }
 
   if (name.endsWith('.')) {
-    errors.push(createValidationError(
-      'ENDS_WITH_DOT',
-      'Repository name cannot end with a dot',
-      'repoName',
-      'error',
-      false,
-      'Remove the trailing dot from the repository name'
-    ));
+    errors.push(
+      createValidationError(
+        'ENDS_WITH_DOT',
+        'Repository name cannot end with a dot',
+        'repoName',
+        'error',
+        false,
+        'Remove the trailing dot from the repository name'
+      )
+    );
   }
 
   // Cannot contain consecutive dots
   if (name.includes('..')) {
-    errors.push(createValidationError(
-      'CONSECUTIVE_DOTS',
-      'Repository name cannot contain consecutive dots (..)',
-      'repoName',
-      'error',
-      false,
-      'Replace consecutive dots with a single dot or another character'
-    ));
+    errors.push(
+      createValidationError(
+        'CONSECUTIVE_DOTS',
+        'Repository name cannot contain consecutive dots (..)',
+        'repoName',
+        'error',
+        false,
+        'Replace consecutive dots with a single dot or another character'
+      )
+    );
   }
 
   // Only allow alphanumeric, hyphen, underscore, and dot
   const validPattern = /^[a-zA-Z0-9._-]+$/;
   if (!validPattern.test(name)) {
     const invalidChars = name.split('').filter(char => !/[a-zA-Z0-9._-]/.test(char));
-    errors.push(createValidationError(
-      'INVALID_CHARACTERS',
-      `Repository name contains invalid characters: ${[...new Set(invalidChars)].join(', ')}`,
-      'repoName',
-      'error',
-      false,
-      'Repository names can only contain letters, numbers, dots, hyphens, and underscores'
-    ));
-    suggestions.push('Use only alphanumeric characters, dots (.), hyphens (-), and underscores (_)');
+    errors.push(
+      createValidationError(
+        'INVALID_CHARACTERS',
+        `Repository name contains invalid characters: ${[...new Set(invalidChars)].join(', ')}`,
+        'repoName',
+        'error',
+        false,
+        'Repository names can only contain letters, numbers, dots, hyphens, and underscores'
+      )
+    );
+    suggestions.push(
+      'Use only alphanumeric characters, dots (.), hyphens (-), and underscores (_)'
+    );
   }
 
   // Add general suggestions
   if (name.length > 50) {
-    warnings.push(createValidationWarning(
-      'LONG_NAME',
-      'Repository name is quite long, consider using a shorter name',
-      'repoName',
-      'Shorter names are easier to remember and type'
-    ));
+    warnings.push(
+      createValidationWarning(
+        'LONG_NAME',
+        'Repository name is quite long, consider using a shorter name',
+        'repoName',
+        'Shorter names are easier to remember and type'
+      )
+    );
   }
 
-  const result = errors.length > 0 
-    ? createErrorResult<string>(errors, warnings, suggestions)
-    : createSuccessResult(name, warnings, suggestions);
+  const result =
+    errors.length > 0
+      ? createErrorResult<string>(errors, warnings, suggestions)
+      : createSuccessResult(name, warnings, suggestions);
 
   // Cache successful results for longer
   setCachedValidationResult(cacheKey, result, result.valid ? 300000 : 30000); // 5 min success, 30 sec failure
@@ -529,22 +597,22 @@ export function validateOwnerName(name: string): boolean {
   if (!name || typeof name !== 'string') {
     return false;
   }
-  
+
   // Check length - minimum 2 characters, maximum 39
   if (name.length < 2 || name.length > 39) {
     return false;
   }
-  
+
   // Cannot start or end with a hyphen
   if (name.startsWith('-') || name.endsWith('-')) {
     return false;
   }
-  
+
   // Cannot contain consecutive hyphens
   if (name.includes('--')) {
     return false;
   }
-  
+
   // Only allow alphanumeric and hyphen
   const validPattern = /^[a-zA-Z0-9-]+$/;
   return validPattern.test(name);
@@ -560,34 +628,34 @@ export function validateFilePath(path: string): string | null {
   if (!path || typeof path !== 'string') {
     return null;
   }
-  
+
   // Remove null bytes
   let sanitized = path.replace(/\0/g, '');
-  
+
   // Prevent directory traversal
   if (sanitized.includes('../') || sanitized.includes('..\\')) {
     return null;
   }
-  
+
   // Remove leading slashes to convert absolute paths to relative
   sanitized = sanitized.replace(/^\/+/, '');
-  
+
   // Reject Windows absolute paths
   if (/^[a-zA-Z]:/.test(sanitized)) {
     return null;
   }
-  
+
   // Normalize multiple slashes
   sanitized = sanitized.replace(/\/+/g, '/');
-  
+
   // Remove trailing slashes
   sanitized = sanitized.replace(/\/$/, '');
-  
+
   // Maximum path length (GitHub's limit)
   if (sanitized.length > 255) {
     return null;
   }
-  
+
   return sanitized;
 }
 
@@ -599,12 +667,12 @@ export function validateRef(ref: string): boolean {
   if (!ref || typeof ref !== 'string') {
     return false;
   }
-  
+
   // Cannot be empty or too long
   if (ref.length === 0 || ref.length > 255) {
     return false;
   }
-  
+
   // Cannot contain certain characters
   const invalidChars = ['~', '^', ':', '\\', ' ', '\t', '\n'];
   for (const char of invalidChars) {
@@ -612,22 +680,22 @@ export function validateRef(ref: string): boolean {
       return false;
     }
   }
-  
+
   // Cannot start with a dot or dash
   if (ref.startsWith('.') || ref.startsWith('-')) {
     return false;
   }
-  
+
   // Cannot end with .lock
   if (ref.endsWith('.lock')) {
     return false;
   }
-  
+
   // Cannot contain consecutive dots or @{
   if (ref.includes('..') || ref.includes('@{')) {
     return false;
   }
-  
+
   return true;
 }
 
@@ -639,7 +707,7 @@ export function validateCommitSha(sha: string): boolean {
   if (!sha || typeof sha !== 'string') {
     return false;
   }
-  
+
   // Must be exactly 40 hex characters
   const shaPattern = /^[a-f0-9]{40}$/i;
   return shaPattern.test(sha);
@@ -654,15 +722,15 @@ export function sanitizeText(text: string, maxLength: number = 1000): string {
   if (!text || typeof text !== 'string') {
     return '';
   }
-  
+
   // Remove control characters except newlines and tabs
   let sanitized = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
-  
+
   // Limit length
   if (sanitized.length > maxLength) {
     sanitized = sanitized.substring(0, maxLength);
   }
-  
+
   return sanitized;
 }
 
@@ -681,9 +749,9 @@ interface TokenFormat {
  * Validation level enum for configurable strictness
  */
 export enum ValidationLevel {
-  STRICT = 'strict',     // Current behavior with exact format matching
+  STRICT = 'strict', // Current behavior with exact format matching
   MODERATE = 'moderate', // Check prefix and length range
-  LENIENT = 'lenient'    // Only check if non-empty
+  LENIENT = 'lenient', // Only check if non-empty
 }
 
 /**
@@ -696,49 +764,49 @@ const TOKEN_FORMATS: TokenFormat[] = [
     minLength: 40,
     maxLength: 40,
     pattern: /^ghp_[A-Za-z0-9_]{36}$/,
-    description: 'GitHub Personal Access Token (classic)'
+    description: 'GitHub Personal Access Token (classic)',
   },
   {
     prefix: 'github_pat_',
     minLength: 82,
     maxLength: 255,
     pattern: /^github_pat_[A-Za-z0-9]{70,}$/,
-    description: 'GitHub Fine-grained Personal Access Token'
+    description: 'GitHub Fine-grained Personal Access Token',
   },
   {
     prefix: 'gho_',
     minLength: 40,
     maxLength: 40,
     pattern: /^gho_[A-Za-z0-9_]{36}$/,
-    description: 'GitHub OAuth token'
+    description: 'GitHub OAuth token',
   },
   {
     prefix: 'ghu_',
     minLength: 40,
     maxLength: 255,
     pattern: /^ghu_[A-Za-z0-9_]{36,}$/,
-    description: 'GitHub user access token'
+    description: 'GitHub user access token',
   },
   {
     prefix: 'ghs_',
     minLength: 40,
     maxLength: 255,
     pattern: /^ghs_[A-Za-z0-9_]{36,}$/,
-    description: 'GitHub server-to-server token'
+    description: 'GitHub server-to-server token',
   },
   {
     prefix: 'ghr_',
     minLength: 40,
     maxLength: 255,
     pattern: /^ghr_[A-Za-z0-9_]{36,}$/,
-    description: 'GitHub refresh token'
+    description: 'GitHub refresh token',
   },
   {
     prefix: 'ghi_',
     minLength: 40,
     maxLength: 255,
     pattern: /^ghi_[A-Za-z0-9_]{36,}$/,
-    description: 'GitHub installation access token'
+    description: 'GitHub installation access token',
   },
   // Legacy format - no prefix
   {
@@ -746,8 +814,8 @@ const TOKEN_FORMATS: TokenFormat[] = [
     minLength: 40,
     maxLength: 40,
     pattern: /^[a-f0-9]{40}$/i,
-    description: 'Legacy GitHub token (40-character hex)'
-  }
+    description: 'Legacy GitHub token (40-character hex)',
+  },
 ];
 
 /**
@@ -767,40 +835,40 @@ export function validateGitHubToken(token: string): boolean {
   if (shouldBypassValidation()) {
     return true;
   }
-  
+
   if (!token || typeof token !== 'string') {
     return false;
   }
-  
+
   // Check for known token formats
   const format = TOKEN_FORMATS.find(fmt => {
     if (fmt.prefix === '') {
       // Legacy format - only match if no other prefixes match AND it looks like hex
-      const hasKnownPrefix = TOKEN_FORMATS.some(otherFmt => 
-        otherFmt.prefix !== '' && token.startsWith(otherFmt.prefix)
+      const hasKnownPrefix = TOKEN_FORMATS.some(
+        otherFmt => otherFmt.prefix !== '' && token.startsWith(otherFmt.prefix)
       );
       if (hasKnownPrefix) return false;
-      
+
       // For legacy format, also check that it's the right length and looks like hex
       return token.length === 40 && /^[a-f0-9]{40}$/i.test(token);
     }
     return token.startsWith(fmt.prefix);
   });
-  
+
   if (!format) {
     return false;
   }
-  
+
   // Check length constraints
   if (token.length < format.minLength || token.length > format.maxLength) {
     return false;
   }
-  
+
   // Check pattern if available (for strict validation)
   if (format.pattern && !format.pattern.test(token)) {
     return false;
   }
-  
+
   return true;
 }
 
@@ -817,7 +885,7 @@ export function validateGitHubTokenFormat(
   if (!token || typeof token !== 'string') {
     return {
       isValid: false,
-      error: 'Token must be a non-empty string'
+      error: 'Token must be a non-empty string',
     };
   }
 
@@ -828,12 +896,12 @@ export function validateGitHubTokenFormat(
       const legacyFormat = TOKEN_FORMATS.find(f => f.prefix === '');
       return {
         isValid: true,
-        format: TOKEN_FORMATS.find(f => f.prefix === "")
+        format: TOKEN_FORMATS.find(f => f.prefix === ''),
       };
     }
     return {
       isValid,
-      error: !isValid ? 'Token cannot be empty' : undefined
+      error: !isValid ? 'Token cannot be empty' : undefined,
     };
   }
 
@@ -841,11 +909,11 @@ export function validateGitHubTokenFormat(
   const format = TOKEN_FORMATS.find(fmt => {
     if (fmt.prefix === '') {
       // Legacy format - only match if no other prefixes match AND it looks like hex
-      const hasKnownPrefix = TOKEN_FORMATS.some(otherFmt => 
-        otherFmt.prefix !== '' && token.startsWith(otherFmt.prefix)
+      const hasKnownPrefix = TOKEN_FORMATS.some(
+        otherFmt => otherFmt.prefix !== '' && token.startsWith(otherFmt.prefix)
       );
       if (hasKnownPrefix) return false;
-      
+
       // For legacy format, also check that it's the right length and looks like hex
       return token.length === 40 && /^[a-f0-9]{40}$/i.test(token);
     }
@@ -855,7 +923,7 @@ export function validateGitHubTokenFormat(
   if (!format) {
     return {
       isValid: false,
-      error: 'Unrecognized token format'
+      error: 'Unrecognized token format',
     };
   }
 
@@ -864,7 +932,7 @@ export function validateGitHubTokenFormat(
     return {
       isValid: false,
       format,
-      error: `${format.description} must be between ${format.minLength} and ${format.maxLength} characters (got ${token.length})`
+      error: `${format.description} must be between ${format.minLength} and ${format.maxLength} characters (got ${token.length})`,
     };
   }
 
@@ -874,37 +942,37 @@ export function validateGitHubTokenFormat(
     if (format.prefix === 'ghp_') {
       return {
         isValid: true,
-        format
+        format,
       };
     }
     if (format.prefix === 'gho_') {
       return {
         isValid: true,
-        format
+        format,
       };
     }
     if (format.prefix === 'github_pat_') {
       return {
         isValid: true,
-        format
+        format,
       };
     }
     if (format.prefix === 'ghi_') {
       return {
         isValid: true,
-        format
+        format,
       };
     }
     if (format.prefix === '') {
       return {
         isValid: true,
-        format: TOKEN_FORMATS.find(f => f.prefix === "")
+        format: TOKEN_FORMATS.find(f => f.prefix === ''),
       };
     }
-    
+
     return {
       isValid: true,
-      format
+      format,
     };
   }
 
@@ -913,17 +981,15 @@ export function validateGitHubTokenFormat(
     return {
       isValid: false,
       format,
-      error: `${format.description} has invalid character pattern`
+      error: `${format.description} has invalid character pattern`,
     };
   }
 
   return {
     isValid: true,
-    format
+    format,
   };
 }
-
-
 
 /**
  * Validates a GitHub Personal Access Token format with detailed error reporting
@@ -943,64 +1009,78 @@ export function validateGitHubTokenWithResult(
 ): ValidationResult<string> {
   const errors: ValidationErrorDetail[] = [];
   const warnings: ValidationWarning[] = [];
-  
+
   // Early bypass for development mode
   if (shouldBypassValidation()) {
-    warnings.push(createValidationWarning(
-      'DEV_BYPASS',
-      'Validation bypassed in development mode',
-      'githubToken',
-      'Only use this in development environments'
-    ));
+    warnings.push(
+      createValidationWarning(
+        'DEV_BYPASS',
+        'Validation bypassed in development mode',
+        'githubToken',
+        'Only use this in development environments'
+      )
+    );
     return createSuccessResult(token, warnings);
   }
-  
+
   // Sanitize the token by removing control characters
   const sanitizedToken = token ? token.replace(/[\x00-\x1f\x7f]/g, '') : token;
-  
+
   // Check for missing token
   if (!sanitizedToken || typeof sanitizedToken !== 'string') {
-    errors.push(createValidationError(
-      'MISSING_TOKEN',
-      'GitHub token is required',
-      'githubToken',
-      'error',
-      true,
-      'Provide a valid GitHub Personal Access Token'
-    ));
-    return createErrorResult(errors, warnings, ['Create a token at https://github.com/settings/tokens']);
+    errors.push(
+      createValidationError(
+        'MISSING_TOKEN',
+        'GitHub token is required',
+        'githubToken',
+        'error',
+        true,
+        'Provide a valid GitHub Personal Access Token'
+      )
+    );
+    return createErrorResult(errors, warnings, [
+      'Create a token at https://github.com/settings/tokens',
+    ]);
   }
-  
+
   // Check for whitespace in sanitized token
-  const hasWhitespace = sanitizedToken.trim() !== sanitizedToken || sanitizedToken.includes(' ') || sanitizedToken.includes('\n') || sanitizedToken.includes('\t');
+  const hasWhitespace =
+    sanitizedToken.trim() !== sanitizedToken ||
+    sanitizedToken.includes(' ') ||
+    sanitizedToken.includes('\n') ||
+    sanitizedToken.includes('\t');
   if (hasWhitespace) {
-    errors.push(createValidationError(
-      'TOKEN_CONTAINS_WHITESPACE',
-      'Token contains whitespace characters',
-      'githubToken',
-      'error',
-      true,
-      'Remove any spaces, tabs, or newlines from the token'
-    ));
+    errors.push(
+      createValidationError(
+        'TOKEN_CONTAINS_WHITESPACE',
+        'Token contains whitespace characters',
+        'githubToken',
+        'error',
+        true,
+        'Remove any spaces, tabs, or newlines from the token'
+      )
+    );
   }
-  
+
   // Validate token format using sanitized token
   const formatResult = validateGitHubTokenFormat(sanitizedToken, level);
   if (typeof formatResult === 'object' && !formatResult.isValid) {
-    errors.push(createValidationError(
-      'INVALID_TOKEN_FORMAT',
-      formatResult.error || 'Invalid token format',
-      'githubToken',
-      'error',
-      true,
-      'Ensure the token follows GitHub\'s format requirements'
-    ));
+    errors.push(
+      createValidationError(
+        'INVALID_TOKEN_FORMAT',
+        formatResult.error || 'Invalid token format',
+        'githubToken',
+        'error',
+        true,
+        "Ensure the token follows GitHub's format requirements"
+      )
+    );
   }
-  
+
   if (errors.length > 0) {
     return createErrorResult(errors, warnings, ['Check your token format and try again']);
   }
-  
+
   return createSuccessResult(sanitizedToken, warnings);
 }
 
@@ -1018,105 +1098,118 @@ export async function validateGitHubTokenWithAPI(
   // First check format using the comprehensive validation
   const formatResult = validateGitHubTokenWithResult(token);
   if (!formatResult.valid) {
-    return createErrorResult<{ token: string; user: any }>(formatResult.errors, formatResult.warnings, formatResult.suggestions);
+    return createErrorResult<{ token: string; user: any }>(
+      formatResult.errors,
+      formatResult.warnings,
+      formatResult.suggestions
+    );
   }
 
   // Development mode bypass
   if (shouldBypassValidation()) {
     return createSuccessResult(
       { token, user: { login: 'dev-user' } },
-      [createValidationWarning('DEV_BYPASS', 'API validation bypassed in development mode', 'githubToken')],
+      [
+        createValidationWarning(
+          'DEV_BYPASS',
+          'API validation bypassed in development mode',
+          'githubToken'
+        ),
+      ],
       ['Set NODE_ENV=production to enable full API validation']
     );
   }
 
   // Check for fetch API availability
   if (typeof fetch === 'undefined' && typeof global !== 'undefined' && !global.fetch) {
-    return createErrorResult<{ token: string; user: any }>([createValidationError(
-      'FETCH_NOT_AVAILABLE',
-      'Fetch API not available in this environment',
-      'githubToken',
-      'error',
-      true,
-      'API validation requires fetch support (Node.js 18+ or modern browser)'
-    )]);
+    return createErrorResult<{ token: string; user: any }>([
+      createValidationError(
+        'FETCH_NOT_AVAILABLE',
+        'Fetch API not available in this environment',
+        'githubToken',
+        'error',
+        true,
+        'API validation requires fetch support (Node.js 18+ or modern browser)'
+      ),
+    ]);
   }
 
   // Use retry logic with circuit breaker
-  return withRetry(async () => {
-    try {
-      // Simple API call to validate token
-      const response = await fetch('https://api.github.com/user', {
-        headers: {
-          'Authorization': `token ${token}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'github-mcp-server'
+  return withRetry(
+    async () => {
+      try {
+        // Simple API call to validate token
+        const response = await fetch('https://api.github.com/user', {
+          headers: {
+            Authorization: `token ${token}`,
+            Accept: 'application/vnd.github.v3+json',
+            'User-Agent': 'github-mcp-server',
+          },
+        });
+
+        if (response.status === 401) {
+          return createErrorResult<{ token: string; user: any }>([
+            createValidationError(
+              'TOKEN_UNAUTHORIZED',
+              'Token is invalid or expired',
+              'githubToken',
+              'error',
+              true, // Recoverable - user can get new token
+              'Create a new token at https://github.com/settings/tokens'
+            ),
+          ]);
         }
-      });
 
-      if (response.status === 401) {
+        if (response.status === 403) {
+          const rateLimitReset = response.headers.get('x-ratelimit-reset');
+          const resetTime = rateLimitReset
+            ? new Date(parseInt(rateLimitReset) * 1000).toISOString()
+            : 'unknown';
+
+          return createErrorResult<{ token: string; user: any }>([
+            createValidationError(
+              'RATE_LIMITED',
+              'API rate limit exceeded',
+              'githubToken',
+              'warning',
+              true,
+              `Wait until ${resetTime} before trying again`
+            ),
+          ]);
+        }
+
+        if (!response.ok) {
+          return createErrorResult<{ token: string; user: any }>([
+            createValidationError(
+              'API_ERROR',
+              `GitHub API returned ${response.status}: ${response.statusText}`,
+              'githubToken',
+              'warning',
+              true,
+              'Check GitHub status at https://www.githubstatus.com/'
+            ),
+          ]);
+        }
+
+        const user = await response.json();
+
+        return createSuccessResult({ token, user }, [], ['Token validation successful']);
+      } catch (error) {
         return createErrorResult<{ token: string; user: any }>([
           createValidationError(
-            'TOKEN_UNAUTHORIZED',
-            'Token is invalid or expired',
-            'githubToken',
-            'error',
-            true, // Recoverable - user can get new token
-            'Create a new token at https://github.com/settings/tokens'
-          )
-        ]);
-      }
-
-      if (response.status === 403) {
-        const rateLimitReset = response.headers.get('x-ratelimit-reset');
-        const resetTime = rateLimitReset ? new Date(parseInt(rateLimitReset) * 1000).toISOString() : 'unknown';
-        
-        return createErrorResult<{ token: string; user: any }>([
-          createValidationError(
-            'RATE_LIMITED',
-            'API rate limit exceeded',
+            'NETWORK_ERROR',
+            `Network error during validation: ${error instanceof Error ? error.message : String(error)}`,
             'githubToken',
             'warning',
             true,
-            `Wait until ${resetTime} before trying again`
-          )
+            'Check your internet connection and try again'
+          ),
         ]);
       }
-
-      if (!response.ok) {
-        return createErrorResult<{ token: string; user: any }>([
-          createValidationError(
-            'API_ERROR',
-            `GitHub API returned ${response.status}: ${response.statusText}`,
-            'githubToken',
-            'warning',
-            true,
-            'Check GitHub status at https://www.githubstatus.com/'
-          )
-        ]);
-      }
-
-      const user = await response.json();
-      
-      return createSuccessResult(
-        { token, user },
-        [],
-        ['Token validation successful']
-      );
-
-    } catch (error) {
-      return createErrorResult<{ token: string; user: any }>([
-        createValidationError(
-          'NETWORK_ERROR',
-          `Network error during validation: ${error instanceof Error ? error.message : String(error)}`,
-          'githubToken',
-          'warning',
-          true,
-          'Check your internet connection and try again'
-        )
-      ]);
-    }
-  }, DEFAULT_RETRY_CONFIG, 'github-api');
+    },
+    DEFAULT_RETRY_CONFIG,
+    'github-api'
+  );
 }
 
 /**
@@ -1132,30 +1225,35 @@ export function validateEnvironmentVariable(name: string, value: string): string
 
   // Remove any null bytes or control characters
   const sanitized = value.replace(/[\x00-\x1f\x7f]/g, '');
-  
+
   // Specific validation based on environment variable name
   switch (name.toUpperCase()) {
     case 'GITHUB_PERSONAL_ACCESS_TOKEN':
     case 'GITHUB_TOKEN':
       return validateGitHubToken(sanitized) ? sanitized : null;
-      
+
     case 'GITHUB_HOST':
     case 'GITHUB_API_URL':
       return validateApiUrl(sanitized) ? sanitized : null;
-      
+
     case 'GITHUB_READ_ONLY':
       return ['1', 'true', 'false', '0'].includes(sanitized.toLowerCase()) ? sanitized : null;
-      
+
     case 'GITHUB_TOOLSETS':
       return validateToolsets(sanitized) ? sanitized : null;
-      
+
     case 'NODE_OPTIONS':
       return validateNodeOptions(sanitized) ? sanitized : null;
-      
+
     default:
       // Generic validation for other environment variables
       // Prevent common injection patterns
-      if (sanitized.includes('$(') || sanitized.includes('`') || sanitized.includes('&&') || sanitized.includes('||')) {
+      if (
+        sanitized.includes('$(') ||
+        sanitized.includes('`') ||
+        sanitized.includes('&&') ||
+        sanitized.includes('||')
+      ) {
         return null;
       }
       return sanitized.length <= 1000 ? sanitized : null;
@@ -1194,7 +1292,14 @@ function validateApiUrl(url: string): boolean {
     if (host.includes(':')) {
       const h = host.replace(/\[/g, '').replace(/\]/g, '');
       // Block fc00::/7 (ULA) and fe80::/10 (link-local)
-      if (h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe8') || h.startsWith('fe9') || h.startsWith('fea') || h.startsWith('feb')) {
+      if (
+        h.startsWith('fc') ||
+        h.startsWith('fd') ||
+        h.startsWith('fe8') ||
+        h.startsWith('fe9') ||
+        h.startsWith('fea') ||
+        h.startsWith('feb')
+      ) {
         return false;
       }
     }
@@ -1215,13 +1320,22 @@ function validateToolsets(toolsets: string): boolean {
   if (toolsets === 'all') {
     return true;
   }
-  
+
   const validToolsets = [
-    'context', 'repos', 'issues', 'pull_requests', 'actions', 
-    'code_security', 'users', 'orgs', 'notifications', 
-    'discussions', 'dependabot', 'secret_protection'
+    'context',
+    'repos',
+    'issues',
+    'pull_requests',
+    'actions',
+    'code_security',
+    'users',
+    'orgs',
+    'notifications',
+    'discussions',
+    'dependabot',
+    'secret_protection',
   ];
-  
+
   const specified = toolsets.split(',').map(t => t.trim());
   return specified.every(t => validToolsets.includes(t));
 }
@@ -1234,11 +1348,11 @@ function validateNodeOptions(options: string): boolean {
     '--max-old-space-size',
     '--expose-gc',
     '--max-semi-space-size',
-    '--max-new-space-size'
+    '--max-new-space-size',
   ];
-  
+
   const parts = options.split(' ').filter(p => p.length > 0);
-  
+
   for (const part of parts) {
     if (part.startsWith('--')) {
       const option = part.split('=')[0];
@@ -1247,7 +1361,7 @@ function validateNodeOptions(options: string): boolean {
       }
     }
   }
-  
+
   return true;
 }
 
@@ -1264,7 +1378,7 @@ export function validateEnvironmentConfiguration(): {
   return {
     isValid: result.valid,
     errors: result.errors.map(e => e.message),
-    sanitizedValues: result.value || {}
+    sanitizedValues: result.value || {},
   };
 }
 
@@ -1273,15 +1387,25 @@ export function validateEnvironmentConfiguration(): {
  * - Validates all security-relevant environment variables
  * - Returns comprehensive validation results with recovery options
  */
-export function validateEnvironmentConfigurationWithResult(): ValidationResult<Record<string, string>> {
+export function validateEnvironmentConfigurationWithResult(): ValidationResult<
+  Record<string, string>
+> {
   // Development mode bypass
   if (shouldBypassValidation()) {
     const mockValues = {
-      GITHUB_TOKEN: 'dev-token-bypassed'
+      GITHUB_TOKEN: 'dev-token-bypassed',
     };
-    return createSuccessResult(mockValues, [
-      createValidationWarning('DEV_BYPASS', 'Environment validation bypassed in development mode', 'environment')
-    ], ['Set NODE_ENV=production to enable full environment validation']);
+    return createSuccessResult(
+      mockValues,
+      [
+        createValidationWarning(
+          'DEV_BYPASS',
+          'Environment validation bypassed in development mode',
+          'environment'
+        ),
+      ],
+      ['Set NODE_ENV=production to enable full environment validation']
+    );
   }
 
   const errors: ValidationErrorDetail[] = [];
@@ -1300,14 +1424,16 @@ export function validateEnvironmentConfigurationWithResult(): ValidationResult<R
   // Required variables - GitHub token
   const token = getEnvVar('GITHUB_PERSONAL_ACCESS_TOKEN') || getEnvVar('GITHUB_TOKEN');
   if (!token) {
-    errors.push(createValidationError(
-      'MISSING_REQUIRED_TOKEN',
-      'GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN environment variable is required',
-      'GITHUB_TOKEN',
-      'error',
-      false,
-      'Set one of these environment variables with your GitHub Personal Access Token'
-    ));
+    errors.push(
+      createValidationError(
+        'MISSING_REQUIRED_TOKEN',
+        'GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN environment variable is required',
+        'GITHUB_TOKEN',
+        'error',
+        false,
+        'Set one of these environment variables with your GitHub Personal Access Token'
+      )
+    );
     suggestions.push('Create a token at: https://github.com/settings/tokens');
     suggestions.push('Required scopes: repo, workflow, user, notifications');
   } else {
@@ -1329,7 +1455,7 @@ export function validateEnvironmentConfigurationWithResult(): ValidationResult<R
     { name: 'GITHUB_API_URL', validator: 'GITHUB_API_URL' },
     { name: 'GITHUB_READ_ONLY', validator: 'GITHUB_READ_ONLY' },
     { name: 'GITHUB_TOOLSETS', validator: 'GITHUB_TOOLSETS' },
-    { name: 'NODE_OPTIONS', validator: 'NODE_OPTIONS' }
+    { name: 'NODE_OPTIONS', validator: 'NODE_OPTIONS' },
   ];
 
   for (const { name, validator } of optionalVars) {
@@ -1337,25 +1463,29 @@ export function validateEnvironmentConfigurationWithResult(): ValidationResult<R
     if (value) {
       const sanitized = validateEnvironmentVariable(validator, value);
       if (sanitized === null) {
-        errors.push(createValidationError(
-          'INVALID_ENV_VAR_FORMAT',
-          `Invalid format for environment variable ${name}`,
-          name,
-          'error',
-          false,
-          `Check the format requirements for ${name}`
-        ));
+        errors.push(
+          createValidationError(
+            'INVALID_ENV_VAR_FORMAT',
+            `Invalid format for environment variable ${name}`,
+            name,
+            'error',
+            false,
+            `Check the format requirements for ${name}`
+          )
+        );
       } else {
         sanitizedValues[name] = sanitized;
-        
+
         // Add specific suggestions for environment variables
         if (name === 'GITHUB_READ_ONLY' && sanitized === 'true') {
-          warnings.push(createValidationWarning(
-            'READ_ONLY_MODE',
-            'Running in read-only mode - write operations will be disabled',
-            name,
-            'Set to false to enable write operations'
-          ));
+          warnings.push(
+            createValidationWarning(
+              'READ_ONLY_MODE',
+              'Running in read-only mode - write operations will be disabled',
+              name,
+              'Set to false to enable write operations'
+            )
+          );
         }
       }
     }
@@ -1364,34 +1494,40 @@ export function validateEnvironmentConfigurationWithResult(): ValidationResult<R
   // Additional environment checks
   const nodeEnv = getEnvVar('NODE_ENV');
   if (!nodeEnv) {
-    warnings.push(createValidationWarning(
-      'NODE_ENV_NOT_SET',
-      'NODE_ENV environment variable is not set',
-      'NODE_ENV',
-      'Set NODE_ENV=production for production deployments'
-    ));
+    warnings.push(
+      createValidationWarning(
+        'NODE_ENV_NOT_SET',
+        'NODE_ENV environment variable is not set',
+        'NODE_ENV',
+        'Set NODE_ENV=production for production deployments'
+      )
+    );
   }
 
   if (nodeEnv === 'development') {
-    warnings.push(createValidationWarning(
-      'DEVELOPMENT_MODE',
-      'Running in development mode',
-      'NODE_ENV',
-      'Use NODE_ENV=production for production deployments'
-    ));
+    warnings.push(
+      createValidationWarning(
+        'DEVELOPMENT_MODE',
+        'Running in development mode',
+        'NODE_ENV',
+        'Use NODE_ENV=production for production deployments'
+      )
+    );
   }
 
   // Security checks
   if (getEnvVar('DEBUG') && nodeEnv === 'production') {
-    warnings.push(createValidationWarning(
-      'DEBUG_IN_PRODUCTION',
-      'DEBUG environment variable is set in production mode',
-      'DEBUG',
-      'Remove DEBUG variable in production for security'
-    ));
+    warnings.push(
+      createValidationWarning(
+        'DEBUG_IN_PRODUCTION',
+        'DEBUG environment variable is set in production mode',
+        'DEBUG',
+        'Remove DEBUG variable in production for security'
+      )
+    );
   }
 
-  return errors.length > 0 
+  return errors.length > 0
     ? createErrorResult<Record<string, string>>(errors, warnings, suggestions)
     : createSuccessResult(sanitizedValues, warnings, suggestions);
 }
@@ -1406,14 +1542,18 @@ export function validateEnvironmentConfigurationGraceful(): ValidationResult<{
   missingFeatures: string[];
 }> {
   const result = validateEnvironmentConfigurationWithResult();
-  
+
   // If validation passed normally, return success
   if (result.valid) {
-    return createSuccessResult({
-      sanitizedValues: result.value!,
-      degradedMode: false,
-      missingFeatures: []
-    }, result.warnings, result.suggestions);
+    return createSuccessResult(
+      {
+        sanitizedValues: result.value!,
+        degradedMode: false,
+        missingFeatures: [],
+      },
+      result.warnings,
+      result.suggestions
+    );
   }
 
   // Try graceful degradation
@@ -1445,16 +1585,24 @@ export function validateEnvironmentConfigurationGraceful(): ValidationResult<{
     // Even if token validation failed, try to proceed with warnings
     sanitizedValues.GITHUB_TOKEN = token;
     missingFeatures.push('Token validation');
-    warnings.push(createValidationWarning(
-      'DEGRADED_TOKEN_VALIDATION',
-      'Token format validation failed, proceeding with degraded validation',
-      'GITHUB_TOKEN',
-      'Fix token format issues for full functionality'
-    ));
+    warnings.push(
+      createValidationWarning(
+        'DEGRADED_TOKEN_VALIDATION',
+        'Token format validation failed, proceeding with degraded validation',
+        'GITHUB_TOKEN',
+        'Fix token format issues for full functionality'
+      )
+    );
   }
 
   // Add other environment variables that might be partially valid
-  const optionalVars = ['GITHUB_HOST', 'GITHUB_API_URL', 'GITHUB_READ_ONLY', 'GITHUB_TOOLSETS', 'NODE_OPTIONS'];
+  const optionalVars = [
+    'GITHUB_HOST',
+    'GITHUB_API_URL',
+    'GITHUB_READ_ONLY',
+    'GITHUB_TOOLSETS',
+    'NODE_OPTIONS',
+  ];
   for (const varName of optionalVars) {
     const value = getEnvVar(varName);
     if (value) {
@@ -1463,15 +1611,19 @@ export function validateEnvironmentConfigurationGraceful(): ValidationResult<{
     }
   }
 
-  return createSuccessResult({
-    sanitizedValues,
-    degradedMode: true,
-    missingFeatures
-  }, warnings, [
-    ...suggestions,
-    'Application running in degraded mode - some features may not work correctly',
-    'Fix validation errors for full functionality'
-  ]);
+  return createSuccessResult(
+    {
+      sanitizedValues,
+      degradedMode: true,
+      missingFeatures,
+    },
+    warnings,
+    [
+      ...suggestions,
+      'Application running in degraded mode - some features may not work correctly',
+      'Fix validation errors for full functionality',
+    ]
+  );
 }
 
 /**
@@ -1504,7 +1656,7 @@ export function getValidationHealthStatus(): {
     lastCheck: string;
   }> = [];
   let overallStatus: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
-  
+
   // Check environment configuration
   try {
     const envResult = validateEnvironmentConfigurationWithResult();
@@ -1513,15 +1665,15 @@ export function getValidationHealthStatus(): {
         name: 'Environment Configuration',
         status: 'pass' as const,
         message: 'All environment variables valid',
-        lastCheck: new Date().toISOString()
+        lastCheck: new Date().toISOString(),
       });
     } else {
       const hasRecoverableErrors = envResult.errors.some(e => e.recoverable);
       checks.push({
         name: 'Environment Configuration',
-        status: hasRecoverableErrors ? 'warn' as const : 'fail' as const,
+        status: hasRecoverableErrors ? ('warn' as const) : ('fail' as const),
         message: `${envResult.errors.length} validation errors`,
-        lastCheck: new Date().toISOString()
+        lastCheck: new Date().toISOString(),
       });
       if (!hasRecoverableErrors) {
         overallStatus = 'unhealthy';
@@ -1534,34 +1686,35 @@ export function getValidationHealthStatus(): {
       name: 'Environment Configuration',
       status: 'fail' as const,
       message: `Check failed: ${error instanceof Error ? error.message : String(error)}`,
-      lastCheck: new Date().toISOString()
+      lastCheck: new Date().toISOString(),
     });
     overallStatus = 'unhealthy';
   }
-  
+
   // Check circuit breakers
   const breakerStatuses = [];
   let hasOpenBreakers = false;
-  
+
   for (const [type, breaker] of circuitBreakers.entries()) {
     breakerStatuses.push({
       type,
       state: breaker.state,
       failures: breaker.failures,
-      lastFailure: breaker.lastFailureTime > 0 ? new Date(breaker.lastFailureTime).toISOString() : null
+      lastFailure:
+        breaker.lastFailureTime > 0 ? new Date(breaker.lastFailureTime).toISOString() : null,
     });
-    
+
     if (breaker.state === 'open') {
       hasOpenBreakers = true;
     }
   }
-  
+
   if (hasOpenBreakers) {
     checks.push({
       name: 'Circuit Breakers',
       status: 'warn' as const,
       message: 'One or more circuit breakers are open',
-      lastCheck: new Date().toISOString()
+      lastCheck: new Date().toISOString(),
     });
     if (overallStatus === 'healthy') {
       overallStatus = 'degraded';
@@ -1571,27 +1724,27 @@ export function getValidationHealthStatus(): {
       name: 'Circuit Breakers',
       status: 'pass' as const,
       message: 'All circuit breakers closed',
-      lastCheck: new Date().toISOString()
+      lastCheck: new Date().toISOString(),
     });
   }
-  
+
   // Cache statistics (simplified)
   const cacheSize = validationCache.size;
   checks.push({
     name: 'Validation Cache',
-    status: cacheSize < 1000 ? 'pass' as const : 'warn' as const,
+    status: cacheSize < 1000 ? ('pass' as const) : ('warn' as const),
     message: `${cacheSize} cached entries`,
-    lastCheck: new Date().toISOString()
+    lastCheck: new Date().toISOString(),
   });
-  
+
   return {
     status: overallStatus,
     checks,
     circuitBreakers: breakerStatuses,
     cache: {
       size: cacheSize,
-      hitRate: 0 // TODO: Implement hit rate tracking
-    }
+      hitRate: 0, // TODO: Implement hit rate tracking
+    },
   };
 }
 
@@ -1617,7 +1770,7 @@ export function getValidationStats(): {
     circuitBreakerCount: circuitBreakers.size,
     openCircuitBreakers: Array.from(circuitBreakers.entries())
       .filter(([, breaker]) => breaker.state === 'open')
-      .map(([type]) => type)
+      .map(([type]) => type),
   };
 }
 
@@ -1633,12 +1786,12 @@ export function validateBranchName(branch: string): boolean {
   if (!branch || typeof branch !== 'string') {
     return false;
   }
-  
+
   // Cannot be empty or too long
   if (branch.length === 0 || branch.length > 255) {
     return false;
   }
-  
+
   // Cannot contain certain characters
   const invalidChars = ['~', '^', ':', '\\', ' ', '\t', '\n', '?', '*', '['];
   for (const char of invalidChars) {
@@ -1646,22 +1799,22 @@ export function validateBranchName(branch: string): boolean {
       return false;
     }
   }
-  
+
   // Cannot start or end with a dot or dash
   if (branch.startsWith('.') || branch.startsWith('-') || branch.endsWith('.')) {
     return false;
   }
-  
+
   // Cannot end with .lock
   if (branch.endsWith('.lock')) {
     return false;
   }
-  
+
   // Cannot contain consecutive dots or @{
   if (branch.includes('..') || branch.includes('@{')) {
     return false;
   }
-  
+
   return true;
 }
 
@@ -1672,7 +1825,7 @@ export function validateSHA(sha: string): boolean {
   if (!sha || typeof sha !== 'string') {
     return false;
   }
-  
+
   // Must be exactly 40 hex characters
   const shaPattern = /^[a-f0-9]{40}$/i;
   return shaPattern.test(sha);
@@ -1688,22 +1841,22 @@ export function validateURL(url: string): boolean {
   if (!url || typeof url !== 'string') {
     return false;
   }
-  
+
   try {
     const parsed = new URL(url);
-    
+
     // Only allow HTTP/HTTPS
     if (!['http:', 'https:'].includes(parsed.protocol)) {
       return false;
     }
-    
+
     // No authentication in URL
     if (parsed.username || parsed.password) {
       return false;
     }
-    
+
     const host = parsed.hostname.toLowerCase();
-    
+
     // Comprehensive IP address validation
     return !isPrivateOrReservedIP(host);
   } catch {
@@ -1718,9 +1871,14 @@ export function validateURL(url: string): boolean {
 // Helper functions to reduce complexity
 function isDisallowedHost(host: string): boolean {
   const disallowedHosts = new Set([
-    'localhost', 'broadcasthost',
-    '127.0.0.1', '0.0.0.0', 
-    '::1', '::', 'ip6-localhost', 'ip6-loopback'
+    'localhost',
+    'broadcasthost',
+    '127.0.0.1',
+    '0.0.0.0',
+    '::1',
+    '::',
+    'ip6-localhost',
+    'ip6-loopback',
   ]);
   return disallowedHosts.has(host);
 }
@@ -1728,77 +1886,82 @@ function isDisallowedHost(host: string): boolean {
 function isPrivateIPv4(a: number, b: number, c: number, d: number): boolean {
   // 10.0.0.0/8 - Private
   if (a === 10) return true;
-  
+
   // 172.16.0.0/12 - Private
   if (a === 172 && b >= 16 && b <= 31) return true;
-  
+
   // 192.168.0.0/16 - Private
   if (a === 192 && b === 168) return true;
-  
+
   return false;
 }
 
 function isReservedIPv4(a: number, b: number, c: number, d: number): boolean {
   // 127.0.0.0/8 - Loopback
   if (a === 127) return true;
-  
+
   // 0.0.0.0/8 - "This" Network
   if (a === 0) return true;
-  
+
   // 224.0.0.0/4 - Multicast
   if (a >= 224 && a <= 239) return true;
-  
+
   // 240.0.0.0/4 - Reserved for future use
   if (a >= 240) return true;
-  
+
   // 169.254.0.0/16 - Link-local
   if (a === 169 && b === 254) return true;
-  
+
   // 100.64.0.0/10 - Carrier-grade NAT
   if (a === 100 && b >= 64 && b <= 127) return true;
-  
+
   return false;
 }
 
 function isDocumentationIPv4(a: number, b: number, c: number): boolean {
   // 198.18.0.0/15 - Benchmarking
   if (a === 198 && (b === 18 || b === 19)) return true;
-  
+
   // 203.0.113.0/24 - Documentation
   if (a === 203 && b === 0 && c === 113) return true;
-  
+
   // 192.0.2.0/24 - Documentation
   if (a === 192 && b === 0 && c === 2) return true;
-  
+
   // 198.51.100.0/24 - Documentation
   if (a === 198 && b === 51 && c === 100) return true;
-  
+
   return false;
 }
 
 function isPrivateOrReservedIPv6(normalizedHost: string): boolean {
   // Loopback and unspecified
   if (normalizedHost === '::1' || normalizedHost === '::') return true;
-  
+
   // fc00::/7 - Unique local addresses (private)
   if (normalizedHost.startsWith('fc') || normalizedHost.startsWith('fd')) return true;
-  
+
   // fe80::/10 - Link-local
-  if (normalizedHost.startsWith('fe8') || normalizedHost.startsWith('fe9') ||
-      normalizedHost.startsWith('fea') || normalizedHost.startsWith('feb')) return true;
-  
+  if (
+    normalizedHost.startsWith('fe8') ||
+    normalizedHost.startsWith('fe9') ||
+    normalizedHost.startsWith('fea') ||
+    normalizedHost.startsWith('feb')
+  )
+    return true;
+
   // ff00::/8 - Multicast
   if (normalizedHost.startsWith('ff')) return true;
-  
+
   // 2001:db8::/32 - Documentation
   if (normalizedHost.startsWith('2001:db8') || normalizedHost.startsWith('2001:0db8')) return true;
-  
+
   // ::ffff:0:0/96 - IPv4-mapped IPv6 addresses
   if (normalizedHost.includes('::ffff:')) return true;
-  
+
   // 2002::/16 - 6to4 (may expose internal networks)
   if (normalizedHost.startsWith('2002:')) return true;
-  
+
   return false;
 }
 
@@ -1807,30 +1970,28 @@ function isPrivateOrReservedIP(host: string): boolean {
   if (isDisallowedHost(host)) {
     return true;
   }
-  
+
   // Check IPv4 addresses
   const ipv4Pattern = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
   const ipv4Match = host.match(ipv4Pattern);
-  
+
   if (ipv4Match) {
     const [, a, b, c, d] = ipv4Match.map(Number);
-    
+
     // Validate each octet is in range 0-255
     if (a > 255 || b > 255 || c > 255 || d > 255) {
       return true; // Invalid IPv4 format
     }
-    
-    return isPrivateIPv4(a, b, c, d) || 
-           isReservedIPv4(a, b, c, d) || 
-           isDocumentationIPv4(a, b, c);
+
+    return isPrivateIPv4(a, b, c, d) || isReservedIPv4(a, b, c, d) || isDocumentationIPv4(a, b, c);
   }
-  
+
   // Check IPv6 addresses
   if (host.includes(':')) {
     const normalizedHost = host.toLowerCase();
     return isPrivateOrReservedIPv6(normalizedHost);
   }
-  
+
   return false;
 }
 
@@ -1855,7 +2016,7 @@ export function validateSearchQuery(query: string): boolean {
   if (!query || typeof query !== 'string') {
     return false;
   }
-  
+
   const trimmed = query.trim();
   return trimmed.length > 0 && trimmed.length <= 256;
 }
@@ -1867,12 +2028,12 @@ export function validateWorkflowFileName(filename: string): boolean {
   if (!filename || typeof filename !== 'string') {
     return false;
   }
-  
+
   // Must end with .yml or .yaml
   if (!filename.endsWith('.yml') && !filename.endsWith('.yaml')) {
     return false;
   }
-  
+
   // Must be a valid file path
   const sanitized = validateFilePath(filename);
   return sanitized !== null;
@@ -1881,7 +2042,9 @@ export function validateWorkflowFileName(filename: string): boolean {
 /**
  * Validates environment variables (legacy version)
  */
-export function validateEnvironment(env: Record<string, string>): ValidationResult<Record<string, string>> {
+export function validateEnvironment(
+  env: Record<string, string>
+): ValidationResult<Record<string, string>> {
   // Temporarily override process.env to validate the provided environment
   const originalEnv = process.env;
   try {
@@ -1900,24 +2063,38 @@ export function validateGitOperation(operation: string): boolean {
   if (!operation || typeof operation !== 'string') {
     return false;
   }
-  
+
   const safeOperations = [
-    'status', 'log', 'diff', 'branch', 'show', 'ls-files',
-    'rev-parse', 'describe', 'tag', 'remote', 'config'
+    'status',
+    'log',
+    'diff',
+    'branch',
+    'show',
+    'ls-files',
+    'rev-parse',
+    'describe',
+    'tag',
+    'remote',
+    'config',
   ];
-  
+
   const dangerousPatterns = [
-    '--force', '--hard', 'rm -rf', 'clean -f', '--exec=',
-    'push --force', 'reset --hard'
+    '--force',
+    '--hard',
+    'rm -rf',
+    'clean -f',
+    '--exec=',
+    'push --force',
+    'reset --hard',
   ];
-  
+
   // Check if operation contains dangerous patterns
   for (const pattern of dangerousPatterns) {
     if (operation.includes(pattern)) {
       return false;
     }
   }
-  
+
   // Check if it's a safe operation
   const baseOperation = operation.split(' ')[0];
   return safeOperations.includes(baseOperation);
@@ -1930,18 +2107,23 @@ export function validateCommandOptions(options: string): boolean {
   if (!options || typeof options !== 'string') {
     return true; // Empty options are safe
   }
-  
+
   const dangerousOptions = [
-    '--force', '--exec=', '--upload-pack=', '--receive-pack=',
-    '--config=', '--work-tree=', '--git-dir='
+    '--force',
+    '--exec=',
+    '--upload-pack=',
+    '--receive-pack=',
+    '--config=',
+    '--work-tree=',
+    '--git-dir=',
   ];
-  
+
   for (const dangerous of dangerousOptions) {
     if (options.includes(dangerous)) {
       return false;
     }
   }
-  
+
   return true;
 }
 
@@ -1951,7 +2133,7 @@ export function validateCommandOptions(options: string): boolean {
  */
 export class ValidationError extends Error {
   public field: string;
-  
+
   constructor(field: string, message: string) {
     super(`Validation failed for ${field}: ${message}`);
     this.name = 'ValidationError';

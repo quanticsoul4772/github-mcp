@@ -1,11 +1,11 @@
 /**
  * GraphQL query complexity calculation for GitHub's point-based rate limiting
- * 
+ *
  * GitHub GraphQL API uses a point-based rate limiting system:
  * - 5000 points per hour
  * - Different queries cost different points based on complexity
  * - Nested queries and connections increase complexity
- * 
+ *
  * Reference: https://docs.github.com/en/graphql/overview/resource-limitations
  */
 
@@ -35,50 +35,50 @@ const DEFAULT_COMPLEXITY_CONFIG: ComplexityConfig = {
   baseQueryCost: 1,
   fieldCosts: {
     // High-cost fields
-    'history': 5,
-    'commits': 5,
-    'collaborators': 3,
-    'languages': 2,
-    'repositoryTopics': 1,
-    'issues': 2,
-    'pullRequests': 2,
-    'releases': 2,
-    'discussions': 3,
-    'projectsV2': 4,
-    'milestones': 2,
-    'reactions': 1,
-    'reviews': 2,
-    'assignees': 1,
-    'labels': 1,
-    'comments': 1,
-    
+    history: 5,
+    commits: 5,
+    collaborators: 3,
+    languages: 2,
+    repositoryTopics: 1,
+    issues: 2,
+    pullRequests: 2,
+    releases: 2,
+    discussions: 3,
+    projectsV2: 4,
+    milestones: 2,
+    reactions: 1,
+    reviews: 2,
+    assignees: 1,
+    labels: 1,
+    comments: 1,
+
     // Search operations (higher cost)
-    'search': 10,
-    'repositories': 5,
-    'users': 3,
-    'organizations': 3,
-    
+    search: 10,
+    repositories: 5,
+    users: 3,
+    organizations: 3,
+
     // Medium-cost fields
-    'defaultBranchRef': 2,
-    'primaryLanguage': 1,
-    'licenseInfo': 1,
-    'owner': 1,
-    'author': 1,
-    'creator': 1,
-    
+    defaultBranchRef: 2,
+    primaryLanguage: 1,
+    licenseInfo: 1,
+    owner: 1,
+    author: 1,
+    creator: 1,
+
     // Low-cost scalar fields
-    'id': 0,
-    'name': 0,
-    'login': 0,
-    'title': 0,
-    'description': 0,
-    'url': 0,
-    'createdAt': 0,
-    'updatedAt': 0,
-    'stargazerCount': 0,
-    'forkCount': 0,
-    'state': 0,
-    'number': 0,
+    id: 0,
+    name: 0,
+    login: 0,
+    title: 0,
+    description: 0,
+    url: 0,
+    createdAt: 0,
+    updatedAt: 0,
+    stargazerCount: 0,
+    forkCount: 0,
+    state: 0,
+    number: 0,
   },
   connectionMultiplier: 1.5,
   nestedQueryMultiplier: 2,
@@ -155,15 +155,20 @@ export class GraphQLComplexityCalculator {
       }
 
       if (connections.some(c => (c.first || 10) > 100)) {
-        analysis.warnings.push('Large connection limits detected - consider pagination for better performance');
+        analysis.warnings.push(
+          'Large connection limits detected - consider pagination for better performance'
+        );
       }
 
       if (nestedQueries.length > 3) {
-        analysis.warnings.push('High query nesting detected - consider breaking into multiple queries');
+        analysis.warnings.push(
+          'High query nesting detected - consider breaking into multiple queries'
+        );
       }
-
     } catch (error) {
-      analysis.warnings.push(`Failed to parse query: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      analysis.warnings.push(
+        `Failed to parse query: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
       // Fallback to conservative estimate
       analysis.estimatedPoints = 50;
     }
@@ -176,38 +181,45 @@ export class GraphQLComplexityCalculator {
    */
   private extractFields(query: string): string[] {
     const fields: string[] = [];
-    
+
     // Simple regex-based extraction - matches field names
     const fieldRegex = /(\w+)\s*(?:\([^)]*\))?\s*\{|(\w+)(?!\s*[:(])/g;
     let match;
-    
+
     while ((match = fieldRegex.exec(query)) !== null) {
       const fieldName = match[1] || match[2];
-      if (fieldName && 
-          !['query', 'mutation', 'subscription', 'fragment', 'on'].includes(fieldName.toLowerCase()) &&
-          !fieldName.startsWith('$')) {
+      if (
+        fieldName &&
+        !['query', 'mutation', 'subscription', 'fragment', 'on'].includes(
+          fieldName.toLowerCase()
+        ) &&
+        !fieldName.startsWith('$')
+      ) {
         fields.push(fieldName);
       }
     }
-    
+
     return [...new Set(fields)]; // Remove duplicates
   }
 
   /**
    * Extract connection fields with their limits
    */
-  private extractConnections(query: string, variables: Record<string, any>): Array<{field: string, first?: number}> {
-    const connections: Array<{field: string, first?: number}> = [];
-  
+  private extractConnections(
+    query: string,
+    variables: Record<string, any>
+  ): Array<{ field: string; first?: number }> {
+    const connections: Array<{ field: string; first?: number }> = [];
+
     const connectionRegex = /(\w+)\s*\([^)]*first:\s*(?:\$(\w+)|(\d+))[^)]*\)/g;
     let match;
-  
+
     while ((match = connectionRegex.exec(query)) !== null) {
       const fieldName = match[1];
       const variableName = match[2];
       const literalValue = match[3];
       if (!fieldName) continue;
-    
+
       let firstValue: number | undefined;
       if (variableName && Object.prototype.hasOwnProperty.call(variables, variableName)) {
         const raw = (variables as any)[variableName];
@@ -217,41 +229,42 @@ export class GraphQLComplexityCalculator {
         const num = parseInt(literalValue, 10);
         if (Number.isFinite(num)) firstValue = num;
       }
-    
+
       connections.push({ field: fieldName, first: firstValue });
     }
-    
+
     return connections;
   }
 
   /**
    * Extract nested query information
    */
-  private extractNestedQueries(query: string): Array<{level: number}> {
-    const nestedQueries: Array<{level: number}> = [];
-    
+  private extractNestedQueries(query: string): Array<{ level: number }> {
+    const nestedQueries: Array<{ level: number }> = [];
+
     // Count nesting levels by counting opening braces
     let level = 0;
     let maxLevel = 0;
     let nestedCount = 0;
-    
+
     for (const char of query) {
       if (char === '{') {
         level++;
         maxLevel = Math.max(maxLevel, level);
-        if (level > 2) { // Consider nesting after query and first field level
+        if (level > 2) {
+          // Consider nesting after query and first field level
           nestedCount++;
         }
       } else if (char === '}') {
         level--;
       }
     }
-    
+
     // Add nested queries based on detected nesting
     for (let i = 0; i < Math.ceil(nestedCount / 3); i++) {
       nestedQueries.push({ level: Math.min(maxLevel - 1, 5) });
     }
-    
+
     return nestedQueries;
   }
 
@@ -283,13 +296,20 @@ export class GraphQLComplexityCalculator {
   /**
    * Estimate points for common query patterns
    */
-  estimatePatternComplexity(pattern: 'repository_basic' | 'repository_detailed' | 'search_repositories' | 'user_profile' | 'batch_repositories'): number {
+  estimatePatternComplexity(
+    pattern:
+      | 'repository_basic'
+      | 'repository_detailed'
+      | 'search_repositories'
+      | 'user_profile'
+      | 'batch_repositories'
+  ): number {
     const patterns = {
-      'repository_basic': 5,
-      'repository_detailed': 25,
-      'search_repositories': 15,
-      'user_profile': 8,
-      'batch_repositories': 40,
+      repository_basic: 5,
+      repository_detailed: 25,
+      search_repositories: 15,
+      user_profile: 8,
+      batch_repositories: 40,
     };
 
     return patterns[pattern] || 10;
@@ -305,7 +325,7 @@ export const githubComplexityCalculator = new GraphQLComplexityCalculator();
  * Quick complexity estimation for common operations
  */
 export function estimateGraphQLPoints(
-  query: string, 
+  query: string,
   variables: Record<string, any> = {},
   calculator: GraphQLComplexityCalculator = githubComplexityCalculator
 ): number {
@@ -321,7 +341,7 @@ export function isQueryComplexitySafe(
   maxPoints: number = 50
 ): { safe: boolean; points: number; warnings: string[] } {
   const analysis = githubComplexityCalculator.calculateQueryComplexity(query, variables);
-  
+
   return {
     safe: analysis.estimatedPoints <= maxPoints,
     points: analysis.estimatedPoints,

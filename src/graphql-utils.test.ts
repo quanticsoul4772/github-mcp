@@ -3,14 +3,14 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { 
-  cachedGraphQL, 
-  smartGraphQL, 
+import {
+  cachedGraphQL,
+  smartGraphQL,
   batchCachedGraphQL,
   GraphQLTTL,
   getQueryOperation,
   createGraphQLWrapper,
-  GraphQLQueries
+  GraphQLQueries,
 } from './graphql-utils.js';
 import { OptimizedAPIClient } from './optimized-api-client.js';
 import { createMockOctokit } from './__tests__/mocks/octokit.js';
@@ -73,17 +73,23 @@ describe('GraphQL Utils', () => {
       const mockResponse = { createDiscussion: { id: '123' } };
 
       const graphqlSpy = vi.spyOn(mockOptimizedClient, 'graphql').mockResolvedValue(mockResponse);
-      const invalidateSpy = vi.spyOn(mockOptimizedClient, 'invalidateGraphQLCacheForMutation').mockReturnValue(2);
+      const invalidateSpy = vi
+        .spyOn(mockOptimizedClient, 'invalidateGraphQLCacheForMutation')
+        .mockReturnValue(2);
 
       const result = await smartGraphQL(
-        mockOptimizedClient, 
-        mutation, 
+        mockOptimizedClient,
+        mutation,
         { owner: 'test', repo: 'test' },
         { isMutation: true }
       );
 
       expect(result).toEqual(mockResponse);
-      expect(graphqlSpy).toHaveBeenCalledWith(mutation, { owner: 'test', repo: 'test' }, { isMutation: true });
+      expect(graphqlSpy).toHaveBeenCalledWith(
+        mutation,
+        { owner: 'test', repo: 'test' },
+        { isMutation: true }
+      );
       expect(invalidateSpy).toHaveBeenCalledWith(mutation, { owner: 'test', repo: 'test' });
     });
 
@@ -103,14 +109,17 @@ describe('GraphQL Utils', () => {
   describe('batchCachedGraphQL', () => {
     it('should execute multiple GraphQL queries', async () => {
       const queries = [
-        { query: 'query GetRepo1 { repository(owner: "test1", name: "repo1") { name } }', variables: { owner: 'test1', repo: 'repo1' } },
-        { query: 'query GetRepo2 { repository(owner: "test2", name: "repo2") { name } }', variables: { owner: 'test2', repo: 'repo2' } },
+        {
+          query: 'query GetRepo1 { repository(owner: "test1", name: "repo1") { name } }',
+          variables: { owner: 'test1', repo: 'repo1' },
+        },
+        {
+          query: 'query GetRepo2 { repository(owner: "test2", name: "repo2") { name } }',
+          variables: { owner: 'test2', repo: 'repo2' },
+        },
       ];
 
-      const mockResponses = [
-        { repository: { name: 'repo1' } },
-        { repository: { name: 'repo2' } },
-      ];
+      const mockResponses = [{ repository: { name: 'repo1' } }, { repository: { name: 'repo2' } }];
 
       vi.spyOn(mockOptimizedClient, 'graphql')
         .mockResolvedValueOnce(mockResponses[0])
@@ -132,8 +141,9 @@ describe('GraphQL Utils', () => {
         .mockResolvedValueOnce({ repository: { name: 'success' } })
         .mockRejectedValueOnce(new Error('GraphQL Error'));
 
-      await expect(batchCachedGraphQL(mockOptimizedClient, queries))
-        .rejects.toThrow('GraphQL Error');
+      await expect(batchCachedGraphQL(mockOptimizedClient, queries)).rejects.toThrow(
+        'GraphQL Error'
+      );
     });
   });
 
@@ -157,8 +167,14 @@ describe('GraphQL Utils', () => {
     it('should extract operation names from GraphQL queries', () => {
       const testCases = [
         { query: 'query GetRepository { repository { name } }', expected: 'GetRepository' },
-        { query: 'mutation CreateDiscussion { createDiscussion { id } }', expected: 'CreateDiscussion' },
-        { query: 'query GetUser($login: String!) { user(login: $login) { name } }', expected: 'GetUser' },
+        {
+          query: 'mutation CreateDiscussion { createDiscussion { id } }',
+          expected: 'CreateDiscussion',
+        },
+        {
+          query: 'query GetUser($login: String!) { user(login: $login) { name } }',
+          expected: 'GetUser',
+        },
         { query: '{ repository(owner: "test", name: "repo") { name } }', expected: 'repository' },
         { query: 'invalid query', expected: 'unknown_operation' },
       ];
@@ -189,7 +205,11 @@ describe('GraphQL Utils', () => {
 
       vi.spyOn(mockOptimizedClient, 'graphql').mockResolvedValue(mockResponse);
 
-      const result = await wrapper.query('query GetRepo { repository { name } }', { owner: 'test' }, 1000);
+      const result = await wrapper.query(
+        'query GetRepo { repository { name } }',
+        { owner: 'test' },
+        1000
+      );
 
       expect(result).toEqual(mockResponse);
       expect(mockOptimizedClient.graphql).toHaveBeenCalledWith(
@@ -204,9 +224,13 @@ describe('GraphQL Utils', () => {
       const mockResponse = { createDiscussion: { id: '123' } };
 
       vi.spyOn(mockOptimizedClient, 'graphql').mockResolvedValue(mockResponse);
-      const invalidateSpy = vi.spyOn(mockOptimizedClient, 'invalidateGraphQLCacheForMutation').mockReturnValue(1);
+      const invalidateSpy = vi
+        .spyOn(mockOptimizedClient, 'invalidateGraphQLCacheForMutation')
+        .mockReturnValue(1);
 
-      const result = await wrapper.mutate('mutation CreateDiscussion { createDiscussion { id } }', { title: 'Test' });
+      const result = await wrapper.mutate('mutation CreateDiscussion { createDiscussion { id } }', {
+        title: 'Test',
+      });
 
       expect(result).toEqual(mockResponse);
       expect(invalidateSpy).toHaveBeenCalled();
@@ -234,7 +258,7 @@ describe('GraphQL Utils', () => {
         repo: 'repo',
         first: 50,
         after: 'cursor123',
-        categoryId: 'category456'
+        categoryId: 'category456',
       });
       expect(config.operation).toBe('ListDiscussions');
       expect(config.ttl).toBe(GraphQLTTL.DISCUSSIONS_LIST);
@@ -269,8 +293,7 @@ describe('GraphQL Utils', () => {
         .mockRejectedValueOnce(new Error('API Error'));
 
       // Should propagate the error
-      await expect(batchCachedGraphQL(mockOptimizedClient, queries))
-        .rejects.toThrow('API Error');
+      await expect(batchCachedGraphQL(mockOptimizedClient, queries)).rejects.toThrow('API Error');
     });
 
     it('should handle wrapper method errors', async () => {

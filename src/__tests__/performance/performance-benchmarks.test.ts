@@ -30,7 +30,7 @@ describe('Performance Benchmarks', () => {
     issueTools = createIssueTools(mockOctokit, false);
     repoTools = createRepositoryTools(mockOctokit, false);
     prTools = createPullRequestTools(mockOctokit, false);
-    
+
     // Force garbage collection if available
     if (global.gc) {
       global.gc();
@@ -45,9 +45,11 @@ describe('Performance Benchmarks', () => {
     }
     const memoryAfter = process.memoryUsage().heapUsed;
     const memoryDiff = (memoryAfter - memoryBefore) / (1024 * 1024);
-    
+
     if (memoryDiff > PERFORMANCE_THRESHOLDS.MEMORY_INCREASE_MAX_MB) {
-      console.warn(`Memory increase of ${memoryDiff.toFixed(2)}MB detected (threshold: ${PERFORMANCE_THRESHOLDS.MEMORY_INCREASE_MAX_MB}MB)`);
+      console.warn(
+        `Memory increase of ${memoryDiff.toFixed(2)}MB detected (threshold: ${PERFORMANCE_THRESHOLDS.MEMORY_INCREASE_MAX_MB}MB)`
+      );
     }
   });
 
@@ -70,14 +72,16 @@ describe('Performance Benchmarks', () => {
 
     it('should handle file content queries under 200ms', async () => {
       const getFileContents = repoTools.find(tool => tool.tool.name === 'get_file_contents');
-      mockOctokit.repos.getContent.mockResolvedValue({ data: { 
-        type: 'file', 
-        content: Buffer.from('test content').toString('base64'),
-        name: 'README.md',
-        path: 'README.md',
-        size: 100,
-        sha: 'abc123'
-      }});
+      mockOctokit.repos.getContent.mockResolvedValue({
+        data: {
+          type: 'file',
+          content: Buffer.from('test content').toString('base64'),
+          name: 'README.md',
+          path: 'README.md',
+          size: 100,
+          sha: 'abc123',
+        },
+      });
 
       const startTime = performance.now();
       await getFileContents.handler({
@@ -111,18 +115,20 @@ describe('Performance Benchmarks', () => {
   describe('Concurrent Request Handling', () => {
     it('should handle 100 concurrent API calls efficiently', async () => {
       const listIssues = issueTools.find(tool => tool.tool.name === 'list_issues');
-      
+
       // Mock API to return quickly
       mockOctokit.issues.listForRepo.mockResolvedValue({ data: [] });
 
       const concurrentRequests = 100;
-      const requests = Array(concurrentRequests).fill(null).map(() => 
-        listIssues.handler({
-          owner: 'test-owner',
-          repo: 'test-repo',
-          state: 'all',
-        })
-      );
+      const requests = Array(concurrentRequests)
+        .fill(null)
+        .map(() =>
+          listIssues.handler({
+            owner: 'test-owner',
+            repo: 'test-repo',
+            state: 'all',
+          })
+        );
 
       const startTime = performance.now();
       await Promise.all(requests);
@@ -137,21 +143,38 @@ describe('Performance Benchmarks', () => {
       const listIssues = issueTools.find(tool => tool.tool.name === 'list_issues');
       const getFileContents = repoTools.find(tool => tool.tool.name === 'get_file_contents');
       const listPRs = prTools.find(tool => tool.tool.name === 'list_pull_requests');
-      
+
       mockOctokit.issues.listForRepo.mockResolvedValue({ data: [] });
       mockOctokit.repos.get.mockResolvedValue({ data: testFixtures.repositories.public });
       mockOctokit.rest.pulls.list.mockResolvedValue({ data: [] });
 
       const requests = [
-        ...Array(30).fill(null).map(() => listIssues.handler({
-          owner: 'test-owner', repo: 'test-repo', state: 'all'
-        })),
-        ...Array(30).fill(null).map(() => mockOctokit.repos.get({
-          owner: 'test-owner', repo: 'test-repo'
-        })),
-        ...Array(40).fill(null).map(() => listPRs.handler({
-          owner: 'test-owner', repo: 'test-repo', state: 'all'
-        })),
+        ...Array(30)
+          .fill(null)
+          .map(() =>
+            listIssues.handler({
+              owner: 'test-owner',
+              repo: 'test-repo',
+              state: 'all',
+            })
+          ),
+        ...Array(30)
+          .fill(null)
+          .map(() =>
+            mockOctokit.repos.get({
+              owner: 'test-owner',
+              repo: 'test-repo',
+            })
+          ),
+        ...Array(40)
+          .fill(null)
+          .map(() =>
+            listPRs.handler({
+              owner: 'test-owner',
+              repo: 'test-repo',
+              state: 'all',
+            })
+          ),
       ];
 
       const startTime = performance.now();
@@ -166,24 +189,26 @@ describe('Performance Benchmarks', () => {
   describe('Large Dataset Processing', () => {
     it('should process large repository data (10k+ files) efficiently', async () => {
       const getRepoContents = repoTools.find(tool => tool.tool.name === 'get_file_contents');
-      
+
       // Generate large dataset
-      const largeFileList = Array(10000).fill(null).map((_, index) => ({
-        name: `file${index}.ts`,
-        path: `src/file${index}.ts`,
-        type: 'file',
-        size: 1024,
-        sha: `sha${index}`,
-        url: `https://api.github.com/repos/test/test/contents/src/file${index}.ts`,
-        html_url: `https://github.com/test/test/blob/main/src/file${index}.ts`,
-        git_url: `https://api.github.com/repos/test/test/git/blobs/sha${index}`,
-        download_url: `https://raw.githubusercontent.com/test/test/main/src/file${index}.ts`,
-        _links: {
-          self: `https://api.github.com/repos/test/test/contents/src/file${index}.ts`,
-          git: `https://api.github.com/repos/test/test/git/blobs/sha${index}`,
-          html: `https://github.com/test/test/blob/main/src/file${index}.ts`,
-        }
-      }));
+      const largeFileList = Array(10000)
+        .fill(null)
+        .map((_, index) => ({
+          name: `file${index}.ts`,
+          path: `src/file${index}.ts`,
+          type: 'file',
+          size: 1024,
+          sha: `sha${index}`,
+          url: `https://api.github.com/repos/test/test/contents/src/file${index}.ts`,
+          html_url: `https://github.com/test/test/blob/main/src/file${index}.ts`,
+          git_url: `https://api.github.com/repos/test/test/git/blobs/sha${index}`,
+          download_url: `https://raw.githubusercontent.com/test/test/main/src/file${index}.ts`,
+          _links: {
+            self: `https://api.github.com/repos/test/test/contents/src/file${index}.ts`,
+            git: `https://api.github.com/repos/test/test/git/blobs/sha${index}`,
+            html: `https://github.com/test/test/blob/main/src/file${index}.ts`,
+          },
+        }));
 
       mockOctokit.repos.getContent.mockResolvedValue({ data: largeFileList });
 
@@ -203,15 +228,17 @@ describe('Performance Benchmarks', () => {
 
     it('should handle large issue lists efficiently', async () => {
       const listIssues = issueTools.find(tool => tool.tool.name === 'list_issues');
-      
+
       // Generate large issue list
-      const largeIssueList = Array(1000).fill(null).map((_, index) => ({
-        ...testFixtures.issues.open,
-        id: index + 1,
-        number: index + 1,
-        title: `Issue ${index + 1}`,
-        body: `This is issue number ${index + 1} with some content`.repeat(10),
-      }));
+      const largeIssueList = Array(1000)
+        .fill(null)
+        .map((_, index) => ({
+          ...testFixtures.issues.open,
+          id: index + 1,
+          number: index + 1,
+          title: `Issue ${index + 1}`,
+          body: `This is issue number ${index + 1} with some content`.repeat(10),
+        }));
 
       mockOctokit.issues.listForRepo.mockResolvedValue({ data: largeIssueList });
 
@@ -255,13 +282,13 @@ describe('Performance Benchmarks', () => {
       // Check that memory usage is stable (not continuously increasing)
       const memoryIncrease = memoryReadings[memoryReadings.length - 1] - memoryReadings[0];
       const memoryIncreaseMB = memoryIncrease / (1024 * 1024);
-      
+
       expect(memoryIncreaseMB).toBeLessThan(PERFORMANCE_THRESHOLDS.MEMORY_INCREASE_MAX_MB);
     });
 
     it('should not leak memory when handling errors', async () => {
       const listIssues = issueTools.find(tool => tool.tool.name === 'list_issues');
-      
+
       // Mock to throw errors
       mockOctokit.issues.listForRepo.mockRejectedValue(new Error('API Error'));
 
@@ -294,19 +321,21 @@ describe('Performance Benchmarks', () => {
   describe('Timeout Handling', () => {
     it('should handle timeout scenarios gracefully', async () => {
       const listIssues = issueTools.find(tool => tool.tool.name === 'list_issues');
-      
+
       // Mock to simulate timeout
       const timeoutError = new Error('Request timeout');
       timeoutError.name = 'TimeoutError';
       mockOctokit.issues.listForRepo.mockRejectedValue(timeoutError);
 
       const startTime = performance.now();
-      
-      await expect(listIssues.handler({
-        owner: 'test-owner',
-        repo: 'test-repo',
-        state: 'all',
-      })).rejects.toThrow('Request timeout');
+
+      await expect(
+        listIssues.handler({
+          owner: 'test-owner',
+          repo: 'test-repo',
+          state: 'all',
+        })
+      ).rejects.toThrow('Request timeout');
 
       const endTime = performance.now();
       const duration = endTime - startTime;
@@ -317,12 +346,13 @@ describe('Performance Benchmarks', () => {
 
     it('should handle slow responses appropriately', async () => {
       const listIssues = issueTools.find(tool => tool.tool.name === 'list_issues');
-      
+
       // Mock to simulate slow response
-      mockOctokit.issues.listForRepo.mockImplementation(() => 
-        new Promise(resolve => 
-          setTimeout(() => resolve({ data: [testFixtures.issues.open] }), 1500)
-        )
+      mockOctokit.issues.listForRepo.mockImplementation(
+        () =>
+          new Promise(resolve =>
+            setTimeout(() => resolve({ data: [testFixtures.issues.open] }), 1500)
+          )
       );
 
       const startTime = performance.now();
@@ -368,7 +398,7 @@ describe('Performance Benchmarks', () => {
       // Performance should be consistent
       expect(avgDuration).toBeLessThan(PERFORMANCE_THRESHOLDS.SIMPLE_QUERY_MAX_MS);
       expect(maxDuration).toBeLessThan(PERFORMANCE_THRESHOLDS.SIMPLE_QUERY_MAX_MS * 2);
-      
+
       // For very fast operations (< 10ms), allow higher variance due to system noise
       // For slower operations, enforce stricter variance limits
       const varianceThreshold = avgDuration < 10 ? 2.0 : 0.5;

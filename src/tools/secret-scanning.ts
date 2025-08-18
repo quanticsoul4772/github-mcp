@@ -72,7 +72,14 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
           resolution: {
             type: 'string',
             description: 'Filter by resolution',
-            enum: ['false_positive', 'wont_fix', 'revoked', 'used_in_tests', 'pattern_deleted', 'pattern_edited'],
+            enum: [
+              'false_positive',
+              'wont_fix',
+              'revoked',
+              'used_in_tests',
+              'pattern_deleted',
+              'pattern_edited',
+            ],
           },
         },
         required: ['owner', 'repo'],
@@ -89,7 +96,7 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
           resolution: params.resolution as any,
         });
 
-        return data.map((alert) => ({
+        return data.map(alert => ({
           number: alert.number,
           created_at: alert.created_at,
           updated_at: alert.updated_at,
@@ -99,26 +106,31 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
           state: alert.state,
           resolution: alert.resolution,
           resolved_at: alert.resolved_at,
-          resolved_by: alert.resolved_by ? {
-            login: alert.resolved_by.login,
-            type: alert.resolved_by.type,
-          } : null,
+          resolved_by: alert.resolved_by
+            ? {
+                login: alert.resolved_by.login,
+                type: alert.resolved_by.type,
+              }
+            : null,
           resolution_comment: alert.resolution_comment,
           secret_type: alert.secret_type,
           secret_type_display_name: alert.secret_type_display_name,
           secret: alert.secret,
           push_protection_bypassed: alert.push_protection_bypassed,
-          push_protection_bypassed_by: alert.push_protection_bypassed_by ? {
-            login: alert.push_protection_bypassed_by.login,
-            type: alert.push_protection_bypassed_by.type,
-          } : null,
+          push_protection_bypassed_by: alert.push_protection_bypassed_by
+            ? {
+                login: alert.push_protection_bypassed_by.login,
+                type: alert.push_protection_bypassed_by.type,
+              }
+            : null,
           push_protection_bypassed_at: alert.push_protection_bypassed_at,
           validity: alert.validity,
         }));
       } catch (error: any) {
         if (error.status === 404 || error.status === 403) {
           return {
-            error: 'Secret scanning is not enabled for this repository or you do not have permission',
+            error:
+              'Secret scanning is not enabled for this repository or you do not have permission',
           };
         }
         throw error;
@@ -169,21 +181,25 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
           state: data.state,
           resolution: data.resolution,
           resolved_at: data.resolved_at,
-          resolved_by: data.resolved_by ? {
-            login: data.resolved_by.login,
-            type: data.resolved_by.type,
-            id: data.resolved_by.id,
-          } : null,
+          resolved_by: data.resolved_by
+            ? {
+                login: data.resolved_by.login,
+                type: data.resolved_by.type,
+                id: data.resolved_by.id,
+              }
+            : null,
           resolution_comment: data.resolution_comment,
           secret_type: data.secret_type,
           secret_type_display_name: data.secret_type_display_name,
           secret: data.secret,
           push_protection_bypassed: data.push_protection_bypassed,
-          push_protection_bypassed_by: data.push_protection_bypassed_by ? {
-            login: data.push_protection_bypassed_by.login,
-            type: data.push_protection_bypassed_by.type,
-            id: data.push_protection_bypassed_by.id,
-          } : null,
+          push_protection_bypassed_by: data.push_protection_bypassed_by
+            ? {
+                login: data.push_protection_bypassed_by.login,
+                type: data.push_protection_bypassed_by.type,
+                id: data.push_protection_bypassed_by.id,
+              }
+            : null,
           push_protection_bypassed_at: data.push_protection_bypassed_at,
           validity: data.validity,
         };
@@ -244,7 +260,7 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
           per_page: params.perPage,
         });
 
-        return data.map((location) => ({
+        return data.map(location => ({
           type: location.type,
           details: location.details,
         }));
@@ -283,7 +299,14 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
           resolution: {
             type: 'string',
             description: 'Filter by resolution',
-            enum: ['false_positive', 'wont_fix', 'revoked', 'used_in_tests', 'pattern_deleted', 'pattern_edited'],
+            enum: [
+              'false_positive',
+              'wont_fix',
+              'revoked',
+              'used_in_tests',
+              'pattern_deleted',
+              'pattern_edited',
+            ],
           },
           page: {
             type: 'number',
@@ -312,7 +335,7 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
           per_page: params.perPage,
         });
 
-        return data.map((alert) => ({
+        return data.map(alert => ({
           number: alert.number,
           created_at: alert.created_at,
           updated_at: alert.updated_at,
@@ -322,23 +345,27 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
           state: alert.state,
           resolution: alert.resolution,
           resolved_at: alert.resolved_at,
-          resolved_by: alert.resolved_by ? {
-            login: alert.resolved_by.login,
-            type: alert.resolved_by.type,
-          } : null,
+          resolved_by: alert.resolved_by
+            ? {
+                login: alert.resolved_by.login,
+                type: alert.resolved_by.type,
+              }
+            : null,
           secret_type: alert.secret_type,
           secret_type_display_name: alert.secret_type_display_name,
           repository: {
-            name: alert.repository?.name || "",
-            full_name: alert.repository?.full_name || "",
+            name: alert.repository?.name || '',
+            full_name: alert.repository?.full_name || '',
             owner: {
-              login: alert.repository?.owner?.login || "",
+              login: alert.repository?.owner?.login || '',
             },
           },
           push_protection_bypassed: alert.push_protection_bypassed,
-          push_protection_bypassed_by: alert.push_protection_bypassed_by ? {
-            login: alert.push_protection_bypassed_by.login,
-          } : null,
+          push_protection_bypassed_by: alert.push_protection_bypassed_by
+            ? {
+                login: alert.push_protection_bypassed_by.login,
+              }
+            : null,
           validity: alert.validity,
         }));
       } catch (error: any) {
@@ -393,7 +420,7 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
         },
       },
       handler: async (args: unknown) => {
-      const params = args as UpdateSecretScanningAlertParams;
+        const params = args as UpdateSecretScanningAlertParams;
         const { data } = await octokit.secretScanning.updateAlert({
           owner: params.owner,
           repo: params.repo,
@@ -408,9 +435,11 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
           state: data.state,
           resolution: data.resolution,
           resolved_at: data.resolved_at,
-          resolved_by: data.resolved_by ? {
-            login: data.resolved_by.login,
-          } : null,
+          resolved_by: data.resolved_by
+            ? {
+                login: data.resolved_by.login,
+              }
+            : null,
           resolution_comment: data.resolution_comment,
           html_url: data.html_url,
         };

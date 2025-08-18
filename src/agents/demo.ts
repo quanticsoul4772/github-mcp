@@ -5,13 +5,13 @@
  */
 
 import { createAgentSystem, quickAnalyze } from './index.js';
-import { 
-  analyzeFile, 
-  analyzeProject, 
-  generateTestsForFile, 
+import {
+  analyzeFile,
+  analyzeProject,
+  generateTestsForFile,
   generateAnalysisReport,
   quickSecurityScan,
-  monitorAgentHealth 
+  monitorAgentHealth,
 } from './examples/basic-usage.js';
 import { AnalysisContext } from './types/agent-interfaces.js';
 import { ReportData, ReportGenerator } from './reporting/report-generator.js';
@@ -164,7 +164,7 @@ export { Calculator };
 async function createSampleFile(): Promise<string> {
   const tempDir = './temp-demo';
   const sampleFile = path.join(tempDir, 'sample.ts');
-  
+
   try {
     await fs.mkdir(tempDir, { recursive: true });
     await fs.writeFile(sampleFile, SAMPLE_CODE);
@@ -189,76 +189,76 @@ async function cleanupSampleFile(filePath: string): Promise<void> {
 async function runDemo() {
   console.log('🚀 Code Analysis Agent System Demo');
   console.log('═'.repeat(60));
-  
+
   let sampleFile: string | null = null;
-  
+
   try {
     // Create sample file
     sampleFile = await createSampleFile();
-    
+
     console.log('\\n1️⃣ Quick Analysis Demo');
     console.log('─'.repeat(40));
-    
+
     // Quick analysis
     const quickResult = await quickAnalyze(sampleFile, {
-      format: 'text'
+      format: 'text',
     });
-    
+
     console.log('Quick analysis completed!');
     console.log(`Found ${(quickResult as any).analysis.summary.totalFindings} issues`);
-    
+
     console.log('\\n2️⃣ Detailed Single File Analysis');
     console.log('─'.repeat(40));
-    
+
     // Detailed analysis
     await analyzeFile(sampleFile);
-    
+
     console.log('\\n3️⃣ Test Generation Demo');
     console.log('─'.repeat(40));
-    
+
     // Generate tests
     await generateTestsForFile(sampleFile);
-    
+
     console.log('\\n4️⃣ Security Scan Demo');
     console.log('─'.repeat(40));
-    
+
     // Security scan
     const tempDir = path.dirname(sampleFile);
     await quickSecurityScan(tempDir);
-    
+
     console.log('\\n5️⃣ Agent Health Monitoring');
     console.log('─'.repeat(40));
-    
+
     // Health monitoring
     await monitorAgentHealth();
-    
+
     console.log('\\n6️⃣ Report Generation Demo');
     console.log('─'.repeat(40));
-    
+
     // Generate markdown report
     const reportPath = path.join(path.dirname(sampleFile), 'analysis-report.md');
     await generateAnalysisReport(tempDir, 'markdown', reportPath);
-    
+
     console.log('\\n7️⃣ Agent System API Demo');
     console.log('─'.repeat(40));
-    
+
     // Demonstrate the agent system API
     const { coordinator, registry, agents } = createAgentSystem();
-    
+
     console.log(`🤖 Available agents: ${agents.map((a: any) => a.name).join(', ')}`);
-    
+
     // Run coordinated analysis
     const context: AnalysisContext = {
       projectPath: path.dirname(sampleFile),
-      files: [sampleFile]
+      files: [sampleFile],
     };
     const result = await coordinator.runFullAnalysis(context);
-    
+
     console.log(`\\n📊 Coordinated Analysis Results:`);
     console.log(`   Total Findings: ${result.summary.totalFindings}`);
     console.log(`   Agents Run: ${result.summary.agentsRun}`);
     console.log(`   Analysis Time: ${Math.round(result.summary.totalExecutionTime)}ms`);
-    
+
     // Generate JSON report
     const reportData: ReportData = {
       title: 'Demo Analysis Report',
@@ -267,12 +267,12 @@ async function runDemo() {
       metadata: {
         generatedAt: new Date(),
         generatedBy: 'demo',
-        version: '1.0.0'
-      }
+        version: '1.0.0',
+      },
     };
     const reportGenerator = new ReportGenerator();
     const jsonReport = await reportGenerator.generateReport(reportData);
-    
+
     const summary = JSON.parse(jsonReport).summary;
     console.log(`\\n📈 Summary Statistics:`);
     console.log(`   Critical: ${summary.criticalFindings}`);
@@ -280,14 +280,13 @@ async function runDemo() {
     console.log(`   Medium: ${summary.mediumFindings}`);
     console.log(`   Low: ${summary.lowFindings}`);
     console.log(`   Info: ${summary.infoFindings}`);
-    
+
     console.log('\\n✅ Demo completed successfully!');
     console.log('\\n💡 Next Steps:');
     console.log('   - Integrate agents into your CI/CD pipeline');
     console.log('   - Customize agent configurations for your project');
     console.log('   - Create custom agents for specific analysis needs');
     console.log('   - Set up automated reporting and monitoring');
-    
   } catch (error) {
     console.error('\\n❌ Demo failed:', error);
     process.exit(1);

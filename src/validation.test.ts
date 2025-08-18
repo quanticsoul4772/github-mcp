@@ -30,17 +30,19 @@ import {
   validateGitOperation,
   validateCommandOptions,
   sanitizeText,
-  cleanupValidation
+  cleanupValidation,
 } from './validation.js';
 
 // Test token factory to avoid hardcoded secrets
-const createTestToken = (type: 'classic' | 'oauth' | 'fine' | 'installation' | 'legacy' = 'classic'): string => {
+const createTestToken = (
+  type: 'classic' | 'oauth' | 'fine' | 'installation' | 'legacy' = 'classic'
+): string => {
   // Generate random alphanumeric characters for token content
   const randomChar = () => {
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     return chars[Math.floor(Math.random() * chars.length)];
   };
-  
+
   const randomString = (length: number) => {
     let result = '';
     for (let i = 0; i < length; i++) {
@@ -48,7 +50,7 @@ const createTestToken = (type: 'classic' | 'oauth' | 'fine' | 'installation' | '
     }
     return result;
   };
-  
+
   switch (type) {
     case 'classic':
       // Classic PAT: ghp_ + 36 alphanumeric characters
@@ -328,9 +330,9 @@ describe('Validation Module', () => {
     describe('Required Token Validation', () => {
       it('should validate with GITHUB_PERSONAL_ACCESS_TOKEN', () => {
         process.env.GITHUB_PERSONAL_ACCESS_TOKEN = 'ghp_' + 'A'.repeat(36);
-        
+
         const result = validateEnvironmentConfiguration();
-        
+
         expect(result.isValid).toBe(true);
         expect(result.errors).toHaveLength(0);
         expect(result.sanitizedValues.GITHUB_TOKEN).toBe(process.env.GITHUB_PERSONAL_ACCESS_TOKEN);
@@ -338,9 +340,9 @@ describe('Validation Module', () => {
 
       it('should validate with GITHUB_TOKEN', () => {
         process.env.GITHUB_TOKEN = 'gho_' + 'B'.repeat(36);
-        
+
         const result = validateEnvironmentConfiguration();
-        
+
         expect(result.isValid).toBe(true);
         expect(result.errors).toHaveLength(0);
         expect(result.sanitizedValues.GITHUB_TOKEN).toBe(process.env.GITHUB_TOKEN);
@@ -349,28 +351,30 @@ describe('Validation Module', () => {
       it('should prioritize GITHUB_PERSONAL_ACCESS_TOKEN over GITHUB_TOKEN', () => {
         const patToken = 'ghp_' + 'A'.repeat(36);
         const githubToken = 'gho_' + 'B'.repeat(36);
-        
+
         process.env.GITHUB_PERSONAL_ACCESS_TOKEN = patToken;
         process.env.GITHUB_TOKEN = githubToken;
-        
+
         const result = validateEnvironmentConfiguration();
-        
+
         expect(result.isValid).toBe(true);
         expect(result.sanitizedValues.GITHUB_TOKEN).toBe(patToken);
       });
 
       it('should fail when no token is provided', () => {
         const result = validateEnvironmentConfiguration();
-        
+
         expect(result.isValid).toBe(false);
-        expect(result.errors).toContain('GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN environment variable is required');
+        expect(result.errors).toContain(
+          'GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN environment variable is required'
+        );
       });
 
       it('should fail with invalid token format', () => {
         process.env.GITHUB_TOKEN = 'invalid-token-format';
-        
+
         const result = validateEnvironmentConfiguration();
-        
+
         expect(result.isValid).toBe(false);
         expect(result.errors).toContain('Unrecognized token format');
       });
@@ -383,7 +387,7 @@ describe('Validation Module', () => {
 
       it('should validate GITHUB_READ_ONLY values', () => {
         const validValues = ['1', 'true', 'false', '0'];
-        
+
         for (const value of validValues) {
           process.env.GITHUB_READ_ONLY = value;
           const result = validateEnvironmentConfiguration();
@@ -394,63 +398,63 @@ describe('Validation Module', () => {
 
       it('should reject invalid GITHUB_READ_ONLY values', () => {
         process.env.GITHUB_READ_ONLY = 'maybe';
-        
+
         const result = validateEnvironmentConfiguration();
-        
+
         expect(result.isValid).toBe(false);
         expect(result.errors).toContain('Invalid format for environment variable GITHUB_READ_ONLY');
       });
 
       it('should validate GITHUB_TOOLSETS', () => {
         process.env.GITHUB_TOOLSETS = 'repos,issues,pull_requests';
-        
+
         const result = validateEnvironmentConfiguration();
-        
+
         expect(result.isValid).toBe(true);
         expect(result.sanitizedValues.GITHUB_TOOLSETS).toBe('repos,issues,pull_requests');
       });
 
       it('should accept "all" for GITHUB_TOOLSETS', () => {
         process.env.GITHUB_TOOLSETS = 'all';
-        
+
         const result = validateEnvironmentConfiguration();
-        
+
         expect(result.isValid).toBe(true);
         expect(result.sanitizedValues.GITHUB_TOOLSETS).toBe('all');
       });
 
       it('should reject invalid toolset names', () => {
         process.env.GITHUB_TOOLSETS = 'invalid_toolset,repos';
-        
+
         const result = validateEnvironmentConfiguration();
-        
+
         expect(result.isValid).toBe(false);
         expect(result.errors).toContain('Invalid format for environment variable GITHUB_TOOLSETS');
       });
 
       it('should validate GITHUB_HOST URLs', () => {
         process.env.GITHUB_HOST = 'https://github.enterprise.com/api/v3';
-        
+
         const result = validateEnvironmentConfiguration();
-        
+
         expect(result.isValid).toBe(true);
         expect(result.sanitizedValues.GITHUB_HOST).toBe('https://github.enterprise.com/api/v3');
       });
 
       it('should reject non-HTTPS URLs', () => {
         process.env.GITHUB_HOST = 'http://github.com/api/v3';
-        
+
         const result = validateEnvironmentConfiguration();
-        
+
         expect(result.isValid).toBe(false);
         expect(result.errors).toContain('Invalid format for environment variable GITHUB_HOST');
       });
 
       it('should reject localhost URLs', () => {
         process.env.GITHUB_HOST = 'https://localhost:3000/api/v3';
-        
+
         const result = validateEnvironmentConfiguration();
-        
+
         expect(result.isValid).toBe(false);
         expect(result.errors).toContain('Invalid format for environment variable GITHUB_HOST');
       });
@@ -460,9 +464,9 @@ describe('Validation Module', () => {
       it('should remove control characters from tokens', () => {
         const tokenWithControlChars = 'ghp_' + 'A'.repeat(35) + '\x00';
         process.env.GITHUB_TOKEN = tokenWithControlChars + 'B';
-        
+
         const result = validateEnvironmentConfiguration();
-        
+
         expect(result.isValid).toBe(true);
         expect(result.sanitizedValues.GITHUB_TOKEN).toBe('ghp_' + 'A'.repeat(35) + 'B');
         expect(result.sanitizedValues.GITHUB_TOKEN).not.toContain('\x00');
@@ -471,9 +475,9 @@ describe('Validation Module', () => {
       it('should prevent injection attacks in environment variables', () => {
         process.env.GITHUB_TOKEN = 'ghp_' + 'A'.repeat(36);
         process.env.GITHUB_TOOLSETS = 'repos$(cat /etc/passwd)';
-        
+
         const result = validateEnvironmentConfiguration();
-        
+
         expect(result.isValid).toBe(false);
         expect(result.errors).toContain('Invalid format for environment variable GITHUB_TOOLSETS');
       });
@@ -482,9 +486,9 @@ describe('Validation Module', () => {
         process.env.GITHUB_TOKEN = 'invalid-token';
         process.env.GITHUB_READ_ONLY = 'invalid-value';
         process.env.GITHUB_HOST = 'http://localhost';
-        
+
         const result = validateEnvironmentConfiguration();
-        
+
         expect(result.isValid).toBe(false);
         expect(result.errors).toHaveLength(3);
         expect(result.errors).toContain('Unrecognized token format');
@@ -633,7 +637,7 @@ describe('Validation Module', () => {
       it('should bypass validation in development mode', async () => {
         process.env.NODE_ENV = 'development';
         process.env.SKIP_VALIDATION = 'true';
-        
+
         const result = await validateGitHubTokenWithAPI('invalid');
         expect(result.valid).toBe(true);
         expect(result.warnings.some(w => w.code === 'DEV_BYPASS')).toBe(true);
@@ -644,12 +648,12 @@ describe('Validation Module', () => {
         const originalFetch = global.fetch;
         // @ts-ignore
         global.fetch = undefined;
-        
+
         const testToken = createTestToken('classic');
         const result = await validateGitHubTokenWithAPI(testToken);
         expect(result.valid).toBe(false);
         expect(result.errors.some(e => e.code === 'FETCH_NOT_AVAILABLE')).toBe(true);
-        
+
         global.fetch = originalFetch;
       });
 
@@ -657,9 +661,9 @@ describe('Validation Module', () => {
         // Mock successful API response
         global.fetch = vi.fn().mockResolvedValue({
           ok: true,
-          json: async () => ({ login: 'testuser' })
+          json: async () => ({ login: 'testuser' }),
         });
-        
+
         const token = createTestToken('classic');
         const result = await validateGitHubTokenWithAPI(token);
         expect(result.valid).toBe(true);
@@ -822,9 +826,9 @@ describe('Validation Module', () => {
       it('should validate environment variables', () => {
         const env = {
           GITHUB_TOKEN: createTestToken('classic'),
-          NODE_ENV: 'production'
+          NODE_ENV: 'production',
         };
-        
+
         const result = validateEnvironment(env);
         expect(result.valid).toBe(true);
         expect(result.value).toBeDefined();
@@ -841,9 +845,9 @@ describe('Validation Module', () => {
         const env = {
           GITHUB_TOKEN: createTestToken('classic'),
           NODE_ENV: 'production',
-          DEBUG: 'true'
+          DEBUG: 'true',
         };
-        
+
         const result = validateEnvironment(env);
         expect(result.warnings.some(w => w.code === 'DEBUG_IN_PRODUCTION')).toBe(true);
       });
@@ -851,9 +855,9 @@ describe('Validation Module', () => {
       it('should sanitize sensitive values', () => {
         const env = {
           GITHUB_TOKEN: createTestToken('classic'),
-          SECRET_KEY: 'secret123'
+          SECRET_KEY: 'secret123',
         };
-        
+
         const result = validateEnvironment(env);
         expect(result.valid).toBe(true);
         // The sanitized token should be present (needed for API calls)
@@ -864,7 +868,7 @@ describe('Validation Module', () => {
     describe('validateEnvironmentConfiguration', () => {
       it('should validate full environment configuration', async () => {
         process.env.GITHUB_TOKEN = createTestToken('classic');
-        
+
         const result = await validateEnvironmentConfiguration();
         expect(result.isValid).toBe(true);
         expect(result.sanitizedValues).toBeDefined();
@@ -912,17 +916,17 @@ describe('Validation Module', () => {
     it('should track failures and open circuit', async () => {
       // Mock fetch to always fail
       global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
-      
+
       // Make multiple failed attempts
       for (let i = 0; i < 5; i++) {
         await validateGitHubTokenWithAPI(['ghp', '_test123'].join(''));
       }
-      
+
       // Circuit should be open now, next call should fail fast
       const start = Date.now();
       const result = await validateGitHubTokenWithAPI(['ghp', '_test123'].join(''));
       const duration = Date.now() - start;
-      
+
       expect(result.valid).toBe(false);
       expect(duration).toBeLessThan(100); // Should fail fast
     });
@@ -931,13 +935,13 @@ describe('Validation Module', () => {
   describe('Cache Functionality', () => {
     it('should cache validation results', () => {
       const token = createTestToken('classic');
-      
+
       // First call
       const result1 = validateGitHubTokenWithResult(token);
-      
+
       // Second call should use cache
       const result2 = validateGitHubTokenWithResult(token);
-      
+
       expect(result1).toEqual(result2);
     });
   });
@@ -946,10 +950,10 @@ describe('Validation Module', () => {
     it('should clean up resources', () => {
       // Create some cached data
       validateGitHubTokenWithResult(['ghp', '_test123'].join(''));
-      
+
       // Cleanup
       cleanupValidation();
-      
+
       // Cache should be cleared (we can't directly test this without exposing internals)
       // But we can verify the function exists and doesn't throw
       expect(cleanupValidation).toBeDefined();

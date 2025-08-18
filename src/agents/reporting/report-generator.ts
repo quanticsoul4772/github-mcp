@@ -1,24 +1,24 @@
 /**
  * Comprehensive Report Generator
- * 
+ *
  * This module provides secure report generation with proper XSS protection
  * for both general reports and code analysis results.
  * All user input is properly escaped to prevent security vulnerabilities.
  */
 
-import { 
-  escapeHtml, 
-  escapeHtmlAttribute, 
-  safeHtmlTemplate, 
+import {
+  escapeHtml,
+  escapeHtmlAttribute,
+  safeHtmlTemplate,
   safeStringify,
-  stripHtmlTags 
+  stripHtmlTags,
 } from '../../utils/html-security.js';
 import {
   AnalysisReport,
   CoordinationResult,
   Finding,
   Severity,
-  FindingCategory
+  FindingCategory,
 } from '../types.js';
 import { logger } from '../../logger.js';
 import * as path from 'path';
@@ -89,7 +89,7 @@ export interface ReportSummary {
 
 /**
  * Comprehensive Report Generator
- * 
+ *
  * This class generates both general HTML reports and code analysis reports
  * with proper security measures to prevent XSS attacks.
  * All user input is automatically escaped and validated.
@@ -103,7 +103,7 @@ export class ReportGenerator {
 
   /**
    * Generates a complete HTML report from the provided data
-   * 
+   *
    * @param data - The report data to render
    * @returns A secure HTML string
    */
@@ -112,11 +112,13 @@ export class ReportGenerator {
 
     const escapedTitle = escapeHtml(data.title);
     const escapedSummary = escapeHtml(data.summary);
-    
+
     const sectionsHtml = data.sections
       .map(section => this.renderSection(section))
-      .join('\
-');
+      .join(
+        '\
+'
+      );
 
     const metadataHtml = this.renderMetadata(data.metadata);
 
@@ -125,14 +127,14 @@ export class ReportGenerator {
       summary: escapedSummary,
       sections: sectionsHtml,
       metadata: metadataHtml,
-      styles: this.cssStyles
+      styles: this.cssStyles,
     });
   }
 
   /**
    * Safely generates a report with default values for missing fields
    * This method provides defensive programming to prevent workflow failures
-   * 
+   *
    * @param data - Partial report data that might be missing required fields
    * @returns A secure HTML string
    */
@@ -142,16 +144,16 @@ export class ReportGenerator {
       summary: data.summary || 'Analysis completed',
       sections: data.sections || [],
       metadata: {
-          generatedAt: (() => {
-            const v = data.metadata?.generatedAt;
-            const d = v instanceof Date ? v : (v ? new Date(v as any) : undefined);
-            return (d && !isNaN(d.getTime())) ? d : new Date();
-          })(),
-          generatedBy: data.metadata?.generatedBy ?? 'Security Analysis Agent (Safe Mode)',
+        generatedAt: (() => {
+          const v = data.metadata?.generatedAt;
+          const d = v instanceof Date ? v : v ? new Date(v as any) : undefined;
+          return d && !isNaN(d.getTime()) ? d : new Date();
+        })(),
+        generatedBy: data.metadata?.generatedBy ?? 'Security Analysis Agent (Safe Mode)',
         version: data.metadata?.version ?? '1.0.0',
         repository: data.metadata?.repository ?? 'Unknown',
-        branch: data.metadata?.branch ?? 'Unknown'
-      }
+        branch: data.metadata?.branch ?? 'Unknown',
+      },
     };
 
     return this.generateReport(safeData);
@@ -201,7 +203,6 @@ export class ReportGenerator {
       }
 
       return report;
-
     } catch (error) {
       logger.error('Failed to generate analysis report', { error });
       throw error;
@@ -214,13 +215,15 @@ export class ReportGenerator {
   private renderSection(section: ReportSection): string {
     const escapedTitle = escapeHtml(section.title);
     const escapedContent = escapeHtml(section.content);
-    
+
     let subsectionsHtml = '';
     if (section.subsections && section.subsections.length > 0) {
       subsectionsHtml = section.subsections
         .map(subsection => this.renderSubsection(subsection))
-        .join('\
-');
+        .join(
+          '\
+'
+        );
     }
 
     let dataHtml = '';
@@ -244,7 +247,7 @@ export class ReportGenerator {
   private renderSubsection(subsection: ReportSubsection): string {
     const escapedTitle = escapeHtml(subsection.title);
     const escapedContent = escapeHtml(subsection.content);
-    
+
     let dataHtml = '';
     if (subsection.data) {
       dataHtml = this.renderDataTable(subsection.data);
@@ -267,7 +270,7 @@ export class ReportGenerator {
       .map(([key, value]) => {
         const escapedKey = escapeHtml(key);
         const escapedValue = safeStringify(value);
-        
+
         return `
           <tr>
             <td class=\"data-key\">${escapedKey}</td>
@@ -275,8 +278,10 @@ export class ReportGenerator {
           </tr>
         `;
       })
-      .join('\
-');
+      .join(
+        '\
+'
+      );
 
     return `
       <table class=\"data-table\">
@@ -310,7 +315,7 @@ export class ReportGenerator {
           <span class=\"metadata-label\">Repository:</span>
           <span class=\"metadata-value\">${escapedRepository}</span>
         </div>`;
-      
+
       if (escapedBranch) {
         repositoryInfo += `
           <div class=\"metadata-item\">
@@ -397,7 +402,7 @@ export class ReportGenerator {
       [Severity.HIGH]: 0,
       [Severity.MEDIUM]: 0,
       [Severity.LOW]: 0,
-      [Severity.INFO]: 0
+      [Severity.INFO]: 0,
     };
 
     const categoryCounts: Record<FindingCategory, number> = {} as Record<FindingCategory, number>;
@@ -412,7 +417,7 @@ export class ReportGenerator {
       .map(([category, count]) => ({
         category: category as FindingCategory,
         count,
-        severity: this.getTypicalSeverityForCategory(category as FindingCategory, findings)
+        severity: this.getTypicalSeverityForCategory(category as FindingCategory, findings),
       }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
@@ -424,16 +429,12 @@ export class ReportGenerator {
       mediumFindings: severityCounts[Severity.MEDIUM],
       lowFindings: severityCounts[Severity.LOW],
       infoFindings: severityCounts[Severity.INFO],
-      filesAnalyzed: isCoordination 
+      filesAnalyzed: isCoordination
         ? data.reports.reduce((sum, r) => sum + r.summary.filesAnalyzed, 0)
         : data.summary.filesAnalyzed,
-      agentsUsed: isCoordination 
-        ? data.summary.agentsUsed 
-        : [data.agentName],
-      analysisTime: isCoordination 
-        ? data.summary.totalDuration 
-        : data.duration,
-      topIssues
+      agentsUsed: isCoordination ? data.summary.agentsUsed : [data.agentName],
+      analysisTime: isCoordination ? data.summary.totalDuration : data.duration,
+      topIssues,
     };
   }
 
@@ -473,7 +474,7 @@ export class ReportGenerator {
    * Group findings by specified criteria
    */
   private groupFindings(
-    findings: Finding[], 
+    findings: Finding[],
     groupBy?: 'severity' | 'category' | 'file'
   ): Record<string, Finding[]> {
     if (!groupBy) {
@@ -484,7 +485,7 @@ export class ReportGenerator {
 
     findings.forEach(finding => {
       let key: string;
-      
+
       switch (groupBy) {
         case 'severity':
           key = finding.severity;
@@ -512,7 +513,13 @@ export class ReportGenerator {
    * Sort findings by specified criteria
    */
   private sortFindings(findings: Finding[], sortBy: string): Finding[] {
-    const severityOrder = [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW, Severity.INFO];
+    const severityOrder = [
+      Severity.CRITICAL,
+      Severity.HIGH,
+      Severity.MEDIUM,
+      Severity.LOW,
+      Severity.INFO,
+    ];
     const list = findings.slice();
 
     return list.sort((a, b) => {
@@ -545,18 +552,20 @@ export class ReportGenerator {
       metadata: {
         generatedAt: new Date().toISOString(),
         format: 'json',
-        version: '1.0.0'
+        version: '1.0.0',
       },
       summary,
       ...(options.includeDetails && { data }),
-      findings: options.includeDetails ? findings : findings.map(f => ({
-        id: f.id,
-        severity: f.severity,
-        category: f.category,
-        title: f.title,
-        file: f.file,
-        line: f.line
-      }))
+      findings: options.includeDetails
+        ? findings
+        : findings.map(f => ({
+            id: f.id,
+            severity: f.severity,
+            category: f.category,
+            title: f.title,
+            file: f.file,
+            line: f.line,
+          })),
     };
 
     return JSON.stringify(report, null, 2);
@@ -571,10 +580,11 @@ export class ReportGenerator {
     groupedFindings: Record<string, Finding[]>,
     options: ReportOptions
   ): string {
-    let report = '# Code Analysis Report\
+    let report =
+      '# Code Analysis Report\
 \
 ';
-    
+
     // Metadata
     report += `**Generated:** ${new Date().toISOString()}\
 `;
@@ -585,7 +595,8 @@ export class ReportGenerator {
 `;
 
     // Summary
-    report += '## Summary\
+    report +=
+      '## Summary\
 \
 ';
     report += `- **Total Findings:** ${summary.totalFindings}\
@@ -605,10 +616,12 @@ export class ReportGenerator {
 `;
 
     // Severity distribution chart
-    report += '### Severity Distribution\
+    report +=
+      '### Severity Distribution\
 \
 ';
-    report += '```\
+    report +=
+      '```\
 ';
     const maxCount = Math.max(
       summary.criticalFindings,
@@ -617,14 +630,14 @@ export class ReportGenerator {
       summary.lowFindings,
       summary.infoFindings
     );
-    
+
     if (maxCount > 0) {
       const severities = [
         { name: 'Critical', count: summary.criticalFindings, symbol: '🔴' },
         { name: 'High', count: summary.highFindings, symbol: '🟠' },
         { name: 'Medium', count: summary.mediumFindings, symbol: '🟡' },
         { name: 'Low', count: summary.lowFindings, symbol: '🔵' },
-        { name: 'Info', count: summary.infoFindings, symbol: '⚪' }
+        { name: 'Info', count: summary.infoFindings, symbol: '⚪' },
       ];
 
       severities.forEach(sev => {
@@ -634,13 +647,15 @@ export class ReportGenerator {
 `;
       });
     }
-    report += '```\
+    report +=
+      '```\
 \
 ';
 
     // Top issues
     if (summary.topIssues.length > 0) {
-      report += '### Top Issues\
+      report +=
+        '### Top Issues\
 \
 ';
       summary.topIssues.forEach((issue, index) => {
@@ -648,60 +663,67 @@ export class ReportGenerator {
         report += `${index + 1}. ${emoji} **${issue.category.replace(/_/g, ' ')}** (${issue.count} occurrences)\
 `;
       });
-      report += '\
+      report +=
+        '\
 ';
     }
 
     // Detailed findings
     if (options.includeDetails) {
-      report += '## Detailed Findings\
+      report +=
+        '## Detailed Findings\
 \
 ';
-      
+
       Object.entries(groupedFindings).forEach(([group, findings]) => {
         if (findings.length === 0) return;
-        
+
         report += `### ${this.formatGroupName(group)}\
 \
 `;
-        
+
         findings.forEach(finding => {
           const emoji = this.getSeverityEmoji(finding.severity);
           report += `#### ${emoji} ${finding.title}\
 `;
           report += `- **File:** \`${finding.file}\`\
 `;
-          if (finding.line) report += `- **Line:** ${finding.line}\
+          if (finding.line)
+            report += `- **Line:** ${finding.line}\
 `;
           report += `- **Severity:** ${finding.severity}\
 `;
           report += `- **Category:** ${finding.category.replace(/_/g, ' ')}\
 `;
-          if (finding.rule) report += `- **Rule:** ${finding.rule}\
+          if (finding.rule)
+            report += `- **Rule:** ${finding.rule}\
 `;
           report += `\
 **Description:** ${finding.description}\
 \
 `;
-          
+
           if (finding.snippet) {
-            report += '**Code:**\
+            report +=
+              '**Code:**\
 ```typescript\
 ';
             report += finding.snippet;
-            report += '\
+            report +=
+              '\
 ```\
 \
 ';
           }
-          
+
           if (finding.suggestion) {
             report += `**Suggestion:** ${finding.suggestion}\
 \
 `;
           }
-          
-          report += '---\
+
+          report +=
+            '---\
 \
 ';
         });
@@ -814,7 +836,7 @@ export class ReportGenerator {
         { name: 'High', count: summary.highFindings, color: '#fd7e14' },
         { name: 'Medium', count: summary.mediumFindings, color: '#ffc107' },
         { name: 'Low', count: summary.lowFindings, color: '#17a2b8' },
-        { name: 'Info', count: summary.infoFindings, color: '#6c757d' }
+        { name: 'Info', count: summary.infoFindings, color: '#6c757d' },
       ];
 
       severities.forEach(sev => {
@@ -835,12 +857,12 @@ export class ReportGenerator {
     // Add detailed findings if requested
     if (options.includeDetails) {
       html += `<h2>🔍 Detailed Findings</h2>`;
-      
+
       Object.entries(groupedFindings).forEach(([group, findings]) => {
         if (findings.length === 0) return;
-        
+
         html += `<h3>${this.formatGroupName(group)}</h3>`;
-        
+
         findings.forEach(finding => {
           const severityClass = `severity-${finding.severity}`;
           html += `
@@ -852,15 +874,15 @@ export class ReportGenerator {
                     ⚠️ ${finding.severity}
                 </div>
                 <div class=\"finding-description\">${escapeHtml(finding.description)}</div>`;
-          
+
           if (finding.snippet) {
             html += `<div class=\"code-snippet\">${escapeHtml(finding.snippet)}</div>`;
           }
-          
+
           if (finding.suggestion) {
             html += `<div class=\"suggestion\"><strong>💡 Suggestion:</strong> ${escapeHtml(finding.suggestion)}</div>`;
           }
-          
+
           html += `</div>`;
         });
       });
@@ -884,13 +906,16 @@ export class ReportGenerator {
     options: ReportOptions
   ): string {
     let report = '';
-    
+
     // Header
-    report += '╔══════════════════════════════════════════════════════════════════════════════╗\
+    report +=
+      '╔══════════════════════════════════════════════════════════════════════════════╗\
 ';
-    report += '║                            CODE ANALYSIS REPORT                             ║\
+    report +=
+      '║                            CODE ANALYSIS REPORT                             ║\
 ';
-    report += '╚══════════════════════════════════════════════════════════════════════════════╝\
+    report +=
+      '╚══════════════════════════════════════════════════════════════════════════════╝\
 \
 ';
 
@@ -937,7 +962,8 @@ export class ReportGenerator {
         report += `${index + 1}. ${emoji} ${issue.category.replace(/_/g, ' ')} (${issue.count})\
 `;
       });
-      report += '\
+      report +=
+        '\
 ';
     }
 
@@ -948,15 +974,15 @@ export class ReportGenerator {
       report += `${'═'.repeat(80)}\
 \
 `;
-      
+
       Object.entries(groupedFindings).forEach(([group, findings]) => {
         if (findings.length === 0) return;
-        
+
         report += `📁 ${this.formatGroupName(group).toUpperCase()}\
 `;
         report += `${'─'.repeat(50)}\
 `;
-        
+
         findings.forEach((finding, index) => {
           const emoji = this.getSeverityEmoji(finding.severity);
           report += `${index + 1}. ${emoji} ${finding.title}\
@@ -967,17 +993,19 @@ export class ReportGenerator {
 `;
           report += `   📝 ${finding.description}\
 `;
-          
+
           if (finding.suggestion) {
             report += `   💡 ${finding.suggestion}\
 `;
           }
-          
-          report += '\
+
+          report +=
+            '\
 ';
         });
-        
-        report += '\
+
+        report +=
+          '\
 ';
       });
     }
@@ -999,10 +1027,12 @@ export class ReportGenerator {
       'Line',
       'Column',
       'Rule',
-      'Suggestion'
+      'Suggestion',
     ];
 
-    let csv = headers.join(',') + '\
+    let csv =
+      headers.join(',') +
+      '\
 ';
 
     findings.forEach(finding => {
@@ -1016,9 +1046,11 @@ export class ReportGenerator {
         finding.line?.toString() || '',
         finding.column?.toString() || '',
         this.escapeCsv(finding.rule || ''),
-        this.escapeCsv(finding.suggestion || '')
+        this.escapeCsv(finding.suggestion || ''),
       ];
-      csv += row.join(',') + '\
+      csv +=
+        row.join(',') +
+        '\
 ';
     });
 
@@ -1029,12 +1061,14 @@ export class ReportGenerator {
    * Generate recommendations based on analysis results
    */
   private generateRecommendations(summary: ReportSummary): string {
-    let recommendations = '## 💡 Recommendations\
+    let recommendations =
+      '## 💡 Recommendations\
 \
 ';
 
     if (summary.criticalFindings > 0) {
-      recommendations += '### 🚨 Immediate Action Required\
+      recommendations +=
+        '### 🚨 Immediate Action Required\
 ';
       recommendations += `You have ${summary.criticalFindings} critical issues that need immediate attention. These could lead to security vulnerabilities or system failures.\
 \
@@ -1042,7 +1076,8 @@ export class ReportGenerator {
     }
 
     if (summary.highFindings > 0) {
-      recommendations += '### ⚠️ High Priority\
+      recommendations +=
+        '### ⚠️ High Priority\
 ';
       recommendations += `Address ${summary.highFindings} high-priority issues to improve code reliability and maintainability.\
 \
@@ -1050,33 +1085,42 @@ export class ReportGenerator {
     }
 
     if (summary.topIssues.length > 0) {
-      recommendations += '### 🎯 Focus Areas\
+      recommendations +=
+        '### 🎯 Focus Areas\
 ';
-      recommendations += 'Based on the analysis, focus on these areas:\
+      recommendations +=
+        'Based on the analysis, focus on these areas:\
 \
 ';
-      
+
       summary.topIssues.slice(0, 3).forEach((issue, index) => {
         recommendations += `${index + 1}. **${issue.category.replace(/_/g, ' ')}** - Found ${issue.count} instances\
 `;
       });
-      recommendations += '\
+      recommendations +=
+        '\
 ';
     }
 
     // General recommendations based on findings
-    recommendations += '### 📋 General Recommendations\
+    recommendations +=
+      '### 📋 General Recommendations\
 \
 ';
-    recommendations += '- Set up automated code quality checks in your CI/CD pipeline\
+    recommendations +=
+      '- Set up automated code quality checks in your CI/CD pipeline\
 ';
-    recommendations += '- Consider using a linter with stricter rules\
+    recommendations +=
+      '- Consider using a linter with stricter rules\
 ';
-    recommendations += '- Implement code review processes\
+    recommendations +=
+      '- Implement code review processes\
 ';
-    recommendations += '- Add comprehensive test coverage\
+    recommendations +=
+      '- Add comprehensive test coverage\
 ';
-    recommendations += '- Document coding standards for your team\
+    recommendations +=
+      '- Document coding standards for your team\
 \
 ';
 
@@ -1091,7 +1135,7 @@ export class ReportGenerator {
       [Severity.HIGH]: '🟠',
       [Severity.MEDIUM]: '🟡',
       [Severity.LOW]: '🔵',
-      [Severity.INFO]: '⚪'
+      [Severity.INFO]: '⚪',
     };
     return emojiMap[severity] || '⚪';
   }
@@ -1103,20 +1147,28 @@ export class ReportGenerator {
   private getTypicalSeverityForCategory(category: FindingCategory, findings: Finding[]): Severity {
     const categoryFindings = findings.filter(f => f.category === category);
     if (categoryFindings.length === 0) return Severity.INFO;
-    
+
     // Return the most common severity for this category
-    const severityCounts = categoryFindings.reduce((acc, f) => {
-      acc[f.severity] = (acc[f.severity] || 0) + 1;
-      return acc;
-    }, {} as Record<Severity, number>);
-    
-    return Object.entries(severityCounts)
-      .sort(([,a], [,b]) => b - a)[0][0] as Severity;
+    const severityCounts = categoryFindings.reduce(
+      (acc, f) => {
+        acc[f.severity] = (acc[f.severity] || 0) + 1;
+        return acc;
+      },
+      {} as Record<Severity, number>
+    );
+
+    return Object.entries(severityCounts).sort(([, a], [, b]) => b - a)[0][0] as Severity;
   }
 
   private escapeCsv(text: string): string {
-    if (text.includes(',') || text.includes('\"') || text.includes('\
-')) {
+    if (
+      text.includes(',') ||
+      text.includes('\"') ||
+      text.includes(
+        '\
+'
+      )
+    ) {
       return `\"${text.replace(/\"/g, '\"\"')}\"`;
     }
     return text;
@@ -1127,7 +1179,7 @@ export class ReportGenerator {
       // Ensure directory exists
       const dir = path.dirname(outputPath);
       await fs.mkdir(dir, { recursive: true });
-      
+
       // Write file
       await fs.writeFile(outputPath, content, 'utf-8');
     } catch (error) {
@@ -1145,28 +1197,40 @@ export class ReportGenerator {
     }
 
     if (!data.title || typeof data.title !== 'string') {
-      throw new Error(`Report title must be a non-empty string. Received: ${typeof data.title} (${JSON.stringify(data.title)})`);
+      throw new Error(
+        `Report title must be a non-empty string. Received: ${typeof data.title} (${JSON.stringify(data.title)})`
+      );
     }
 
     if (!data.summary || typeof data.summary !== 'string') {
-      throw new Error(`Report summary must be a non-empty string. Received: ${typeof data.summary} (${JSON.stringify(data.summary)})`);
+      throw new Error(
+        `Report summary must be a non-empty string. Received: ${typeof data.summary} (${JSON.stringify(data.summary)})`
+      );
     }
 
     if (!Array.isArray(data.sections)) {
-      throw new Error(`Report sections must be an array. Received: ${typeof data.sections} (${JSON.stringify(data.sections)})`);
+      throw new Error(
+        `Report sections must be an array. Received: ${typeof data.sections} (${JSON.stringify(data.sections)})`
+      );
     }
 
     if (!data.metadata || typeof data.metadata !== 'object') {
-      throw new Error(`Report metadata must be a valid object. Received: ${typeof data.metadata} (${JSON.stringify(data.metadata)})`);
+      throw new Error(
+        `Report metadata must be a valid object. Received: ${typeof data.metadata} (${JSON.stringify(data.metadata)})`
+      );
     }
 
     // Validate each section
     data.sections.forEach((section, index) => {
       if (!section.title || typeof section.title !== 'string') {
-        throw new Error(`Section ${index} must have a valid title. Received: ${typeof section.title} (${JSON.stringify(section.title)})`);
+        throw new Error(
+          `Section ${index} must have a valid title. Received: ${typeof section.title} (${JSON.stringify(section.title)})`
+        );
       }
       if (!section.content || typeof section.content !== 'string') {
-        throw new Error(`Section ${index} must have valid content. Received: ${typeof section.content} (${JSON.stringify(section.content)})`);
+        throw new Error(
+          `Section ${index} must have valid content. Received: ${typeof section.content} (${JSON.stringify(section.content)})`
+        );
       }
     });
   }
@@ -1364,7 +1428,7 @@ export class ReportGenerator {
     this.validateReportData(data);
 
     const lines: string[] = [];
-    
+
     // Title and summary
     lines.push(data.title.toUpperCase());
     lines.push('='.repeat(data.title.length));
@@ -1402,17 +1466,19 @@ export class ReportGenerator {
     lines.push(`Generated: ${data.metadata.generatedAt.toISOString()}`);
     lines.push(`Generated By: ${data.metadata.generatedBy}`);
     lines.push(`Version: ${data.metadata.version}`);
-    
+
     if (data.metadata.repository) {
       lines.push(`Repository: ${data.metadata.repository}`);
     }
-    
+
     if (data.metadata.branch) {
       lines.push(`Branch: ${data.metadata.branch}`);
     }
 
-    return lines.join('\
-');
+    return lines.join(
+      '\
+'
+    );
   }
 }
 

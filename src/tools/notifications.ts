@@ -95,7 +95,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
     handler: async (args: unknown) => {
       const params = args as ListNotificationsParams;
       let data;
-      
+
       if (params.owner && params.repo) {
         const response = await octokit.activity.listRepoNotificationsForAuthenticatedUser({
           owner: params.owner,
@@ -120,7 +120,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
         data = response.data;
       }
 
-      return data.map((notification) => ({
+      return data.map(notification => ({
         id: notification.id,
         unread: notification.unread,
         reason: notification.reason,
@@ -313,7 +313,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
         },
       },
       handler: async (args: unknown) => {
-      const params = args as DismissNotificationParams;
+        const params = args as DismissNotificationParams;
         await octokit.activity.markThreadAsRead({
           thread_id: parseInt(params.threadID),
         });
@@ -356,7 +356,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
         },
       },
       handler: async (args: unknown) => {
-      const params = args as MarkAllNotificationsReadParams;
+        const params = args as MarkAllNotificationsReadParams;
         if (params.owner && params.repo) {
           await octokit.activity.markRepoNotificationsAsRead({
             owner: params.owner,
@@ -403,7 +403,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
         },
       },
       handler: async (args: unknown) => {
-      const params = args as ManageNotificationSubscriptionParams;
+        const params = args as ManageNotificationSubscriptionParams;
         const threadId = parseInt(params.notificationID);
 
         if (params.action === 'delete') {
@@ -459,7 +459,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
         },
       },
       handler: async (args: unknown) => {
-      const params = args as ManageRepositoryNotificationSubscriptionParams;
+        const params = args as ManageRepositoryNotificationSubscriptionParams;
         if (params.action === 'delete') {
           await octokit.activity.deleteRepoSubscription({
             owner: params.owner,

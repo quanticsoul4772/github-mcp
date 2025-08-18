@@ -19,13 +19,13 @@ describe('Edge Cases and Error Handling', () => {
   beforeEach(async () => {
     registry = new DefaultAgentRegistry();
     coordinator = new DefaultAgentCoordinator(registry);
-    
+
     // Register agents
     registry.register(new CodeAnalysisAgent());
     registry.register(new TypeSafetyAgent());
     registry.register(new TestingAgent());
     registry.register(new SecurityAgent());
-    
+
     // Create temporary directory for test files
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'edge-case-test-'));
   });
@@ -44,8 +44,8 @@ describe('Edge Cases and Error Handling', () => {
       const options = {
         target: {
           type: 'directory' as const,
-          path: emptyDir
-        }
+          path: emptyDir,
+        },
       };
 
       const result = await coordinator.coordinate(options);
@@ -66,8 +66,8 @@ describe('Edge Cases and Error Handling', () => {
       const options = {
         target: {
           type: 'project' as const,
-          path: tempDir
-        }
+          path: tempDir,
+        },
       };
 
       const result = await coordinator.coordinate(options);
@@ -83,8 +83,8 @@ describe('Edge Cases and Error Handling', () => {
       const options = {
         target: {
           type: 'project' as const,
-          path: tempDir
-        }
+          path: tempDir,
+        },
       };
 
       const result = await coordinator.coordinate(options);
@@ -104,8 +104,8 @@ describe('Edge Cases and Error Handling', () => {
       const options = {
         target: {
           type: 'project' as const,
-          path: tempDir
-        }
+          path: tempDir,
+        },
       };
 
       const result = await coordinator.coordinate(options);
@@ -123,13 +123,13 @@ describe('Edge Cases and Error Handling', () => {
       const options = {
         target: {
           type: 'directory' as const,
-          path: nonexistentPath
-        }
+          path: nonexistentPath,
+        },
       };
 
       // Should not throw, but return empty results
       const result = await coordinator.coordinate(options);
-      
+
       expect(result).toHaveProperty('summary');
       expect(result).toHaveProperty('reports');
       expect(result).toHaveProperty('consolidatedFindings');
@@ -141,9 +141,9 @@ describe('Edge Cases and Error Handling', () => {
       const options = {
         target: {
           type: 'project' as const,
-          path: tempDir
+          path: tempDir,
           // exclude is intentionally undefined
-        }
+        },
       };
 
       const result = await coordinator.coordinate(options);
@@ -176,8 +176,8 @@ describe('Edge Cases and Error Handling', () => {
       await fs.writeFile(path.join(tempDir, 'test.js'), 'var x = 1;');
 
       // Test with invalid format option
-      const result = await quickAnalyze(tempDir, { 
-        format: 'invalid-format' as any 
+      const result = await quickAnalyze(tempDir, {
+        format: 'invalid-format' as any,
       });
 
       expect(result).toHaveProperty('analysis');
@@ -198,9 +198,11 @@ describe('Edge Cases and Error Handling', () => {
       await fs.writeFile(path.join(tempDir, 'test.js'), 'var x = 1;');
 
       // Should throw an error for unknown agents
-      await expect(quickAnalyze(tempDir, { 
-        agents: ['nonexistent-agent'] 
-      })).rejects.toThrow('Unknown agents: nonexistent-agent');
+      await expect(
+        quickAnalyze(tempDir, {
+          agents: ['nonexistent-agent'],
+        })
+      ).rejects.toThrow('Unknown agents: nonexistent-agent');
     });
 
     test('should handle path that cannot be read', async () => {
@@ -245,7 +247,7 @@ describe('Edge Cases and Error Handling', () => {
 
       // Registry should allow modifications
       expect(system.registry.getAgentCount()).toBe(initialAgentCount);
-      
+
       // The agents array is a snapshot, so modifying registry won't affect it
       expect(system.agents.length).toBe(initialAgentCount);
     });
@@ -256,15 +258,15 @@ describe('Edge Cases and Error Handling', () => {
       // Create coordinator with minimal context that might not populate findings
       const context: AnalysisContext = {
         projectPath: tempDir,
-        files: []
+        files: [],
       };
 
       const report = await coordinator.runFullAnalysis(context);
       const result = await coordinator.coordinate({
         target: {
           type: 'project',
-          path: tempDir
-        }
+          path: tempDir,
+        },
       });
 
       // Should handle empty or undefined findings gracefully
@@ -279,8 +281,8 @@ describe('Edge Cases and Error Handling', () => {
       const result = await coordinator.coordinate({
         target: {
           type: 'project',
-          path: tempDir
-        }
+          path: tempDir,
+        },
       });
 
       // All category counts should be non-negative integers
@@ -298,14 +300,14 @@ describe('Edge Cases and Error Handling', () => {
         ${'// eval("test");'.repeat(50)}
         ${'var x = "password123";'.repeat(25)}
       `;
-      
+
       await fs.writeFile(path.join(tempDir, 'large-test.js'), problemFile);
 
       const result = await coordinator.coordinate({
         target: {
           type: 'project',
-          path: tempDir
-        }
+          path: tempDir,
+        },
       });
 
       // Should handle large result sets without issues

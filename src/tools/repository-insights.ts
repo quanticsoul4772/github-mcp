@@ -5,7 +5,7 @@ import { createTypeSafeHandler } from '../utils/type-safety.js';
 import {
   validateGraphQLInput,
   validateGraphQLVariableValue,
-  GraphQLValidationError
+  GraphQLValidationError,
 } from '../graphql-validation.js';
 import { withErrorHandling } from '../errors.js';
 
@@ -53,21 +53,21 @@ const CommitActivitySchema = z.object({
 
 /**
  * Creates repository insights tools using GraphQL API for enhanced analytics capabilities.
- * 
+ *
  * These tools provide sophisticated repository analytics functionality that leverages GraphQL's
  * ability to fetch nested relationships and statistical data in single queries,
  * offering performance and feature advantages over REST-based analytics.
- * 
+ *
  * @param octokit - Configured Octokit instance with GraphQL support
  * @param readOnly - Whether to exclude write operations (all insights tools are read-only)
  * @returns Array of repository insights tool configurations
- * 
+ *
  * @example
  * ```typescript
  * const tools = createRepositoryInsightsTools(octokit, true);
  * // Returns tools: get_repository_insights, get_contribution_stats, etc.
  * ```
- * 
+ *
  * @see https://docs.github.com/en/graphql/reference/objects#repository
  */
 export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
@@ -207,9 +207,9 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
               repo: validateGraphQLVariableValue(params.repo, 'repo'),
             };
 
-            const result: any = await (octokit as any).graphqlWithComplexity ? 
-              await (octokit as any).graphqlWithComplexity(query, variables) :
-              await octokit.graphql(query, variables);
+            const result: any = (await (octokit as any).graphqlWithComplexity)
+              ? await (octokit as any).graphqlWithComplexity(query, variables)
+              : await octokit.graphql(query, variables);
 
             if (!result.repository) {
               throw new Error('Repository not found or insights query failed');
@@ -242,7 +242,8 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
                 pullRequests: {
                   total: repository.pullRequests.totalCount,
                   open: repository.openPullRequests.totalCount,
-                  closed: repository.pullRequests.totalCount - repository.openPullRequests.totalCount,
+                  closed:
+                    repository.pullRequests.totalCount - repository.openPullRequests.totalCount,
                 },
                 releases: repository.releases.totalCount,
                 commits: repository.defaultBranchRef?.target?.history?.totalCount || 0,
@@ -253,17 +254,19 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
                   name: edge.node.name,
                   color: edge.node.color,
                   size: edge.size,
-                  percentage: Math.round((edge.size / repository.languages.totalSize) * 100 * 100) / 100,
+                  percentage:
+                    Math.round((edge.size / repository.languages.totalSize) * 100 * 100) / 100,
                 })),
               },
               activity: {
-                recentCommits: repository.defaultBranchRef?.target?.history?.nodes.map((commit: any) => ({
-                  date: commit.committedDate,
-                  message: commit.messageHeadline,
-                  author: commit.author?.user?.login,
-                  additions: commit.additions,
-                  deletions: commit.deletions,
-                })) || [],
+                recentCommits:
+                  repository.defaultBranchRef?.target?.history?.nodes.map((commit: any) => ({
+                    date: commit.committedDate,
+                    message: commit.messageHeadline,
+                    author: commit.author?.user?.login,
+                    additions: commit.additions,
+                    deletions: commit.deletions,
+                  })) || [],
               },
               metadata: {
                 createdAt: repository.createdAt,
@@ -363,9 +366,9 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
               first: validateGraphQLVariableValue(params.first || 25, 'first'),
             };
 
-            const result: any = await (octokit as any).graphqlWithComplexity ? 
-              await (octokit as any).graphqlWithComplexity(query, variables) :
-              await octokit.graphql(query, variables);
+            const result: any = (await (octokit as any).graphqlWithComplexity)
+              ? await (octokit as any).graphqlWithComplexity(query, variables)
+              : await octokit.graphql(query, variables);
 
             if (!result.repository) {
               throw new Error('Repository not found or contribution stats query failed');
@@ -375,8 +378,11 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
             const commitHistory = repository.defaultBranchRef?.target?.history?.nodes || [];
 
             // Calculate commit statistics per contributor
-            const commitStats: Record<string, { commits: number; additions: number; deletions: number }> = {};
-            
+            const commitStats: Record<
+              string,
+              { commits: number; additions: number; deletions: number }
+            > = {};
+
             commitHistory.forEach((commit: any) => {
               const author = commit.author?.user?.login;
               if (author) {
@@ -403,7 +409,11 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
                   pullRequests: contributor.contributionsCollection.totalPullRequestContributions,
                   reviews: contributor.contributionsCollection.totalPullRequestReviewContributions,
                 },
-                commitStats: commitStats[contributor.login] || { commits: 0, additions: 0, deletions: 0 },
+                commitStats: commitStats[contributor.login] || {
+                  commits: 0,
+                  additions: 0,
+                  deletions: 0,
+                },
               })),
             };
           },
@@ -506,21 +516,23 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
             const variables = {
               owner: validateGraphQLVariableValue(params.owner, 'owner'),
               repo: validateGraphQLVariableValue(params.repo, 'repo'),
-              branch: params.branch ? validateGraphQLVariableValue(`refs/heads/${params.branch}`, 'branch') : undefined,
+              branch: params.branch
+                ? validateGraphQLVariableValue(`refs/heads/${params.branch}`, 'branch')
+                : undefined,
               since: params.since ? validateGraphQLVariableValue(params.since, 'since') : undefined,
               until: params.until ? validateGraphQLVariableValue(params.until, 'until') : undefined,
             };
 
-            const result: any = await (octokit as any).graphqlWithComplexity ? 
-              await (octokit as any).graphqlWithComplexity(query, variables) :
-              await octokit.graphql(query, variables);
+            const result: any = (await (octokit as any).graphqlWithComplexity)
+              ? await (octokit as any).graphqlWithComplexity(query, variables)
+              : await octokit.graphql(query, variables);
 
             if (!result.repository) {
               throw new Error('Repository not found or commit activity query failed');
             }
 
             const repository = result.repository;
-            const history = params.branch 
+            const history = params.branch
               ? repository.ref?.target?.history
               : repository.defaultBranchRef?.target?.history;
 
@@ -535,7 +547,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
             const activityByHour: Record<number, number> = {};
             const activityByAuthor: Record<string, number> = {};
             const activityByWeekday: Record<string, number> = {};
-            
+
             let totalAdditions = 0;
             let totalDeletions = 0;
             let totalFilesChanged = 0;
@@ -549,13 +561,13 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
 
               // Count by day
               activityByDay[dayKey] = (activityByDay[dayKey] || 0) + 1;
-              
+
               // Count by hour
               activityByHour[hour] = (activityByHour[hour] || 0) + 1;
-              
+
               // Count by author
               activityByAuthor[author] = (activityByAuthor[author] || 0) + 1;
-              
+
               // Count by weekday
               activityByWeekday[weekday] = (activityByWeekday[weekday] || 0) + 1;
 
@@ -571,9 +583,12 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
                 totalAdditions,
                 totalDeletions,
                 totalFilesChanged,
-                averageAdditionsPerCommit: commits.length > 0 ? Math.round(totalAdditions / commits.length) : 0,
-                averageDeletionsPerCommit: commits.length > 0 ? Math.round(totalDeletions / commits.length) : 0,
-                averageFilesPerCommit: commits.length > 0 ? Math.round(totalFilesChanged / commits.length) : 0,
+                averageAdditionsPerCommit:
+                  commits.length > 0 ? Math.round(totalAdditions / commits.length) : 0,
+                averageDeletionsPerCommit:
+                  commits.length > 0 ? Math.round(totalDeletions / commits.length) : 0,
+                averageFilesPerCommit:
+                  commits.length > 0 ? Math.round(totalFilesChanged / commits.length) : 0,
               },
               patterns: {
                 byDay: Object.entries(activityByDay)
@@ -582,8 +597,10 @@ export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolea
                 byHour: Object.entries(activityByHour)
                   .sort(([a], [b]) => parseInt(a) - parseInt(b))
                   .map(([hour, count]) => ({ hour: parseInt(hour), commits: count })),
-                byWeekday: Object.entries(activityByWeekday)
-                  .map(([weekday, count]) => ({ weekday, commits: count })),
+                byWeekday: Object.entries(activityByWeekday).map(([weekday, count]) => ({
+                  weekday,
+                  commits: count,
+                })),
                 byAuthor: Object.entries(activityByAuthor)
                   .sort(([, a], [, b]) => b - a)
                   .map(([author, count]) => ({ author, commits: count })),

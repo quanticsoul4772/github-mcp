@@ -1,6 +1,6 @@
 /**
  * Metrics collection system for GitHub MCP Server
- * 
+ *
  * Collects and aggregates metrics for API calls, performance,
  * rate limiting, and system health monitoring.
  */
@@ -51,9 +51,12 @@ export class MetricsCollector {
 
   private constructor() {
     // Cleanup old metrics every hour
-    setInterval(() => {
-      this.cleanup();
-    }, 60 * 60 * 1000);
+    setInterval(
+      () => {
+        this.cleanup();
+      },
+      60 * 60 * 1000
+    );
   }
 
   public static getInstance(): MetricsCollector {
@@ -68,7 +71,7 @@ export class MetricsCollector {
    */
   public recordApiCall(metric: ApiCallMetric): void {
     this.apiCalls.push(metric);
-    
+
     // Update counters
     const successKey = `api_calls_total{tool="${metric.tool}",operation="${metric.operation}",status="${metric.success ? 'success' : 'error'}"}`;
     this.incrementCounter(successKey);
@@ -156,9 +159,8 @@ export class MetricsCollector {
     const total = this.apiCalls.length;
     const successful = this.apiCalls.filter(call => call.success).length;
     const failed = total - successful;
-    const averageResponseTime = total > 0 
-      ? this.apiCalls.reduce((sum, call) => sum + call.duration, 0) / total 
-      : 0;
+    const averageResponseTime =
+      total > 0 ? this.apiCalls.reduce((sum, call) => sum + call.duration, 0) / total : 0;
     const successRate = total > 0 ? successful / total : 0;
 
     return {
@@ -207,7 +209,8 @@ export class MetricsCollector {
   } {
     const remaining = this.gauges.get('github_rate_limit_remaining') || 0;
     const resetTimestamp = this.gauges.get('github_rate_limit_reset_timestamp') || 0;
-    const resetTimeRemaining = resetTimestamp > 0 ? Math.max(0, resetTimestamp - Math.floor(Date.now() / 1000)) : 0;
+    const resetTimeRemaining =
+      resetTimestamp > 0 ? Math.max(0, resetTimestamp - Math.floor(Date.now() / 1000)) : 0;
 
     return {
       remaining,
@@ -254,7 +257,7 @@ export class MetricsCollector {
     const avg = sum / count;
     const min = sorted[0];
     const max = sorted[count - 1];
-    
+
     const percentile = (p: number) => {
       const index = Math.ceil((p / 100) * count) - 1;
       return sorted[Math.max(0, index)];
@@ -295,7 +298,7 @@ export class MetricsCollector {
       const baseName = name.split('{')[0];
       const labels = name.includes('{') ? name.split('{')[1].split('}')[0] : '';
       const labelPart = labels ? `{${labels}}` : '';
-      
+
       const sorted = [...values].sort((a, b) => a - b);
       const count = values.length;
       const sum = values.reduce((a, b) => a + b, 0);
@@ -303,12 +306,16 @@ export class MetricsCollector {
       lines.push(`# TYPE ${baseName} histogram`);
       lines.push(`${baseName}_count${labelPart} ${count}`);
       lines.push(`${baseName}_sum${labelPart} ${sum}`);
-      
+
       // Add histogram buckets
-      const buckets = [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0];
+      const buckets = [
+        0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0,
+      ];
       for (const bucket of buckets) {
         const countInBucket = sorted.filter(v => v <= bucket).length;
-        lines.push(`${baseName}_bucket{le="${bucket}"${labels ? ',' + labels : ''}} ${countInBucket}`);
+        lines.push(
+          `${baseName}_bucket{le="${bucket}"${labels ? ',' + labels : ''}} ${countInBucket}`
+        );
       }
       lines.push(`${baseName}_bucket{le="+Inf"${labels ? ',' + labels : ''}} ${count}`);
     }
@@ -320,8 +327,8 @@ export class MetricsCollector {
    * Clean up old metrics (keep last hour)
    */
   private cleanup(): void {
-    const oneHourAgo = Date.now() - (60 * 60 * 1000);
-    
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+
     this.apiCalls = this.apiCalls.filter(metric => metric.timestamp > oneHourAgo);
     this.performance = this.performance.filter(metric => metric.timestamp > oneHourAgo);
     this.errors = this.errors.filter(metric => metric.timestamp > oneHourAgo);

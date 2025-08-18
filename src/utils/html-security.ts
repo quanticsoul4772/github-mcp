@@ -1,6 +1,6 @@
 /**
  * Secure HTML escaping utilities for preventing XSS vulnerabilities
- * 
+ *
  * This module provides robust, Node.js-compatible HTML escaping functions
  * that properly sanitize user input for safe inclusion in HTML content.
  */
@@ -10,31 +10,31 @@
  * Based on OWASP XSS Prevention guidelines
  */
 const HTML_ESCAPE_MAP: Record<string, string> = {
-  '&': '&amp;',   // Must be first to avoid double-escaping
+  '&': '&amp;', // Must be first to avoid double-escaping
   '<': '&lt;',
   '>': '&gt;',
   '"': '&quot;',
-  "'": '&#x27;',  // More compatible than &apos;
-  '/': '&#x2F;',  // Forward slash for extra safety
-  '`': '&#x60;',  // Backtick for template literal safety
-  '=': '&#x3D;',  // Equals sign for attribute safety
-  ':': '&#x3A;',  // Colon for javascript: URL safety
+  "'": '&#x27;', // More compatible than &apos;
+  '/': '&#x2F;', // Forward slash for extra safety
+  '`': '&#x60;', // Backtick for template literal safety
+  '=': '&#x3D;', // Equals sign for attribute safety
+  ':': '&#x3A;', // Colon for javascript: URL safety
 } as const;
 
 /**
  * Escapes HTML characters in a string to prevent XSS attacks
- * 
+ *
  * This function replaces dangerous HTML characters with their corresponding
  * HTML entities, making the string safe for inclusion in HTML content.
- * 
+ *
  * @param text - The text to escape
  * @returns The escaped text safe for HTML inclusion
- * 
+ *
  * @example
  * ```typescript
  * escapeHtml('<script>alert("xss")</script>')
  * // Returns: '&lt;script&gt;alert(&quot;xss&quot;)&lt;&#x2F;script&gt;'
- * 
+ *
  * escapeHtml('User input: "Hello & goodbye"')
  * // Returns: 'User input: &quot;Hello &amp; goodbye&quot;'
  * ```
@@ -45,18 +45,18 @@ export function escapeHtml(text: string): string {
   }
 
   // Use a single regex replace for optimal performance
-  return text.replace(/[&<>"'`=\/:]/g, (match) => HTML_ESCAPE_MAP[match] || match);
+  return text.replace(/[&<>"'`=\/:]/g, match => HTML_ESCAPE_MAP[match] || match);
 }
 
 /**
  * Escapes HTML attributes specifically
- * 
+ *
  * This function is optimized for escaping text that will be used in HTML attributes.
  * It includes additional safety measures for attribute contexts.
- * 
+ *
  * @param text - The text to escape for use in HTML attributes
  * @returns The escaped text safe for HTML attribute values
- * 
+ *
  * @example
  * ```typescript
  * escapeHtmlAttribute('user"input')
@@ -69,7 +69,7 @@ export function escapeHtmlAttribute(text: string): string {
   }
 
   // For attributes, we need to be extra careful with quotes and spaces
-  return text.replace(/[&<>"'`=\/:\s]/g, (match) => {
+  return text.replace(/[&<>"'`=\/:\s]/g, match => {
     if (match === ' ') return '&#x20;';
     return HTML_ESCAPE_MAP[match] || match;
   });
@@ -77,13 +77,13 @@ export function escapeHtmlAttribute(text: string): string {
 
 /**
  * Sanitizes text for safe inclusion in JavaScript strings within HTML
- * 
+ *
  * This function escapes characters that could break out of JavaScript string contexts
  * when the string is embedded in HTML script tags.
- * 
+ *
  * @param text - The text to escape for JavaScript context
  * @returns The escaped text safe for JavaScript strings in HTML
- * 
+ *
  * @example
  * ```typescript
  * escapeJavaScript('alert("hello"); //comment')
@@ -96,23 +96,23 @@ export function escapeJavaScript(text: string): string {
   }
 
   return text
-    .replace(/\\/g, '\\\\')    // Escape backslashes first
-    .replace(/"/g, '\\"')      // Escape double quotes
-    .replace(/'/g, "\\'")      // Escape single quotes
-    .replace(/\n/g, '\\n')     // Escape newlines
-    .replace(/\r/g, '\\r')     // Escape carriage returns
-    .replace(/\t/g, '\\t')     // Escape tabs
-    .replace(/\//g, '\\x2F')   // Escape forward slashes
-    .replace(/</g, '\\x3C')    // Escape less-than
-    .replace(/>/g, '\\x3E');   // Escape greater-than
+    .replace(/\\/g, '\\\\') // Escape backslashes first
+    .replace(/"/g, '\\"') // Escape double quotes
+    .replace(/'/g, "\\'") // Escape single quotes
+    .replace(/\n/g, '\\n') // Escape newlines
+    .replace(/\r/g, '\\r') // Escape carriage returns
+    .replace(/\t/g, '\\t') // Escape tabs
+    .replace(/\//g, '\\x2F') // Escape forward slashes
+    .replace(/</g, '\\x3C') // Escape less-than
+    .replace(/>/g, '\\x3E'); // Escape greater-than
 }
 
 /**
  * Validates that a string contains only safe characters for HTML content
- * 
+ *
  * This function checks if a string contains potentially dangerous characters
  * that should be escaped before including in HTML.
- * 
+ *
  * @param text - The text to validate
  * @returns True if the text is safe, false if it contains dangerous characters
  */
@@ -127,13 +127,13 @@ export function isHtmlSafe(text: string): boolean {
 
 /**
  * Strips all HTML tags from a string, leaving only text content
- * 
+ *
  * This function removes all HTML tags and returns only the text content.
  * It's useful for creating plain text versions of HTML content.
- * 
+ *
  * @param html - The HTML string to strip tags from
  * @returns The text content without HTML tags
- * 
+ *
  * @example
  * ```typescript
  * stripHtmlTags('<p>Hello <strong>world</strong>!</p>')
@@ -147,28 +147,28 @@ export function stripHtmlTags(html: string): string {
 
   // Remove HTML tags and decode common entities
   return html
-    .replace(/<[^>]*>/g, '')           // Remove all HTML tags
-    .replace(/&amp;/g, '&')           // Decode ampersands
-    .replace(/&lt;/g, '<')            // Decode less-than
-    .replace(/&gt;/g, '>')            // Decode greater-than
-    .replace(/&quot;/g, '"')          // Decode quotes
-    .replace(/&#x27;/g, "'")          // Decode apostrophes
-    .replace(/&#x2F;/g, '/')          // Decode forward slashes
-    .replace(/&#x60;/g, '`')          // Decode backticks
-    .replace(/&#x3D;/g, '=')          // Decode equals signs
-    .trim();                          // Remove leading/trailing whitespace
+    .replace(/<[^>]*>/g, '') // Remove all HTML tags
+    .replace(/&amp;/g, '&') // Decode ampersands
+    .replace(/&lt;/g, '<') // Decode less-than
+    .replace(/&gt;/g, '>') // Decode greater-than
+    .replace(/&quot;/g, '"') // Decode quotes
+    .replace(/&#x27;/g, "'") // Decode apostrophes
+    .replace(/&#x2F;/g, '/') // Decode forward slashes
+    .replace(/&#x60;/g, '`') // Decode backticks
+    .replace(/&#x3D;/g, '=') // Decode equals signs
+    .trim(); // Remove leading/trailing whitespace
 }
 
 /**
  * Security-focused HTML template function
- * 
+ *
  * This function provides a safe way to create HTML templates with automatic escaping.
  * All interpolated values are automatically escaped unless explicitly marked as safe.
- * 
+ *
  * @param template - The HTML template string
  * @param values - Object containing values to interpolate
  * @returns The rendered HTML with all values safely escaped
- * 
+ *
  * @example
  * ```typescript
  * const html = safeHtmlTemplate(
@@ -210,15 +210,15 @@ export function safeStringify(value: unknown): string {
   if (value === null || value === undefined) {
     return '';
   }
-  
+
   if (typeof value === 'string') {
     return escapeHtml(value);
   }
-  
+
   if (typeof value === 'number' || typeof value === 'boolean') {
     return escapeHtml(String(value));
   }
-  
+
   // For objects, arrays, etc., convert to JSON and escape
   try {
     return escapeHtml(JSON.stringify(value));

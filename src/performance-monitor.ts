@@ -81,7 +81,7 @@ export class PerformanceMonitor {
     } finally {
       const duration = Date.now() - startTime;
       const endMemory = process.memoryUsage();
-      
+
       const metric: PerformanceMetric = {
         operation,
         duration,
@@ -108,7 +108,7 @@ export class PerformanceMonitor {
    */
   private recordMetric(metric: PerformanceMetric): void {
     this.metrics.push(metric);
-    
+
     // Keep only the most recent metrics
     if (this.metrics.length > this.maxMetrics) {
       this.metrics = this.metrics.slice(-this.maxMetrics);
@@ -120,7 +120,7 @@ export class PerformanceMonitor {
    */
   private updateAggregatedMetrics(metric: PerformanceMetric): void {
     const existing = this.aggregatedMetrics.get(metric.operation);
-    
+
     if (existing) {
       existing.count++;
       existing.totalDuration += metric.duration;
@@ -128,7 +128,7 @@ export class PerformanceMonitor {
       existing.minDuration = Math.min(existing.minDuration, metric.duration);
       existing.maxDuration = Math.max(existing.maxDuration, metric.duration);
       existing.lastUpdated = Date.now();
-      
+
       if (metric.status === 'success') {
         existing.successCount++;
       } else {
@@ -168,7 +168,8 @@ export class PerformanceMonitor {
 
     // Check error rate threshold
     const aggregated = this.aggregatedMetrics.get(metric.operation);
-    if (aggregated && aggregated.count >= 10) { // Only check after sufficient samples
+    if (aggregated && aggregated.count >= 10) {
+      // Only check after sufficient samples
       const errorRate = (aggregated.errorCount / aggregated.count) * 100;
       if (errorRate > (this.thresholds.errorRateThreshold || 10)) {
         console.warn(`⚠️  High error rate for ${metric.operation}: ${errorRate.toFixed(1)}%`);
@@ -252,19 +253,22 @@ export class PerformanceMonitor {
       `  Uptime: ${(systemMetrics.uptime / 1000 / 60).toFixed(1)} minutes`,
       '',
       '📈 Top Operations:',
-      ...aggregatedMetrics.slice(0, 10).map(m => 
-        `  ${m.operation}: ${m.count} calls, ${m.avgDuration.toFixed(2)}ms avg, ${m.successRate.toFixed(1)}% success`
-      ),
+      ...aggregatedMetrics
+        .slice(0, 10)
+        .map(
+          m =>
+            `  ${m.operation}: ${m.count} calls, ${m.avgDuration.toFixed(2)}ms avg, ${m.successRate.toFixed(1)}% success`
+        ),
       '',
       `🐌 Slow Queries (${slowQueries.length}):`,
-      ...slowQueries.slice(0, 5).map(m => 
-        `  ${m.operation}: ${m.duration}ms at ${new Date(m.timestamp).toISOString()}`
-      ),
+      ...slowQueries
+        .slice(0, 5)
+        .map(m => `  ${m.operation}: ${m.duration}ms at ${new Date(m.timestamp).toISOString()}`),
       '',
       `❌ Recent Errors (${errors.length}):`,
-      ...errors.slice(-5).map(m => 
-        `  ${m.operation}: ${m.status} at ${new Date(m.timestamp).toISOString()}`
-      ),
+      ...errors
+        .slice(-5)
+        .map(m => `  ${m.operation}: ${m.status} at ${new Date(m.timestamp).toISOString()}`),
     ];
 
     return report.join('\n');

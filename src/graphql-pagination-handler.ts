@@ -117,18 +117,16 @@ export class GraphQLPaginationHandler {
 
       const variables = {
         ...queryBuilder.variables,
-        first: maxItems && allData.length + first > maxItems 
-          ? maxItems - allData.length 
-          : first,
+        first: maxItems && allData.length + first > maxItems ? maxItems - allData.length : first,
         after: currentCursor,
       };
 
       try {
         const result = await this.octokit.graphql(queryBuilder.query, variables);
         const extracted = queryBuilder.extractData(result);
-        
+
         const pageData = extracted.nodes || extracted.edges?.map(e => e.node) || [];
-        
+
         // Respect maxItems limit
         if (maxItems) {
           const remaining = maxItems - allData.length;
@@ -136,7 +134,7 @@ export class GraphQLPaginationHandler {
         } else {
           allData.push(...pageData);
         }
-        
+
         lastPageInfo = extracted.pageInfo;
         totalCount = extracted.totalCount;
         currentCursor = extracted.pageInfo.endCursor;
@@ -168,11 +166,7 @@ export class GraphQLPaginationHandler {
   /**
    * Create paginated query builder for discussions
    */
-  createDiscussionsQuery(
-    owner: string,
-    repo: string,
-    categoryId?: string
-  ): GraphQLQueryBuilder {
+  createDiscussionsQuery(owner: string, repo: string, categoryId?: string): GraphQLQueryBuilder {
     return {
       query: `
         query($owner: String!, $repo: String!, $first: Int!, $after: String, $categoryId: ID) {
@@ -276,9 +270,7 @@ export class GraphQLPaginationHandler {
   /**
    * Create paginated query builder for project items
    */
-  createProjectItemsQuery(
-    projectId: string
-  ): GraphQLQueryBuilder {
+  createProjectItemsQuery(projectId: string): GraphQLQueryBuilder {
     return {
       query: `
         query($projectId: ID!, $first: Int!, $after: String) {
@@ -511,8 +503,10 @@ export class GraphQLPaginationHandler {
       `,
       variables: { owner, repo, branch, since, until },
       extractData: (result: any) => {
-        return result.repository.ref?.target?.history || 
-               result.repository.defaultBranchRef?.target?.history;
+        return (
+          result.repository.ref?.target?.history ||
+          result.repository.defaultBranchRef?.target?.history
+        );
       },
     };
   }
@@ -647,10 +641,11 @@ export class GraphQLPaginationHandler {
       extractData: (result: any) => ({
         nodes: result.search.nodes,
         pageInfo: result.search.pageInfo,
-        totalCount: result.search.repositoryCount || 
-                   result.search.issueCount || 
-                   result.search.userCount || 
-                   result.search.discussionCount,
+        totalCount:
+          result.search.repositoryCount ||
+          result.search.issueCount ||
+          result.search.userCount ||
+          result.search.discussionCount,
       }),
     };
   }
@@ -673,14 +668,14 @@ export class GraphQLPaginationHandler {
         options: serializableOptions,
       });
       const cached = cache.get(cacheKey);
-      
+
       if (cached && Date.now() - cached.timestamp < ttl) {
         return cached.data;
       }
 
       const result = await this.paginate<T>(queryBuilder, options);
       cache.set(cacheKey, { data: result, timestamp: Date.now() });
-      
+
       return result;
     };
   }
@@ -725,9 +720,7 @@ export const GraphQLPaginationUtils = {
   /**
    * Merge multiple paginated results
    */
-  mergeResults<T>(
-    results: Array<GraphQLPaginationResponse<T>>
-  ): GraphQLPaginationResponse<T> {
+  mergeResults<T>(results: Array<GraphQLPaginationResponse<T>>): GraphQLPaginationResponse<T> {
     const allData: T[] = [];
     let totalCount = 0;
     let hasMore = false;

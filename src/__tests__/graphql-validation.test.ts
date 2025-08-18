@@ -21,7 +21,7 @@ describe('GraphQL Validation', () => {
         repo: 'Hello-World',
         since: '2023-01-01T00:00:00.000Z',
       };
-      
+
       const result = validateGraphQLInput(RepositoryInsightsSchema, input, 'test');
       expect(result.owner).toBe('octocat');
       expect(result.repo).toBe('Hello-World');
@@ -33,9 +33,10 @@ describe('GraphQL Validation', () => {
         owner: 'invalid..owner',
         repo: 'valid-repo',
       };
-      
-      expect(() => validateGraphQLInput(RepositoryInsightsSchema, input, 'test'))
-        .toThrow(GraphQLValidationError);
+
+      expect(() => validateGraphQLInput(RepositoryInsightsSchema, input, 'test')).toThrow(
+        GraphQLValidationError
+      );
     });
 
     it('should reject invalid repository names', () => {
@@ -43,9 +44,10 @@ describe('GraphQL Validation', () => {
         owner: 'valid-owner',
         repo: '.invalid-repo',
       };
-      
-      expect(() => validateGraphQLInput(RepositoryInsightsSchema, input, 'test'))
-        .toThrow(GraphQLValidationError);
+
+      expect(() => validateGraphQLInput(RepositoryInsightsSchema, input, 'test')).toThrow(
+        GraphQLValidationError
+      );
     });
   });
 
@@ -56,7 +58,7 @@ describe('GraphQL Validation', () => {
         type: 'REPOSITORY' as const,
         first: 10,
       };
-      
+
       const result = validateGraphQLInput(CrossRepoSearchSchema, input, 'test');
       expect(result.query).toBe('react test'); // malicious variable reference removed
       expect(result.type).toBe('REPOSITORY');
@@ -68,7 +70,7 @@ describe('GraphQL Validation', () => {
         query: 'test { repository { name } }',
         type: 'REPOSITORY' as const,
       };
-      
+
       const result = validateGraphQLInput(CrossRepoSearchSchema, input, 'test');
       expect(result.query).toBe('test repository name'); // GraphQL syntax removed
     });
@@ -85,7 +87,7 @@ describe('GraphQL Validation', () => {
         includeMetrics: true,
         first: 25,
       };
-      
+
       const result = validateGraphQLInput(AdvancedRepoSearchSchema, input, 'test');
       expect(result.query).toBe('javascript framework');
       expect(result.language).toBe('javascript');
@@ -101,9 +103,10 @@ describe('GraphQL Validation', () => {
         query: 'test',
         created: 'invalid-date',
       };
-      
-      expect(() => validateGraphQLInput(AdvancedRepoSearchSchema, input, 'test'))
-        .toThrow(GraphQLValidationError);
+
+      expect(() => validateGraphQLInput(AdvancedRepoSearchSchema, input, 'test')).toThrow(
+        GraphQLValidationError
+      );
     });
 
     it('should reject too many topics', () => {
@@ -111,9 +114,10 @@ describe('GraphQL Validation', () => {
         query: 'test',
         topics: Array(25).fill('topic'),
       };
-      
-      expect(() => validateGraphQLInput(AdvancedRepoSearchSchema, input, 'test'))
-        .toThrow(GraphQLValidationError);
+
+      expect(() => validateGraphQLInput(AdvancedRepoSearchSchema, input, 'test')).toThrow(
+        GraphQLValidationError
+      );
     });
   });
 
@@ -127,7 +131,7 @@ describe('GraphQL Validation', () => {
         includeLanguages: true,
         includeContributors: false,
       };
-      
+
       const result = validateGraphQLInput(BatchRepositoryQuerySchema, input, 'test');
       expect(result.repositories).toHaveLength(2);
       expect(result.repositories[0]?.owner).toBe('octocat');
@@ -139,27 +143,28 @@ describe('GraphQL Validation', () => {
       const input = {
         repositories: Array(15).fill({ owner: 'test', repo: 'repo' }),
       };
-      
-      expect(() => validateGraphQLInput(BatchRepositoryQuerySchema, input, 'test'))
-        .toThrow(GraphQLValidationError);
+
+      expect(() => validateGraphQLInput(BatchRepositoryQuerySchema, input, 'test')).toThrow(
+        GraphQLValidationError
+      );
     });
 
     it('should reject invalid alias format', () => {
       const input = {
-        repositories: [
-          { owner: 'test', repo: 'repo', alias: 'invalid-alias-name' },
-        ],
+        repositories: [{ owner: 'test', repo: 'repo', alias: 'invalid-alias-name' }],
       };
-      
-      expect(() => validateGraphQLInput(BatchRepositoryQuerySchema, input, 'test'))
-        .toThrow(GraphQLValidationError);
+
+      expect(() => validateGraphQLInput(BatchRepositoryQuerySchema, input, 'test')).toThrow(
+        GraphQLValidationError
+      );
     });
   });
 
   describe('validateGraphQLVariableValue', () => {
     it('should reject strings with injection patterns', () => {
-      expect(() => validateGraphQLVariableValue('test ${injection}', 'testVar'))
-        .toThrow(GraphQLValidationError);
+      expect(() => validateGraphQLVariableValue('test ${injection}', 'testVar')).toThrow(
+        GraphQLValidationError
+      );
     });
 
     it('should validate and sanitize safe string values', () => {
@@ -173,8 +178,9 @@ describe('GraphQL Validation', () => {
     });
 
     it('should reject infinite numbers', () => {
-      expect(() => validateGraphQLVariableValue(Infinity, 'testVar'))
-        .toThrow(GraphQLValidationError);
+      expect(() => validateGraphQLVariableValue(Infinity, 'testVar')).toThrow(
+        GraphQLValidationError
+      );
     });
 
     it('should validate arrays with size limits', () => {
@@ -184,8 +190,9 @@ describe('GraphQL Validation', () => {
 
     it('should reject arrays that are too large', () => {
       const largeArray = Array(150).fill('item');
-      expect(() => validateGraphQLVariableValue(largeArray, 'testVar'))
-        .toThrow(GraphQLValidationError);
+      expect(() => validateGraphQLVariableValue(largeArray, 'testVar')).toThrow(
+        GraphQLValidationError
+      );
     });
 
     it('should validate objects with property limits', () => {
@@ -199,15 +206,15 @@ describe('GraphQL Validation', () => {
       for (let i = 0; i < 60; i++) {
         largeObj[`prop${i}`] = `value${i}`;
       }
-      
-      expect(() => validateGraphQLVariableValue(largeObj, 'testVar'))
-        .toThrow(GraphQLValidationError);
+
+      expect(() => validateGraphQLVariableValue(largeObj, 'testVar')).toThrow(
+        GraphQLValidationError
+      );
     });
 
     it('should reject objects with invalid property names', () => {
       const obj = { 'invalid-prop': 'value' };
-      expect(() => validateGraphQLVariableValue(obj, 'testVar'))
-        .toThrow(GraphQLValidationError);
+      expect(() => validateGraphQLVariableValue(obj, 'testVar')).toThrow(GraphQLValidationError);
     });
   });
 
@@ -226,8 +233,7 @@ describe('GraphQL Validation', () => {
 
     it('should limit length', () => {
       const longQuery = 'a'.repeat(2000);
-      expect(() => SearchQuerySchema.parse(longQuery))
-        .toThrow();
+      expect(() => SearchQuerySchema.parse(longQuery)).toThrow();
     });
   });
 
@@ -238,7 +244,7 @@ describe('GraphQL Validation', () => {
         '2023-12-31T23:59:59.999Z',
         '2020-06-15T12:30:45.000Z',
       ];
-      
+
       validDates.forEach(date => {
         expect(() => ISO8601DateSchema.parse(date)).not.toThrow();
       });
@@ -252,18 +258,15 @@ describe('GraphQL Validation', () => {
         '2023-01-01T25:00:00Z',
         'not a date',
       ];
-      
+
       invalidDates.forEach(date => {
         expect(() => ISO8601DateSchema.parse(date)).toThrow();
       });
     });
 
     it('should reject dates outside reasonable range', () => {
-      const invalidDates = [
-        '1999-01-01T00:00:00Z',
-        '2101-01-01T00:00:00Z',
-      ];
-      
+      const invalidDates = ['1999-01-01T00:00:00Z', '2101-01-01T00:00:00Z'];
+
       invalidDates.forEach(date => {
         expect(() => ISO8601DateSchema.parse(date)).toThrow();
       });

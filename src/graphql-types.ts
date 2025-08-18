@@ -1,6 +1,6 @@
 /**
  * TypeScript interfaces for GitHub GraphQL API responses
- * 
+ *
  * This file contains comprehensive type definitions for all GraphQL responses
  * used throughout the application, providing type safety and better IDE support.
  */
@@ -333,19 +333,39 @@ export interface SimpleRepositoryResponse {
 
 // Type guards for runtime validation
 export function isRepository(node: any): node is Repository {
-  return node && typeof node.id === 'string' && typeof node.name === 'string' && node.stargazerCount !== undefined;
+  return (
+    node &&
+    typeof node.id === 'string' &&
+    typeof node.name === 'string' &&
+    node.stargazerCount !== undefined
+  );
 }
 
 export function isIssue(node: any): node is Issue {
-  return node && typeof node.id === 'string' && typeof node.number === 'number' && node.state !== undefined;
+  return (
+    node &&
+    typeof node.id === 'string' &&
+    typeof node.number === 'number' &&
+    node.state !== undefined
+  );
 }
 
 export function isUser(node: any): node is User {
-  return node && typeof node.id === 'string' && typeof node.login === 'string' && node.followers !== undefined;
+  return (
+    node &&
+    typeof node.id === 'string' &&
+    typeof node.login === 'string' &&
+    node.followers !== undefined
+  );
 }
 
 export function isDiscussion(node: any): node is Discussion {
-  return node && typeof node.id === 'string' && typeof node.number === 'number' && node.upvoteCount !== undefined;
+  return (
+    node &&
+    typeof node.id === 'string' &&
+    typeof node.number === 'number' &&
+    node.upvoteCount !== undefined
+  );
 }
 
 // Validation utilities
@@ -358,10 +378,12 @@ export function validateActor(actor: any): actor is Actor {
 }
 
 export function validateRepository(repo: any): repo is Repository {
-  return repo && 
-    typeof repo.id === 'string' && 
-    typeof repo.name === 'string' && 
-    typeof repo.stargazerCount === 'number';
+  return (
+    repo &&
+    typeof repo.id === 'string' &&
+    typeof repo.name === 'string' &&
+    typeof repo.stargazerCount === 'number'
+  );
 }
 
 // Utility type for GraphQL responses with error handling
@@ -383,10 +405,10 @@ export function extractGraphQLData<T>(response: GraphQLResponse<T>): T {
     const errorMessages = response.errors.map(error => error.message).join(', ');
     throw new Error(`GraphQL errors: ${errorMessages}`);
   }
-  
+
   if (!response.data) {
     throw new Error('No data returned from GraphQL query');
   }
-  
+
   return response.data;
 }

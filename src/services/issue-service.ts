@@ -96,7 +96,10 @@ export class IssueService implements IIssueService {
       processed.assignee = options.assignee;
     }
 
-    if (options.milestone && (typeof options.milestone === 'string' || typeof options.milestone === 'number')) {
+    if (
+      options.milestone &&
+      (typeof options.milestone === 'string' || typeof options.milestone === 'number')
+    ) {
       processed.milestone = options.milestone;
     }
 
@@ -108,7 +111,12 @@ export class IssueService implements IIssueService {
       processed.direction = options.direction;
     }
 
-    if (options.per_page && Number.isInteger(options.per_page) && options.per_page > 0 && options.per_page <= 100) {
+    if (
+      options.per_page &&
+      Number.isInteger(options.per_page) &&
+      options.per_page > 0 &&
+      options.per_page <= 100
+    ) {
       processed.per_page = options.per_page;
     }
 
@@ -134,18 +142,21 @@ export class IssueService implements IIssueService {
     }
 
     if (data.assignees && Array.isArray(data.assignees)) {
-      processed.assignees = data.assignees.filter((assignee: any) => 
-        typeof assignee === 'string' && assignee.trim().length > 0
+      processed.assignees = data.assignees.filter(
+        (assignee: any) => typeof assignee === 'string' && assignee.trim().length > 0
       );
     }
 
     if (data.labels && Array.isArray(data.labels)) {
-      processed.labels = data.labels.filter((label: any) => 
-        typeof label === 'string' && label.trim().length > 0
+      processed.labels = data.labels.filter(
+        (label: any) => typeof label === 'string' && label.trim().length > 0
       );
     }
 
-    if (data.milestone && (typeof data.milestone === 'string' || typeof data.milestone === 'number')) {
+    if (
+      data.milestone &&
+      (typeof data.milestone === 'string' || typeof data.milestone === 'number')
+    ) {
       processed.milestone = data.milestone;
     }
 

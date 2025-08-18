@@ -385,7 +385,7 @@ describe('Issue Tools', () => {
         user: { login: 'test-user', type: 'User' },
         created_at: '2024-01-01T00:00:00Z',
       };
-      
+
       mockOctokit.issues.createComment.mockResolvedValue({ data: newComment });
 
       const result = await createComment.handler({

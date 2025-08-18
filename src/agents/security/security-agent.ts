@@ -12,7 +12,7 @@ export class SecurityAgent extends AbstractBaseAgent {
   public readonly description = 'Security vulnerability and best practices analysis';
 
   private readonly supportedExtensions = ['ts', 'js', 'tsx', 'jsx', 'json'];
-  
+
   // Common security patterns to detect
   private readonly securityPatterns = {
     // Code injection vulnerabilities
@@ -20,18 +20,18 @@ export class SecurityAgent extends AbstractBaseAgent {
       /eval\s*\(/,
       /Function\s*\(/,
       /setTimeout\s*\(\s*['"`][^'"`]*\$\{/,
-      /setInterval\s*\(\s*['"`][^'"`]*\$\{/
+      /setInterval\s*\(\s*['"`][^'"`]*\$\{/,
     ],
-    
+
     // XSS vulnerabilities
     xss: [
       /innerHTML\s*=/,
       /outerHTML\s*=/,
       /document\.write\s*\(/,
       /\.html\s*\(/,
-      /dangerouslySetInnerHTML/
+      /dangerouslySetInnerHTML/,
     ],
-    
+
     // SQL injection (for Node.js backends)
     sqlInjection: [
       /query\s*\(\s*['"`][^'"`]*\$\{/,
@@ -39,37 +39,35 @@ export class SecurityAgent extends AbstractBaseAgent {
       /SELECT\s+.*\$\{/i,
       /INSERT\s+.*\$\{/i,
       /UPDATE\s+.*\$\{/i,
-      /DELETE\s+.*\$\{/i
+      /DELETE\s+.*\$\{/i,
     ],
-    
+
     // Insecure randomness
-    weakRandom: [
-      /Math\.random\s*\(/
-    ],
-    
+    weakRandom: [/Math\.random\s*\(/],
+
     // Hardcoded secrets
     secrets: [
       /password\s*[:=]\s*['"`][^'"`]+['"`]/i,
       /api[_-]?key\s*[:=]\s*['"`][^'"`]+['"`]/i,
       /secret\s*[:=]\s*['"`][^'"`]+['"`]/i,
       /token\s*[:=]\s*['"`][^'"`]+['"`]/i,
-      /private[_-]?key\s*[:=]\s*['"`][^'"`]+['"`]/i
+      /private[_-]?key\s*[:=]\s*['"`][^'"`]+['"`]/i,
     ],
-    
+
     // Insecure HTTP
     insecureHttp: [
       /http:\/\/(?!localhost|127\.0\.0\.1)/,
       /fetch\s*\(\s*['"`]http:/,
-      /axios\s*\.\s*get\s*\(\s*['"`]http:/
+      /axios\s*\.\s*get\s*\(\s*['"`]http:/,
     ],
-    
+
     // File system vulnerabilities
     pathTraversal: [
       /\.\.\//,
       /path\.join\s*\([^)]*\.\./,
       /fs\.readFile\s*\([^)]*\.\./,
-      /fs\.writeFile\s*\([^)]*\.\./
-    ]
+      /fs\.writeFile\s*\([^)]*\.\./,
+    ],
   };
 
   public canHandle(fileType: string): boolean {
@@ -86,7 +84,7 @@ export class SecurityAgent extends AbstractBaseAgent {
       filesAnalyzed: 0,
       vulnerabilities: 0,
       criticalIssues: 0,
-      securityScore: 100
+      securityScore: 100,
     };
 
     try {
@@ -94,13 +92,13 @@ export class SecurityAgent extends AbstractBaseAgent {
       this.log('info', `Analyzing security in ${targetFiles.length} files`);
 
       // Analyze package.json for vulnerable dependencies
-      findings.push(...await this.analyzeDependencies(context));
+      findings.push(...(await this.analyzeDependencies(context)));
 
       // Analyze source files for security issues
       for (const file of targetFiles) {
         const filePath = path.resolve(context.projectPath, file);
         const content = await this.readFile(filePath);
-        
+
         if (content === null) {
           continue;
         }
@@ -108,16 +106,16 @@ export class SecurityAgent extends AbstractBaseAgent {
         metrics.filesAnalyzed++;
 
         // Security pattern analysis
-        findings.push(...await this.analyzeSecurityPatterns(file, content));
-        
+        findings.push(...(await this.analyzeSecurityPatterns(file, content)));
+
         // Authentication and authorization analysis
-        findings.push(...await this.analyzeAuthSecurity(file, content));
-        
+        findings.push(...(await this.analyzeAuthSecurity(file, content)));
+
         // Data validation analysis
-        findings.push(...await this.analyzeDataValidation(file, content));
-        
+        findings.push(...(await this.analyzeDataValidation(file, content)));
+
         // Configuration security
-        findings.push(...await this.analyzeConfigSecurity(file, content));
+        findings.push(...(await this.analyzeConfigSecurity(file, content)));
       }
 
       // Calculate security metrics
@@ -128,7 +126,6 @@ export class SecurityAgent extends AbstractBaseAgent {
       const recommendations = this.generateRecommendations(findings, metrics);
 
       return this.createResult('success', findings, metrics, recommendations);
-      
     } catch (error) {
       this.log('error', 'Security analysis failed', error);
       return this.createResult('error', [
@@ -136,7 +133,7 @@ export class SecurityAgent extends AbstractBaseAgent {
           'critical',
           'analysis-error',
           `Security analysis failed: ${error instanceof Error ? error.message : String(error)}`
-        )
+        ),
       ]);
     }
   }
@@ -153,64 +150,61 @@ export class SecurityAgent extends AbstractBaseAgent {
       if (content) {
         try {
           const packageJson = JSON.parse(content);
-          
+
           // Check for known vulnerable packages (simplified list)
-          const vulnerablePackages = [
-            'lodash', 'moment', 'request', 'node-uuid', 'validator'
-          ];
+          const vulnerablePackages = ['lodash', 'moment', 'request', 'node-uuid', 'validator'];
 
           const allDeps = {
             ...packageJson.dependencies,
-            ...packageJson.devDependencies
+            ...packageJson.devDependencies,
           };
 
           for (const [pkg, version] of Object.entries(allDeps)) {
             if (vulnerablePackages.includes(pkg)) {
-              findings.push(this.createFinding(
-                'medium',
-                'vulnerable-dependency',
-                `Potentially vulnerable dependency: ${pkg}@${version}`,
-                { 
-                  file: 'package.json',
-                  fix: `Update ${pkg} to latest secure version or find alternative`
-                }
-              ));
+              findings.push(
+                this.createFinding(
+                  'medium',
+                  'vulnerable-dependency',
+                  `Potentially vulnerable dependency: ${pkg}@${version}`,
+                  {
+                    file: 'package.json',
+                    fix: `Update ${pkg} to latest secure version or find alternative`,
+                  }
+                )
+              );
             }
 
             // Check for wildcard versions
             if (typeof version === 'string' && version.includes('*')) {
-              findings.push(this.createFinding(
-                'medium',
-                'dependency-version',
-                `Wildcard version for ${pkg}: ${version}`,
-                { 
-                  file: 'package.json',
-                  fix: 'Use specific version numbers for better security'
-                }
-              ));
+              findings.push(
+                this.createFinding(
+                  'medium',
+                  'dependency-version',
+                  `Wildcard version for ${pkg}: ${version}`,
+                  {
+                    file: 'package.json',
+                    fix: 'Use specific version numbers for better security',
+                  }
+                )
+              );
             }
           }
 
           // Check for missing package-lock.json
           const lockFilePath = path.join(context.projectPath, 'package-lock.json');
-          if (!await this.fileExists(lockFilePath)) {
-            findings.push(this.createFinding(
-              'medium',
-              'missing-lockfile',
-              'Missing package-lock.json file',
-              { 
-                fix: 'Commit package-lock.json to ensure consistent dependency versions'
-              }
-            ));
+          if (!(await this.fileExists(lockFilePath))) {
+            findings.push(
+              this.createFinding('medium', 'missing-lockfile', 'Missing package-lock.json file', {
+                fix: 'Commit package-lock.json to ensure consistent dependency versions',
+              })
+            );
           }
-
         } catch (error) {
-          findings.push(this.createFinding(
-            'low',
-            'package-analysis',
-            'Could not parse package.json',
-            { file: 'package.json' }
-          ));
+          findings.push(
+            this.createFinding('low', 'package-analysis', 'Could not parse package.json', {
+              file: 'package.json',
+            })
+          );
         }
       }
     }
@@ -237,50 +231,43 @@ export class SecurityAgent extends AbstractBaseAgent {
             const message = this.getMessageForCategory(category);
             const fix = this.getFixForCategory(category);
 
-            findings.push(this.createFinding(
-              severity,
-              'security-pattern',
-              message,
-              { 
-                file, 
+            findings.push(
+              this.createFinding(severity, 'security-pattern', message, {
+                file,
                 line: lineNumber,
                 evidence: line.trim(),
-                fix
-              }
-            ));
+                fix,
+              })
+            );
           }
         }
       }
 
       // Check for console.log with sensitive data
       if (line.includes('console.log') && this.containsSensitiveData(line)) {
-        findings.push(this.createFinding(
-          'medium',
-          'data-exposure',
-          'Console.log may expose sensitive data',
-          { 
-            file, 
+        findings.push(
+          this.createFinding('medium', 'data-exposure', 'Console.log may expose sensitive data', {
+            file,
             line: lineNumber,
             evidence: line.trim(),
-            fix: 'Remove console.log or sanitize sensitive data'
-          }
-        ));
+            fix: 'Remove console.log or sanitize sensitive data',
+          })
+        );
       }
 
       // Check for TODO/FIXME with security implications
-      if ((line.includes('TODO') || line.includes('FIXME')) && 
-          (line.toLowerCase().includes('security') || line.toLowerCase().includes('auth'))) {
-        findings.push(this.createFinding(
-          'medium',
-          'security-todo',
-          'Security-related TODO/FIXME found',
-          { 
-            file, 
+      if (
+        (line.includes('TODO') || line.includes('FIXME')) &&
+        (line.toLowerCase().includes('security') || line.toLowerCase().includes('auth'))
+      ) {
+        findings.push(
+          this.createFinding('medium', 'security-todo', 'Security-related TODO/FIXME found', {
+            file,
             line: lineNumber,
             evidence: line.trim(),
-            fix: 'Address security-related TODO items promptly'
-          }
-        ));
+            fix: 'Address security-related TODO items promptly',
+          })
+        );
       }
     }
 
@@ -300,60 +287,52 @@ export class SecurityAgent extends AbstractBaseAgent {
 
       // Check for weak authentication
       if (line.includes('password') && line.includes('==') && !line.includes('hash')) {
-        findings.push(this.createFinding(
-          'critical',
-          'weak-auth',
-          'Plain text password comparison detected',
-          { 
-            file, 
+        findings.push(
+          this.createFinding('critical', 'weak-auth', 'Plain text password comparison detected', {
+            file,
             line: lineNumber,
-            fix: 'Use secure password hashing (bcrypt, scrypt, etc.)'
-          }
-        ));
+            fix: 'Use secure password hashing (bcrypt, scrypt, etc.)',
+          })
+        );
       }
 
       // Check for missing authentication
-      if (line.includes('app.') && (line.includes('.get') || line.includes('.post')) && 
-          !line.includes('auth') && !line.includes('middleware')) {
-        findings.push(this.createFinding(
-          'medium',
-          'missing-auth',
-          'Route without authentication middleware',
-          { 
-            file, 
+      if (
+        line.includes('app.') &&
+        (line.includes('.get') || line.includes('.post')) &&
+        !line.includes('auth') &&
+        !line.includes('middleware')
+      ) {
+        findings.push(
+          this.createFinding('medium', 'missing-auth', 'Route without authentication middleware', {
+            file,
             line: lineNumber,
             evidence: line.trim(),
-            fix: 'Add authentication middleware to protected routes'
-          }
-        ));
+            fix: 'Add authentication middleware to protected routes',
+          })
+        );
       }
 
       // Check for JWT without expiration
       if (line.includes('jwt.sign') && !line.includes('expiresIn')) {
-        findings.push(this.createFinding(
-          'medium',
-          'jwt-security',
-          'JWT token without expiration',
-          { 
-            file, 
+        findings.push(
+          this.createFinding('medium', 'jwt-security', 'JWT token without expiration', {
+            file,
             line: lineNumber,
-            fix: 'Add expiresIn option to JWT tokens'
-          }
-        ));
+            fix: 'Add expiresIn option to JWT tokens',
+          })
+        );
       }
 
       // Check for session security
       if (line.includes('session') && line.includes('secure') && line.includes('false')) {
-        findings.push(this.createFinding(
-          'high',
-          'session-security',
-          'Session cookie not marked as secure',
-          { 
-            file, 
+        findings.push(
+          this.createFinding('high', 'session-security', 'Session cookie not marked as secure', {
+            file,
             line: lineNumber,
-            fix: 'Set secure: true for session cookies in production'
-          }
-        ));
+            fix: 'Set secure: true for session cookies in production',
+          })
+        );
       }
     }
 
@@ -372,49 +351,47 @@ export class SecurityAgent extends AbstractBaseAgent {
       const lineNumber = i + 1;
 
       // Check for missing input validation
-      if ((line.includes('req.body') || line.includes('req.query') || line.includes('req.params')) &&
-          !this.hasValidation(content, i)) {
-        findings.push(this.createFinding(
-          'high',
-          'missing-validation',
-          'User input used without validation',
-          { 
-            file, 
+      if (
+        (line.includes('req.body') || line.includes('req.query') || line.includes('req.params')) &&
+        !this.hasValidation(content, i)
+      ) {
+        findings.push(
+          this.createFinding('high', 'missing-validation', 'User input used without validation', {
+            file,
             line: lineNumber,
             evidence: line.trim(),
-            fix: 'Add input validation before using user data'
-          }
-        ));
+            fix: 'Add input validation before using user data',
+          })
+        );
       }
 
       // Check for regex without anchors (ReDoS vulnerability)
       const regexMatch = line.match(/new RegExp\(['"`]([^'"`]+)['"`]\)/);
       if (regexMatch && !regexMatch[1].startsWith('^') && !regexMatch[1].endsWith('$')) {
-        findings.push(this.createFinding(
-          'medium',
-          'regex-security',
-          'Regular expression without anchors may be vulnerable to ReDoS',
-          { 
-            file, 
-            line: lineNumber,
-            evidence: regexMatch[1],
-            fix: 'Add ^ and $ anchors to regex patterns'
-          }
-        ));
+        findings.push(
+          this.createFinding(
+            'medium',
+            'regex-security',
+            'Regular expression without anchors may be vulnerable to ReDoS',
+            {
+              file,
+              line: lineNumber,
+              evidence: regexMatch[1],
+              fix: 'Add ^ and $ anchors to regex patterns',
+            }
+          )
+        );
       }
 
       // Check for unsafe JSON parsing
       if (line.includes('JSON.parse') && !line.includes('try')) {
-        findings.push(this.createFinding(
-          'medium',
-          'unsafe-parsing',
-          'JSON.parse without error handling',
-          { 
-            file, 
+        findings.push(
+          this.createFinding('medium', 'unsafe-parsing', 'JSON.parse without error handling', {
+            file,
             line: lineNumber,
-            fix: 'Wrap JSON.parse in try-catch block'
-          }
-        ));
+            fix: 'Wrap JSON.parse in try-catch block',
+          })
+        );
       }
     }
 
@@ -430,38 +407,37 @@ export class SecurityAgent extends AbstractBaseAgent {
     // Check for environment variable usage
     if (file.endsWith('.env') || file.includes('config')) {
       const lines = content.split('\n');
-      
+
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         const lineNumber = i + 1;
 
         // Check for hardcoded secrets in config files
         if (line.includes('=') && this.containsSecret(line)) {
-          findings.push(this.createFinding(
-            'critical',
-            'hardcoded-secret',
-            'Hardcoded secret in configuration file',
-            { 
-              file, 
-              line: lineNumber,
-              evidence: line.split('=')[0] + '=***',
-              fix: 'Use environment variables for secrets'
-            }
-          ));
+          findings.push(
+            this.createFinding(
+              'critical',
+              'hardcoded-secret',
+              'Hardcoded secret in configuration file',
+              {
+                file,
+                line: lineNumber,
+                evidence: line.split('=')[0] + '=***',
+                fix: 'Use environment variables for secrets',
+              }
+            )
+          );
         }
 
         // Check for debug mode in production
         if (line.toLowerCase().includes('debug') && line.includes('true')) {
-          findings.push(this.createFinding(
-            'medium',
-            'debug-mode',
-            'Debug mode enabled',
-            { 
-              file, 
+          findings.push(
+            this.createFinding('medium', 'debug-mode', 'Debug mode enabled', {
+              file,
               line: lineNumber,
-              fix: 'Disable debug mode in production'
-            }
-          ));
+              fix: 'Disable debug mode in production',
+            })
+          );
         }
       }
     }
@@ -469,15 +445,12 @@ export class SecurityAgent extends AbstractBaseAgent {
     // Check for CORS configuration
     if (content.includes('cors') || content.includes('Access-Control-Allow-Origin')) {
       if (content.includes('*')) {
-        findings.push(this.createFinding(
-          'high',
-          'cors-wildcard',
-          'CORS configured with wildcard (*)',
-          { 
+        findings.push(
+          this.createFinding('high', 'cors-wildcard', 'CORS configured with wildcard (*)', {
             file,
-            fix: 'Specify allowed origins instead of using wildcard'
-          }
-        ));
+            fix: 'Specify allowed origins instead of using wildcard',
+          })
+        );
       }
     }
 
@@ -495,7 +468,7 @@ export class SecurityAgent extends AbstractBaseAgent {
       weakRandom: 'medium',
       secrets: 'critical',
       insecureHttp: 'medium',
-      pathTraversal: 'high'
+      pathTraversal: 'high',
     };
     return severityMap[category] || 'medium';
   }
@@ -508,7 +481,7 @@ export class SecurityAgent extends AbstractBaseAgent {
       weakRandom: 'Weak random number generation',
       secrets: 'Hardcoded secret detected',
       insecureHttp: 'Insecure HTTP connection',
-      pathTraversal: 'Path traversal vulnerability detected'
+      pathTraversal: 'Path traversal vulnerability detected',
     };
     return messageMap[category] || 'Security issue detected';
   }
@@ -521,28 +494,36 @@ export class SecurityAgent extends AbstractBaseAgent {
       weakRandom: 'Use crypto.randomBytes() for cryptographic randomness',
       secrets: 'Move secrets to environment variables',
       insecureHttp: 'Use HTTPS for all external communications',
-      pathTraversal: 'Validate and sanitize file paths'
+      pathTraversal: 'Validate and sanitize file paths',
     };
     return fixMap[category] || 'Review and fix security issue';
   }
 
   private containsSensitiveData(line: string): boolean {
     const sensitiveKeywords = [
-      'password', 'token', 'key', 'secret', 'auth', 'credential',
-      'ssn', 'social', 'credit', 'card', 'email', 'phone'
+      'password',
+      'token',
+      'key',
+      'secret',
+      'auth',
+      'credential',
+      'ssn',
+      'social',
+      'credit',
+      'card',
+      'email',
+      'phone',
     ];
-    
-    return sensitiveKeywords.some(keyword => 
-      line.toLowerCase().includes(keyword)
-    );
+
+    return sensitiveKeywords.some(keyword => line.toLowerCase().includes(keyword));
   }
 
   private containsSecret(line: string): boolean {
     const secretPatterns = [
-      /[a-zA-Z0-9]{32,}/,  // Long alphanumeric strings
-      /sk_[a-zA-Z0-9]+/,   // Stripe secret keys
-      /pk_[a-zA-Z0-9]+/,   // Stripe public keys
-      /AKIA[0-9A-Z]{16}/,  // AWS access keys
+      /[a-zA-Z0-9]{32,}/, // Long alphanumeric strings
+      /sk_[a-zA-Z0-9]+/, // Stripe secret keys
+      /pk_[a-zA-Z0-9]+/, // Stripe public keys
+      /AKIA[0-9A-Z]{16}/, // AWS access keys
       /ghp_[a-zA-Z0-9]{36}/, // GitHub personal access tokens
     ];
 
@@ -553,15 +534,15 @@ export class SecurityAgent extends AbstractBaseAgent {
     // Simple check for validation keywords near the line
     const contextLines = content.split('\n').slice(Math.max(0, lineIndex - 5), lineIndex + 5);
     const validationKeywords = ['validate', 'joi', 'yup', 'check', 'sanitize', 'escape'];
-    
-    return contextLines.some(line => 
+
+    return contextLines.some(line =>
       validationKeywords.some(keyword => line.toLowerCase().includes(keyword))
     );
   }
 
   private calculateSecurityScore(findings: Finding[]): number {
     let score = 100;
-    
+
     findings.forEach(finding => {
       switch (finding.severity) {
         case 'critical':

@@ -29,12 +29,7 @@ export async function batchExecute<TInput, TResult>(
   operation: (item: TInput, index: number) => Promise<TResult>,
   options: BatchOptions = {}
 ): Promise<BatchResult<TResult>[]> {
-  const {
-    concurrency = 5,
-    stopOnError = false,
-    retryFailures = true,
-    onProgress,
-  } = options;
+  const { concurrency = 5, stopOnError = false, retryFailures = true, onProgress } = options;
 
   const results: BatchResult<TResult>[] = [];
   const queue = [...items.map((item, index) => ({ item, index }))];
@@ -45,10 +40,10 @@ export async function batchExecute<TInput, TResult>(
   const executeItem = async (item: TInput, index: number) => {
     try {
       const fn = () => operation(item, index);
-      const data = retryFailures 
+      const data = retryFailures
         ? await withRetry(fn, { maxAttempts: 3, backoffMs: 1000 })
         : await fn();
-      
+
       results[index] = {
         success: true,
         data,
@@ -62,7 +57,7 @@ export async function batchExecute<TInput, TResult>(
         index,
         input: item,
       };
-      
+
       if (stopOnError) {
         shouldStop = true;
       }
@@ -129,7 +124,7 @@ export async function batchGetFiles(
   // Create a map of paths to SHAs
   const pathToSha = new Map<string, string>();
   const pathToSize = new Map<string, number>();
-  
+
   for (const item of tree.tree) {
     if (item.type === 'blob' && paths.includes(item.path!)) {
       pathToSha.set(item.path!, item.sha!);
@@ -159,7 +154,7 @@ export async function batchGetFiles(
         repo,
         file_sha: sha,
       });
-      
+
       const content = Buffer.from(data.content, 'base64').toString('utf-8');
       return { path, content };
     },
@@ -210,7 +205,7 @@ export async function batchUpdateFiles(
   // Create blobs for all files
   const blobs = await batchExecute(
     files,
-    async (file) => {
+    async file => {
       const { data } = await octokit.git.createBlob({
         owner,
         repo,
@@ -323,7 +318,7 @@ export async function batchGetIssuesWithComments(
     const issues = new Map<number, any>();
     const results = await batchExecute(
       issueNumbers,
-      async (number) => {
+      async number => {
         const [issue, comments] = await Promise.all([
           octokit.issues.get({ owner, repo, issue_number: number }),
           octokit.issues.listComments({ owner, repo, issue_number: number }),

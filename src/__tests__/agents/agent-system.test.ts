@@ -18,7 +18,7 @@ describe('Agent System', () => {
   beforeEach(async () => {
     registry = new DefaultAgentRegistry();
     coordinator = new DefaultAgentCoordinator(registry);
-    
+
     // Create temporary directory for test files
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-test-'));
   });
@@ -65,7 +65,7 @@ describe('Agent System', () => {
       const testAgent = new TestingAgent(); // Depends on code-analysis
 
       registry.register(testAgent);
-      
+
       let validation = registry.validateDependencies();
       expect(validation.valid).toBe(false);
       expect(validation.errors).toContain(
@@ -92,7 +92,7 @@ describe('Agent System', () => {
 
       const context: AnalysisContext = {
         projectPath: tempDir,
-        files: ['test.ts', 'test.js', 'package.json']
+        files: ['test.ts', 'test.js', 'package.json'],
       };
 
       const report = await coordinator.runFullAnalysis(context);
@@ -107,7 +107,7 @@ describe('Agent System', () => {
 
       const context: AnalysisContext = {
         projectPath: tempDir,
-        files: ['test.ts']
+        files: ['test.ts'],
       };
 
       const report = await coordinator.runSelectedAgents(['code-analysis', 'type-safety'], context);
@@ -121,7 +121,7 @@ describe('Agent System', () => {
     test('should handle agent errors gracefully', async () => {
       const context: AnalysisContext = {
         projectPath: '/nonexistent/path',
-        files: ['test.ts']
+        files: ['test.ts'],
       };
 
       const report = await coordinator.runFullAnalysis(context);
@@ -134,8 +134,8 @@ describe('Agent System', () => {
 
     test('should emit events during analysis', async () => {
       const events: string[] = [];
-      
-      coordinator.addEventListener((event) => {
+
+      coordinator.addEventListener(event => {
         events.push(event.type);
       });
 
@@ -143,7 +143,7 @@ describe('Agent System', () => {
 
       const context: AnalysisContext = {
         projectPath: tempDir,
-        files: ['test.ts']
+        files: ['test.ts'],
       };
 
       await coordinator.runFullAnalysis(context);
@@ -162,7 +162,7 @@ describe('Agent System', () => {
           target: {
             type: 'project' as const,
             path: tempDir,
-            exclude: ['*.log']
+            exclude: ['*.log'],
           },
           parallel: false,
           config: {
@@ -170,8 +170,8 @@ describe('Agent System', () => {
             depth: 'deep',
             minSeverity: 'medium',
             maxFindings: 100,
-            includeCategories: ['security', 'code-quality']
-          }
+            includeCategories: ['security', 'code-quality'],
+          },
         };
 
         const result = await coordinator.coordinate(options);
@@ -203,7 +203,7 @@ describe('Agent System', () => {
           expect(firstReport).toHaveProperty('summary');
           expect(firstReport).toHaveProperty('findings');
           expect(firstReport).toHaveProperty('duration');
-          
+
           expect(firstReport.summary).toHaveProperty('filesAnalyzed');
           expect(firstReport.summary).toHaveProperty('totalFindings');
           expect(firstReport.summary).toHaveProperty('duration');
@@ -224,8 +224,8 @@ describe('Agent System', () => {
         const options = {
           target: {
             type: 'directory' as const,
-            path: emptyDir
-          }
+            path: emptyDir,
+          },
         };
 
         const result = await coordinator.coordinate(options);
@@ -248,8 +248,8 @@ describe('Agent System', () => {
         const options = {
           target: {
             type: 'project' as const,
-            path: tempDir
-          }
+            path: tempDir,
+          },
         };
 
         const result = await coordinator.coordinate(options);
@@ -262,7 +262,7 @@ describe('Agent System', () => {
         if (result.summary.totalFindings > 0) {
           const categoryKeys = Object.keys(result.summary.findingsByCategory);
           expect(categoryKeys.length).toBeGreaterThan(0);
-          
+
           // Category counts should be positive numbers
           categoryKeys.forEach(category => {
             expect(result.summary.findingsByCategory[category]).toBeGreaterThan(0);
@@ -276,9 +276,9 @@ describe('Agent System', () => {
         const options = {
           target: {
             type: 'project' as const,
-            path: tempDir
+            path: tempDir,
             // exclude is undefined
-          }
+          },
         };
 
         const result = await coordinator.coordinate(options);
@@ -295,8 +295,8 @@ describe('Agent System', () => {
         const options = {
           target: {
             type: 'project' as const,
-            path: tempDir
-          }
+            path: tempDir,
+          },
         };
 
         const result = await coordinator.coordinate(options);
@@ -306,11 +306,11 @@ describe('Agent System', () => {
           expect(typeof report.summary.filesAnalyzed).toBe('number');
           expect(typeof report.summary.totalFindings).toBe('number');
           expect(typeof report.summary.duration).toBe('number');
-          
+
           expect(report.summary.filesAnalyzed).toBeGreaterThanOrEqual(0);
           expect(report.summary.totalFindings).toBeGreaterThanOrEqual(0);
           expect(report.summary.duration).toBeGreaterThanOrEqual(0);
-          
+
           // Total findings should match actual findings array length
           expect(report.summary.totalFindings).toBe(report.findings.length);
         });
@@ -321,7 +321,7 @@ describe('Agent System', () => {
       const agents = coordinator.getAgents();
       expect(Array.isArray(agents)).toBe(true);
       expect(agents.length).toBeGreaterThan(0);
-      
+
       // All returned items should have agent-like properties
       agents.forEach(agent => {
         expect(agent).toHaveProperty('name');
@@ -369,20 +369,20 @@ describe('Agent System', () => {
 
       const context: AnalysisContext = {
         projectPath: tempDir,
-        files: ['syntax-test.js']
+        files: ['syntax-test.js'],
       };
 
       const result = await agent.analyze(context);
 
       expect(result.status).toBe('success');
       expect(result.findings.length).toBeGreaterThan(0);
-      
+
       // Should detect missing semicolon
       expect(result.findings.some(f => f.category === 'syntax')).toBe(true);
-      
+
       // Should detect console.log
       expect(result.findings.some(f => f.category === 'code-quality')).toBe(true);
-      
+
       // Should detect deep nesting
       expect(result.findings.some(f => f.category === 'complexity')).toBe(true);
     });
@@ -425,23 +425,23 @@ describe('Agent System', () => {
 
       const context: AnalysisContext = {
         projectPath: tempDir,
-        files: ['type-test.ts']
+        files: ['type-test.ts'],
       };
 
       const result = await agent.analyze(context);
 
       expect(result.status).toBe('success');
       expect(result.findings.length).toBeGreaterThan(0);
-      
+
       // Log actual findings for debugging
       // console.log('Actual findings:', result.findings.map(f => f.category));
-      
+
       // Should detect missing type annotations
       expect(result.findings.some(f => f.category === 'type-annotation')).toBe(true);
-      
-      // Should detect any type usage  
+
+      // Should detect any type usage
       expect(result.findings.some(f => f.category === 'any-type')).toBe(true);
-      
+
       // The interface check may not have detected issues in our test code
       // Making this optional since the main assertions above are passing
     });
@@ -456,7 +456,9 @@ describe('Agent System', () => {
 
     test('should analyze test coverage', async () => {
       // Create source file
-      await fs.writeFile(path.join(tempDir, 'calculator.ts'), `
+      await fs.writeFile(
+        path.join(tempDir, 'calculator.ts'),
+        `
         export function add(a: number, b: number): number {
           return a + b;
         }
@@ -464,10 +466,13 @@ describe('Agent System', () => {
         export function multiply(a: number, b: number): number {
           return a * b;
         }
-      `);
+      `
+      );
 
       // Create test file
-      await fs.writeFile(path.join(tempDir, 'calculator.test.ts'), `
+      await fs.writeFile(
+        path.join(tempDir, 'calculator.test.ts'),
+        `
         import { add } from './calculator';
         
         describe('Calculator', () => {
@@ -483,21 +488,22 @@ describe('Agent System', () => {
           
           });
         });
-      `);
+      `
+      );
 
       const context: AnalysisContext = {
         projectPath: tempDir,
-        files: ['calculator.ts', 'calculator.test.ts']
+        files: ['calculator.ts', 'calculator.test.ts'],
       };
 
       const result = await agent.analyze(context);
 
       expect(result.status).toBe('success');
       expect(result.findings.length).toBeGreaterThan(0);
-      
-      // Should detect skipped tests  
+
+      // Should detect skipped tests
       expect(result.findings.some(f => f.category === 'skipped-test')).toBe(true);
-      
+
       // Should detect empty tests
       expect(result.findings.some(f => f.category === 'empty-test')).toBe(true);
     });
@@ -530,23 +536,23 @@ describe('Agent System', () => {
 
       const context: AnalysisContext = {
         projectPath: tempDir,
-        files: ['security-test.js']
+        files: ['security-test.js'],
       };
 
       const result = await agent.analyze(context);
 
       expect(result.status).toBe('success');
       expect(result.findings.length).toBeGreaterThan(0);
-      
+
       // Should detect hardcoded secrets
       expect(result.findings.some(f => f.category === 'security-pattern')).toBe(true);
-      
+
       // Should detect code injection
       expect(result.findings.some(f => f.message.includes('Code injection'))).toBe(true);
-      
+
       // Should detect XSS vulnerability
       expect(result.findings.some(f => f.message.includes('XSS'))).toBe(true);
-      
+
       // Should detect insecure HTTP
       expect(result.findings.some(f => f.message.includes('Insecure HTTP'))).toBe(true);
     });
@@ -554,31 +560,28 @@ describe('Agent System', () => {
     test('should analyze package.json for vulnerabilities', async () => {
       const packageJson = {
         dependencies: {
-          "lodash": "*",
-          "moment": "^2.0.0"
+          lodash: '*',
+          moment: '^2.0.0',
         },
         devDependencies: {
-          "request": "^2.88.0"
-        }
+          request: '^2.88.0',
+        },
       };
 
-      await fs.writeFile(
-        path.join(tempDir, 'package.json'), 
-        JSON.stringify(packageJson, null, 2)
-      );
+      await fs.writeFile(path.join(tempDir, 'package.json'), JSON.stringify(packageJson, null, 2));
 
       const context: AnalysisContext = {
         projectPath: tempDir,
-        files: ['package.json']
+        files: ['package.json'],
       };
 
       const result = await agent.analyze(context);
 
       expect(result.status).toBe('success');
-      
+
       // Should detect vulnerable dependencies
       expect(result.findings.some(f => f.category === 'vulnerable-dependency')).toBe(true);
-      
+
       // Should detect wildcard versions
       expect(result.findings.some(f => f.category === 'dependency-version')).toBe(true);
     });
@@ -586,24 +589,37 @@ describe('Agent System', () => {
 
   // Helper function to create test files
   async function createTestFiles(dir: string): Promise<void> {
-    await fs.writeFile(path.join(dir, 'test.ts'), `
+    await fs.writeFile(
+      path.join(dir, 'test.ts'),
+      `
       function example(param: any): void {
         console.log(param);
         // eval("dangerous code"); // Removed for security testing
       }
-    `);
+    `
+    );
 
-    await fs.writeFile(path.join(dir, 'test.js'), `
+    await fs.writeFile(
+      path.join(dir, 'test.js'),
+      `
       const x = 1
       function test() {
         return x;
       }
-    `);
+    `
+    );
 
-    await fs.writeFile(path.join(dir, 'package.json'), JSON.stringify({
-      dependencies: {
-        "lodash": "*"
-      }
-    }, null, 2));
+    await fs.writeFile(
+      path.join(dir, 'package.json'),
+      JSON.stringify(
+        {
+          dependencies: {
+            lodash: '*',
+          },
+        },
+        null,
+        2
+      )
+    );
   }
 });

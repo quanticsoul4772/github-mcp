@@ -14,7 +14,7 @@ export class DefaultAgentRegistry implements AgentRegistry {
     if (this.agents.has(agent.name)) {
       throw new Error(`Agent with name '${agent.name}' is already registered`);
     }
-    
+
     this.agents.set(agent.name, agent);
     logger.info(`Registered agent: ${agent.name} v${agent.version}`);
   }
@@ -26,7 +26,7 @@ export class DefaultAgentRegistry implements AgentRegistry {
     if (!this.agents.has(agentName)) {
       throw new Error(`Agent with name '${agentName}' is not registered`);
     }
-    
+
     this.agents.delete(agentName);
     logger.info(`Unregistered agent: ${agentName}`);
   }
@@ -99,7 +99,7 @@ export class DefaultAgentRegistry implements AgentRegistry {
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -116,7 +116,7 @@ export class DefaultAgentRegistry implements AgentRegistry {
       if (visiting.has(agent.name)) {
         throw new Error(`Circular dependency detected involving agent '${agent.name}'`);
       }
-      
+
       if (visited.has(agent.name)) {
         return;
       }
@@ -138,7 +138,7 @@ export class DefaultAgentRegistry implements AgentRegistry {
 
     // Sort by priority first, then resolve dependencies
     const sortedAgents = agents.sort((a, b) => a.getPriority() - b.getPriority());
-    
+
     for (const agent of sortedAgents) {
       visit(agent);
     }

@@ -6,14 +6,18 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { Octokit } from '@octokit/rest';
 import { createMockOctokit } from './__tests__/mocks/octokit.js';
-import { mockEnvVars, mockProcessExit, restoreProcessExit } from './__tests__/helpers/test-helpers.js';
+import {
+  mockEnvVars,
+  mockProcessExit,
+  restoreProcessExit,
+} from './__tests__/helpers/test-helpers.js';
 
 // Mock external dependencies
 vi.mock('@modelcontextprotocol/sdk/server/mcp.js');
 vi.mock('@modelcontextprotocol/sdk/server/stdio.js');
 vi.mock('@octokit/rest');
 vi.mock('./rate-limiter.js', () => ({
-  createRateLimitedOctokit: vi.fn((token) => {
+  createRateLimitedOctokit: vi.fn(token => {
     const { Octokit } = require('@octokit/rest');
     const mockOctokit = {
       hook: {
@@ -30,21 +34,28 @@ vi.mock('./rate-limiter.js', () => ({
   }),
   GitHubRateLimiter: vi.fn(),
   ResponseSizeLimiter: vi.fn(() => ({
-    limitResponseSize: vi.fn((data) => ({ data, truncated: false, originalSize: 0 })),
+    limitResponseSize: vi.fn(data => ({ data, truncated: false, originalSize: 0 })),
   })),
 }));
 
 // Mock env module to prevent process.exit during tests
 vi.mock('./env.js', () => ({
   env: {
-    GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp_' + 'A'.repeat(36),  // Valid token format
+    GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp_' + 'A'.repeat(36), // Valid token format
     GITHUB_READ_ONLY: false,
     GITHUB_TOOLSETS: undefined,
     GITHUB_HOST: undefined,
     NODE_ENV: 'test',
   },
-  getGitHubToken: vi.fn(() => 'ghp_' + 'A'.repeat(36)),  // Valid token format
-  getEnabledToolsets: vi.fn(() => ['context', 'repos', 'issues', 'pull_requests', 'search', 'users']),  // Return default toolsets including users
+  getGitHubToken: vi.fn(() => 'ghp_' + 'A'.repeat(36)), // Valid token format
+  getEnabledToolsets: vi.fn(() => [
+    'context',
+    'repos',
+    'issues',
+    'pull_requests',
+    'search',
+    'users',
+  ]), // Return default toolsets including users
   displayConfig: vi.fn(),
 }));
 
@@ -252,7 +263,7 @@ describe('GitHubMCPServer', () => {
     it('should initialize with proper configuration', async () => {
       const { createRateLimitedOctokit } = await import('./rate-limiter.js');
       const { GitHubMCPServer } = await import('./index.js');
-      
+
       const server = new (GitHubMCPServer as any)(true);
 
       expect(McpServer).toHaveBeenCalledWith({
@@ -260,7 +271,7 @@ describe('GitHubMCPServer', () => {
         version: '1.0.0',
         description: 'GitHub API integration for MCP',
       });
-      
+
       // Verify createRateLimitedOctokit was called with the token
       expect(createRateLimitedOctokit).toHaveBeenCalledWith('ghp_' + 'A'.repeat(36));
     });
@@ -271,7 +282,7 @@ describe('GitHubMCPServer', () => {
       const { GitHubMCPServer } = await import('./index.js');
 
       const server = new (GitHubMCPServer as any)(true);
-      
+
       // Verify that validateEnvironmentConfiguration was called
       expect(validateEnvironmentConfiguration).toHaveBeenCalled();
     });
@@ -294,9 +305,9 @@ describe('GitHubMCPServer', () => {
 
       const { GitHubMCPServer } = await import('./index.js');
       const server = new (GitHubMCPServer as any)(true);
-      
+
       expect(server.readOnly).toBe(true);
-      
+
       // Reset
       (env as any).GITHUB_READ_ONLY = false;
     });
@@ -308,14 +319,14 @@ describe('GitHubMCPServer', () => {
 
       const { GitHubMCPServer } = await import('./index.js');
       const server = new (GitHubMCPServer as any)(true);
-      
+
       expect(server.enabledToolsets).toEqual(new Set(['repos', 'issues', 'pull_requests']));
     });
 
     it('should use all toolsets when not specified', async () => {
       const { GitHubMCPServer } = await import('./index.js');
       const server = new (GitHubMCPServer as any)(true);
-      
+
       // The mock returns specific toolsets, so check for those
       expect(server.enabledToolsets.size).toBe(6); // context, repos, issues, pull_requests, search, users
       expect(server.enabledToolsets.has('context')).toBe(true);
@@ -492,7 +503,7 @@ describe('GitHubMCPServer', () => {
 
       // Verify tools were registered
       expect(mockServer.tool).toHaveBeenCalled();
-      
+
       // Check that tools from different modules were registered
       const registeredTools = mockServer.tool.mock.calls.map((call: any) => call[0]);
       expect(registeredTools).toContain('get_me');
@@ -521,7 +532,7 @@ describe('GitHubMCPServer', () => {
 
       const registeredTools = mockServer.tool.mock.calls.map((call: any) => call[0]);
       const uniqueTools = [...new Set(registeredTools)];
-      
+
       expect(registeredTools).toHaveLength(uniqueTools.length);
     });
   });

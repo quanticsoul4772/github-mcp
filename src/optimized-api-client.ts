@@ -7,14 +7,30 @@ import { Octokit } from '@octokit/rest';
 import { GitHubAPICache, CACHE_CONFIG, type CacheMetrics } from './cache.js';
 import { GraphQLCache, type GraphQLCacheMetrics } from './graphql-cache.js';
 import { RequestDeduplicator, type DeduplicationMetrics } from './request-deduplication.js';
-import { PerformanceMonitor, type AggregatedMetrics, type SystemMetrics } from './performance-monitor.js';
+import {
+  PerformanceMonitor,
+  type AggregatedMetrics,
+  type SystemMetrics,
+} from './performance-monitor.js';
 import { PaginationHandler } from './pagination-handler.js';
 
-export type { CacheMetrics, DeduplicationMetrics, AggregatedMetrics, SystemMetrics, GraphQLCacheMetrics };
+export type {
+  CacheMetrics,
+  DeduplicationMetrics,
+  AggregatedMetrics,
+  SystemMetrics,
+  GraphQLCacheMetrics,
+};
 
 export interface GraphQLDetailedStats {
   general: GraphQLCacheMetrics;
-  topQueries: Array<{ query: string; hits: number; misses: number; hitRate: number; avgResponseTime: number }>;
+  topQueries: Array<{
+    query: string;
+    hits: number;
+    misses: number;
+    hitRate: number;
+    avgResponseTime: number;
+  }>;
   cacheEfficiency: { overall: number; byQuery: Record<string, number> };
   memorySummary: { entries: number; estimatedSize: string };
 }
@@ -121,23 +137,24 @@ export class OptimizedAPIClient {
       if (this.enableDeduplication && !options.skipDeduplication && this.deduplicator) {
         return this.deduplicator.deduplicate(operation, params, apiCall);
       }
-      
+
       return apiCall();
     };
 
     const cachedExecutor = async (): Promise<T> => {
       // Apply caching if enabled
       if (this.enableCache && !options.skipCache && this.cache) {
-        const cacheTTL = options.cacheTTL ?? CACHE_CONFIG[operation as keyof typeof CACHE_CONFIG] ?? 5 * 60 * 1000;
-        
+        const cacheTTL =
+          options.cacheTTL ?? CACHE_CONFIG[operation as keyof typeof CACHE_CONFIG] ?? 5 * 60 * 1000;
+
         // Skip caching for write operations
         if (cacheTTL === 0) {
           return executor();
         }
-        
+
         return this.cache.get(operation, params, executor, cacheTTL);
       }
-      
+
       return executor();
     };
 
@@ -158,33 +175,25 @@ export class OptimizedAPIClient {
     path: string = '',
     ref?: string
   ): Promise<any> {
-    return this.call(
-      'repos.getContent',
-      { owner, repo, path, ref },
-      async () => {
-        const { data } = await this.octokit.repos.getContent({
-          owner,
-          repo,
-          path,
-          ref,
-        });
-        return data;
-      }
-    );
+    return this.call('repos.getContent', { owner, repo, path, ref }, async () => {
+      const { data } = await this.octokit.repos.getContent({
+        owner,
+        repo,
+        path,
+        ref,
+      });
+      return data;
+    });
   }
 
   /**
    * Optimized repository information retrieval
    */
   async getRepository(owner: string, repo: string): Promise<any> {
-    return this.call(
-      'repos.get',
-      { owner, repo },
-      async () => {
-        const { data } = await this.octokit.repos.get({ owner, repo });
-        return data;
-      }
-    );
+    return this.call('repos.get', { owner, repo }, async () => {
+      const { data } = await this.octokit.repos.get({ owner, repo });
+      return data;
+    });
   }
 
   /**
@@ -193,20 +202,16 @@ export class OptimizedAPIClient {
   async getUser(username?: string): Promise<any> {
     const operation = username ? 'users.get' : 'users.getAuthenticated';
     const params = username ? { username } : {};
-    
-    return this.call(
-      operation,
-      params,
-      async () => {
-        if (username) {
-          const { data } = await this.octokit.users.getByUsername({ username });
-          return data;
-        } else {
-          const { data } = await this.octokit.users.getAuthenticated();
-          return data;
-        }
+
+    return this.call(operation, params, async () => {
+      if (username) {
+        const { data } = await this.octokit.users.getByUsername({ username });
+        return data;
+      } else {
+        const { data } = await this.octokit.users.getAuthenticated();
+        return data;
       }
-    );
+    });
   }
 
   /**
@@ -226,22 +231,18 @@ export class OptimizedAPIClient {
   ): Promise<any[]> {
     const { state = 'open', maxPages = 5, perPage = 100, ...otherOptions } = options;
     const params = { owner, repo, state, per_page: perPage, ...otherOptions };
-    
+
     // For single page requests, use optimized call
     if (maxPages === 1) {
-      return this.call(
-        'issues.listForRepo',
-        params,
-        async () => {
-          const { data } = await this.octokit.issues.listForRepo(params);
-          return data;
-        }
-      );
+      return this.call('issues.listForRepo', params, async () => {
+        const { data } = await this.octokit.issues.listForRepo(params);
+        return data;
+      });
     }
 
     // For multi-page requests, use smart pagination without caching individual pages
     const fetcher = this.paginationHandler.createGitHubFetcher(
-      (fetchParams) => this.octokit.issues.listForRepo(fetchParams),
+      fetchParams => this.octokit.issues.listForRepo(fetchParams),
       { owner, repo, state, ...otherOptions }
     );
 
@@ -263,23 +264,19 @@ export class OptimizedAPIClient {
     } = {}
   ): Promise<any[]> {
     const { state = 'open', maxPages = 5, perPage = 100, ...otherOptions } = options;
-    
+
     // For single page requests, use optimized call
     if (maxPages === 1) {
       const params = { owner, repo, state, per_page: perPage, ...otherOptions };
-      return this.call(
-        'pulls.list',
-        params,
-        async () => {
-          const { data } = await this.octokit.pulls.list(params);
-          return data;
-        }
-      );
+      return this.call('pulls.list', params, async () => {
+        const { data } = await this.octokit.pulls.list(params);
+        return data;
+      });
     }
 
     // For multi-page requests, use smart pagination
     const fetcher = this.paginationHandler.createGitHubFetcher(
-      (params) => this.octokit.pulls.list(params),
+      params => this.octokit.pulls.list(params),
       { owner, repo, state, ...otherOptions }
     );
 
@@ -291,20 +288,16 @@ export class OptimizedAPIClient {
    */
   async listBranches(owner: string, repo: string, maxPages: number = 3): Promise<any[]> {
     const params = { owner, repo, per_page: 100 };
-    
+
     if (maxPages === 1) {
-      return this.call(
-        'repos.listBranches',
-        params,
-        async () => {
-          const { data } = await this.octokit.repos.listBranches(params);
-          return data;
-        }
-      );
+      return this.call('repos.listBranches', params, async () => {
+        const { data } = await this.octokit.repos.listBranches(params);
+        return data;
+      });
     }
 
     const fetcher = this.paginationHandler.createGitHubFetcher(
-      (fetchParams) => this.octokit.repos.listBranches(fetchParams),
+      fetchParams => this.octokit.repos.listBranches(fetchParams),
       { owner, repo }
     );
 
@@ -314,7 +307,7 @@ export class OptimizedAPIClient {
   /**
    * Optimized workflow runs listing
    */
-  async listWorkflowRuns(params: any): Promise<{ data: unknown[]; headers?: any; }> {
+  async listWorkflowRuns(params: any): Promise<{ data: unknown[]; headers?: any }> {
     const fetchParams = {
       owner: params.owner,
       repo: params.repo,
@@ -328,9 +321,9 @@ export class OptimizedAPIClient {
       check_suite_id: params.check_suite_id,
       head_sha: params.head_sha,
       per_page: params.per_page || 30,
-      page: params.page || 1
+      page: params.page || 1,
     };
-    
+
     const response = await this.octokit.actions.listWorkflowRuns(fetchParams);
     return { data: response.data.workflow_runs, headers: response.headers };
   }
@@ -348,14 +341,14 @@ export class OptimizedAPIClient {
     concurrency: number = 5
   ): Promise<Array<{ success: boolean; data?: T; error?: Error; operation: string }>> {
     const { batchExecute } = await import('./batch-operations.js');
-    
+
     return batchExecute(
       calls,
-      async (call) => {
+      async call => {
         return this.call(call.operation, call.params, call.apiCall, call.options);
       },
       { concurrency }
-    ).then(results => 
+    ).then(results =>
       results.map(result => ({
         ...result,
         operation: result.input.operation,
@@ -379,29 +372,30 @@ export class OptimizedAPIClient {
     const fetcher = async (): Promise<T> => {
       const sortedVars = Object.keys(variables || {})
         .sort()
-        .reduce((acc, k) => { acc[k] = (variables as any)[k]; return acc; }, {} as Record<string, any>);
+        .reduce(
+          (acc, k) => {
+            acc[k] = (variables as any)[k];
+            return acc;
+          },
+          {} as Record<string, any>
+        );
       const dedupeKey = `graphql:${this.hashQuery(query)}:${JSON.stringify(sortedVars)}`;
       if (this.enableDeduplication && !options.skipDeduplication && this.deduplicator) {
         const deduplicatedCall = async () => this.octokit.graphql(query, variables) as Promise<T>;
         return this.deduplicator.deduplicate(dedupeKey, sortedVars, deduplicatedCall);
       }
-      
+
       return this.octokit.graphql(query, variables) as Promise<T>;
     };
 
     // Use GraphQL cache if enabled
     if (this.enableGraphQLCache && !options.skipCache && this.graphqlCache) {
       const cachedExecutor = async (): Promise<T> => {
-        return this.graphqlCache!.get(
-          query,
-          variables,
-          fetcher,
-          {
-            ttl: options.ttl,
-            skipCache: options.skipCache,
-            operation: options.operation,
-          }
-        );
+        return this.graphqlCache!.get(query, variables, fetcher, {
+          ttl: options.ttl,
+          skipCache: options.skipCache,
+          operation: options.operation,
+        });
       };
 
       // Apply performance monitoring if enabled
@@ -436,13 +430,13 @@ export class OptimizedAPIClient {
   private hashQuery(query: string): string {
     const normalizedQuery = query.replace(/\s+/g, ' ').trim();
     let hash = 0;
-    
+
     for (let i = 0; i < normalizedQuery.length; i++) {
       const char = normalizedQuery.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32bit integer
     }
-    
+
     return hash.toString(36);
   }
 
@@ -489,7 +483,7 @@ export class OptimizedAPIClient {
     if (!this.performanceMonitor) {
       return 'Performance monitoring is disabled';
     }
-    
+
     return this.performanceMonitor.generateReport();
   }
 

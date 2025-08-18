@@ -112,7 +112,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
       return {
         total_count: data.total_count,
         incomplete_results: data.incomplete_results,
-        items: data.items.map((org) => ({
+        items: data.items.map(org => ({
           login: org.login,
           id: org.id,
           node_id: org.node_id,
@@ -237,7 +237,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         per_page: params.perPage,
       });
 
-      return data.map((member) => ({
+      return data.map(member => ({
         login: member.login,
         id: member.id,
         node_id: member.node_id,
@@ -304,7 +304,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         per_page: params.perPage,
       });
 
-      return data.map((repo) => ({
+      return data.map(repo => ({
         id: repo.id,
         name: repo.name,
         full_name: repo.full_name,
@@ -367,7 +367,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         per_page: params.perPage,
       });
 
-      return data.map((team) => ({
+      return data.map(team => ({
         id: team.id,
         node_id: team.node_id,
         url: team.url,
@@ -457,7 +457,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
     handler: async (args: unknown) => {
       const params = args as ListUserOrgsParams;
       let data;
-      
+
       if (params.username) {
         const response = await octokit.orgs.listForUser({
           username: params.username,
@@ -473,7 +473,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         data = response.data;
       }
 
-      return data.map((org) => ({
+      return data.map(org => ({
         login: org.login,
         id: org.id,
         node_id: org.node_id,
@@ -490,7 +490,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
     tools.push({
       tool: {
         name: 'update_org',
-        description: 'Update an organization\'s profile',
+        description: "Update an organization's profile",
         inputSchema: {
           type: 'object',
           properties: {
@@ -535,7 +535,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
         },
       },
       handler: async (args: unknown) => {
-      const params = args as UpdateOrgParams;
+        const params = args as UpdateOrgParams;
         const { data } = await octokit.orgs.update({
           org: params.org,
           billing_email: params.billing_email,

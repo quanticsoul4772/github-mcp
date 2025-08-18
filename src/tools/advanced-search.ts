@@ -72,24 +72,27 @@ const SearchWithRelationshipsSchema = z.object({
 
 /**
  * Creates advanced search tools using GraphQL API for enhanced search capabilities.
- * 
+ *
  * These tools provide sophisticated search functionality that leverages GraphQL's
  * ability to fetch nested relationships and contextual data in single queries,
  * offering performance and feature advantages over REST-based search.
- * 
+ *
  * @param octokit - Configured Octokit instance with GraphQL support
  * @param readOnly - Whether to exclude write operations (all search tools are read-only)
  * @returns Array of advanced search tool configurations
- * 
+ *
  * @example
  * ```typescript
  * const tools = createAdvancedSearchTools(octokit, true);
  * // Returns tools: search_across_repos, advanced_code_search, etc.
  * ```
- * 
+ *
  * @see https://docs.github.com/en/graphql/reference/queries#search
  */
-export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: boolean): ToolConfig[] {
+export function createAdvancedSearchTools(
+  client: OptimizedAPIClient,
+  readOnly: boolean
+): ToolConfig[] {
   const tools: ToolConfig[] = [];
   const paginationHandler = new GraphQLPaginationHandler(client.getOctokit());
 
@@ -141,9 +144,7 @@ export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: 
     handler: createTypeSafeHandler(
       SearchAcrossReposSchema,
       async (params: SearchAcrossReposParams) => {
-        return withErrorHandling(
-          'search_across_repos',
-          async () => {
+        return withErrorHandling('search_across_repos', async () => {
           const query = `
             query($searchQuery: String!, $type: SearchType!, $first: Int!, $after: String) {
               search(query: $searchQuery, type: $type, first: $first, after: $after) {
@@ -262,11 +263,11 @@ export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: 
           `;
 
           const result: any = await client.graphql(query, {
-        searchQuery: params.query,
-        type: params.type,
-        first: params.first,
-        after: params.after,
-      });
+            searchQuery: params.query,
+            type: params.type,
+            first: params.first,
+            after: params.after,
+          });
           if (!result.search) {
             throw new Error('Search query returned no results');
           }
@@ -281,8 +282,7 @@ export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: 
             pageInfo: result.search.pageInfo,
             results: result.search.nodes,
           };
-        }
-      );
+        });
       },
       'search_across_repos'
     ),
@@ -352,7 +352,7 @@ export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: 
       async (params: SearchRepositoriesAdvancedParams) => {
         // Build search query with filters - all parameters are now properly typed
         let searchQuery = params.query;
-        
+
         if (params.language) searchQuery += ` language:${params.language}`;
         if (params.stars) searchQuery += ` stars:${params.stars}`;
         if (params.forks) searchQuery += ` forks:${params.forks}`;
@@ -366,10 +366,8 @@ export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: 
           }
         }
 
-        return withErrorHandling(
-          'search_repositories_advanced',
-          async () => {
-            const baseQuery = `
+        return withErrorHandling('search_repositories_advanced', async () => {
+          const baseQuery = `
             query($searchQuery: String!, $first: Int!) {
               search(query: $searchQuery, type: REPOSITORY, first: $first) {
                 repositoryCount
@@ -424,7 +422,9 @@ export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: 
                     }
                   }
                 }
-                ${params.includeMetrics ? `
+                ${
+                  params.includeMetrics
+                    ? `
                 issues {
                   totalCount
                 }
@@ -437,7 +437,9 @@ export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: 
                 collaborators {
                   totalCount
                 }
-                ` : ''}
+                `
+                    : ''
+                }
                 defaultBranchRef {
                   name
                   target {
@@ -450,7 +452,9 @@ export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: 
                         }
                       }
                     }
-                    ${params.includeMetrics ? `
+                    ${
+                      params.includeMetrics
+                        ? `
                     issues {
                       totalCount
                     }
@@ -463,7 +467,9 @@ export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: 
                     collaborators {
                       totalCount
                     }
-                    ` : ''}
+                    `
+                        : ''
+                    }
                     defaultBranchRef {
                       name
                       target {
@@ -478,53 +484,52 @@ export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: 
             }
           `;
 
-            const result: any = await client.graphql(baseQuery, {
-              searchQuery,
-              first: params.first,
-            });
+          const result: any = await client.graphql(baseQuery, {
+            searchQuery,
+            first: params.first,
+          });
 
-            return {
-              query: searchQuery,
-              totalCount: result.search.repositoryCount,
-              pageInfo: result.search.pageInfo,
-              repositories: result.search.nodes.map((repo: any) => ({
-                id: repo.id,
-                name: repo.name,
-                fullName: repo.nameWithOwner,
-                description: repo.description,
-                url: repo.url,
-                statistics: {
-                  stars: repo.stargazerCount,
-                  forks: repo.forkCount,
-                  watchers: repo.watchers.totalCount,
-                  size: repo.diskUsage,
-                  ...(params.includeMetrics && {
-                    issues: repo.issues?.totalCount,
-                    pullRequests: repo.pullRequests?.totalCount,
-                    releases: repo.releases?.totalCount,
-                    collaborators: repo.collaborators?.totalCount,
-                  }),
-                },
-                languages: repo.languages.edges.map((edge: any) => ({
-                  name: edge.node.name,
-                  color: edge.node.color,
-                  size: edge.size,
-                })),
-                primaryLanguage: repo.primaryLanguage,
-                owner: repo.owner,
-                license: repo.licenseInfo,
-                topics: repo.repositoryTopics.nodes.map((node: any) => node.topic.name),
-                dates: {
-                  created: repo.createdAt,
-                  updated: repo.updatedAt,
-                  pushed: repo.pushedAt,
-                  lastCommit: repo.defaultBranchRef?.target?.committedDate,
-                },
-                defaultBranch: repo.defaultBranchRef?.name,
+          return {
+            query: searchQuery,
+            totalCount: result.search.repositoryCount,
+            pageInfo: result.search.pageInfo,
+            repositories: result.search.nodes.map((repo: any) => ({
+              id: repo.id,
+              name: repo.name,
+              fullName: repo.nameWithOwner,
+              description: repo.description,
+              url: repo.url,
+              statistics: {
+                stars: repo.stargazerCount,
+                forks: repo.forkCount,
+                watchers: repo.watchers.totalCount,
+                size: repo.diskUsage,
+                ...(params.includeMetrics && {
+                  issues: repo.issues?.totalCount,
+                  pullRequests: repo.pullRequests?.totalCount,
+                  releases: repo.releases?.totalCount,
+                  collaborators: repo.collaborators?.totalCount,
+                }),
+              },
+              languages: repo.languages.edges.map((edge: any) => ({
+                name: edge.node.name,
+                color: edge.node.color,
+                size: edge.size,
               })),
-            };
-          }
-        );
+              primaryLanguage: repo.primaryLanguage,
+              owner: repo.owner,
+              license: repo.licenseInfo,
+              topics: repo.repositoryTopics.nodes.map((node: any) => node.topic.name),
+              dates: {
+                created: repo.createdAt,
+                updated: repo.updatedAt,
+                pushed: repo.pushedAt,
+                lastCommit: repo.defaultBranchRef?.target?.committedDate,
+              },
+              defaultBranch: repo.defaultBranchRef?.name,
+            })),
+          };
+        });
       },
       'search_repositories_advanced'
     ),
@@ -534,7 +539,8 @@ export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: 
   tools.push({
     tool: {
       name: 'search_with_relationships',
-      description: 'Search for entities and include their relationships (e.g., user with their repositories)',
+      description:
+        'Search for entities and include their relationships (e.g., user with their repositories)',
       inputSchema: {
         type: 'object',
         properties: {
@@ -578,7 +584,7 @@ export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: 
     handler: createTypeSafeHandler(
       SearchWithRelationshipsSchema,
       async (params: SearchWithRelationshipsParams) => {
-      const query = `
+        const query = `
         query($searchQuery: String!, $entityType: SearchType!, $first: Int!, $repoLimit: Int!) {
           search(query: $searchQuery, type: $entityType, first: $first) {
             userCount
@@ -599,7 +605,9 @@ export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: 
                 avatarUrl
                 createdAt
                 updatedAt
-                ${params.includeRepositories ? `
+                ${
+                  params.includeRepositories
+                    ? `
                 repositories(first: $repoLimit, orderBy: {field: STARGAZERS, direction: DESC}) {
                   totalCount
                   nodes {
@@ -617,8 +625,12 @@ export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: 
                     updatedAt
                   }
                 }
-                ` : ''}
-                ${params.includeGists ? `
+                `
+                    : ''
+                }
+                ${
+                  params.includeGists
+                    ? `
                 gists(first: 10) {
                   totalCount
                   nodes {
@@ -630,15 +642,21 @@ export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: 
                     updatedAt
                   }
                 }
-                ` : ''}
-                ${params.includeFollowers ? `
+                `
+                    : ''
+                }
+                ${
+                  params.includeFollowers
+                    ? `
                 followers {
                   totalCount
                 }
                 following {
                   totalCount
                 }
-                ` : ''}
+                `
+                    : ''
+                }
               }
               ... on Organization {
                 id
@@ -651,7 +669,9 @@ export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: 
                 avatarUrl
                 createdAt
                 updatedAt
-                ${params.includeRepositories ? `
+                ${
+                  params.includeRepositories
+                    ? `
                 repositories(first: $repoLimit, orderBy: {field: STARGAZERS, direction: DESC}) {
                   totalCount
                   nodes {
@@ -669,7 +689,9 @@ export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: 
                     updatedAt
                   }
                 }
-                ` : ''}
+                `
+                    : ''
+                }
                 membersWithRole {
                   totalCount
                 }
@@ -679,18 +701,16 @@ export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: 
         }
       `;
 
-      const variables = {
-        searchQuery: params.query,
-        entityType: params.entityType,
-        first: params.first || 20,
-        repoLimit: params.repositoryLimit || 10,
-      };
+        const variables = {
+          searchQuery: params.query,
+          entityType: params.entityType,
+          first: params.first || 20,
+          repoLimit: params.repositoryLimit || 10,
+        };
 
-      return withErrorHandling(
-        'search_with_relationships',
-        async () => {
-          const result = await client.graphql(query, variables) as any;
-          
+        return withErrorHandling('search_with_relationships', async () => {
+          const result = (await client.graphql(query, variables)) as any;
+
           if (!result.search) {
             throw new Error('Entity search with relationships returned no results');
           }
@@ -699,7 +719,7 @@ export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: 
           const processedEntities = result.search.nodes.map((node: any) => {
             // Determine if this is a user or organization
             const isOrganization = 'membersWithRole' in node;
-            
+
             if (isOrganization) {
               return {
                 ...node,
@@ -724,8 +744,7 @@ export function createAdvancedSearchTools(client: OptimizedAPIClient, readOnly: 
             pageInfo: result.search.pageInfo,
             entities: processedEntities,
           };
-        }
-      );
+        });
       },
       'search_with_relationships'
     ),

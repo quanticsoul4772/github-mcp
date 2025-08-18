@@ -17,7 +17,7 @@ import * as path from 'path';
  */
 export async function basicAnalysisExample(): Promise<void> {
   console.log('🔍 Basic Analysis Example');
-  console.log('=' .repeat(50));
+  console.log('='.repeat(50));
 
   // Create registry and coordinator
   const registry = new DefaultAgentRegistry();
@@ -35,7 +35,7 @@ export async function basicAnalysisExample(): Promise<void> {
   const context: AnalysisContext = {
     projectPath: process.cwd(),
     files: await discoverSourceFiles(process.cwd()),
-    excludePatterns: ['node_modules/**', 'dist/**', '*.test.ts']
+    excludePatterns: ['node_modules/**', 'dist/**', '*.test.ts'],
   };
 
   console.log(`Found ${context.files.length} files to analyze`);
@@ -52,7 +52,7 @@ export async function basicAnalysisExample(): Promise<void> {
  */
 export async function selectiveAnalysisExample(): Promise<void> {
   console.log('\n🎯 Selective Analysis Example');
-  console.log('=' .repeat(50));
+  console.log('='.repeat(50));
 
   const registry = new DefaultAgentRegistry();
   const coordinator = new DefaultAgentCoordinator(registry);
@@ -63,7 +63,7 @@ export async function selectiveAnalysisExample(): Promise<void> {
 
   const context: AnalysisContext = {
     projectPath: process.cwd(),
-    files: await discoverSourceFiles(process.cwd())
+    files: await discoverSourceFiles(process.cwd()),
   };
 
   // Run only security and type safety analysis
@@ -78,7 +78,7 @@ export async function selectiveAnalysisExample(): Promise<void> {
  */
 export async function eventDrivenAnalysisExample(): Promise<void> {
   console.log('\n📊 Event-Driven Analysis Example');
-  console.log('=' .repeat(50));
+  console.log('='.repeat(50));
 
   const registry = new DefaultAgentRegistry();
   const coordinator = new DefaultAgentCoordinator(registry);
@@ -96,21 +96,21 @@ export async function eventDrivenAnalysisExample(): Promise<void> {
       case 'analysis-start':
         console.log('🚀 Analysis started');
         break;
-      
+
       case 'agent-start':
         console.log(`  ⏳ Starting ${event.agentName}...`);
         break;
-      
+
       case 'agent-complete':
         completedAgents++;
         const progress = Math.round((completedAgents / totalAgents) * 100);
         console.log(`  ✅ ${event.agentName} completed [${progress}%]`);
         break;
-      
+
       case 'agent-error':
         console.error(`  ❌ ${event.agentName} failed: ${event.error?.message}`);
         break;
-      
+
       case 'analysis-complete':
         console.log('🎉 Analysis finished!');
         break;
@@ -119,7 +119,7 @@ export async function eventDrivenAnalysisExample(): Promise<void> {
 
   const context: AnalysisContext = {
     projectPath: process.cwd(),
-    files: await discoverSourceFiles(process.cwd())
+    files: await discoverSourceFiles(process.cwd()),
   };
 
   await coordinator.runFullAnalysis(context);
@@ -130,7 +130,7 @@ export async function eventDrivenAnalysisExample(): Promise<void> {
  */
 export async function customConfigurationExample(): Promise<void> {
   console.log('\n⚙️  Custom Configuration Example');
-  console.log('=' .repeat(50));
+  console.log('='.repeat(50));
 
   const registry = new DefaultAgentRegistry();
   const coordinator = new DefaultAgentCoordinator(registry);
@@ -140,35 +140,41 @@ export async function customConfigurationExample(): Promise<void> {
 
   // Custom configuration
   const configuration = new Map([
-    ['code-analysis', {
-      enabled: true,
-      priority: 10,
-      timeout: 60000,
-      options: {
-        maxComplexity: 15,
-        checkConsoleStatements: false,
-        maxLineLength: 100
-      }
-    }],
-    ['security', {
-      enabled: true,
-      priority: 5,
-      timeout: 45000,
-      options: {
-        checkHardcodedSecrets: true,
-        checkDependencies: false
-      }
-    }]
+    [
+      'code-analysis',
+      {
+        enabled: true,
+        priority: 10,
+        timeout: 60000,
+        options: {
+          maxComplexity: 15,
+          checkConsoleStatements: false,
+          maxLineLength: 100,
+        },
+      },
+    ],
+    [
+      'security',
+      {
+        enabled: true,
+        priority: 5,
+        timeout: 45000,
+        options: {
+          checkHardcodedSecrets: true,
+          checkDependencies: false,
+        },
+      },
+    ],
   ]);
 
   const context: AnalysisContext = {
     projectPath: process.cwd(),
     files: await discoverSourceFiles(process.cwd()),
-    configuration
+    configuration,
   };
 
   const report = await coordinator.runFullAnalysis(context);
-  
+
   console.log('Analysis completed with custom configuration');
   displaySummary(report);
 }
@@ -178,7 +184,7 @@ export async function customConfigurationExample(): Promise<void> {
  */
 export async function fileTypeAnalysisExample(): Promise<void> {
   console.log('\n📁 File Type Analysis Example');
-  console.log('=' .repeat(50));
+  console.log('='.repeat(50));
 
   const registry = new DefaultAgentRegistry();
   const coordinator = new DefaultAgentCoordinator(registry);
@@ -193,7 +199,7 @@ export async function fileTypeAnalysisExample(): Promise<void> {
   const context: AnalysisContext = {
     projectPath: process.cwd(),
     files: tsFiles,
-    targetFiles: tsFiles
+    targetFiles: tsFiles,
   };
 
   console.log(`Analyzing ${tsFiles.length} TypeScript files`);
@@ -207,7 +213,7 @@ export async function fileTypeAnalysisExample(): Promise<void> {
  */
 export async function reportFormatsExample(): Promise<void> {
   console.log('\n📄 Report Formats Example');
-  console.log('=' .repeat(50));
+  console.log('='.repeat(50));
 
   const registry = new DefaultAgentRegistry();
   const coordinator = new DefaultAgentCoordinator(registry);
@@ -217,7 +223,7 @@ export async function reportFormatsExample(): Promise<void> {
 
   const context: AnalysisContext = {
     projectPath: process.cwd(),
-    files: await discoverSourceFiles(process.cwd())
+    files: await discoverSourceFiles(process.cwd()),
   };
 
   const report = await coordinator.runFullAnalysis(context);
@@ -243,7 +249,7 @@ export async function reportFormatsExample(): Promise<void> {
  */
 export async function errorHandlingExample(): Promise<void> {
   console.log('\n🛡️  Error Handling Example');
-  console.log('=' .repeat(50));
+  console.log('='.repeat(50));
 
   const registry = new DefaultAgentRegistry();
   const coordinator = new DefaultAgentCoordinator(registry);
@@ -253,15 +259,15 @@ export async function errorHandlingExample(): Promise<void> {
   // Intentionally problematic context
   const context: AnalysisContext = {
     projectPath: '/nonexistent/path',
-    files: ['nonexistent.ts']
+    files: ['nonexistent.ts'],
   };
 
   try {
     const report = await coordinator.runFullAnalysis(context);
-    
+
     // Check for agent errors
     const failedAgents = report.agentResults.filter(result => result.status === 'error');
-    
+
     if (failedAgents.length > 0) {
       console.log(`⚠️  ${failedAgents.length} agents encountered errors:`);
       failedAgents.forEach(result => {
@@ -270,7 +276,6 @@ export async function errorHandlingExample(): Promise<void> {
     }
 
     console.log('✅ Analysis completed despite errors');
-    
   } catch (error) {
     console.error('❌ Analysis failed completely:', error);
   }
@@ -282,15 +287,15 @@ export async function errorHandlingExample(): Promise<void> {
 
 async function discoverSourceFiles(projectPath: string): Promise<string[]> {
   const files: string[] = [];
-  
+
   const walk = async (dir: string): Promise<void> => {
     try {
       const entries = await fs.readdir(dir, { withFileTypes: true });
-      
+
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
         const relativePath = path.relative(projectPath, fullPath);
-        
+
         if (entry.isDirectory() && !shouldSkipDirectory(entry.name)) {
           await walk(fullPath);
         } else if (entry.isFile() && isSourceFile(entry.name)) {
@@ -318,7 +323,7 @@ function isSourceFile(fileName: string): boolean {
 
 function displaySummary(report: AnalysisReport): void {
   const { summary } = report;
-  
+
   console.log('\n📊 Analysis Summary:');
   console.log(`  Total Findings: ${summary.totalFindings}`);
   console.log(`  Critical: ${summary.criticalFindings}`);
@@ -359,22 +364,29 @@ function generateHtmlReport(report: AnalysisReport): string {
         <p>Files Analyzed: ${report.summary.filesAnalyzed}</p>
     </div>
     <h2>Findings</h2>
-    ${report.findings.map(finding => `
+    ${report.findings
+      .map(
+        finding => `
         <div class="finding ${finding.severity}">
             <strong>${finding.message}</strong>
             ${finding.file ? `<br>File: ${finding.file}` : ''}
         </div>
-    `).join('')}
+    `
+      )
+      .join('')}
 </body>
 </html>`;
 }
 
 function generateCsvReport(report: AnalysisReport): string {
   const headers = 'Severity,Category,Message,File,Line,Fix\n';
-  const rows = report.findings.map(finding => 
-    `"${finding.severity}","${finding.category}","${finding.message}","${finding.file || ''}","${finding.line || ''}","${finding.fix || ''}"`
-  ).join('\n');
-  
+  const rows = report.findings
+    .map(
+      finding =>
+        `"${finding.severity}","${finding.category}","${finding.message}","${finding.file || ''}","${finding.line || ''}","${finding.fix || ''}"`
+    )
+    .join('\n');
+
   return headers + rows;
 }
 
@@ -392,7 +404,7 @@ export async function runAllExamples(): Promise<void> {
     await fileTypeAnalysisExample();
     await reportFormatsExample();
     await errorHandlingExample();
-    
+
     console.log('\n✅ All examples completed successfully!');
   } catch (error) {
     console.error('\n❌ Example execution failed:', error);

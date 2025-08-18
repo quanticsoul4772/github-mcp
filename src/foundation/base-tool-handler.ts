@@ -21,23 +21,23 @@ export abstract class BaseToolHandler<TParams, TResult> {
       if (error instanceof ValidationError) {
         throw error;
       }
-      
+
       if (error.status === 404) {
         throw new Error(`${context}: Resource not found`);
       }
-      
+
       if (error.status === 403) {
         throw new Error(`${context}: Access forbidden - check token permissions`);
       }
-      
+
       if (error.status === 401) {
         throw new Error(`${context}: Authentication failed - check token`);
       }
-      
+
       if (error.status && error.message) {
         throw new Error(`${context}: GitHub API error (${error.status}): ${error.message}`);
       }
-      
+
       throw new Error(`${context}: ${error.message || 'Unknown error'}`);
     }
   }
@@ -45,7 +45,11 @@ export abstract class BaseToolHandler<TParams, TResult> {
   /**
    * Validate required parameters
    */
-  protected validateParams(params: TParams, validator: (params: TParams) => boolean, message: string): void {
+  protected validateParams(
+    params: TParams,
+    validator: (params: TParams) => boolean,
+    message: string
+  ): void {
     if (!validator(params)) {
       throw new ValidationError('params', message);
     }

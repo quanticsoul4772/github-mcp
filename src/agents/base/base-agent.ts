@@ -1,4 +1,10 @@
-import { BaseAgent, AnalysisContext, AnalysisResult, AgentConfiguration, Finding } from '../types/agent-interfaces.js';
+import {
+  BaseAgent,
+  AnalysisContext,
+  AnalysisResult,
+  AgentConfiguration,
+  Finding,
+} from '../types/agent-interfaces.js';
 
 /**
  * Abstract base class for all analysis agents
@@ -36,9 +42,12 @@ export abstract class AbstractBaseAgent implements BaseAgent {
    * Validate configuration for this agent
    */
   public validateConfiguration(config: AgentConfiguration): boolean {
-    return config && typeof config.enabled === 'boolean' && 
-           typeof config.priority === 'number' && 
-           typeof config.timeout === 'number';
+    return (
+      config &&
+      typeof config.enabled === 'boolean' &&
+      typeof config.priority === 'number' &&
+      typeof config.timeout === 'number'
+    );
   }
 
   /**
@@ -49,7 +58,7 @@ export abstract class AbstractBaseAgent implements BaseAgent {
       enabled: true,
       priority: this.getPriority(),
       timeout: 30000, // 30 seconds
-      options: {}
+      options: {},
     };
   }
 
@@ -69,7 +78,7 @@ export abstract class AbstractBaseAgent implements BaseAgent {
       findings,
       metrics,
       recommendations,
-      filesAnalyzed: findings.filter(f => f.file).length
+      filesAnalyzed: findings.filter(f => f.file).length,
     };
   }
 
@@ -87,7 +96,7 @@ export abstract class AbstractBaseAgent implements BaseAgent {
       severity,
       category,
       message,
-      ...options
+      ...options,
     };
   }
 
@@ -106,18 +115,14 @@ export abstract class AbstractBaseAgent implements BaseAgent {
 
     // Apply exclude patterns
     if (context.excludePatterns) {
-      filteredFiles = filteredFiles.filter(file => 
-        !context.excludePatterns!.some(pattern => 
-          new RegExp(pattern).test(file)
-        )
+      filteredFiles = filteredFiles.filter(
+        file => !context.excludePatterns!.some(pattern => new RegExp(pattern).test(file))
       );
     }
 
     // Apply target files filter
     if (context.targetFiles && context.targetFiles.length > 0) {
-      filteredFiles = filteredFiles.filter(file => 
-        context.targetFiles!.includes(file)
-      );
+      filteredFiles = filteredFiles.filter(file => context.targetFiles!.includes(file));
     }
 
     return filteredFiles;
@@ -171,7 +176,7 @@ export abstract class AbstractBaseAgent implements BaseAgent {
   protected log(level: 'info' | 'warn' | 'error', message: string, data?: any): void {
     const timestamp = new Date().toISOString();
     const logMessage = `[${timestamp}] [${this.name}] ${message}`;
-    
+
     switch (level) {
       case 'info':
         console.log(logMessage, data || '');

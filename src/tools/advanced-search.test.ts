@@ -12,14 +12,14 @@ describe('Advanced Search Tools', () => {
 
   beforeEach(() => {
     mockOctokit = createMockOctokit();
-    
+
     // Create a mock OptimizedAPIClient
     mockClient = {
       getOctokit: () => mockOctokit,
-      graphql: mockOctokit.graphql,  // Forward graphql calls to the mock
+      graphql: mockOctokit.graphql, // Forward graphql calls to the mock
       // Add other methods if needed
     };
-    
+
     tools = createAdvancedSearchTools(mockClient, false);
   });
 
@@ -71,10 +71,7 @@ describe('Advanced Search Tools', () => {
                 spdxId: 'MIT',
               },
               repositoryTopics: {
-                nodes: [
-                  { topic: { name: 'typescript' } },
-                  { topic: { name: 'github' } },
-                ],
+                nodes: [{ topic: { name: 'typescript' } }, { topic: { name: 'github' } }],
               },
             },
           ],
@@ -90,7 +87,9 @@ describe('Advanced Search Tools', () => {
       });
 
       expect(mockOctokit.graphql).toHaveBeenCalledWith(
-        expect.stringContaining('query($searchQuery: String!, $type: SearchType!, $first: Int!, $after: String)'),
+        expect.stringContaining(
+          'query($searchQuery: String!, $type: SearchType!, $first: Int!, $after: String)'
+        ),
         {
           searchQuery: 'typescript language:typescript',
           type: 'REPOSITORY',
@@ -134,10 +133,7 @@ describe('Advanced Search Tools', () => {
               spdxId: 'MIT',
             },
             repositoryTopics: {
-              nodes: [
-                { topic: { name: 'typescript' } },
-                { topic: { name: 'github' } },
-              ],
+              nodes: [{ topic: { name: 'typescript' } }, { topic: { name: 'github' } }],
             },
           },
         ],
@@ -316,7 +312,9 @@ describe('Advanced Search Tools', () => {
     let searchRepositoriesAdvanced: any;
 
     beforeEach(() => {
-      searchRepositoriesAdvanced = tools.find(tool => tool.tool.name === 'search_repositories_advanced');
+      searchRepositoriesAdvanced = tools.find(
+        tool => tool.tool.name === 'search_repositories_advanced'
+      );
     });
 
     it('should be registered', () => {
@@ -365,10 +363,7 @@ describe('Advanced Search Tools', () => {
                 spdxId: 'MIT',
               },
               repositoryTopics: {
-                nodes: [
-                  { topic: { name: 'typescript' } },
-                  { topic: { name: 'api' } },
-                ],
+                nodes: [{ topic: { name: 'typescript' } }, { topic: { name: 'api' } }],
               },
               defaultBranchRef: {
                 name: 'main',
@@ -398,7 +393,8 @@ describe('Advanced Search Tools', () => {
       });
 
       // Verify the query was built correctly
-      const expectedQuery = 'api language:typescript stars:>50 forks:>10 size:<2000 created:>2023-01-01 pushed:>2024-01-01 license:mit topic:typescript topic:api';
+      const expectedQuery =
+        'api language:typescript stars:>50 forks:>10 size:<2000 created:>2023-01-01 pushed:>2024-01-01 license:mit topic:typescript topic:api';
 
       expect(mockOctokit.graphql).toHaveBeenCalledWith(
         expect.stringContaining('query($searchQuery: String!, $first: Int!)'),
@@ -527,13 +523,10 @@ describe('Advanced Search Tools', () => {
         query: 'test',
       });
 
-      expect(mockOctokit.graphql).toHaveBeenCalledWith(
-        expect.any(String),
-        {
-          searchQuery: 'test',
-          first: 25,
-        }
-      );
+      expect(mockOctokit.graphql).toHaveBeenCalledWith(expect.any(String), {
+        searchQuery: 'test',
+        first: 25,
+      });
     });
   });
 
@@ -547,7 +540,9 @@ describe('Advanced Search Tools', () => {
     it('should be registered', () => {
       expect(searchWithRelationships).toBeDefined();
       expect(searchWithRelationships.tool.name).toBe('search_with_relationships');
-      expect(searchWithRelationships.tool.description).toContain('Search for entities and include their relationships');
+      expect(searchWithRelationships.tool.description).toContain(
+        'Search for entities and include their relationships'
+      );
     });
 
     it('should search users with relationships', async () => {
@@ -616,7 +611,9 @@ describe('Advanced Search Tools', () => {
       });
 
       expect(mockOctokit.graphql).toHaveBeenCalledWith(
-        expect.stringContaining('query($searchQuery: String!, $entityType: SearchType!, $first: Int!, $repoLimit: Int!)'),
+        expect.stringContaining(
+          'query($searchQuery: String!, $entityType: SearchType!, $first: Int!, $repoLimit: Int!)'
+        ),
         {
           searchQuery: 'location:"Test City"',
           entityType: 'USER',
@@ -778,15 +775,12 @@ describe('Advanced Search Tools', () => {
         query: 'test',
       });
 
-      expect(mockOctokit.graphql).toHaveBeenCalledWith(
-        expect.any(String),
-        {
-          searchQuery: 'test',
-          entityType: 'USER',
-          first: 10,
-          repoLimit: 10,
-        }
-      );
+      expect(mockOctokit.graphql).toHaveBeenCalledWith(expect.any(String), {
+        searchQuery: 'test',
+        entityType: 'USER',
+        first: 10,
+        repoLimit: 10,
+      });
     });
 
     it('should handle mixed user and organization results', async () => {

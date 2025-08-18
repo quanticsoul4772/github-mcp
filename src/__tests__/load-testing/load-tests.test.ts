@@ -7,13 +7,13 @@ import { createIssueTools } from '../../tools/issues.js';
 import { createRepositoryTools } from '../../tools/repositories.js';
 import { createMockOctokit } from '../mocks/octokit.js';
 import { testFixtures } from '../fixtures/test-data.js';
-import { 
-  LoadTestRunner, 
+import {
+  LoadTestRunner,
   MemoryMonitor,
   CircuitBreakerTester,
   RegressionDetector,
   LoadTestConfig,
-  LoadTestResult 
+  LoadTestResult,
 } from './load-test-runner.js';
 import { ReliabilityManager, RetryManager, ConsoleTelemetry } from '../../reliability.js';
 
@@ -28,11 +28,11 @@ describe('Load Testing Suite', () => {
     mockOctokit = createMockOctokit();
     issueTools = createIssueTools(mockOctokit, false);
     repoTools = createRepositoryTools(mockOctokit, false);
-    
+
     const telemetry = new ConsoleTelemetry(false); // Quiet for load tests
     const retryManager = new RetryManager();
     reliabilityManager = new ReliabilityManager(retryManager, telemetry);
-    
+
     loadTestRunner = new LoadTestRunner();
   });
 
@@ -47,11 +47,12 @@ describe('Load Testing Suite', () => {
         rampUpTime: 1000, // 1 second ramp up
       };
 
-      const operation = () => listIssues.handler({
-        owner: 'test-owner',
-        repo: 'test-repo',
-        state: 'all',
-      });
+      const operation = () =>
+        listIssues.handler({
+          owner: 'test-owner',
+          repo: 'test-repo',
+          state: 'all',
+        });
 
       const result = await loadTestRunner.runLoadTest(operation, config);
 
@@ -72,10 +73,11 @@ describe('Load Testing Suite', () => {
         requestsPerSecond: 100, // Target 100 RPS
       };
 
-      const operation = () => getRepo.handler({
-        owner: 'test-owner',
-        repo: 'test-repo',
-      });
+      const operation = () =>
+        getRepo.handler({
+          owner: 'test-owner',
+          repo: 'test-repo',
+        });
 
       const result = await loadTestRunner.runLoadTest(operation, config);
 
@@ -87,7 +89,7 @@ describe('Load Testing Suite', () => {
     it('should maintain performance under mixed workload', async () => {
       const listIssues = issueTools.find(tool => tool.tool.name === 'list_issues');
       const getRepo = repoTools.find(tool => tool.tool.name === 'get_repository');
-      
+
       mockOctokit.issues.listForRepo.mockResolvedValue({ data: [] });
       mockOctokit.repos.get.mockResolvedValue({ data: testFixtures.repositories.public });
 
@@ -123,17 +125,19 @@ describe('Load Testing Suite', () => {
   describe('Memory Usage Under Load', () => {
     it('should maintain stable memory usage during sustained load', async () => {
       const listIssues = issueTools.find(tool => tool.tool.name === 'list_issues');
-      
+
       // Generate varied responses to prevent caching
       let requestCount = 0;
       mockOctokit.issues.listForRepo.mockImplementation(() => {
         requestCount++;
-        return Promise.resolve({ 
-          data: Array(10).fill(null).map((_, i) => ({
-            ...testFixtures.issues.open,
-            id: requestCount * 10 + i,
-            number: requestCount * 10 + i,
-          }))
+        return Promise.resolve({
+          data: Array(10)
+            .fill(null)
+            .map((_, i) => ({
+              ...testFixtures.issues.open,
+              id: requestCount * 10 + i,
+              number: requestCount * 10 + i,
+            })),
         });
       });
 
@@ -145,11 +149,12 @@ describe('Load Testing Suite', () => {
         concurrency: 25,
       };
 
-      const operation = () => listIssues.handler({
-        owner: 'test-owner',
-        repo: 'test-repo',
-        state: 'all',
-      });
+      const operation = () =>
+        listIssues.handler({
+          owner: 'test-owner',
+          repo: 'test-repo',
+          state: 'all',
+        });
 
       const result = await loadTestRunner.runLoadTest(operation, config);
 
@@ -165,24 +170,25 @@ describe('Load Testing Suite', () => {
 
     it('should handle garbage collection during load', async () => {
       const listIssues = issueTools.find(tool => tool.tool.name === 'list_issues');
-      
+
       // Create memory pressure with large responses
-      mockOctokit.issues.listForRepo.mockResolvedValue({ 
-        data: Array(1000).fill(testFixtures.issues.open)
+      mockOctokit.issues.listForRepo.mockResolvedValue({
+        data: Array(1000).fill(testFixtures.issues.open),
       });
 
       const memoryBefore = process.memoryUsage();
-      
+
       const config: LoadTestConfig = {
         duration: 3000,
         concurrency: 15,
       };
 
-      const operation = () => listIssues.handler({
-        owner: 'test-owner',
-        repo: 'test-repo',
-        state: 'all',
-      });
+      const operation = () =>
+        listIssues.handler({
+          owner: 'test-owner',
+          repo: 'test-repo',
+          state: 'all',
+        });
 
       await loadTestRunner.runLoadTest(operation, config);
 
@@ -202,7 +208,7 @@ describe('Load Testing Suite', () => {
   describe('Circuit Breaker Under Load', () => {
     it('should handle circuit breaker activation during load', async () => {
       const listIssues = issueTools.find(tool => tool.tool.name === 'list_issues');
-      
+
       // Mock the listIssues to fail consistently to trigger circuit breaker
       let callCount = 0;
       mockOctokit.issues.listForRepo.mockImplementation(() => {
@@ -213,15 +219,15 @@ describe('Load Testing Suite', () => {
         }
         throw new Error('API failure');
       });
-      
-      const operation = () => reliabilityManager.executeWithReliability(
-        'load_test_operation',
-        () => listIssues.handler({
-          owner: 'test-owner',
-          repo: 'test-repo',
-          state: 'all',
-        })
-      );
+
+      const operation = () =>
+        reliabilityManager.executeWithReliability('load_test_operation', () =>
+          listIssues.handler({
+            owner: 'test-owner',
+            repo: 'test-repo',
+            state: 'all',
+          })
+        );
 
       const config: LoadTestConfig = {
         duration: 4000,
@@ -242,7 +248,7 @@ describe('Load Testing Suite', () => {
 
     it('should recover from circuit breaker trips', async () => {
       const listIssues = issueTools.find(tool => tool.tool.name === 'list_issues');
-      
+
       let requestCount = 0;
       let totalApiCalls = 0;
       mockOctokit.issues.listForRepo.mockImplementation(() => {
@@ -278,12 +284,12 @@ describe('Load Testing Suite', () => {
 
       // Should have made multiple requests
       expect(result.totalRequests).toBeGreaterThanOrEqual(30); // At least 30 requests
-      
+
       // With direct API calls, we expect some successes after initial failures
       if (totalApiCalls > 20) {
         expect(result.successfulRequests).toBeGreaterThan(0);
       }
-      
+
       // Should have failures from the first 20 calls
       expect(result.failedRequests).toBeGreaterThan(0);
     });
@@ -295,8 +301,8 @@ describe('Load Testing Suite', () => {
       const detector = new RegressionDetector();
 
       // Baseline: Fast responses
-      mockOctokit.issues.listForRepo.mockImplementation(() => 
-        new Promise(resolve => setTimeout(() => resolve({ data: [] }), 10))
+      mockOctokit.issues.listForRepo.mockImplementation(
+        () => new Promise(resolve => setTimeout(() => resolve({ data: [] }), 10))
       );
 
       const baselineConfig: LoadTestConfig = {
@@ -304,18 +310,19 @@ describe('Load Testing Suite', () => {
         concurrency: 10,
       };
 
-      const operation = () => listIssues.handler({
-        owner: 'test-owner',
-        repo: 'test-repo',
-        state: 'all',
-      });
+      const operation = () =>
+        listIssues.handler({
+          owner: 'test-owner',
+          repo: 'test-repo',
+          state: 'all',
+        });
 
       const baselineResult = await loadTestRunner.runLoadTest(operation, baselineConfig);
       detector.setBaseline(baselineResult);
 
       // Current: Slow responses (regression)
-      mockOctokit.issues.listForRepo.mockImplementation(() => 
-        new Promise(resolve => setTimeout(() => resolve({ data: [] }), 100))
+      mockOctokit.issues.listForRepo.mockImplementation(
+        () => new Promise(resolve => setTimeout(() => resolve({ data: [] }), 100))
       );
 
       const currentResult = await loadTestRunner.runLoadTest(operation, baselineConfig);
@@ -331,8 +338,8 @@ describe('Load Testing Suite', () => {
       const detector = new RegressionDetector();
 
       // Baseline with consistent fast responses
-      mockOctokit.issues.listForRepo.mockImplementation(() => 
-        new Promise(resolve => setTimeout(() => resolve({ data: [] }), 5))
+      mockOctokit.issues.listForRepo.mockImplementation(
+        () => new Promise(resolve => setTimeout(() => resolve({ data: [] }), 5))
       );
 
       const config: LoadTestConfig = {
@@ -340,20 +347,21 @@ describe('Load Testing Suite', () => {
         concurrency: 10,
       };
 
-      const operation = () => listIssues.handler({
-        owner: 'test-owner',
-        repo: 'test-repo',
-        state: 'all',
-      });
+      const operation = () =>
+        listIssues.handler({
+          owner: 'test-owner',
+          repo: 'test-repo',
+          state: 'all',
+        });
 
       const baselineResult = await loadTestRunner.runLoadTest(operation, config);
       detector.setBaseline(baselineResult);
 
       // Current: Similar performance with slight variation (10ms instead of 5ms)
-      mockOctokit.issues.listForRepo.mockImplementation(() => 
-        new Promise(resolve => setTimeout(() => resolve({ data: [] }), 10))
+      mockOctokit.issues.listForRepo.mockImplementation(
+        () => new Promise(resolve => setTimeout(() => resolve({ data: [] }), 10))
       );
-      
+
       const currentResult = await loadTestRunner.runLoadTest(operation, config);
       const regressionAnalysis = detector.detectRegression(currentResult, 0.5); // 50% threshold
 
@@ -382,10 +390,11 @@ describe('Load Testing Suite', () => {
         rampUpTime: 500,
       };
 
-      const operation = () => getRepo.handler({
-        owner: 'test-owner',
-        repo: 'test-repo',
-      });
+      const operation = () =>
+        getRepo.handler({
+          owner: 'test-owner',
+          repo: 'test-repo',
+        });
 
       const result = await loadTestRunner.runLoadTest(operation, config);
 
@@ -404,11 +413,12 @@ describe('Load Testing Suite', () => {
         rampUpTime: 100, // Very fast ramp up
       };
 
-      const operation = () => listIssues.handler({
-        owner: 'test-owner',
-        repo: 'test-repo',
-        state: 'all',
-      });
+      const operation = () =>
+        listIssues.handler({
+          owner: 'test-owner',
+          repo: 'test-repo',
+          state: 'all',
+        });
 
       const result = await loadTestRunner.runLoadTest(operation, config);
 

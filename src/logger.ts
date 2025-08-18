@@ -1,6 +1,6 @@
 /**
  * Structured logging infrastructure for GitHub MCP Server
- * 
+ *
  * Provides centralized logging with correlation IDs, log levels,
  * and structured data for better observability.
  */
@@ -9,7 +9,7 @@ export enum LogLevel {
   DEBUG = 'debug',
   INFO = 'info',
   WARN = 'warn',
-  ERROR = 'error'
+  ERROR = 'error',
 }
 
 export interface LogContext {
@@ -27,11 +27,13 @@ export interface LogEntry {
   level: LogLevel;
   message: string;
   context: LogContext;
-  error?: {
-    name: string;
-    message: string;
-    stack?: string | undefined;
-  } | undefined;
+  error?:
+    | {
+        name: string;
+        message: string;
+        stack?: string | undefined;
+      }
+    | undefined;
 }
 
 /**

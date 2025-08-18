@@ -48,18 +48,18 @@ export function createAgentSystem() {
   const registry = new DefaultAgentRegistry();
   const coordinator = new DefaultAgentCoordinator(registry);
   const reportGenerator = new ReportGenerator();
-  
+
   // Register all available agents
   registry.register(new CodeAnalysisAgent());
   registry.register(new TypeSafetyAgent());
   registry.register(new TestingAgent());
   registry.register(new SecurityAgent());
-  
+
   return {
     registry,
     coordinator,
     reportGenerator,
-    agents: registry.getAllAgents()
+    agents: registry.getAllAgents(),
   };
 }
 
@@ -79,21 +79,22 @@ export async function quickAnalyze(
   } = {}
 ) {
   const { coordinator } = createAgentSystem();
-  
+
   // Discover files
   const files = await discoverFiles(projectPath, options.include, options.exclude);
-  
+
   const context = {
     projectPath,
     files,
-    excludePatterns: options.exclude
+    excludePatterns: options.exclude,
   };
-  
+
   // Run analysis
-  const report = options.agents && options.agents.length > 0
-    ? await coordinator.runSelectedAgents(options.agents, context)
-    : await coordinator.runFullAnalysis(context);
-  
+  const report =
+    options.agents && options.agents.length > 0
+      ? await coordinator.runSelectedAgents(options.agents, context)
+      : await coordinator.runFullAnalysis(context);
+
   // Add null-safe defaults to prevent runtime crashes
   const summary = report.summary ?? {
     totalFindings: (report.findings ?? []).length,
@@ -101,14 +102,14 @@ export async function quickAnalyze(
     highFindings: 0,
     mediumFindings: 0,
     lowFindings: 0,
-    infoFindings: 0
+    infoFindings: 0,
   };
-  
+
   const findings = report.findings ?? [];
-  
+
   // Create safe report object for formatting functions
   const safeReport = { ...report, summary, findings };
-  
+
   // Return in the format expected by workflow
   return {
     analysis: {
@@ -119,36 +120,39 @@ export async function quickAnalyze(
           high: summary.highFindings,
           medium: summary.mediumFindings,
           low: summary.lowFindings,
-          info: summary.infoFindings
-        }
+          info: summary.infoFindings,
+        },
       },
       findings,
-      report: options.format === 'json' ? JSON.stringify(safeReport, null, 2) :
-              options.format === 'html' ? generateHtmlReport(safeReport) :
-              generateTextReport(safeReport)
-    }
+      report:
+        options.format === 'json'
+          ? JSON.stringify(safeReport, null, 2)
+          : options.format === 'html'
+            ? generateHtmlReport(safeReport)
+            : generateTextReport(safeReport),
+    },
   };
 }
 
 // Helper functions
-async function discoverFiles(
-  projectPath: string, 
-  include?: string[], 
+export async function discoverFiles(
+  projectPath: string,
+  include?: string[],
   exclude?: string[]
 ): Promise<string[]> {
   const fs = await import('fs/promises');
   const path = await import('path');
-  
+
   const files: string[] = [];
-  
+
   const walk = async (dir: string): Promise<void> => {
     try {
       const entries = await fs.readdir(dir, { withFileTypes: true });
-      
+
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
         const relativePath = path.relative(projectPath, fullPath);
-        
+
         if (entry.isDirectory() && !shouldSkipDirectory(entry.name)) {
           await walk(fullPath);
         } else if (entry.isFile() && shouldIncludeFile(relativePath, include, exclude)) {
@@ -164,12 +168,16 @@ async function discoverFiles(
   return files;
 }
 
-function shouldSkipDirectory(dirName: string): boolean {
+export function shouldSkipDirectory(dirName: string): boolean {
   const skipDirs = ['node_modules', '.git', 'dist', 'build', 'coverage'];
   return skipDirs.includes(dirName);
 }
 
-function shouldIncludeFile(filePath: string, include?: string[], exclude?: string[]): boolean {
+export function shouldIncludeFile(
+  filePath: string,
+  include?: string[],
+  exclude?: string[]
+): boolean {
   // Check exclude patterns first
   if (exclude) {
     for (const pattern of exclude) {
@@ -189,9 +197,9 @@ function shouldIncludeFile(filePath: string, include?: string[], exclude?: strin
   return sourceExtensions.some(ext => filePath.endsWith(ext));
 }
 
-function generateTextReport(report: any): string {
+export function generateTextReport(report: any): string {
   const { summary, findings } = report;
-  
+
   let output = '\n📊 ANALYSIS SUMMARY\n';
   output += '═'.repeat(50) + '\n';
   output += `Total Findings: ${summary.totalFindings}\n`;
@@ -204,7 +212,7 @@ function generateTextReport(report: any): string {
   if (findings.length > 0) {
     output += '🔍 FINDINGS\n';
     output += '═'.repeat(50) + '\n';
-    
+
     findings.forEach((finding: any) => {
       output += `• ${finding.message}\n`;
       if (finding.file) {
@@ -220,9 +228,9 @@ function generateTextReport(report: any): string {
   return output;
 }
 
-function generateHtmlReport(report: any): string {
+export function generateHtmlReport(report: any): string {
   const { summary, findings } = report;
-  
+
   return `
 <!DOCTYPE html>
 <html>
@@ -252,13 +260,17 @@ function generateHtmlReport(report: any): string {
     </div>
 
     <h2>Findings</h2>
-    ${findings.map((finding: any) => `
+    ${findings
+      .map(
+        (finding: any) => `
         <div class="finding ${finding.severity}">
             <div><strong>${finding.message}</strong></div>
             ${finding.file ? `<div>📁 ${finding.file}${finding.line ? `:${finding.line}` : ''}</div>` : ''}
             ${finding.fix ? `<div><strong>Fix:</strong> ${finding.fix}</div>` : ''}
         </div>
-    `).join('')}
+    `
+      )
+      .join('')}
 </body>
 </html>`;
 }

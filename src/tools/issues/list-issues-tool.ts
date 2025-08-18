@@ -68,7 +68,10 @@ class ListIssuesHandler extends BaseToolHandler<ListIssuesParams, IssueListItem[
       throw ErrorHandler.createValidationError('owner', 'Owner is required and must be a string');
     }
     if (!params.repo || typeof params.repo !== 'string') {
-      throw ErrorHandler.createValidationError('repo', 'Repository name is required and must be a string');
+      throw ErrorHandler.createValidationError(
+        'repo',
+        'Repository name is required and must be a string'
+      );
     }
 
     if (params.state && !['open', 'closed', 'all'].includes(params.state)) {
@@ -76,15 +79,24 @@ class ListIssuesHandler extends BaseToolHandler<ListIssuesParams, IssueListItem[
     }
 
     if (params.sort && !['created', 'updated', 'comments'].includes(params.sort)) {
-      throw ErrorHandler.createValidationError('sort', 'Sort must be one of: created, updated, comments');
+      throw ErrorHandler.createValidationError(
+        'sort',
+        'Sort must be one of: created, updated, comments'
+      );
     }
 
     if (params.direction && !['asc', 'desc'].includes(params.direction)) {
       throw ErrorHandler.createValidationError('direction', 'Direction must be one of: asc, desc');
     }
 
-    if (params.per_page && (!Number.isInteger(params.per_page) || params.per_page < 1 || params.per_page > 100)) {
-      throw ErrorHandler.createValidationError('per_page', 'Per page must be an integer between 1 and 100');
+    if (
+      params.per_page &&
+      (!Number.isInteger(params.per_page) || params.per_page < 1 || params.per_page > 100)
+    ) {
+      throw ErrorHandler.createValidationError(
+        'per_page',
+        'Per page must be an integer between 1 and 100'
+      );
     }
 
     if (params.page && (!Number.isInteger(params.page) || params.page < 1)) {
@@ -109,21 +121,26 @@ class ListIssuesHandler extends BaseToolHandler<ListIssuesParams, IssueListItem[
         number: issue.number,
         title: issue.title,
         state: issue.state,
-        user: issue.user ? {
-          login: issue.user.login,
-          type: issue.user.type,
-        } : null,
+        user: issue.user
+          ? {
+              login: issue.user.login,
+              type: issue.user.type,
+            }
+          : null,
         labels: (issue.labels ?? []).map((label: any) =>
           typeof label === 'string' ? label : label?.name
         ),
-        assignees: issue.assignees?.map((user: any) => ({
-          login: user.login,
-          type: user.type,
-        })) || [],
-        milestone: issue.milestone ? {
-          title: issue.milestone.title,
-          number: issue.milestone.number,
-        } : null,
+        assignees:
+          issue.assignees?.map((user: any) => ({
+            login: user.login,
+            type: user.type,
+          })) || [],
+        milestone: issue.milestone
+          ? {
+              title: issue.milestone.title,
+              number: issue.milestone.number,
+            }
+          : null,
         comments: issue.comments,
         created_at: issue.created_at,
         updated_at: issue.updated_at,
@@ -176,10 +193,7 @@ export function createListIssuesTool(octokit: any, issueService: IIssueService):
             description: 'Filter by assignee username',
           },
           milestone: {
-            oneOf: [
-              { type: 'string' },
-              { type: 'number' },
-            ],
+            oneOf: [{ type: 'string' }, { type: 'number' }],
             description: 'Filter by milestone number or title',
           },
           per_page: {

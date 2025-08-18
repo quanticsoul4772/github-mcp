@@ -5,7 +5,11 @@
 
 import { Octokit } from '@octokit/rest';
 import { RateLimitError, withRetry } from './errors.js';
-import { estimateGraphQLPoints, isQueryComplexitySafe, githubComplexityCalculator } from './graphql-complexity.js';
+import {
+  estimateGraphQLPoints,
+  isQueryComplexitySafe,
+  githubComplexityCalculator,
+} from './graphql-complexity.js';
 import { logger } from './logger.js';
 
 interface RateLimitInfo {
@@ -37,18 +41,28 @@ interface RequestQueue {
 }
 
 export class GitHubRateLimiter {
-  private core: RateLimitInfo = { limit: 5000, remaining: 5000, reset: new Date(), resource: 'core' };
-  private search: RateLimitInfo = { limit: 30, remaining: 30, reset: new Date(), resource: 'search' };
-  private graphql: GraphQLRateLimitInfo = { 
-    limit: 5000, 
-    remaining: 5000, 
-    reset: new Date(), 
+  private core: RateLimitInfo = {
+    limit: 5000,
+    remaining: 5000,
+    reset: new Date(),
+    resource: 'core',
+  };
+  private search: RateLimitInfo = {
+    limit: 30,
+    remaining: 30,
+    reset: new Date(),
+    resource: 'search',
+  };
+  private graphql: GraphQLRateLimitInfo = {
+    limit: 5000,
+    remaining: 5000,
+    reset: new Date(),
     resource: 'graphql',
     pointsUsed: 0,
     estimatedPointsPerHour: 0,
-    queryHistory: []
+    queryHistory: [],
   };
-  
+
   private requestQueue: RequestQueue[] = [];
   private isProcessingQueue = false;
   private lastRequestTime = 0;
@@ -69,12 +83,12 @@ export class GitHubRateLimiter {
       case 'graphql':
         // Preserve GraphQL-specific tracking when updating from headers
         const currentGraphQL = this.graphql as GraphQLRateLimitInfo;
-        this.graphql = { 
+        this.graphql = {
           ...currentGraphQL,
-          limit, 
-          remaining, 
-          reset, 
-          resource 
+          limit,
+          remaining,
+          reset,
+          resource,
         };
         break;
       default:
@@ -102,19 +116,19 @@ export class GitHubRateLimiter {
   private updateGraphQLPoints(points: number, query: string) {
     const now = new Date();
     const graphql = this.graphql as GraphQLRateLimitInfo;
-  
+
     graphql.queryHistory.push({
       timestamp: now,
       points,
-      query: query.length > 100 ? query.substring(0, 100) + '...' : query
+      query: query.length > 100 ? query.substring(0, 100) + '...' : query,
     });
-  
+
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     graphql.queryHistory = graphql.queryHistory.filter(h => h.timestamp > oneHourAgo);
-  
+
     graphql.pointsUsed += points;
     graphql.estimatedPointsPerHour = graphql.queryHistory.reduce((sum, h) => sum + h.points, 0);
-  
+
     // Do not override server-provided remaining; compute an advisory value instead.
     const estimatedRemaining = Math.max(0, graphql.limit - graphql.estimatedPointsPerHour);
     // Optionally store as a derived property for status reporting without mutating `remaining`
@@ -125,36 +139,39 @@ export class GitHubRateLimiter {
   /**
    * Check if we should wait before making a request (with GraphQL point awareness)
    */
-  private shouldThrottle(resource: string, estimatedPoints: number = 1): { shouldWait: boolean; waitTime: number; reason?: string } {
+  private shouldThrottle(
+    resource: string,
+    estimatedPoints: number = 1
+  ): { shouldWait: boolean; waitTime: number; reason?: string } {
     const rateLimitInfo = this.getRateLimitInfo(resource);
     const now = new Date();
-    
+
     // Special handling for GraphQL point-based rate limiting
     if (resource === 'graphql') {
       const graphql = this.graphql as GraphQLRateLimitInfo;
-      
+
       // Check if estimated points would exceed remaining points
       if (estimatedPoints > graphql.remaining) {
         const waitTime = Math.max(0, graphql.reset.getTime() - now.getTime());
-        return { 
-          shouldWait: true, 
-          waitTime, 
-          reason: `Query requires ${estimatedPoints} points but only ${graphql.remaining} remaining` 
+        return {
+          shouldWait: true,
+          waitTime,
+          reason: `Query requires ${estimatedPoints} points but only ${graphql.remaining} remaining`,
         };
       }
-      
+
       // Check if we're approaching the hourly limit based on our tracking
       const safetyBuffer = Math.max(100, graphql.limit * 0.1); // 10% safety buffer
       if (graphql.estimatedPointsPerHour + estimatedPoints > graphql.limit - safetyBuffer) {
         const waitTime = Math.max(0, graphql.reset.getTime() - now.getTime());
-        return { 
-          shouldWait: true, 
+        return {
+          shouldWait: true,
           waitTime,
-          reason: `Approaching GraphQL rate limit (${graphql.estimatedPointsPerHour + estimatedPoints}/${graphql.limit})` 
+          reason: `Approaching GraphQL rate limit (${graphql.estimatedPointsPerHour + estimatedPoints}/${graphql.limit})`,
         };
       }
     }
-    
+
     // Standard rate limit checks
     if (rateLimitInfo.remaining <= 10) {
       const waitTime = Math.max(0, rateLimitInfo.reset.getTime() - now.getTime());
@@ -164,7 +181,11 @@ export class GitHubRateLimiter {
     // Enforce minimum interval between requests
     const timeSinceLastRequest = now.getTime() - this.lastRequestTime;
     if (timeSinceLastRequest < this.minInterval) {
-      return { shouldWait: true, waitTime: this.minInterval - timeSinceLastRequest, reason: 'Minimum interval enforcement' };
+      return {
+        shouldWait: true,
+        waitTime: this.minInterval - timeSinceLastRequest,
+        reason: 'Minimum interval enforcement',
+      };
     }
 
     return { shouldWait: false, waitTime: 0 };
@@ -190,13 +211,13 @@ export class GitHubRateLimiter {
         // Among equal priority, prefer lower point cost queries
         return (a.estimatedPoints || 1) - (b.estimatedPoints || 1);
       });
-      
+
       const request = this.requestQueue.shift()!;
 
       try {
         const result = await request.fn();
         request.resolve(result);
-        
+
         // Update GraphQL points if this was a GraphQL request
         if (request.resource === 'graphql' && request.estimatedPoints && request.query) {
           this.updateGraphQLPoints(request.estimatedPoints, request.query);
@@ -224,7 +245,7 @@ export class GitHubRateLimiter {
     // Calculate query complexity
     const complexity = githubComplexityCalculator.calculateQueryComplexity(query, variables);
     const estimatedPoints = complexity.estimatedPoints;
-    
+
     // Log warnings if query is complex
     if (complexity.warnings.length > 0) {
       logger.warn('GraphQL query complexity warnings:', { warnings: complexity.warnings });
@@ -235,23 +256,25 @@ export class GitHubRateLimiter {
         const throttleCheck = this.shouldThrottle('graphql', estimatedPoints);
 
         if (throttleCheck.shouldWait && throttleCheck.waitTime > 0) {
-          logger.info(`GraphQL rate limit throttling: ${throttleCheck.reason}, waiting ${Math.ceil(throttleCheck.waitTime / 1000)}s`);
+          logger.info(
+            `GraphQL rate limit throttling: ${throttleCheck.reason}, waiting ${Math.ceil(throttleCheck.waitTime / 1000)}s`
+          );
           await new Promise(resolve => setTimeout(resolve, throttleCheck.waitTime));
         }
 
         try {
           this.lastRequestTime = Date.now();
-          const result = await withRetry(
-            request,
-            {
-              maxAttempts: 3,
-              backoffMs: 1000,
-              maxBackoffMs: 30000,
-              onRetry: (attempt, error) => {
-                logger.error(`GraphQL retry attempt ${attempt}:`, { attempt, errorMessage: error.message });
-              }
-            }
-          );
+          const result = await withRetry(request, {
+            maxAttempts: 3,
+            backoffMs: 1000,
+            maxBackoffMs: 30000,
+            onRetry: (attempt, error) => {
+              logger.error(`GraphQL retry attempt ${attempt}:`, {
+                attempt,
+                errorMessage: error.message,
+              });
+            },
+          });
 
           // Extract rate limit headers if available (GraphQL often lacks headers in response objects)
           if (result && typeof result === 'object' && (result as any).headers) {
@@ -282,7 +305,7 @@ export class GitHubRateLimiter {
         resource: 'graphql',
         estimatedPoints,
         query,
-        variables
+        variables,
       });
 
       // Process queue
@@ -304,24 +327,26 @@ export class GitHubRateLimiter {
 
         if (throttleCheck.shouldWait && throttleCheck.waitTime > 0) {
           if (throttleCheck.reason) {
-            logger.info(`Rate limit throttling (${resource}): ${throttleCheck.reason}, waiting ${Math.ceil(throttleCheck.waitTime / 1000)}s`);
+            logger.info(
+              `Rate limit throttling (${resource}): ${throttleCheck.reason}, waiting ${Math.ceil(throttleCheck.waitTime / 1000)}s`
+            );
           }
           await new Promise(resolve => setTimeout(resolve, throttleCheck.waitTime));
         }
 
         try {
           this.lastRequestTime = Date.now();
-          const result = await withRetry(
-            request,
-            {
-              maxAttempts: 3,
-              backoffMs: 1000,
-              maxBackoffMs: 30000,
-              onRetry: (attempt, error) => {
-                logger.error(`Retry attempt ${attempt} for GitHub API request:`, { attempt, errorMessage: error.message });
-              }
-            }
-          );
+          const result = await withRetry(request, {
+            maxAttempts: 3,
+            backoffMs: 1000,
+            maxBackoffMs: 30000,
+            onRetry: (attempt, error) => {
+              logger.error(`Retry attempt ${attempt} for GitHub API request:`, {
+                attempt,
+                errorMessage: error.message,
+              });
+            },
+          });
 
           // Extract rate limit headers if available
           if (result && typeof result === 'object' && 'headers' in result) {
@@ -346,7 +371,7 @@ export class GitHubRateLimiter {
         reject,
         fn: wrappedRequest,
         priority,
-        resource
+        resource,
       });
 
       // Process queue
@@ -371,16 +396,17 @@ export class GitHubRateLimiter {
     const graphql = this.graphql as GraphQLRateLimitInfo;
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
     const recentQueries = graphql.queryHistory.filter(h => h.timestamp > oneHourAgo);
-    
+
     return {
       core: { ...this.core },
       search: { ...this.search },
       graphql: { ...graphql },
       queueLength: this.requestQueue.length,
       graphqlInsights: {
-        averagePointsPerQuery: recentQueries.length > 0 
-          ? Math.round(recentQueries.reduce((sum, q) => sum + q.points, 0) / recentQueries.length)
-          : 0,
+        averagePointsPerQuery:
+          recentQueries.length > 0
+            ? Math.round(recentQueries.reduce((sum, q) => sum + q.points, 0) / recentQueries.length)
+            : 0,
         queriesInLastHour: recentQueries.length,
         topComplexQueries: [...recentQueries]
           .sort((a, b) => b.points - a.points)
@@ -388,9 +414,9 @@ export class GitHubRateLimiter {
           .map(q => ({
             points: q.points,
             query: q.query,
-            timestamp: q.timestamp
-          }))
-      }
+            timestamp: q.timestamp,
+          })),
+      },
     };
   }
 
@@ -406,15 +432,18 @@ export class GitHubRateLimiter {
   } {
     const graphql = this.graphql as GraphQLRateLimitInfo;
     const pointsRemaining = Math.max(0, graphql.remaining);
-    const isApproachingLimit = pointsRemaining < (graphql.limit * 0.2); // Less than 20% remaining
-    
+    const isApproachingLimit = pointsRemaining < graphql.limit * 0.2; // Less than 20% remaining
+
     // Calculate recommended delay based on current usage rate
     let recommendedDelay = 0;
     if (isApproachingLimit && graphql.queryHistory.length > 0) {
       const recentQueries = graphql.queryHistory.slice(-10);
-      const avgPointsPerQuery = recentQueries.reduce((sum, q) => sum + q.points, 0) / recentQueries.length;
+      const avgPointsPerQuery =
+        recentQueries.reduce((sum, q) => sum + q.points, 0) / recentQueries.length;
       const timeToReset = Math.max(0, graphql.reset.getTime() - Date.now());
-      recommendedDelay = Math.ceil(timeToReset / Math.max(1, Math.floor(pointsRemaining / avgPointsPerQuery)));
+      recommendedDelay = Math.ceil(
+        timeToReset / Math.max(1, Math.floor(pointsRemaining / avgPointsPerQuery))
+      );
     }
 
     return {
@@ -422,14 +451,17 @@ export class GitHubRateLimiter {
       estimatedPointsUsed: graphql.estimatedPointsPerHour,
       resetTime: graphql.reset,
       recommendedDelay,
-      isApproachingLimit
+      isApproachingLimit,
     };
   }
 
   /**
    * Check if a GraphQL query can be safely executed
    */
-  canExecuteGraphQLQuery(query: string, variables: Record<string, any> = {}): {
+  canExecuteGraphQLQuery(
+    query: string,
+    variables: Record<string, any> = {}
+  ): {
     canExecute: boolean;
     estimatedPoints: number;
     reason?: string;
@@ -444,13 +476,13 @@ export class GitHubRateLimiter {
         canExecute: false,
         estimatedPoints,
         reason: throttleCheck.reason,
-        waitTime: throttleCheck.waitTime
+        waitTime: throttleCheck.waitTime,
       };
     }
 
     return {
       canExecute: true,
-      estimatedPoints
+      estimatedPoints,
     };
   }
 
@@ -461,7 +493,7 @@ export class GitHubRateLimiter {
     const rateLimitInfo = this.getRateLimitInfo(resource);
     const now = new Date();
     const waitTime = Math.max(0, rateLimitInfo.reset.getTime() - now.getTime());
-    
+
     if (waitTime > 0) {
       logger.info(`Waiting ${Math.ceil(waitTime / 1000)}s for ${resource} rate limit to reset`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
@@ -519,14 +551,14 @@ export class ResponseSizeLimiter {
           return {
             data: bestFit as T,
             truncated: true,
-            originalSize: sizeBytes
+            originalSize: sizeBytes,
           };
         }
 
         return {
           data: limitedData,
           truncated,
-          originalSize: sizeBytes
+          originalSize: sizeBytes,
         };
       }
 
@@ -540,24 +572,28 @@ export class ResponseSizeLimiter {
         return {
           data: truncatedData,
           truncated: true,
-          originalSize: sizeBytes
+          originalSize: sizeBytes,
         };
       }
 
       return {
         data,
         truncated: false,
-        originalSize: sizeBytes
+        originalSize: sizeBytes,
       };
     } catch (error) {
-      logger.error('Error limiting response size:', {}, error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Error limiting response size:',
+        {},
+        error instanceof Error ? error : new Error(String(error))
+      );
       return { data, truncated: false };
     }
   }
 
   private static truncateObjectStrings<T>(obj: T, maxSize: number): T {
     const MAX_STRING_LENGTH = 1000; // Maximum length for individual string fields
-    
+
     function truncateRecursive(value: any): any {
       if (typeof value === 'string' && value.length > MAX_STRING_LENGTH) {
         return value.substring(0, MAX_STRING_LENGTH) + '... [truncated]';
@@ -587,7 +623,7 @@ export function createRateLimitedOctokit(token: string): {
   rateLimiter: GitHubRateLimiter;
 } {
   const rateLimiter = new GitHubRateLimiter();
-  
+
   const octokit = new Octokit({
     auth: token,
     request: {
@@ -605,13 +641,15 @@ export function createRateLimitedOctokit(token: string): {
         if (resource === 'graphql' && options.body) {
           let query = '';
           let variables: Record<string, any> = {};
-  
+
           try {
             const body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
             query = body?.query || '';
             variables = body?.variables || {};
           } catch (e) {
-            logger.warn('Could not parse GraphQL request body for complexity analysis', { error: e instanceof Error ? e.message : String(e) });
+            logger.warn('Could not parse GraphQL request body for complexity analysis', {
+              error: e instanceof Error ? e.message : String(e),
+            });
           }
 
           // If we have a query, use complexity-aware wrapper; otherwise still wrap with conservative handling
@@ -638,8 +676,8 @@ export function createRateLimitedOctokit(token: string): {
           resource,
           1 // Default priority
         );
-      }
-    }
+      },
+    },
   }) as Octokit & {
     graphqlWithComplexity: (query: string, variables?: Record<string, any>) => Promise<any>;
   };
@@ -648,12 +686,12 @@ export function createRateLimitedOctokit(token: string): {
   octokit.graphqlWithComplexity = async (query: string, variables: Record<string, any> = {}) => {
     // Check query safety first
     const safetyCheck = rateLimiter.canExecuteGraphQLQuery(query, variables);
-    
+
     if (!safetyCheck.canExecute) {
       throw new Error(
         `GraphQL query blocked: ${safetyCheck.reason}. ` +
-        `Estimated points: ${safetyCheck.estimatedPoints}. ` +
-        `Wait time: ${safetyCheck.waitTime ? Math.ceil(safetyCheck.waitTime / 1000) + 's' : 'unknown'}`
+          `Estimated points: ${safetyCheck.estimatedPoints}. ` +
+          `Wait time: ${safetyCheck.waitTime ? Math.ceil(safetyCheck.waitTime / 1000) + 's' : 'unknown'}`
       );
     }
 

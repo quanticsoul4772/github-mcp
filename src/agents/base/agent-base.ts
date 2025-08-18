@@ -2,16 +2,16 @@
  * Base class for all code analysis agents
  */
 
-import { 
-  CodeAnalysisAgent, 
-  AgentConfig, 
-  AnalysisTarget, 
-  AnalysisReport, 
+import {
+  CodeAnalysisAgent,
+  AgentConfig,
+  AnalysisTarget,
+  AnalysisReport,
   AgentHealth,
   AgentCapabilities,
   Severity,
   FindingCategory,
-  Finding
+  Finding,
 } from '../types.js';
 import { logger } from '../../logger.js';
 import { performance } from 'perf_hooks';
@@ -28,7 +28,7 @@ export const DEFAULT_AGENT_CONFIG: AgentConfig = {
   excludeCategories: [],
   customRules: {},
   timeout: 300000, // 5 minutes
-  enableCache: true
+  enableCache: true,
 };
 
 /**
@@ -52,7 +52,7 @@ export abstract class BaseAgent implements CodeAnalysisAgent {
     this.lastHealth = {
       healthy: true,
       status: 'Initialized',
-      lastCheck: new Date()
+      lastCheck: new Date(),
     };
   }
 
@@ -115,17 +115,16 @@ export abstract class BaseAgent implements CodeAnalysisAgent {
         duration,
         findings: filteredFindings,
         summary: this.generateSummary(filteredFindings, target),
-        config: this.config
+        config: this.config,
       };
 
       logger.info(`Analysis completed by ${this.name}`, {
         duration,
         findingsCount: filteredFindings.length,
-        target: target.path
+        target: target.path,
       });
 
       return report;
-
     } catch (error) {
       const endTime = new Date();
       const duration = performance.now() - perfStart;
@@ -136,7 +135,7 @@ export abstract class BaseAgent implements CodeAnalysisAgent {
       logger.error(`Analysis failed in ${this.name}`, {
         error: error instanceof Error ? error.message : String(error),
         target: target.path,
-        duration
+        duration,
       });
 
       // Return error report
@@ -153,10 +152,10 @@ export abstract class BaseAgent implements CodeAnalysisAgent {
           findingsBySeverity: {} as Record<Severity, number>,
           findingsByCategory: {} as Record<FindingCategory, number>,
           filesAnalyzed: 0,
-          linesAnalyzed: 0
+          linesAnalyzed: 0,
         },
         config: this.config,
-        errors: [error instanceof Error ? error.message : String(error)]
+        errors: [error instanceof Error ? error.message : String(error)],
       };
     }
   }
@@ -185,7 +184,8 @@ export abstract class BaseAgent implements CodeAnalysisAgent {
   async getHealth(): Promise<AgentHealth> {
     try {
       const now = new Date();
-      const avgAnalysisTime = this.analysisCount > 0 ? this.totalAnalysisTime / this.analysisCount : 0;
+      const avgAnalysisTime =
+        this.analysisCount > 0 ? this.totalAnalysisTime / this.analysisCount : 0;
       const successRate = this.analysisCount > 0 ? this.successCount / this.analysisCount : 1;
 
       // Perform health check (can be overridden by subclasses)
@@ -198,8 +198,8 @@ export abstract class BaseAgent implements CodeAnalysisAgent {
         metrics: {
           avgAnalysisTime,
           successRate,
-          memoryUsage: process.memoryUsage().heapUsed
-        }
+          memoryUsage: process.memoryUsage().heapUsed,
+        },
       };
 
       return this.lastHealth;
@@ -207,7 +207,7 @@ export abstract class BaseAgent implements CodeAnalysisAgent {
       this.lastHealth = {
         healthy: false,
         status: `Health check failed: ${error instanceof Error ? error.message : String(error)}`,
-        lastCheck: new Date()
+        lastCheck: new Date(),
       };
       return this.lastHealth;
     }
@@ -235,7 +235,13 @@ export abstract class BaseAgent implements CodeAnalysisAgent {
 
     // Filter by severity
     if (this.config.minSeverity) {
-      const severityOrder = [Severity.INFO, Severity.LOW, Severity.MEDIUM, Severity.HIGH, Severity.CRITICAL];
+      const severityOrder = [
+        Severity.INFO,
+        Severity.LOW,
+        Severity.MEDIUM,
+        Severity.HIGH,
+        Severity.CRITICAL,
+      ];
       const minIndex = severityOrder.indexOf(this.config.minSeverity);
       filtered = filtered.filter(f => severityOrder.indexOf(f.severity) >= minIndex);
     }
@@ -252,8 +258,16 @@ export abstract class BaseAgent implements CodeAnalysisAgent {
     // Limit number of findings
     if (this.config.maxFindings && filtered.length > this.config.maxFindings) {
       // Sort by severity (critical first) and take top N
-      const severityOrder = [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW, Severity.INFO];
-      filtered.sort((a, b) => severityOrder.indexOf(a.severity) - severityOrder.indexOf(b.severity));
+      const severityOrder = [
+        Severity.CRITICAL,
+        Severity.HIGH,
+        Severity.MEDIUM,
+        Severity.LOW,
+        Severity.INFO,
+      ];
+      filtered.sort(
+        (a, b) => severityOrder.indexOf(a.severity) - severityOrder.indexOf(b.severity)
+      );
       filtered = filtered.slice(0, this.config.maxFindings);
     }
 
@@ -263,7 +277,10 @@ export abstract class BaseAgent implements CodeAnalysisAgent {
   /**
    * Generate summary statistics for findings
    */
-  protected generateSummary(findings: Finding[], target: AnalysisTarget): AnalysisReport['summary'] {
+  protected generateSummary(
+    findings: Finding[],
+    target: AnalysisTarget
+  ): AnalysisReport['summary'] {
     const findingsBySeverity = {} as Record<Severity, number>;
     const findingsByCategory = {} as Record<FindingCategory, number>;
 
@@ -286,7 +303,7 @@ export abstract class BaseAgent implements CodeAnalysisAgent {
       findingsBySeverity,
       findingsByCategory,
       filesAnalyzed: this.countFilesAnalyzed(target),
-      linesAnalyzed: 0 // Will be updated by subclasses if they track this
+      linesAnalyzed: 0, // Will be updated by subclasses if they track this
     };
   }
 
@@ -332,7 +349,7 @@ export abstract class BaseAgent implements CodeAnalysisAgent {
       snippet,
       suggestion,
       rule,
-      metadata
+      metadata,
     };
   }
 
@@ -352,18 +369,18 @@ export abstract class BaseAgent implements CodeAnalysisAgent {
       line?.toString() || '0',
       column?.toString() || '0',
       rule || 'unknown',
-      title || 'finding'
+      title || 'finding',
     ];
-    
+
     // Create a simple hash of the parts
     const content = parts.join('|');
     let hash = 0;
     for (let i = 0; i < content.length; i++) {
       const char = content.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
-    
+
     return `${this.name}-${Math.abs(hash).toString(16)}`;
   }
 

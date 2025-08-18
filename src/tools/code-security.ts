@@ -114,7 +114,7 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
           severity: params.severity,
         });
 
-        return data.map((alert) => ({
+        return data.map(alert => ({
           number: alert.number,
           state: alert.state,
           rule: {
@@ -128,12 +128,14 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
             name: alert.tool.name,
             version: alert.tool.version,
           },
-          most_recent_instance: alert.most_recent_instance ? {
-            ref: alert.most_recent_instance.ref,
-            state: alert.most_recent_instance.state,
-            location: alert.most_recent_instance.location,
-            message: alert.most_recent_instance.message,
-          } : null,
+          most_recent_instance: alert.most_recent_instance
+            ? {
+                ref: alert.most_recent_instance.ref,
+                state: alert.most_recent_instance.state,
+                location: alert.most_recent_instance.location,
+                message: alert.most_recent_instance.message,
+              }
+            : null,
           created_at: alert.created_at,
           updated_at: alert.updated_at,
           html_url: alert.html_url,
@@ -141,7 +143,8 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
       } catch (error: any) {
         if (error.status === 404) {
           return {
-            error: 'Code scanning is not enabled for this repository or you do not have permission to view alerts',
+            error:
+              'Code scanning is not enabled for this repository or you do not have permission to view alerts',
           };
         }
         throw error;
@@ -185,9 +188,11 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
         return {
           number: data.number,
           state: data.state,
-          dismissed_by: data.dismissed_by ? {
-            login: data.dismissed_by.login,
-          } : null,
+          dismissed_by: data.dismissed_by
+            ? {
+                login: data.dismissed_by.login,
+              }
+            : null,
           dismissed_at: data.dismissed_at,
           dismissed_reason: data.dismissed_reason,
           dismissed_comment: data.dismissed_comment,
@@ -204,14 +209,16 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
             name: data.tool.name,
             version: data.tool.version,
           },
-          most_recent_instance: data.most_recent_instance ? {
-            ref: data.most_recent_instance.ref,
-            state: data.most_recent_instance.state,
-            commit_sha: data.most_recent_instance.commit_sha,
-            location: data.most_recent_instance.location,
-            message: data.most_recent_instance.message,
-            classifications: data.most_recent_instance.classifications,
-          } : null,
+          most_recent_instance: data.most_recent_instance
+            ? {
+                ref: data.most_recent_instance.ref,
+                state: data.most_recent_instance.state,
+                commit_sha: data.most_recent_instance.commit_sha,
+                location: data.most_recent_instance.location,
+                message: data.most_recent_instance.message,
+                classifications: data.most_recent_instance.classifications,
+              }
+            : null,
           created_at: data.created_at,
           updated_at: data.updated_at,
           fixed_at: data.fixed_at,
@@ -263,7 +270,7 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
           state: params.state as any as any,
         });
 
-        return data.map((advisory) => ({
+        return data.map(advisory => ({
           ghsa_id: advisory.ghsa_id,
           cve_id: advisory.cve_id,
           summary: advisory.summary,
@@ -283,7 +290,8 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
       } catch (error: any) {
         if (error.status === 404 || error.status === 403) {
           return {
-            error: 'Security advisories not available for this repository or you do not have permission',
+            error:
+              'Security advisories not available for this repository or you do not have permission',
           };
         }
         throw error;
@@ -414,7 +422,7 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
             dismissed_reason: {
               type: 'string',
               description: 'The reason for dismissing the alert',
-              enum: ['false positive', 'won\'t fix', 'used in tests', null],
+              enum: ['false positive', "won't fix", 'used in tests', null],
             },
             dismissed_comment: {
               type: 'string',
@@ -425,7 +433,7 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
         },
       },
       handler: async (args: unknown) => {
-      const params = args as UpdateCodeScanningAlertParams;
+        const params = args as UpdateCodeScanningAlertParams;
         const { data } = await octokit.codeScanning.updateAlert({
           owner: params.owner,
           repo: params.repo,
@@ -438,9 +446,11 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
         return {
           number: data.number,
           state: data.state,
-          dismissed_by: data.dismissed_by ? {
-            login: data.dismissed_by.login,
-          } : null,
+          dismissed_by: data.dismissed_by
+            ? {
+                login: data.dismissed_by.login,
+              }
+            : null,
           dismissed_at: data.dismissed_at,
           dismissed_reason: data.dismissed_reason,
           dismissed_comment: data.dismissed_comment,
@@ -486,11 +496,11 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
         },
       },
       handler: async (args: unknown) => {
-      const params = args as UploadSarifParams;
+        const params = args as UploadSarifParams;
         const { gzip } = await import('zlib');
         const { promisify } = await import('util');
         const gzipAsync = promisify(gzip);
-        
+
         // Properly gzip the SARIF data as required by GitHub API
         const sarifBuffer = Buffer.from(
           typeof params.sarif === 'string' ? params.sarif : JSON.stringify(params.sarif)
@@ -502,8 +512,8 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
           owner: params.owner,
           repo: params.repo,
           sarif: gzippedSarif,
-          ref: params.ref || "",
-          commit_sha: params.commit_sha || "",
+          ref: params.ref || '',
+          commit_sha: params.commit_sha || '',
           tool_name: params.tool_name,
         });
 
@@ -535,7 +545,7 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
         },
       },
       handler: async (args: unknown) => {
-      const params = args as EnableVulnerabilityAlertsParams;
+        const params = args as EnableVulnerabilityAlertsParams;
         await octokit.repos.enableVulnerabilityAlerts({
           owner: params.owner,
           repo: params.repo,
@@ -569,7 +579,7 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
         },
       },
       handler: async (args: unknown) => {
-      const params = args as DisableVulnerabilityAlertsParams;
+        const params = args as DisableVulnerabilityAlertsParams;
         await octokit.repos.disableVulnerabilityAlerts({
           owner: params.owner,
           repo: params.repo,

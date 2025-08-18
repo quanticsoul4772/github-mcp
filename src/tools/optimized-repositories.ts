@@ -2,12 +2,12 @@ import { z } from 'zod';
 import { OptimizedAPIClient } from '../optimized-api-client.js';
 import { ToolConfig } from '../types.js';
 import { createTypeSafeHandler } from '../utils/type-safety.js';
-import { 
-  validateOwnerName, 
-  validateRepoName, 
-  validateFilePath, 
+import {
+  validateOwnerName,
+  validateRepoName,
+  validateFilePath,
   validateRef,
-  ValidationError 
+  ValidationError,
 } from '../validation.js';
 
 // Type definitions for optimized repository tools
@@ -94,14 +94,18 @@ const ListPullRequestsOptimizedSchema = z.object({
   perPage: z.number().int().min(1).max(100).optional(),
 });
 
-export function createOptimizedRepositoryTools(optimizedClient: OptimizedAPIClient, readOnly: boolean): ToolConfig[] {
+export function createOptimizedRepositoryTools(
+  optimizedClient: OptimizedAPIClient,
+  readOnly: boolean
+): ToolConfig[] {
   const tools: ToolConfig[] = [];
 
   // Optimized get file contents tool
   tools.push({
     tool: {
       name: 'get_file_contents_optimized',
-      description: 'Get file or directory contents from a GitHub repository with performance optimizations (caching, deduplication)',
+      description:
+        'Get file or directory contents from a GitHub repository with performance optimizations (caching, deduplication)',
       inputSchema: {
         type: 'object',
         properties: {
@@ -115,7 +119,7 @@ export function createOptimizedRepositoryTools(optimizedClient: OptimizedAPIClie
           },
           path: {
             type: 'string',
-            description: 'Path to file/directory (directories must end with a slash \'/\')',
+            description: "Path to file/directory (directories must end with a slash '/')",
           },
           ref: {
             type: 'string',
@@ -139,7 +143,7 @@ export function createOptimizedRepositoryTools(optimizedClient: OptimizedAPIClie
         if (!validateRepoName(params.repo)) {
           throw new ValidationError('repo', 'Invalid repository name');
         }
-        
+
         // Validate and sanitize path if provided
         let safePath = '';
         if (params.path) {
@@ -149,12 +153,12 @@ export function createOptimizedRepositoryTools(optimizedClient: OptimizedAPIClie
           }
           safePath = validated;
         }
-        
+
         // Validate ref if provided
         if (params.ref && !validateRef(params.ref)) {
           throw new ValidationError('ref', 'Invalid Git ref');
         }
-        
+
         const data = await optimizedClient.getFileContents(
           params.owner,
           params.repo,
@@ -162,16 +166,16 @@ export function createOptimizedRepositoryTools(optimizedClient: OptimizedAPIClie
           params.ref
         );
 
-      if (Array.isArray(data)) {
-        // Directory listing
-        return data.map((item: any) => ({
-          name: item.name,
-          path: item.path,
-          type: item.type,
-          size: item.size,
-          sha: item.sha,
-        }));
-      } else if (data.type === 'file') {
+        if (Array.isArray(data)) {
+          // Directory listing
+          return data.map((item: any) => ({
+            name: item.name,
+            path: item.path,
+            type: item.type,
+            size: item.size,
+            sha: item.sha,
+          }));
+        } else if (data.type === 'file') {
           // File content: only decode when content and encoding are provided and content is not excessively large
           const encoding = (data as any).encoding;
           const rawContent = (data as any).content;
@@ -196,9 +200,9 @@ export function createOptimizedRepositoryTools(optimizedClient: OptimizedAPIClie
             is_decoded: !!decoded,
             media_type: (data as any).type,
           };
-      } else {
-        return data;
-      }
+        } else {
+          return data;
+        }
       },
       'get_file_contents_optimized'
     ),

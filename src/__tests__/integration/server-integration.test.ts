@@ -32,7 +32,17 @@ vi.mock('../../env.js', () => ({
     if (toolsets === 'repos,issues') {
       return ['context', 'repos', 'issues'];
     }
-    return ['context', 'repos', 'issues', 'pull_requests', 'actions', 'search', 'users', 'orgs', 'notifications'];
+    return [
+      'context',
+      'repos',
+      'issues',
+      'pull_requests',
+      'actions',
+      'search',
+      'users',
+      'orgs',
+      'notifications',
+    ];
   }),
   displayConfig: vi.fn(),
 }));
@@ -58,7 +68,7 @@ vi.mock('../../rate-limiter.js', () => ({
   createRateLimitedOctokit: vi.fn(),
   GitHubRateLimiter: vi.fn(),
   ResponseSizeLimiter: {
-    limitResponseSize: vi.fn((data) => ({ data, truncated: false, originalSize: 0 })),
+    limitResponseSize: vi.fn(data => ({ data, truncated: false, originalSize: 0 })),
   },
 }));
 
@@ -135,7 +145,7 @@ vi.mock('../../tools/issues.js', () => ({
         handler: vi.fn(),
       },
     ];
-    
+
     // Only add write tools if not in read-only mode
     if (!readOnly) {
       tools.push({
@@ -143,7 +153,7 @@ vi.mock('../../tools/issues.js', () => ({
         handler: vi.fn(),
       });
     }
-    
+
     return tools;
   },
 }));
@@ -156,7 +166,7 @@ vi.mock('../../tools/pull-requests.js', () => ({
         handler: vi.fn(),
       },
     ];
-    
+
     // Only add write tools if not in read-only mode
     if (!readOnly) {
       tools.push({
@@ -164,7 +174,7 @@ vi.mock('../../tools/pull-requests.js', () => ({
         handler: vi.fn(),
       });
     }
-    
+
     return tools;
   },
 }));
@@ -269,12 +279,12 @@ describe('GitHub MCP Server Integration', () => {
     mockOctokit = createMockOctokit();
     const { Octokit } = await import('@octokit/rest');
     (Octokit as any).mockImplementation(() => mockOctokit);
-    
+
     // Configure the rate limiter mock to return the mock Octokit
     const { createRateLimitedOctokit } = await import('../../rate-limiter.js');
     (createRateLimitedOctokit as any).mockImplementation(() => ({
       octokit: mockOctokit,
-      rateLimiter: { 
+      rateLimiter: {
         limit: vi.fn(),
         getStatus: vi.fn(() => ({
           core: { limit: 5000, remaining: 4999, reset: new Date(Date.now() + 3600000) },
@@ -294,7 +304,7 @@ describe('GitHub MCP Server Integration', () => {
 
     // Set up environment variables with valid token format
     restoreEnv = mockEnvVars({
-      GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp_' + 'A'.repeat(36),  // Valid token format
+      GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp_' + 'A'.repeat(36), // Valid token format
       GITHUB_READ_ONLY: 'false',
       GITHUB_TOOLSETS: 'all',
     });
@@ -355,7 +365,7 @@ describe('GitHub MCP Server Integration', () => {
       const tool = registeredTools.get('get_me');
       expect(tool).toBeDefined();
       expect(tool.description).toBe('Get my GitHub user profile');
-      
+
       // Verify the handler exists and is a function
       expect(tool.handler).toBeDefined();
       expect(typeof tool.handler).toBe('function');
@@ -366,7 +376,7 @@ describe('GitHub MCP Server Integration', () => {
       const tool = registeredTools.get('get_file_contents');
       expect(tool).toBeDefined();
       expect(tool.description).toBe('Get file contents');
-      
+
       // Verify the handler exists and is a function
       expect(tool.handler).toBeDefined();
       expect(typeof tool.handler).toBe('function');
@@ -377,7 +387,7 @@ describe('GitHub MCP Server Integration', () => {
       const tool = registeredTools.get('list_repositories');
       expect(tool).toBeDefined();
       expect(tool.description).toBe('List repositories');
-      
+
       // Verify the handler exists and is a function
       expect(tool.handler).toBeDefined();
       expect(typeof tool.handler).toBe('function');
@@ -387,7 +397,7 @@ describe('GitHub MCP Server Integration', () => {
       // This test verifies error handling wrapper is in place
       const tool = registeredTools.get('get_me');
       expect(tool).toBeDefined();
-      
+
       // The handler wrapper should handle errors gracefully
       // Actual error handling is tested in unit tests
       expect(tool.handler).toBeDefined();
@@ -399,7 +409,7 @@ describe('GitHub MCP Server Integration', () => {
       const tool = registeredTools.get('get_file_contents');
       expect(tool).toBeDefined();
       expect(tool.schema).toBeDefined();
-      
+
       // The schema should define required parameters
       // Actual validation is tested in unit tests
       expect(tool.handler).toBeDefined();
@@ -410,7 +420,7 @@ describe('GitHub MCP Server Integration', () => {
     beforeEach(() => {
       restoreEnv();
       restoreEnv = mockEnvVars({
-        GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp_' + 'A'.repeat(36),  // Valid token format
+        GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp_' + 'A'.repeat(36), // Valid token format
         GITHUB_READ_ONLY: 'true',
         GITHUB_TOOLSETS: 'all',
       });
@@ -439,7 +449,7 @@ describe('GitHub MCP Server Integration', () => {
     beforeEach(() => {
       restoreEnv();
       restoreEnv = mockEnvVars({
-        GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp_' + 'A'.repeat(36),  // Valid token format
+        GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp_' + 'A'.repeat(36), // Valid token format
         GITHUB_READ_ONLY: 'false',
         GITHUB_TOOLSETS: 'repos,issues',
       });
@@ -474,7 +484,7 @@ describe('GitHub MCP Server Integration', () => {
         errors: ['No GitHub token provided'],
         sanitizedValues: {},
       });
-      
+
       const { GitHubMCPServer } = await import('../../index.js');
 
       expect(() => new (GitHubMCPServer as any)(true)).toThrow('Environment validation failed');
@@ -539,7 +549,7 @@ describe('GitHub MCP Server Integration', () => {
 
       expect(getMeTool).toBeDefined();
       expect(listReposTool).toBeDefined();
-      
+
       // Both tools should have handlers that can be called
       expect(getMeTool.handler).toBeDefined();
       expect(listReposTool.handler).toBeDefined();
@@ -555,7 +565,7 @@ describe('GitHub MCP Server Integration', () => {
       // Both read tools should be available
       expect(getMeTool).toBeDefined();
       expect(listReposTool).toBeDefined();
-      
+
       // The handlers should have error handling built in (wrapped by server)
       expect(getMeTool.handler).toBeDefined();
       expect(listReposTool.handler).toBeDefined();

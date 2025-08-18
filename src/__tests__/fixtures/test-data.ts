@@ -81,9 +81,7 @@ const getRandom = (seed?: number): SeededRandom | null => {
 
 const generateId = (seed?: number) => {
   const random = getRandom(seed);
-  return random 
-    ? random.nextInt(1000, 999999)
-    : Math.floor(Math.random() * 999000) + 1000;
+  return random ? random.nextInt(1000, 999999) : Math.floor(Math.random() * 999000) + 1000;
 };
 
 const generateTimestamp = (offsetDays = 0) => {
@@ -97,7 +95,9 @@ const generateString = (prefix: string, length = 8, seed?: number) => {
   if (random) {
     return random.nextString(prefix, length);
   }
-  return `${prefix}-${Math.random().toString(36).substring(2, length + 2)}`;
+  return `${prefix}-${Math.random()
+    .toString(36)
+    .substring(2, length + 2)}`;
 };
 
 const generateSha = (seed?: number) => {
@@ -349,14 +349,14 @@ export const createRepository = (overrides: any = {}, seed?: number) => {
   const id = overrides.id ?? generateId(seed);
   const name = overrides.name ?? generateString('repo', 8, seed);
   const owner = overrides.owner?.login ?? generateString('user', 6, seed);
-  
+
   return {
     id,
     name,
     full_name: `${owner}/${name}`,
-    owner: { 
-      login: owner, 
-      id: overrides.owner?.id ?? generateId((seed ?? 0) + 1) 
+    owner: {
+      login: owner,
+      id: overrides.owner?.id ?? generateId((seed ?? 0) + 1),
     },
     private: overrides.private ?? (random ? random.nextBoolean() : false),
     description: overrides.description ?? `Test repository ${name}`,
@@ -368,7 +368,9 @@ export const createRepository = (overrides: any = {}, seed?: number) => {
     watchers_count: overrides.watchers_count ?? (random ? random.nextInt(0, 50) : 5),
     forks_count: overrides.forks_count ?? (random ? random.nextInt(0, 20) : 2),
     open_issues_count: overrides.open_issues_count ?? (random ? random.nextInt(0, 10) : 3),
-    language: overrides.language ?? (random ? random.nextFromArray(['TypeScript', 'JavaScript', 'Python', 'Go']) : 'TypeScript'),
+    language:
+      overrides.language ??
+      (random ? random.nextFromArray(['TypeScript', 'JavaScript', 'Python', 'Go']) : 'TypeScript'),
     topics: overrides.topics ?? [`mcp`, `github`, `api`, `test-${id}`],
     ...overrides,
   };
@@ -378,7 +380,7 @@ export const createUser = (overrides: any = {}, seed?: number) => {
   const random = getRandom(seed);
   const login = overrides.login ?? generateString('user', 8, seed);
   const id = overrides.id ?? generateId(seed);
-  
+
   return {
     id,
     login,
@@ -403,7 +405,7 @@ export const createIssue = (overrides: any = {}, seed?: number) => {
   const id = overrides.id ?? generateId(seed);
   const number = overrides.number ?? (random ? random.nextInt(1, 1000) : id);
   const title = overrides.title ?? generateString('issue', 12, seed);
-  
+
   return {
     id,
     number,
@@ -427,7 +429,7 @@ export const createPullRequest = (overrides: any = {}, seed?: number) => {
   const id = overrides.id ?? generateId(seed);
   const number = overrides.number ?? (random ? random.nextInt(1, 1000) : id);
   const title = overrides.title ?? generateString('pr', 12, seed);
-  
+
   return {
     id,
     number,
@@ -459,7 +461,7 @@ export const createPullRequest = (overrides: any = {}, seed?: number) => {
 export const createWorkflow = (overrides: any = {}, seed?: number) => {
   const id = overrides.id ?? generateId(seed);
   const name = overrides.name ?? generateString('workflow', 8, seed);
-  
+
   return {
     id,
     name,
@@ -468,8 +470,10 @@ export const createWorkflow = (overrides: any = {}, seed?: number) => {
     created_at: overrides.created_at ?? generateTimestamp(-30),
     updated_at: overrides.updated_at ?? generateTimestamp(-1),
     url: overrides.url ?? `https://api.github.com/repos/test-owner/test-repo/workflows/${id}`,
-    html_url: overrides.html_url ?? `https://github.com/test-owner/test-repo/actions/workflows/${name}.yml`,
-    badge_url: overrides.badge_url ?? `https://github.com/test-owner/test-repo/workflows/${name}/badge.svg`,
+    html_url:
+      overrides.html_url ?? `https://github.com/test-owner/test-repo/actions/workflows/${name}.yml`,
+    badge_url:
+      overrides.badge_url ?? `https://github.com/test-owner/test-repo/workflows/${name}/badge.svg`,
     ...overrides,
   };
 };
@@ -477,7 +481,7 @@ export const createWorkflow = (overrides: any = {}, seed?: number) => {
 export const createCommit = (overrides: any = {}, seed?: number) => {
   const sha = overrides.sha ?? generateSha(seed);
   const message = overrides.message ?? generateString('commit', 20, seed);
-  
+
   return {
     sha,
     commit: {
@@ -504,7 +508,7 @@ export const createFile = (overrides: any = {}, seed?: number) => {
   const name = overrides.name ?? generateString('file', 8, seed) + '.txt';
   const path = overrides.path ?? name;
   const content = overrides.content ?? `Test content for ${name}`;
-  
+
   return {
     name,
     path,
@@ -526,12 +530,10 @@ export const generateNetworkError = (overrides: any = {}) => {
     { code: 'ENETUNREACH', message: 'Network unreachable', errno: -51 },
     { code: 'ECONNRESET', message: 'Connection reset by peer', errno: -54 },
   ];
-  
+
   const random = getRandom();
-  const errorType = random 
-    ? errorTypes[random.nextInt(0, errorTypes.length - 1)]
-    : errorTypes[0];
-  
+  const errorType = random ? errorTypes[random.nextInt(0, errorTypes.length - 1)] : errorTypes[0];
+
   return {
     code: overrides.code ?? errorType.code,
     message: overrides.message ?? errorType.message,
@@ -546,10 +548,9 @@ export const generateNetworkError = (overrides: any = {}) => {
 export const generateRandomApiError = (overrides: any = {}, seed?: number) => {
   const random = getRandom(seed);
   const statusCodes = [400, 401, 403, 404, 409, 422, 429, 500, 502, 503];
-  const status = overrides.status ?? (random 
-    ? statusCodes[random.nextInt(0, statusCodes.length - 1)]
-    : 404);
-  
+  const status =
+    overrides.status ?? (random ? statusCodes[random.nextInt(0, statusCodes.length - 1)] : 404);
+
   const errorMessages: Record<number, string> = {
     400: 'Bad Request',
     401: 'Requires authentication',
@@ -562,9 +563,9 @@ export const generateRandomApiError = (overrides: any = {}, seed?: number) => {
     502: 'Bad Gateway',
     503: 'Service Unavailable',
   };
-  
+
   const message = overrides.message ?? errorMessages[status] ?? 'Unknown Error';
-  
+
   return {
     name: 'HttpError',
     status,

@@ -364,7 +364,7 @@ export interface UpdateCodeScanningAlertParams {
   repo: string;
   alert_number: number;
   state: 'open' | 'dismissed';
-  dismissed_reason?: 'false positive' | 'won\'t fix' | 'used in tests' | null;
+  dismissed_reason?: 'false positive' | "won't fix" | 'used in tests' | null;
   dismissed_comment?: string;
 }
 
@@ -465,7 +465,18 @@ export interface SearchReposParams {
 
 export interface SearchIssuesParams {
   q: string;
-  sort?: 'comments' | 'reactions' | 'reactions-+1' | 'reactions--1' | 'reactions-smile' | 'reactions-thinking_face' | 'reactions-heart' | 'reactions-tada' | 'interactions' | 'created' | 'updated';
+  sort?:
+    | 'comments'
+    | 'reactions'
+    | 'reactions-+1'
+    | 'reactions--1'
+    | 'reactions-smile'
+    | 'reactions-thinking_face'
+    | 'reactions-heart'
+    | 'reactions-tada'
+    | 'interactions'
+    | 'created'
+    | 'updated';
   order?: 'asc' | 'desc';
   page?: number;
   perPage?: number;
@@ -506,7 +517,7 @@ export interface GetCodeMetricsParams {
   until?: string;
 }
 
-// Advanced Search Parameters  
+// Advanced Search Parameters
 export interface AdvancedCodeSearchParams {
   query: string;
   language?: string;
@@ -641,7 +652,7 @@ export function isCreatePullRequestParams(params: unknown): params is CreatePull
 }
 
 // Union type for all tool parameters
-export type ToolParams = 
+export type ToolParams =
   | GetFileContentsParams
   | ListBranchesParams
   | ListCommitsParams

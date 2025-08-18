@@ -2,7 +2,7 @@ import { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 /**
  * Available GitHub toolsets that can be enabled/disabled
- * 
+ *
  * - context: User context tools (get_me)
  * - repos: Repository management tools
  * - issues: Issue management tools
@@ -21,7 +21,7 @@ import { Tool } from '@modelcontextprotocol/sdk/types.js';
  * - batch_operations: GraphQL batch query operations
  * - experiments: Experimental features
  */
-export type GitHubToolset = 
+export type GitHubToolset =
   | 'context'
   | 'repos'
   | 'issues'
@@ -61,7 +61,7 @@ export interface JSONSchema {
 
 /**
  * Configuration object for MCP tools
- * 
+ *
  * @template TParams - Type for tool input parameters
  * @template TResult - Type for tool result
  */
@@ -101,7 +101,6 @@ export interface GitHubError {
   /** URL to relevant GitHub API documentation */
   documentation_url?: string;
 }
-
 
 // Response types are now in tool-types.ts using @octokit/openapi-types
 // Re-export commonly used types from tool-types.ts for backward compatibility

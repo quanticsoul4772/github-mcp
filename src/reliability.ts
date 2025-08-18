@@ -36,7 +36,10 @@ export class ConsoleTelemetry implements Telemetry {
 
   trackRequest(operation: string, duration: number, success: boolean): void {
     if (this.verbose) {
-      logger.info(`[TELEMETRY] Request: ${operation} - ${duration}ms - ${success ? 'SUCCESS' : 'FAILED'}`, { operation, duration, success });
+      logger.info(
+        `[TELEMETRY] Request: ${operation} - ${duration}ms - ${success ? 'SUCCESS' : 'FAILED'}`,
+        { operation, duration, success }
+      );
     }
   }
 
@@ -51,7 +54,11 @@ export class ConsoleTelemetry implements Telemetry {
   }
 
   trackRetry(operation: string, attempt: number, error: Error): void {
-    logger.warn(`[TELEMETRY] Retry: ${operation} attempt ${attempt} - ${error.message}`, { operation, attempt, errorMessage: error.message });
+    logger.warn(`[TELEMETRY] Retry: ${operation} attempt ${attempt} - ${error.message}`, {
+      operation,
+      attempt,
+      errorMessage: error.message,
+    });
   }
 
   trackCircuitBreakerState(operation: string, state: CircuitBreakerState): void {
@@ -99,11 +106,11 @@ export class CircuitBreaker {
           `Circuit breaker is open for operation: ${this.operation}`,
           'CIRCUIT_BREAKER_OPEN',
           503,
-          { 
+          {
             operation: this.operation,
             failures: this.failures,
             lastFailTime: this.lastFailTime,
-            resetTime: this.getResetTime()
+            resetTime: this.getResetTime(),
           }
         );
       }
@@ -223,26 +230,28 @@ export class RetryManager {
         return await fn();
       } catch (error) {
         lastError = error as Error;
-        
-        const normalizedError = error instanceof GitHubMCPError 
-          ? error 
-          : this.normalizeError(error, operation);
+
+        const normalizedError =
+          error instanceof GitHubMCPError ? error : this.normalizeError(error, operation);
 
         // Track the error
-        this.telemetry.trackError(normalizedError, { 
-          operation, 
-          attempt, 
-          maxAttempts: effectiveConfig.maxAttempts 
+        this.telemetry.trackError(normalizedError, {
+          operation,
+          attempt,
+          maxAttempts: effectiveConfig.maxAttempts,
         });
 
         // Don't retry if not retryable or last attempt
-        if (!this.isRetryable(normalizedError, effectiveConfig) || attempt === effectiveConfig.maxAttempts) {
+        if (
+          !this.isRetryable(normalizedError, effectiveConfig) ||
+          attempt === effectiveConfig.maxAttempts
+        ) {
           throw normalizedError;
         }
 
         // Calculate delay
         const delay = this.calculateDelay(attempt, effectiveConfig);
-        
+
         // Track retry attempt
         this.telemetry.trackRetry(operation, attempt, normalizedError);
 
@@ -363,7 +372,7 @@ export class CorrelationManager {
   withCorrelationId<T>(id: string, fn: () => Promise<T>): Promise<T> {
     const previousId = this.currentId;
     this.currentId = id;
-    
+
     return fn().finally(() => {
       this.currentId = previousId;
     });
@@ -425,9 +434,10 @@ export class ReliabilityManager {
     };
 
     return this.correlationManager.withCorrelationId(correlationId, async () => {
-      const wrappedFn = options?.useCircuitBreaker !== false
-        ? () => this.getCircuitBreaker(operation).execute(fn)
-        : fn;
+      const wrappedFn =
+        options?.useCircuitBreaker !== false
+          ? () => this.getCircuitBreaker(operation).execute(fn)
+          : fn;
 
       const retryFn = () => this.retryManager.withRetry(operation, wrappedFn, options?.retryConfig);
 
@@ -481,7 +491,7 @@ export class ReliabilityManager {
    */
   getHealthStatus(): Record<string, any> {
     const circuitBreakers: Record<string, any> = {};
-    
+
     for (const [operation, breaker] of this.circuitBreakers) {
       circuitBreakers[operation] = breaker.getStats();
     }

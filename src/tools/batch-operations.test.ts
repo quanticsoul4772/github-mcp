@@ -24,7 +24,9 @@ describe('Batch Operations Tools', () => {
     it('should be registered', () => {
       expect(batchQueryRepositories).toBeDefined();
       expect(batchQueryRepositories.tool.name).toBe('batch_query_repositories');
-      expect(batchQueryRepositories.tool.description).toContain('Query multiple repositories in a single GraphQL request');
+      expect(batchQueryRepositories.tool.description).toContain(
+        'Query multiple repositories in a single GraphQL request'
+      );
     });
 
     it('should query multiple repositories successfully', async () => {
@@ -50,10 +52,7 @@ describe('Batch Operations Tools', () => {
             spdxId: 'MIT',
           },
           repositoryTopics: {
-            nodes: [
-              { topic: { name: 'typescript' } },
-              { topic: { name: 'github' } },
-            ],
+            nodes: [{ topic: { name: 'typescript' } }, { topic: { name: 'github' } }],
           },
         },
         repo1: {
@@ -77,10 +76,7 @@ describe('Batch Operations Tools', () => {
             spdxId: 'Apache-2.0',
           },
           repositoryTopics: {
-            nodes: [
-              { topic: { name: 'javascript' } },
-              { topic: { name: 'api' } },
-            ],
+            nodes: [{ topic: { name: 'javascript' } }, { topic: { name: 'api' } }],
           },
         },
       };
@@ -98,7 +94,9 @@ describe('Batch Operations Tools', () => {
       const callArgs = mockOctokit.graphql.mock.calls[0];
       expect(callArgs[0]).toContain('query BatchRepositoryQuery');
       expect(callArgs[0]).toContain('repo0: repository(owner: "owner1", name: "test-repo1")');
-      expect(callArgs[0]).toContain('custom_alias: repository(owner: "owner2", name: "test-repo2")');
+      expect(callArgs[0]).toContain(
+        'custom_alias: repository(owner: "owner2", name: "test-repo2")'
+      );
 
       expect(result).toEqual({
         totalQueried: 2,
@@ -778,7 +776,8 @@ describe('Batch Operations Tools', () => {
         queries: [
           {
             alias: 'repoWithVars',
-            query: 'repository(owner: $repoWithVars_owner, name: $repoWithVars_name) { name stargazerCount }',
+            query:
+              'repository(owner: $repoWithVars_owner, name: $repoWithVars_name) { name stargazerCount }',
             variables: {
               owner: 'test-owner',
               name: 'test-repo',
@@ -788,7 +787,9 @@ describe('Batch Operations Tools', () => {
       });
 
       expect(mockOctokit.graphql).toHaveBeenCalledWith(
-        expect.stringContaining('query BatchQuery($repoWithVars_owner: String, $repoWithVars_name: String)'),
+        expect.stringContaining(
+          'query BatchQuery($repoWithVars_owner: String, $repoWithVars_name: String)'
+        ),
         {
           repoWithVars_owner: 'test-owner',
           repoWithVars_name: 'test-repo',
@@ -824,7 +825,9 @@ describe('Batch Operations Tools', () => {
       });
 
       expect(mockOctokit.graphql).toHaveBeenCalledWith(
-        expect.stringContaining('$mixedTypes_stringVar: String, $mixedTypes_numberVar: Int, $mixedTypes_booleanVar: Boolean'),
+        expect.stringContaining(
+          '$mixedTypes_stringVar: String, $mixedTypes_numberVar: Int, $mixedTypes_booleanVar: Boolean'
+        ),
         {
           mixedTypes_stringVar: 'test',
           mixedTypes_numberVar: 42,

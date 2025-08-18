@@ -1,6 +1,10 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
-import { GraphQLPaginationHandler, GraphQLPaginationOptions, GraphQLPaginationUtils } from '../graphql-pagination-handler.js';
+import {
+  GraphQLPaginationHandler,
+  GraphQLPaginationOptions,
+  GraphQLPaginationUtils,
+} from '../graphql-pagination-handler.js';
 import { OptimizedAPIClient } from '../optimized-api-client.js';
 import { cachedGraphQL, smartGraphQL, GraphQLTTL } from '../graphql-utils.js';
 import { typedGraphQL, createTypedHandler } from '../graphql-utils.js';
@@ -13,7 +17,7 @@ import {
   CreateDiscussionResponse,
   AddDiscussionCommentResponse,
   UpdateDiscussionResponse,
-  SimpleRepositoryResponse
+  SimpleRepositoryResponse,
 } from '../graphql-types.js';
 
 interface ListDiscussionsParams {
@@ -83,15 +87,15 @@ interface DeleteDiscussionParams {
 
 /**
  * Creates GitHub Discussion tools using GraphQL API.
- * 
+ *
  * GitHub Discussions are only available through GraphQL and provide community
  * conversation features around repositories. These tools offer comprehensive
  * discussion management including creation, querying, and moderation.
- * 
+ *
  * @param octokit - Configured Octokit instance with GraphQL support
  * @param readOnly - Whether to exclude write operations (create, update, delete)
  * @returns Array of discussion tool configurations
- * 
+ *
  * @example
  * ```typescript
  * const tools = createDiscussionTools(octokit, false);
@@ -152,7 +156,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
     },
     handler: async (args: unknown) => {
       const params = args as ListDiscussionsParams;
-      
+
       const query = `
         query($owner: String!, $repo: String!, $first: Int!, $after: String, $categoryId: ID) {
           repository(owner: $owner, name: $repo) {
@@ -230,7 +234,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
     },
     handler: async (args: unknown) => {
       const params = args as GetDiscussionParams;
-      
+
       const query = `
         query($owner: String!, $repo: String!, $number: Int!) {
           repository(owner: $owner, name: $repo) {
@@ -320,7 +324,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
     },
     handler: async (args: unknown) => {
       const params = args as GetDiscussionCommentsParams;
-      
+
       const query = `
         query($owner: String!, $repo: String!, $number: Int!, $first: Int!, $after: String) {
           repository(owner: $owner, name: $repo) {
@@ -402,7 +406,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
     },
     handler: async (args: unknown) => {
       const params = args as ListDiscussionCategoriesParams;
-      
+
       const query = `
         query($owner: String!, $repo: String!) {
           repository(owner: $owner, name: $repo) {
@@ -468,7 +472,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
     handler: async (args: unknown) => {
       const params = args as SearchDiscussionsParams;
       let searchQuery = params.query;
-      
+
       if (params.owner && params.repo) {
         searchQuery = `repo:${params.owner}/${params.repo} ${searchQuery}`;
       }
@@ -549,7 +553,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
       },
       handler: async (args: unknown) => {
         const params = args as CreateDiscussionParams;
-        
+
         // First get the repository ID
         const repoQuery = `
           query($owner: String!, $repo: String!) {
@@ -627,7 +631,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
       },
       handler: async (args: unknown) => {
         const params = args as AddDiscussionCommentParams;
-        
+
         const mutation = `
           mutation($discussionId: ID!, $body: String!, $replyToId: ID) {
             addDiscussionComment(input: {
@@ -687,7 +691,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
       },
       handler: async (args: unknown) => {
         const params = args as UpdateDiscussionParams;
-        
+
         const mutation = `
           mutation($discussionId: ID!, $title: String, $body: String, $categoryId: ID) {
             updateDiscussion(input: {
@@ -739,7 +743,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
       },
       handler: async (args: unknown) => {
         const params = args as DeleteDiscussionParams;
-        
+
         const mutation = `
           mutation($discussionId: ID!) {
             deleteDiscussion(input: {

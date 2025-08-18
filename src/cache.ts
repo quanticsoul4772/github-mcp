@@ -50,13 +50,16 @@ export class GitHubAPICache {
   private generateKey(operation: string, params: Record<string, any>): string {
     const sortedParams = Object.keys(params)
       .sort()
-      .reduce((acc, key) => {
-        if (params[key] !== undefined && params[key] !== null) {
-          acc[key] = params[key];
-        }
-        return acc;
-      }, {} as Record<string, any>);
-    
+      .reduce(
+        (acc, key) => {
+          if (params[key] !== undefined && params[key] !== null) {
+            acc[key] = params[key];
+          }
+          return acc;
+        },
+        {} as Record<string, any>
+      );
+
     return `${operation}:${JSON.stringify(sortedParams)}`;
   }
 
@@ -71,7 +74,7 @@ export class GitHubAPICache {
   ): Promise<T> {
     const key = this.generateKey(operation, params);
     const entry = this.cache.get(key);
-    
+
     // Check if entry exists and is still valid
     if (entry && this.isValid(entry)) {
       this.updateAccessOrder(key);
@@ -158,7 +161,7 @@ export class GitHubAPICache {
   invalidate(pattern: string | RegExp): number {
     let count = 0;
     const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern;
-    
+
     for (const key of this.cache.keys()) {
       if (regex.test(key)) {
         this.cache.delete(key);
@@ -183,7 +186,7 @@ export class GitHubAPICache {
   delete(operation: string, params: Record<string, any>): boolean {
     const key = this.generateKey(operation, params);
     const result = this.cache.delete(key);
-    
+
     if (result) {
       const index = this.accessOrder.indexOf(key);
       if (index > -1) {
@@ -228,7 +231,7 @@ export class GitHubAPICache {
   cleanup(): number {
     let removed = 0;
     const now = Date.now();
-    
+
     for (const [key, entry] of this.cache.entries()) {
       if (now - entry.timestamp >= entry.ttl) {
         this.cache.delete(key);
@@ -256,18 +259,18 @@ export const CACHE_CONFIG = {
   'repos.get': 10 * 60 * 1000,
   'repos.listBranches': 5 * 60 * 1000,
   'repos.listTags': 10 * 60 * 1000,
-  
+
   // User data - cache for 30 minutes
   'users.get': 30 * 60 * 1000,
   'users.getAuthenticated': 30 * 60 * 1000,
-  
+
   // Organization data - cache for 15 minutes
   'orgs.get': 15 * 60 * 1000,
   'orgs.listMembers': 10 * 60 * 1000,
-  
+
   // File contents - cache for 5 minutes
   'repos.getContent': 5 * 60 * 1000,
-  
+
   // Don't cache write operations or dynamic data
   'issues.create': 0,
   'pulls.create': 0,

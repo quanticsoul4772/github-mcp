@@ -1,11 +1,11 @@
-import { 
-  AgentCoordinator, 
-  AnalysisContext, 
-  AnalysisResult, 
-  AnalysisReport, 
+import {
+  AgentCoordinator,
+  AnalysisContext,
+  AnalysisResult,
+  AnalysisReport,
   AgentEvent,
   AgentEventListener,
-  BaseAgent
+  BaseAgent,
 } from '../types/agent-interfaces.js';
 import { DefaultAgentRegistry } from './agent-registry.js';
 
@@ -88,7 +88,7 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
     this.emitEvent({
       type: 'analysis-start',
       timestamp: new Date(),
-      data: { context }
+      data: { context },
     });
 
     const startTime = Date.now();
@@ -101,26 +101,27 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
       try {
         const result = await this.runSingleAgentInternal(agent, context);
         results.push(result);
-        
+
         // Add result to context for dependent agents
         if (!context.previousResults) {
           context.previousResults = new Map();
         }
         context.previousResults.set(agent.name, result);
-        
       } catch (error) {
         console.error(`Agent ${agent.name} failed:`, error);
         results.push({
           agentName: agent.name,
           timestamp: new Date(),
           status: 'error',
-          findings: [{
-            id: `${agent.name}-error-${Date.now()}`,
-            severity: 'critical',
-            category: 'agent-error',
-            message: `Agent execution failed: ${error instanceof Error ? error.message : String(error)}`,
-            evidence: error instanceof Error ? error.stack : undefined
-          }]
+          findings: [
+            {
+              id: `${agent.name}-error-${Date.now()}`,
+              severity: 'critical',
+              category: 'agent-error',
+              message: `Agent execution failed: ${error instanceof Error ? error.message : String(error)}`,
+              evidence: error instanceof Error ? error.stack : undefined,
+            },
+          ],
         });
       }
     }
@@ -131,7 +132,7 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
     this.emitEvent({
       type: 'analysis-complete',
       timestamp: new Date(),
-      data: { report }
+      data: { report },
     });
 
     console.log(`Analysis complete. Found ${report.summary.totalFindings} findings.`);
@@ -141,7 +142,10 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
   /**
    * Run analysis with specific agents
    */
-  public async runSelectedAgents(agentNames: string[], context: AnalysisContext): Promise<AnalysisReport> {
+  public async runSelectedAgents(
+    agentNames: string[],
+    context: AnalysisContext
+  ): Promise<AnalysisReport> {
     const agents = agentNames
       .map(name => this.registry.getAgent(name))
       .filter((agent): agent is BaseAgent => agent !== undefined);
@@ -160,7 +164,7 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
     for (const agent of sortedAgents) {
       const result = await this.runSingleAgentInternal(agent, context);
       results.push(result);
-      
+
       if (!context.previousResults) {
         context.previousResults = new Map();
       }
@@ -173,7 +177,10 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
   /**
    * Run a single agent
    */
-  public async runSingleAgent(agentName: string, context: AnalysisContext): Promise<AnalysisResult> {
+  public async runSingleAgent(
+    agentName: string,
+    context: AnalysisContext
+  ): Promise<AnalysisResult> {
     const agent = this.registry.getAgent(agentName);
     if (!agent) {
       throw new Error(`Agent '${agentName}' not found`);
@@ -185,15 +192,18 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
   /**
    * Internal method to run a single agent with event handling
    */
-  private async runSingleAgentInternal(agent: BaseAgent, context: AnalysisContext): Promise<AnalysisResult> {
+  private async runSingleAgentInternal(
+    agent: BaseAgent,
+    context: AnalysisContext
+  ): Promise<AnalysisResult> {
     this.emitEvent({
       type: 'agent-start',
       agentName: agent.name,
-      timestamp: new Date()
+      timestamp: new Date(),
     });
 
     const startTime = Date.now();
-    
+
     try {
       console.log(`Running agent: ${agent.name}`);
       const result = await agent.analyze(context);
@@ -203,20 +213,19 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
         type: 'agent-complete',
         agentName: agent.name,
         timestamp: new Date(),
-        data: { result }
+        data: { result },
       });
 
       console.log(`Agent ${agent.name} completed with ${result.findings.length} findings`);
       return result;
-      
     } catch (error) {
       this.emitEvent({
         type: 'agent-error',
         agentName: agent.name,
         timestamp: new Date(),
-        error: error instanceof Error ? error : new Error(String(error))
+        error: error instanceof Error ? error : new Error(String(error)),
       });
-      
+
       throw error;
     }
   }
@@ -237,7 +246,7 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
       infoFindings: allFindings.filter(f => f.severity === 'info').length,
       agentsRun: results.length,
       totalExecutionTime: results.reduce((sum, r) => sum + (r.executionTime || 0), 0),
-      filesAnalyzed: new Set(allFindings.map(f => f.file).filter(Boolean)).size
+      filesAnalyzed: new Set(allFindings.map(f => f.file).filter(Boolean)).size,
     };
 
     return {
@@ -247,7 +256,7 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
       recommendations: [...new Set(recommendations)], // Remove duplicates
       timestamp: new Date(),
       projectPath: context.projectPath,
-      gitContext: context.gitContext
+      gitContext: context.gitContext,
     };
   }
 
@@ -288,12 +297,12 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
     const context: AnalysisContext = {
       projectPath: options.target.path,
       files: [], // Will be populated during discovery
-      excludePatterns: options.target.exclude
+      excludePatterns: options.target.exclude,
     };
 
     // Run the analysis
     const report = await this.runFullAnalysis(context);
-    
+
     // Convert AnalysisReport to CoordinationResult format expected by workflow
     const result: CoordinationResult = {
       summary: {
@@ -305,27 +314,27 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
           high: report.summary.highFindings,
           medium: report.summary.mediumFindings,
           low: report.summary.lowFindings,
-          info: report.summary.infoFindings
+          info: report.summary.infoFindings,
         },
-        findingsByCategory: {}
+        findingsByCategory: {},
       },
       reports: report.agentResults.map(r => ({
         agentName: r.agentName,
         summary: {
           filesAnalyzed: new Set(r.findings.map(f => f.file).filter(Boolean)).size,
           totalFindings: r.findings.length,
-          duration: r.executionTime || 0
+          duration: r.executionTime || 0,
         },
         findings: r.findings,
-        duration: r.executionTime || 0
+        duration: r.executionTime || 0,
       })),
-      consolidatedFindings: report.findings
+      consolidatedFindings: report.findings,
     };
 
     // Populate findingsByCategory
     report.findings.forEach(finding => {
       if (finding.category) {
-        result.summary.findingsByCategory[finding.category] = 
+        result.summary.findingsByCategory[finding.category] =
           (result.summary.findingsByCategory[finding.category] || 0) + 1;
       }
     });
@@ -353,7 +362,7 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 }

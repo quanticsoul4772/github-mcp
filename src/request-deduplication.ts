@@ -51,13 +51,16 @@ export class RequestDeduplicator {
   private generateKey(operation: string, params: Record<string, any>): string {
     const sortedParams = Object.keys(params)
       .sort()
-      .reduce((acc, key) => {
-        if (params[key] !== undefined && params[key] !== null) {
-          acc[key] = params[key];
-        }
-        return acc;
-      }, {} as Record<string, any>);
-    
+      .reduce(
+        (acc, key) => {
+          if (params[key] !== undefined && params[key] !== null) {
+            acc[key] = params[key];
+          }
+          return acc;
+        },
+        {} as Record<string, any>
+      );
+
     return `${operation}:${JSON.stringify(sortedParams)}`;
   }
 

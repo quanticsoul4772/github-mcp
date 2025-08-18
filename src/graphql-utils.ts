@@ -24,7 +24,7 @@ export async function cachedGraphQL<T>(
   if (client && typeof (client as any).graphql === 'function' && 'getMetrics' in client) {
     return (client as OptimizedAPIClient).graphql<T>(query, variables, options);
   }
-  
+
   // Fallback to direct octokit.graphql for backward compatibility
   return (client as Octokit).graphql(query, variables) as Promise<T>;
 }
@@ -44,18 +44,18 @@ export async function smartGraphQL<T>(
   } = {}
 ): Promise<T> {
   const result = await cachedGraphQL<T>(client, query, variables, options);
-  
+
   // If this was a mutation and we have an OptimizedAPIClient, invalidate related cache entries
   if (options.isMutation && client && 'invalidateGraphQLCacheForMutation' in client) {
     (client as OptimizedAPIClient).invalidateGraphQLCacheForMutation(query, variables);
   }
-  
+
   return result;
 }
 
 /**
  * Type-safe wrapper for Octokit GraphQL queries
- * 
+ *
  * @param octokit - The Octokit instance
  * @param query - The GraphQL query string
  * @param variables - Variables for the query
@@ -68,7 +68,7 @@ export async function typedGraphQL<T>(
 ): Promise<T> {
   try {
     // Cast the octokit.graphql response to our typed structure
-    const response = await octokit.graphql(query, variables) as T;
+    const response = (await octokit.graphql(query, variables)) as T;
     return response;
   } catch (error) {
     // Handle GraphQL-specific errors
@@ -81,7 +81,7 @@ export async function typedGraphQL<T>(
         throw new Error(`GraphQL errors: ${errorMessages}`);
       }
     }
-    
+
     // Re-throw other errors as-is
     throw error;
   }
@@ -89,7 +89,7 @@ export async function typedGraphQL<T>(
 
 /**
  * Type-safe wrapper for GraphQL queries with validation
- * 
+ *
  * @param octokit - The Octokit instance
  * @param query - The GraphQL query string
  * @param variables - Variables for the query
@@ -103,11 +103,11 @@ export async function validatedGraphQL<T>(
   validator?: (data: any) => data is T
 ): Promise<T> {
   const result = await typedGraphQL<T>(octokit, query, variables);
-  
+
   if (validator && !validator(result)) {
     throw new Error('GraphQL response failed validation');
   }
-  
+
   return result;
 }
 
@@ -125,7 +125,7 @@ export async function batchCachedGraphQL<T>(
   const promises = queries.map(({ query, variables = {}, options = {} }) =>
     cachedGraphQL<T>(client, query, variables, options)
   );
-  
+
   return Promise.all(promises);
 }
 
@@ -138,24 +138,24 @@ export const GraphQLTTL = {
   REPOSITORY_INSIGHTS: 60 * 60 * 1000, // 1 hour
   REPOSITORY_INFO: 60 * 60 * 1000, // 1 hour
   LANGUAGES: 4 * 60 * 60 * 1000, // 4 hours
-  
+
   // Contributor data (moderate frequency changes)
   CONTRIBUTORS: 6 * 60 * 60 * 1000, // 6 hours
   COMMIT_ACTIVITY: 30 * 60 * 1000, // 30 minutes
-  
+
   // Discussion data
   DISCUSSION_CATEGORIES: 2 * 60 * 60 * 1000, // 2 hours
   DISCUSSIONS_LIST: 30 * 60 * 1000, // 30 minutes
   DISCUSSION_DETAIL: 30 * 60 * 1000, // 30 minutes
   DISCUSSION_COMMENTS: 15 * 60 * 1000, // 15 minutes
-  
+
   // Search results (short-lived)
   SEARCH_RESULTS: 15 * 60 * 1000, // 15 minutes
-  
+
   // Project management
   PROJECTS: 30 * 60 * 1000, // 30 minutes
   MILESTONES: 30 * 60 * 1000, // 30 minutes
-  
+
   // Default
   DEFAULT: 5 * 60 * 1000, // 5 minutes
 } as const;
@@ -165,19 +165,15 @@ export const GraphQLTTL = {
  */
 export function getQueryOperation(query: string): string {
   // Try to extract operation name from query
-  const patterns = [
-    /(?:query|mutation)\s+(\w+)/i,
-    /(\w+)\s*\(/,
-    /{\s*(\w+)/
-  ];
-  
+  const patterns = [/(?:query|mutation)\s+(\w+)/i, /(\w+)\s*\(/, /{\s*(\w+)/];
+
   for (const pattern of patterns) {
     const match = query.match(pattern);
     if (match && match[1]) {
       return match[1];
     }
   }
-  
+
   return 'unknown_operation';
 }
 
@@ -188,12 +184,16 @@ export function getQueryOperation(query: string): string {
 export function createGraphQLWrapper(client: OptimizedAPIClient | Octokit): {
   query: <T>(query: string, variables?: Record<string, any>, ttl?: number) => Promise<T>;
   mutate: <T>(mutation: string, variables?: Record<string, any>) => Promise<T>;
-  execute: <T>(query: string, variables?: Record<string, any>, options?: {
-    ttl?: number;
-    skipCache?: boolean;
-    operation?: string;
-    isMutation?: boolean;
-  }) => Promise<T>;
+  execute: <T>(
+    query: string,
+    variables?: Record<string, any>,
+    options?: {
+      ttl?: number;
+      skipCache?: boolean;
+      operation?: string;
+      isMutation?: boolean;
+    }
+  ) => Promise<T>;
   getClient: () => OptimizedAPIClient | Octokit;
 } {
   return {
@@ -201,28 +201,35 @@ export function createGraphQLWrapper(client: OptimizedAPIClient | Octokit): {
      * Execute a GraphQL query with automatic caching
      */
     query: <T>(query: string, variables?: Record<string, any>, ttl?: number) =>
-      cachedGraphQL<T>(client, query, variables || {}, { ttl, operation: getQueryOperation(query) }),
-    
+      cachedGraphQL<T>(client, query, variables || {}, {
+        ttl,
+        operation: getQueryOperation(query),
+      }),
+
     /**
      * Execute a GraphQL mutation with cache invalidation
      */
     mutate: <T>(mutation: string, variables?: Record<string, any>) =>
-      smartGraphQL<T>(client, mutation, variables || {}, { 
+      smartGraphQL<T>(client, mutation, variables || {}, {
         isMutation: true,
         skipCache: true, // Don't cache mutations
-        operation: getQueryOperation(mutation)
+        operation: getQueryOperation(mutation),
       }),
-    
+
     /**
      * Execute a GraphQL query with custom options
      */
-    execute: <T>(query: string, variables?: Record<string, any>, options?: {
-      ttl?: number;
-      skipCache?: boolean;
-      operation?: string;
-      isMutation?: boolean;
-    }) => smartGraphQL<T>(client, query, variables || {}, options || {}),
-    
+    execute: <T>(
+      query: string,
+      variables?: Record<string, any>,
+      options?: {
+        ttl?: number;
+        skipCache?: boolean;
+        operation?: string;
+        isMutation?: boolean;
+      }
+    ) => smartGraphQL<T>(client, query, variables || {}, options || {}),
+
     /**
      * Get the underlying client (for direct access when needed)
      */
@@ -267,13 +274,19 @@ export const GraphQLQueries = {
     `,
     variables: { owner, repo },
     operation: 'GetRepositoryInsights',
-    ttl: GraphQLTTL.REPOSITORY_INSIGHTS
+    ttl: GraphQLTTL.REPOSITORY_INSIGHTS,
   }),
-  
+
   /**
    * Discussion list query
    */
-  discussionsList: (owner: string, repo: string, first: number = 25, after?: string, categoryId?: string) => ({
+  discussionsList: (
+    owner: string,
+    repo: string,
+    first: number = 25,
+    after?: string,
+    categoryId?: string
+  ) => ({
     query: `
       query ListDiscussions($owner: String!, $repo: String!, $first: Int!, $after: String, $categoryId: ID) {
         repository(owner: $owner, name: $repo) {
@@ -293,9 +306,9 @@ export const GraphQLQueries = {
     `,
     variables: { owner, repo, first, after, categoryId },
     operation: 'ListDiscussions',
-    ttl: GraphQLTTL.DISCUSSIONS_LIST
+    ttl: GraphQLTTL.DISCUSSIONS_LIST,
   }),
-  
+
   /**
    * Contributor stats query
    */
@@ -332,9 +345,9 @@ export const GraphQLQueries = {
       }
     `,
     variables: { owner, repo, first },
-    operation: 'GetContributorStats', 
-    ttl: GraphQLTTL.CONTRIBUTORS
-  })
+    operation: 'GetContributorStats',
+    ttl: GraphQLTTL.CONTRIBUTORS,
+  }),
 };
 
 /**
@@ -352,7 +365,7 @@ export function createTypedHandler<TParams, TResult>(
 
 /**
  * Utility for paginated GraphQL queries
- * 
+ *
  * @param octokit - The Octokit instance
  * @param baseQuery - The base GraphQL query template
  * @param variables - Base variables for the query
@@ -360,7 +373,9 @@ export function createTypedHandler<TParams, TResult>(
  * @param maxPages - Maximum number of pages to fetch
  * @returns Array of all fetched items
  */
-export async function paginatedGraphQL<T extends { pageInfo: { hasNextPage: boolean; endCursor: string | null } }>(
+export async function paginatedGraphQL<
+  T extends { pageInfo: { hasNextPage: boolean; endCursor: string | null } },
+>(
   octokit: Octokit,
   baseQuery: string,
   variables: Record<string, any> = {},
@@ -392,17 +407,13 @@ export async function paginatedGraphQL<T extends { pageInfo: { hasNextPage: bool
 
 /**
  * Create a safe property accessor for nested GraphQL responses
- * 
+ *
  * @param obj - The object to access
  * @param path - Array of property names to traverse
  * @param defaultValue - Default value if path doesn't exist
  * @returns The value at the path or default value
  */
-export function safeAccess<T>(
-  obj: any,
-  path: string[],
-  defaultValue: T
-): T {
+export function safeAccess<T>(obj: any, path: string[], defaultValue: T): T {
   let current = obj;
   for (const key of path) {
     if (current == null || typeof current !== 'object') {
@@ -415,15 +426,12 @@ export function safeAccess<T>(
 
 /**
  * Validates that a response contains expected fields
- * 
+ *
  * @param response - The response to validate
  * @param requiredFields - Array of required field paths
  * @returns True if all fields are present
  */
-export function validateResponseFields(
-  response: any,
-  requiredFields: string[][]
-): boolean {
+export function validateResponseFields(response: any, requiredFields: string[][]): boolean {
   return requiredFields.every(path => {
     let current = response;
     for (const key of path) {
@@ -438,7 +446,7 @@ export function validateResponseFields(
 
 /**
  * Transform GraphQL error to a user-friendly message
- * 
+ *
  * @param error - The error from GraphQL operation
  * @returns User-friendly error message
  */
@@ -449,10 +457,10 @@ export function formatGraphQLError(error: any): string {
       return errors.map(err => err.message || 'Unknown GraphQL error').join('; ');
     }
   }
-  
+
   if (error?.message) {
     return error.message;
   }
-  
+
   return 'An unknown error occurred while executing GraphQL query';
 }

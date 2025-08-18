@@ -13,8 +13,7 @@ export class ErrorHandler {
       throw error;
     }
 
-    const messageFrom = (msg: string) =>
-      new Error(`${context}: ${msg}`, { cause: error });
+    const messageFrom = (msg: string) => new Error(`${context}: ${msg}`, { cause: error });
 
     if (error?.status === 404) {
       throw messageFrom('Resource not found');
@@ -31,7 +30,13 @@ export class ErrorHandler {
     if (error?.status === 422) {
       const message = error?.response?.data?.message || 'Validation failed';
       const errors = Array.isArray(error?.response?.data?.errors) ? error.response.data.errors : [];
-      const errorDetails = errors.length > 0 ? `: ${errors.map((e: any) => e?.message).filter(Boolean).join(', ')}` : '';
+      const errorDetails =
+        errors.length > 0
+          ? `: ${errors
+              .map((e: any) => e?.message)
+              .filter(Boolean)
+              .join(', ')}`
+          : '';
       throw messageFrom(`${message}${errorDetails}`);
     }
 
@@ -39,17 +44,17 @@ export class ErrorHandler {
       throw messageFrom(`GitHub API error (${error.status}): ${error.message}`);
     }
 
-    const fallbackMsg = typeof error?.message === 'string' && error.message.length > 0 ? error.message : 'Unknown error';
+    const fallbackMsg =
+      typeof error?.message === 'string' && error.message.length > 0
+        ? error.message
+        : 'Unknown error';
     throw messageFrom(fallbackMsg);
   }
 
   /**
    * Wrap async operations with error handling
    */
-  static async withErrorHandling<T>(
-    operation: () => Promise<T>,
-    context: string
-  ): Promise<T> {
+  static async withErrorHandling<T>(operation: () => Promise<T>, context: string): Promise<T> {
     try {
       return await operation();
     } catch (error) {
@@ -76,7 +81,10 @@ export function withErrorHandling(context: string) {
       try {
         return await originalMethod.apply(this, args);
       } catch (error) {
-        ErrorHandler.handleGitHubError(error, `${target.constructor.name}.${propertyKey} (${context})`);
+        ErrorHandler.handleGitHubError(
+          error,
+          `${target.constructor.name}.${propertyKey} (${context})`
+        );
       }
     };
 

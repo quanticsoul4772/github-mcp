@@ -46,7 +46,7 @@ export function extractPagination(params: PaginationParams): {
  */
 export function mapUser(user: SimpleUser | null | undefined): any {
   if (!user) return null;
-  
+
   return {
     login: user.login,
     id: user.id,
@@ -153,18 +153,22 @@ export function mapPullRequest(pr: PullRequest): any {
     comments: pr.comments,
     review_comments: pr.review_comments,
     maintainer_can_modify: pr.maintainer_can_modify,
-    head: pr.head ? {
-      label: pr.head.label,
-      ref: pr.head.ref,
-      sha: pr.head.sha,
-      user: mapUser(pr.head.user),
-    } : undefined,
-    base: pr.base ? {
-      label: pr.base.label,
-      ref: pr.base.ref,
-      sha: pr.base.sha,
-      user: mapUser(pr.base.user),
-    } : undefined,
+    head: pr.head
+      ? {
+          label: pr.head.label,
+          ref: pr.head.ref,
+          sha: pr.head.sha,
+          user: mapUser(pr.head.user),
+        }
+      : undefined,
+    base: pr.base
+      ? {
+          label: pr.base.label,
+          ref: pr.base.ref,
+          sha: pr.base.sha,
+          user: mapUser(pr.base.user),
+        }
+      : undefined,
   };
 }
 
@@ -208,7 +212,10 @@ export function encodeBase64Content(content: string): string {
  */
 export function parseCommaSeparated(value: string | undefined): string[] {
   if (!value) return [];
-  return value.split(',').map(v => v.trim()).filter(Boolean);
+  return value
+    .split(',')
+    .map(v => v.trim())
+    .filter(Boolean);
 }
 
 /**
@@ -218,12 +225,12 @@ export function formatFileSize(bytes: number): string {
   const units = ['B', 'KB', 'MB', 'GB'];
   let size = bytes;
   let unitIndex = 0;
-  
+
   while (size >= 1024 && unitIndex < units.length - 1) {
     size /= 1024;
     unitIndex++;
   }
-  
+
   return `${size.toFixed(2)} ${units[unitIndex]}`;
 }
 
@@ -249,9 +256,11 @@ export function isNotFoundError(error: any): boolean {
  * Check if error is a rate limit error
  */
 export function isRateLimitError(error: any): boolean {
-  return error?.status === 429 || 
-         error?.response?.status === 429 ||
-         error?.response?.headers?.['x-ratelimit-remaining'] === '0';
+  return (
+    error?.status === 429 ||
+    error?.response?.status === 429 ||
+    error?.response?.headers?.['x-ratelimit-remaining'] === '0'
+  );
 }
 
 /**
@@ -271,16 +280,16 @@ export function parseLinkHeader(linkHeader: string | undefined): {
   last?: number;
 } {
   if (!linkHeader) return {};
-  
+
   const links: any = {};
   const parts = linkHeader.split(',');
-  
+
   for (const part of parts) {
     const match = part.match(/<[^>]*[?&]page=(\d+)[^>]*>;\s*rel="(\w+)"/);
     if (match) {
       links[match[2]] = parseInt(match[1], 10);
     }
   }
-  
+
   return links;
 }

@@ -40,10 +40,11 @@ describe('GraphQLCache', () => {
     });
 
     it('should generate consistent cache keys for identical queries', async () => {
-      const query = 'query GetRepo($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { name } }';
+      const query =
+        'query GetRepo($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { name } }';
       const variables1 = { owner: 'test', name: 'repo' };
       const variables2 = { name: 'repo', owner: 'test' }; // Different order
-      
+
       const fetcher1 = vi.fn().mockResolvedValue({ result: 'test1' });
       const fetcher2 = vi.fn().mockResolvedValue({ result: 'test2' });
 
@@ -76,7 +77,7 @@ describe('GraphQLCache', () => {
     it('should use configured TTL for specific query types', async () => {
       const repositoryQuery = 'query GetRepository { repository { name } }';
       const searchQuery = 'query SearchDiscussions { search { nodes } }';
-      
+
       const repoFetcher = vi.fn().mockResolvedValue({ repository: { name: 'test' } });
       const searchFetcher = vi.fn().mockResolvedValue({ search: { nodes: [] } });
 
@@ -127,7 +128,7 @@ describe('GraphQLCache', () => {
 
       // Invalidate repository-related queries
       const invalidated = cache.invalidate(/repository/i);
-      
+
       expect(invalidated).toBe(2);
       expect(cache.size()).toBe(1);
     });
@@ -140,7 +141,7 @@ describe('GraphQLCache', () => {
       expect(cache.size()).toBe(2);
 
       cache.clear();
-      
+
       expect(cache.size()).toBe(0);
       const metrics = cache.getMetrics();
       expect(metrics.size).toBe(0);
@@ -185,9 +186,9 @@ describe('GraphQLCache', () => {
 
       // Then simulate error with fresh fetcher - should return stale data
       const errorFetcher = vi.fn().mockRejectedValue(new Error('API Error'));
-      
+
       const result = await cache.get(query, variables, errorFetcher);
-      
+
       expect(result).toEqual(staleData);
       expect(errorFetcher).toHaveBeenCalledTimes(1);
     });
@@ -195,12 +196,10 @@ describe('GraphQLCache', () => {
     it('should throw error if no stale data available', async () => {
       const query = 'query { test }';
       const variables = {};
-      
+
       const errorFetcher = vi.fn().mockRejectedValue(new Error('API Error'));
-      
-      await expect(cache.get(query, variables, errorFetcher))
-        .rejects
-        .toThrow('API Error');
+
+      await expect(cache.get(query, variables, errorFetcher)).rejects.toThrow('API Error');
     });
   });
 
@@ -212,7 +211,7 @@ describe('GraphQLCache', () => {
 
       // Cache miss
       await cache.get(query, variables, fetcher);
-      
+
       // Cache hit
       await cache.get(query, variables, fetcher);
       await cache.get(query, variables, fetcher);
@@ -235,7 +234,7 @@ describe('GraphQLCache', () => {
       }
 
       const stats = cache.getDetailedStats();
-      
+
       expect(stats.topQueries).toHaveLength(2);
       expect(stats.topQueries[0].hits).toBe(1);
       expect(stats.topQueries[0].misses).toBe(1);
@@ -248,7 +247,7 @@ describe('GraphQLCache', () => {
       await cache.get('query2', {}, vi.fn().mockResolvedValue({ data: 'test2' }));
 
       const stats = cache.getDetailedStats();
-      
+
       expect(stats.memorySummary.entries).toBe(2);
       expect(stats.memorySummary.estimatedSize).toContain('KB');
       expect(stats.general.size).toBe(2);
@@ -258,7 +257,7 @@ describe('GraphQLCache', () => {
   describe('Cleanup functionality', () => {
     it('should clean up expired entries', async () => {
       const shortTTL = 50; // 50ms
-      
+
       // Add entries with short TTL
       await cache.get('query1', {}, vi.fn().mockResolvedValue({ data: '1' }), { ttl: shortTTL });
       await cache.get('query2', {}, vi.fn().mockResolvedValue({ data: '2' }), { ttl: 10000 }); // Long TTL
@@ -269,7 +268,7 @@ describe('GraphQLCache', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       const removed = cache.cleanup();
-      
+
       expect(removed).toBe(1);
       expect(cache.size()).toBe(1);
     });
