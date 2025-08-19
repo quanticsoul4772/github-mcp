@@ -1,0 +1,52 @@
+# TruffleHog ignore file
+# This file tells TruffleHog to ignore certain files or patterns when scanning for secrets
+
+# Test files that contain mock credentials
+**/*.test.ts
+**/*.spec.ts
+**/__tests__/**
+**/test/**
+**/tests/**
+**/spec/**
+**/fixtures/**
+**/mocks/**
+
+# Test constants file (contains documented mock values)
+src/test-constants.ts
+
+# Configuration files that might contain example values
+**/.env.example
+**/.env.template
+**/example.env
+**/sample.env
+**/*.example
+**/*.template
+
+# Documentation that might contain example tokens
+docs/**
+README.md
+CONTRIBUTING.md
+*.md
+
+# Build and temporary files
+build/**
+dist/**
+node_modules/**
+.git/**
+coverage/**
+*.log
+
+# Package files that might contain hashes
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Ignore specific patterns that are known false positives
+# GitHub token patterns in test files
+.*ghp_[A-Za-z0-9_]{36}.*\.test\.ts$
+.*github_pat_[A-Za-z0-9_]{70,}.*\.test\.ts$
+.*ghs_[A-Za-z0-9_]{36}.*\.test\.ts$
+.*ghr_[A-Za-z0-9_]{36}.*\.test\.ts$
+
+# Mock JWT tokens for testing
+.*eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9\.mock\..*
