@@ -94,8 +94,8 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/node": "^24.2.1",
-    "@typescript-eslint/eslint-plugin": "^8.17.0",
+    "@types/node": "^24.3.0",
+    "@typescript-eslint/eslint-plugin": "^8.40.0",
     "@typescript-eslint/parser": "^8.17.0",
     "@vitest/ui": "3.2.4",
     "better-npm-audit": "^3.11.0",
