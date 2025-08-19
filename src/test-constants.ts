@@ -51,7 +51,7 @@ export const TEST_CONSTANTS = {
   MOCK_WEBHOOK_SECRET: 'mock_webhook_secret_for_testing',
   
   // Mock JWT tokens for GitHub Apps
-  MOCK_JWT_TOKEN: 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.mock.payload.signature',
+  MOCK_JWT_TOKEN: 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJNT0NLX1VTRVIiLCJpc3MiOiJURVNUX0lTU1VFUiJ9.MOCK_SIGNATURE_FOR_TESTING_ONLY',
   
   // Environment variable names (not values) for reference
   ENV_VARS: {

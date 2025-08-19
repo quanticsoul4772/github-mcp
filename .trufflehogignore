@@ -47,3 +47,6 @@ pnpm-lock.yaml
 .*github_pat_[A-Za-z0-9_]{70,}.*\.test\.ts$
 .*ghs_[A-Za-z0-9_]{36}.*\.test\.ts$
 .*ghr_[A-Za-z0-9_]{36}.*\.test\.ts$
+
+# Mock JWT tokens for testing
+.*eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9\.mock\..*

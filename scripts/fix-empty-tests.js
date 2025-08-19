@@ -3,6 +3,10 @@
 /**
  * Script to find and fix test files that have no assertions
  * This addresses the CI issue where 752 tests have no assertions
+ * 
+ * Usage:
+ *   node scripts/fix-empty-tests.js           # Fix empty tests
+ *   node scripts/fix-empty-tests.js --dry-run # Show what would be fixed without making changes
  */
 
 const fs = require('fs');
@@ -105,7 +109,6 @@ function fixEmptyTests(filePath, emptyTests) {
     const testLines = lines.slice(test.startLine, test.endLine + 1);
     
     // Find the last meaningful line before the closing brace
-    let insertIndex = test.endLine - 1;
     // Insert just before the closing brace of the test block to ensure reachability
     let insertIndex = test.endLine - 1;
     // Move upwards to the last line that is not just the block closer
@@ -139,7 +142,15 @@ function fixEmptyTests(filePath, emptyTests) {
  * Process all test files
  */
 async function main() {
-  console.log('🔍 Finding test files without assertions...');
+  // Parse command line arguments
+  const args = process.argv.slice(2);
+  const isDryRun = args.includes('--dry-run') || args.includes('-n');
+  
+  if (isDryRun) {
+    console.log('🔍 DRY RUN: Finding test files without assertions (no changes will be made)...');
+  } else {
+    console.log('🔍 Finding test files without assertions...');
+  }
   
   try {
     // Find all test files
@@ -168,25 +179,39 @@ async function main() {
           console.log(`   - ... and ${emptyTests.length - 3} more`);
         }
         
-        // Fix the tests by adding placeholder assertions
-        const fixedContent = fixEmptyTests(filePath, emptyTests);
-        
-        // Write the fixed content back
-        fs.writeFileSync(filePath, fixedContent, 'utf8');
-        console.log(`   ✅ Added ${emptyTests.length} placeholder assertions`);
+        if (!isDryRun) {
+          // Fix the tests by adding placeholder assertions
+          const fixedContent = fixEmptyTests(filePath, emptyTests);
+          
+          // Write the fixed content back
+          fs.writeFileSync(filePath, fixedContent, 'utf8');
+          console.log(`   ✅ Added ${emptyTests.length} placeholder assertions`);
+        } else {
+          console.log(`   🔍 Would add ${emptyTests.length} placeholder assertions (dry run)`);
+        }
       }
     }
     
     console.log(`\n📊 Summary:`);
     console.log(`   - Files processed: ${testFiles.length}`);
     console.log(`   - Files with empty tests: ${filesWithEmptyTests}`);
-    console.log(`   - Total empty tests fixed: ${totalEmptyTests}`);
     
-    if (totalEmptyTests > 0) {
-      console.log(`\n⚠️  Note: Added placeholder assertions. Please replace with proper test logic.`);
-      console.log(`   Search for "TODO: Add proper assertion" to find them.`);
+    if (isDryRun) {
+      console.log(`   - Total empty tests found: ${totalEmptyTests}`);
+      if (totalEmptyTests > 0) {
+        console.log(`\n🔍 DRY RUN: Would have added placeholder assertions to ${totalEmptyTests} tests.`);
+        console.log(`   Run without --dry-run to make actual changes.`);
+      } else {
+        console.log(`\n✅ No empty tests found!`);
+      }
     } else {
-      console.log(`\n✅ No empty tests found!`);
+      console.log(`   - Total empty tests fixed: ${totalEmptyTests}`);
+      if (totalEmptyTests > 0) {
+        console.log(`\n⚠️  Note: Added placeholder assertions. Please replace with proper test logic.`);
+        console.log(`   Search for "TODO: Add proper assertion" to find them.`);
+      } else {
+        console.log(`\n✅ No empty tests found!`);
+      }
     }
     
   } catch (error) {
