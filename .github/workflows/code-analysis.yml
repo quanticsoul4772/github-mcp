@@ -523,7 +523,7 @@ jobs:
 
       - name: Create PR with generated tests
         if: github.event_name == 'schedule' || github.event.inputs.generate_tests == 'true'
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: 'test: add generated test cases for uncovered files'
