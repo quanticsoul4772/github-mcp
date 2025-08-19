@@ -114,8 +114,13 @@ function fixEmptyTests(filePath, emptyTests) {
       /^\s*\}?[\);\s]*$/.test(lines[insertIndex])
     ) {
       insertIndex--;
-    }
-    // Ensure we don't insert after an early exit; if last non-closing is return/throw, insert above it
+    // Determine indentation from the line where the test block starts
+    const openingLine = lines[test.startLine] || '';
+    const baseIndentMatch = openingLine.match(/^(\s+)/);
+    const baseIndent = baseIndentMatch ? baseIndentMatch[1] : '';
+    const extraIndent = '  '; // add one level inside the block
+    const indentation = baseIndent + extraIndent;
+    const placeholderAssertion = `${indentation}expect(true).toBe(true); // TODO: Add proper assertion for: ${test.name}`;
     if (/\b(return|throw)\b/.test(lines[insertIndex])) {
       insertIndex--;
     }
