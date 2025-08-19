@@ -1,0 +1,41 @@
+# Semgrep ignore file
+# This file tells Semgrep to ignore certain files or patterns when scanning
+
+# Test files that contain mock credentials and test patterns
+**/*.test.ts
+**/*.spec.ts
+**/__tests__/**
+**/test/**
+**/tests/**
+**/spec/**
+**/fixtures/**
+**/mocks/**
+
+# Test constants file (contains documented mock values)
+src/test-constants.ts
+
+# Configuration files
+**/.env.example
+**/.env.template
+**/example.env
+**/sample.env
+
+# Documentation
+docs/**
+README.md
+CONTRIBUTING.md
+*.md
+
+# Build outputs
+build/**
+dist/**
+node_modules/**
+coverage/**
+
+# Ignore specific rules for test files
+# rules:
+#   - id: javascript.lang.security.audit.hardcoded-secret
+#     paths:
+#       include:
+#         - "**/*.test.ts"
+#         - "**/__tests__/**"

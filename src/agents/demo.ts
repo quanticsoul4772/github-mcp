@@ -118,19 +118,140 @@ class Calculator {
 
   // Security vulnerability fixed - use safer alternative
   evaluateExpression(expr: string): any {
-    // Instead of eval, use a safe expression evaluator
-    // For demo purposes, just parse and evaluate simple math expressions
+    // Safe expression evaluator for demo purposes
+    // Only supports basic math expressions - no code execution
     try {
-      // Only allow numbers and basic math operators
+      // Strict whitelist: only allow numbers, spaces, and basic math operators
       if (!/^[\d\s+\-*/().]+$/.test(expr)) {
-        throw new Error('Invalid expression');
+        throw new Error('Invalid expression: Only numbers and basic math operators (+, -, *, /, parentheses) are allowed');
       }
-      // Use Function constructor as a safer alternative for simple math
-      return new Function('return ' + expr)();
+      
+      // Additional validation: check for suspicious patterns
+      if (expr.includes('..') || expr.length > 100) {
+        throw new Error('Invalid expression: Expression too complex or contains invalid patterns');
+      }
+      
+      // Use a safer evaluation approach with a math library or parser
+      // For now, implement basic arithmetic parsing manually
+      return this.safeArithmeticEval(expr.trim());
     } catch (error) {
       logger.error('Expression evaluation failed', { expr }, error as Error);
       throw new Error('Failed to evaluate expression safely');
     }
+  }
+
+  private safeArithmeticEval(expr: string): number {
+    // Remove all spaces
+    expr = expr.replace(/\s/g, '');
+    
+    // Simple recursive descent parser for arithmetic expressions
+    // This is much safer than using eval() or Function()
+    let pos = 0;
+    
+    const parseExpression = (): number => {
+      let result = parseTerm();
+      
+      while (pos < expr.length) {
+        const op = expr[pos];
+        if (op === '+' || op === '-') {
+          pos++;
+          const term = parseTerm();
+          result = op === '+' ? result + term : result - term;
+        } else {
+          break;
+        }
+      }
+      
+      return result;
+    };
+    
+    const parseTerm = (): number => {
+      let result = parseFactor();
+      
+      while (pos < expr.length) {
+        const op = expr[pos];
+        if (op === '*' || op === '/') {
+          pos++;
+          const factor = parseFactor();
+          if (op === '/') {
+            if (factor === 0) throw new Error('Division by zero');
+            result = result / factor;
+          } else {
+            result = result * factor;
+          }
+        } else {
+          break;
+        }
+      }
+      
+      return result;
+    };
+    
+    const parseFactor = (): number => {
+      if (pos >= expr.length) {
+        throw new Error('Unexpected end of expression');
+      }
+      
+      if (expr[pos] === '(') {
+        pos++; // skip '('
+        const result = parseExpression();
+        if (pos >= expr.length || expr[pos] !== ')') {
+          throw new Error('Missing closing parenthesis');
+        }
+        pos++; // skip ')'
+        return result;
+      }
+      
+      if (expr[pos] === '-') {
+        pos++; // skip '-'
+        return -parseFactor();
+      }
+      
+      if (expr[pos] === '+') {
+        pos++; // skip '+'
+        return parseFactor();
+      }
+      
+      return parseNumber();
+    };
+    
+    const parseNumber = (): number => {
+      const start = pos;
+      
+      // Parse integer part
+      while (pos < expr.length && /\d/.test(expr[pos])) {
+        pos++;
+      }
+      
+      // Parse decimal part
+      if (pos < expr.length && expr[pos] === '.') {
+        pos++;
+        while (pos < expr.length && /\d/.test(expr[pos])) {
+          pos++;
+        }
+      }
+      
+      if (start === pos) {
+        throw new Error('Expected number at position ' + pos);
+      }
+      
+      const numStr = expr.substring(start, pos);
+      const num = parseFloat(numStr);
+      
+      if (isNaN(num)) {
+        throw new Error('Invalid number: ' + numStr);
+      }
+      
+      return num;
+    };
+    
+    const result = parseExpression();
+    
+    if (pos < expr.length) {
+      throw new Error('Unexpected character at position ' + pos + ': ' + expr[pos]);
+    }
+    
+    return result;
   }
 
   // Fixed: Properly handle file resources
