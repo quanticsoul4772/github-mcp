@@ -106,10 +106,17 @@ function fixEmptyTests(filePath, emptyTests) {
     
     // Find the last meaningful line before the closing brace
     let insertIndex = test.endLine - 1;
-    while (insertIndex > test.startLine && 
-           (lines[insertIndex].trim() === '' || 
-            lines[insertIndex].trim() === '}' ||
-            lines[insertIndex].trim() === '});')) {
+    // Insert just before the closing brace of the test block to ensure reachability
+    let insertIndex = test.endLine - 1;
+    // Move upwards to the last line that is not just the block closer
+    while (
+      insertIndex > test.startLine &&
+      /^\s*\}?[\);\s]*$/.test(lines[insertIndex])
+    ) {
+      insertIndex--;
+    }
+    // Ensure we don't insert after an early exit; if last non-closing is return/throw, insert above it
+    if (/\b(return|throw)\b/.test(lines[insertIndex])) {
       insertIndex--;
     }
     
