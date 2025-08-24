@@ -13,7 +13,7 @@ import {
   RateLimitError,
   normalizeError,
 } from '../../errors.js';
-import { validateGitHubToken } from '../../validation.js';
+import { validateGitHubToken } from '../../config.js';
 import { config } from 'dotenv';
 
 // Load .env file to get GITHUB_TEST_TOKEN

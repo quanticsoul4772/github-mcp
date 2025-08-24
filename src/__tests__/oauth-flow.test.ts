@@ -3,7 +3,7 @@
  * Tests OAuth authentication flow components and security
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { validateGitHubToken } from '../validation.js';
+import { validateGitHubToken } from '../config.js';
 import { AuthenticationError, AuthorizationError } from '../errors.js';
 
 describe('OAuth Flow Testing Infrastructure', () => {

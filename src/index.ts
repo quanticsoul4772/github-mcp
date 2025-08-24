@@ -12,29 +12,8 @@ import {
 } from './rate-limiter.js';
 
 // Environment configuration
-import { env, getGitHubToken, getEnabledToolsets, displayConfig } from './env.js';
-import { validateEnvironmentConfiguration } from './validation.js';
-
-// Tool modules
-import { createRepositoryTools } from './tools/repositories.js';
-import { createIssueTools } from './tools/issues.js';
-import { createPullRequestTools } from './tools/pull-requests.js';
-import { createActionTools } from './tools/actions.js';
-import { createCodeSecurityTools } from './tools/code-security.js';
-import { createSearchTools } from './tools/search.js';
-import { createUserTools } from './tools/users.js';
-import { createOrganizationTools } from './tools/organizations.js';
-import { createNotificationTools } from './tools/notifications.js';
-import { createDiscussionTools } from './tools/discussions.js';
-import { createDependabotTools } from './tools/dependabot.js';
-import { createSecretScanningTools } from './tools/secret-scanning.js';
-import { createRepositoryInsightsTools } from './tools/repository-insights.js';
-import { createAdvancedSearchTools } from './tools/advanced-search.js';
-import { createProjectManagementTools } from './tools/project-management.js';
-import { createBatchOperationsTools } from './tools/batch-operations.js';
-import { createOptimizedRepositoryTools } from './tools/optimized-repositories.js';
-import { createAgentTools } from './agents/tools/agent-tools.js';
-import { createCacheManagementTools } from './tools/cache-management.js';
+import { config, getGitHubToken, getEnabledToolsets, displayConfig } from './config.js';
+import { ToolRegistry } from './tool-registry.js';
 
 // Performance optimizations
 import { OptimizedAPIClient } from './optimized-api-client.js';
@@ -74,14 +53,8 @@ export class GitHubMCPServer {
   private rateLimiter: GitHubRateLimiter;
   /** Optimized API client with performance features */
   private optimizedClient: OptimizedAPIClient;
-  /** Set of enabled toolsets */
-  private enabledToolsets: Set<string>;
   /** Whether the server is running in read-only mode */
   private readOnly: boolean;
-  /** Set of registered tool names to prevent duplicates */
-  private registeredTools = new Set<string>();
-  /** Total count of registered tools */
-  private toolCount = 0;
   /** Reliability manager for circuit breaker and retry logic */
   private reliabilityManager: ReliabilityManager;
   /** Health manager for system monitoring */
@@ -94,6 +67,10 @@ export class GitHubMCPServer {
    * parses environment variables, and registers tools.
    */
   constructor(testMode: boolean = false) {
+    // The 'config' object is initialized on import and will throw an error
+    // if validation fails. The try/catch in the config module handles logging
+    // and process exit for non-test environments.
+
     // Initialize monitoring first
     logger.info('Starting GitHub MCP Server', {
       version: SERVER_VERSION,
@@ -107,30 +84,8 @@ export class GitHubMCPServer {
       description: 'GitHub API integration for MCP',
     });
 
-    // Validate environment configuration for security
-    const envValidation = validateEnvironmentConfiguration();
-    if (!envValidation.isValid) {
-      logger.error('Environment configuration validation failed', {
-        errors: envValidation.errors,
-      });
-
-      // Environment validation errors are already logged via logger.error above
-      // Removed console.error statements to avoid breaking MCP protocol
-
-      // Don't exit in test environment
-      if (!testMode && process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
-        process.exit(1);
-      } else if (testMode) {
-        // In test mode, throw an error instead of exiting
-        logger.warn(
-          'Environment validation failed (test mode): ' + envValidation.errors.join(', ')
-        );
-        throw new Error('Environment validation failed: ' + envValidation.errors.join(', '));
-      }
-    }
-
     // Get token from environment configuration
-    const token = getGitHubToken() || envValidation.sanitizedValues.GITHUB_TOKEN;
+    const token = getGitHubToken();
 
     // Create rate-limited Octokit instance with logging
     const rateLimitedSetup = createRateLimitedOctokit(token);
@@ -138,10 +93,10 @@ export class GitHubMCPServer {
     this.rateLimiter = rateLimitedSetup.rateLimiter;
 
     // Configure base URL if using GitHub Enterprise
-    if (env.GITHUB_HOST) {
+    if (config.GITHUB_HOST) {
       this.octokit = new Octokit({
         auth: token,
-        baseUrl: env.GITHUB_HOST,
+        baseUrl: config.GITHUB_HOST,
       });
     }
 
@@ -176,20 +131,19 @@ export class GitHubMCPServer {
     // Initialize optimized API client
     this.optimizedClient = new OptimizedAPIClient({
       octokit: this.octokit,
-      enableCache: process.env.GITHUB_ENABLE_CACHE !== 'false',
-      enableGraphQLCache: process.env.GITHUB_ENABLE_GRAPHQL_CACHE !== 'false',
-      enableDeduplication: process.env.GITHUB_ENABLE_DEDUPLICATION !== 'false',
-      enablePerformanceMonitoring: process.env.GITHUB_ENABLE_MONITORING !== 'false',
+      enableCache: config.GITHUB_ENABLE_CACHE,
+      enableGraphQLCache: config.GITHUB_ENABLE_GRAPHQL_CACHE,
+      enableDeduplication: config.GITHUB_ENABLE_DEDUPLICATION,
+      enablePerformanceMonitoring: config.GITHUB_ENABLE_MONITORING,
     });
 
     // Parse configuration from validated environment
-    this.readOnly = env.GITHUB_READ_ONLY;
-    this.enabledToolsets = new Set(getEnabledToolsets());
+    this.readOnly = config.GITHUB_READ_ONLY;
 
     // Initialize reliability infrastructure
-    const enableVerboseTelemetry = process.env.GITHUB_TELEMETRY_VERBOSE === 'true';
+    const enableVerboseTelemetry = config.GITHUB_TELEMETRY_VERBOSE;
     const telemetry =
-      process.env.GITHUB_TELEMETRY_DISABLE === 'true'
+      config.GITHUB_TELEMETRY_DISABLE
         ? new NoOpTelemetry()
         : new ConsoleTelemetry(enableVerboseTelemetry);
 
@@ -201,12 +155,21 @@ export class GitHubMCPServer {
     this.setupRequestInterception();
 
     // Register all tools
-    this.registerTools();
+    const toolRegistry = new ToolRegistry(
+        this.server,
+        this.octokit,
+        this.optimizedClient,
+        this.reliabilityManager,
+        this.healthManager,
+        this.rateLimiter,
+        this.readOnly,
+    );
+    toolRegistry.registerAllTools();
 
     logger.info('GitHub MCP Server initialized', {
       readOnly: this.readOnly,
-      toolsets: Array.from(this.enabledToolsets),
-      toolCount: this.toolCount,
+      toolsets: getEnabledToolsets(),
+      toolCount: toolRegistry.toolCount,
     });
   }
 
@@ -242,423 +205,6 @@ export class GitHubMCPServer {
     });
   }
 
-  /**
-   * Convert a JSON Schema to a Zod schema for validation
-   *
-   * @param schema - The JSON schema to convert
-   * @returns A Zod schema object for input validation
-   */
-  private convertSchemaToZod(schema: JSONSchema): Record<string, z.ZodType> {
-    if (!schema?.properties) {
-      return {};
-    }
-
-    const zodSchema: Record<string, z.ZodType> = {};
-    for (const [key, value] of Object.entries(schema.properties)) {
-      const prop = value as JSONSchemaProperty;
-      let zodType: z.ZodType;
-
-      if (prop.type === 'string') {
-        zodType = z.string();
-      } else if (prop.type === 'number') {
-        zodType = z.number();
-      } else if (prop.type === 'boolean') {
-        zodType = z.boolean();
-      } else if (prop.type === 'array') {
-        // Try to infer array element type from items property
-        if (prop.items) {
-          if (prop.items.type === 'string') {
-            zodType = z.array(z.string());
-          } else if (prop.items.type === 'number') {
-            zodType = z.array(z.number());
-          } else if (prop.items.type === 'boolean') {
-            zodType = z.array(z.boolean());
-          } else if (prop.items.type === 'object') {
-            zodType = z.array(z.object({}));
-          } else {
-            zodType = z.array(z.unknown());
-          }
-        } else {
-          zodType = z.array(z.unknown());
-        }
-      } else if (prop.type === 'object') {
-        zodType = z.object({});
-      } else {
-        zodType = z.unknown();
-      }
-
-      if (prop.description) {
-        zodType = zodType.describe(prop.description);
-      }
-
-      // Handle optional fields
-      if (!schema.required || !schema.required.includes(key)) {
-        zodType = zodType.optional();
-      }
-
-      zodSchema[key] = zodType;
-    }
-
-    return zodSchema;
-  }
-
-  /**
-   * Register a tool configuration with the MCP server
-   *
-   * @param config - Tool configuration object containing tool definition and handler
-   */
-  private registerTool(config: ToolConfig<unknown, unknown>): void {
-    // Skip if tool name is already registered (prevent duplicates)
-    if (this.registeredTools.has(config.tool.name)) {
-      logger.warn(`Tool ${config.tool.name} is already registered. Skipping duplicate.`);
-      return;
-    }
-
-    // Convert the JSON schema to Zod schema for validation
-    const zodSchema = this.convertSchemaToZod(config.tool.inputSchema as JSONSchema);
-
-    // Register the tool handler with the MCP server
-    this.server.tool(
-      config.tool.name,
-      config.tool.description || 'GitHub API operation',
-      zodSchema,
-      async (args: Record<string, unknown>, extra: unknown) => {
-        const startTime = Date.now();
-        const toolName = config.tool.name;
-        try {
-          logger.debug(`Tool invoked: ${toolName}`, { args });
-          metrics.recordApiCall({ method: 'TOOL', url: toolName } as any);
-
-          // Execute the tool handler
-          const result = await config.handler(args);
-
-          const duration = Date.now() - startTime;
-          logger.info(`Tool completed: ${toolName}`, {
-            duration,
-            success: true,
-          });
-
-          // Apply response size limiting
-          const {
-            data: limitedResult,
-            truncated,
-            originalSize,
-          } = ResponseSizeLimiter.limitResponseSize(result);
-
-          let responseText: string;
-          if (typeof limitedResult === 'string') {
-            responseText = limitedResult;
-          } else {
-            responseText = JSON.stringify(limitedResult, null, 2);
-            // Add truncation warning if response was limited
-            if (truncated) {
-              const warningMsg = `\n\n[Response truncated - original size: ${originalSize ? Math.round(originalSize / 1024) + 'KB' : 'unknown'}]`;
-              responseText += warningMsg;
-            }
-          }
-
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: responseText,
-              },
-            ],
-          };
-        } catch (error: any) {
-          const duration = Date.now() - startTime;
-          metrics.recordError({ name: 'TOOL_ERROR', message: error.message } as any);
-
-          // Log error details for debugging
-          logger.error(`Tool error: ${toolName}`, {
-            error: error.message,
-            duration,
-            args,
-          });
-
-          // Return standardized error response with proper formatting
-          const errorResponse = formatErrorResponse(error);
-          const errorMessage = errorResponse.error.message;
-          const errorCode = errorResponse.error.code;
-          const errorDetails = errorResponse.error.details;
-
-          // Build a helpful error message
-          let errorText = `Error: ${errorMessage}`;
-          if (errorCode && errorCode !== 'UNKNOWN_ERROR') {
-            errorText += `\nCode: ${errorCode}`;
-          }
-          if (errorDetails?.statusCode) {
-            errorText += `\nStatus: ${errorDetails.statusCode}`;
-          }
-
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: errorText,
-              },
-            ],
-            isError: true,
-          };
-        }
-      }
-    );
-
-    // Track registered tool
-    this.registeredTools.add(config.tool.name);
-    this.toolCount++;
-  }
-
-  /**
-   * Register all available GitHub tools with the server
-   *
-   * Conditionally registers tools based on enabled toolsets
-   * and read-only mode configuration.
-   */
-  private registerTools() {
-    // Register tools silently - no console output to avoid breaking MCP protocol
-
-    // Add rate limit status tool (always enabled)
-    this.registerTool({
-      tool: {
-        name: 'get_rate_limit_status',
-        description: 'Get current GitHub API rate limit status',
-        inputSchema: { type: 'object' as const, properties: {} },
-      },
-      handler: async () => {
-        const status = this.rateLimiter.getStatus();
-        return {
-          rate_limits: {
-            core: {
-              limit: status.core.limit,
-              remaining: status.core.remaining,
-              reset: status.core.reset.toISOString(),
-              used: status.core.limit - status.core.remaining,
-            },
-            search: {
-              limit: status.search.limit,
-              remaining: status.search.remaining,
-              reset: status.search.reset.toISOString(),
-              used: status.search.limit - status.search.remaining,
-            },
-            graphql: {
-              limit: status.graphql.limit,
-              remaining: status.graphql.remaining,
-              reset: status.graphql.reset.toISOString(),
-              used: status.graphql.limit - status.graphql.remaining,
-            },
-          },
-          queue_length: status.queueLength,
-        };
-      },
-    });
-    // Rate limit status tool registered
-
-    // Register context tools
-    if (this.enabledToolsets.has('context')) {
-      const contextTools = [
-        {
-          tool: {
-            name: 'get_me',
-            description: 'Get my GitHub user profile',
-            inputSchema: { type: 'object' as const, properties: {} },
-          },
-          handler: async () => {
-            const { data } = await this.reliabilityManager.executeWithReliability(
-              'users.getAuthenticated',
-              () => this.octokit.users.getAuthenticated()
-            );
-            return data;
-          },
-        },
-      ];
-      contextTools.forEach(tool => this.registerTool(tool));
-      // Context tools registered
-    }
-
-    // Register repository tools
-    if (this.enabledToolsets.has('repos')) {
-      // Standard repository tools
-      const repoTools = createRepositoryTools(this.octokit, this.readOnly);
-      repoTools.forEach(tool => this.registerTool(tool));
-      // Repository tools registered
-
-      // Optimized repository tools
-      const optimizedRepoTools = createOptimizedRepositoryTools(
-        this.optimizedClient,
-        this.readOnly
-      );
-      optimizedRepoTools.forEach(tool => this.registerTool(tool));
-      // Optimized repository tools registered
-    }
-
-    // Register issue tools
-    if (this.enabledToolsets.has('issues')) {
-      const issueTools = createIssueTools(this.octokit, this.readOnly);
-      issueTools.forEach(tool => this.registerTool(tool));
-      // Issue tools registered
-    }
-
-    // Register pull request tools
-    if (this.enabledToolsets.has('pull_requests')) {
-      const prTools = createPullRequestTools(this.octokit, this.readOnly);
-      prTools.forEach(tool => this.registerTool(tool));
-      // Pull Request tools registered
-    }
-
-    // Register GitHub Actions tools
-    if (this.enabledToolsets.has('actions')) {
-      const actionTools = createActionTools(this.octokit, this.readOnly);
-      actionTools.forEach(tool => this.registerTool(tool));
-      // GitHub Actions tools registered
-    }
-
-    // Register code security tools
-    if (this.enabledToolsets.has('code_security')) {
-      const codeSecurityTools = createCodeSecurityTools(this.octokit, this.readOnly);
-      codeSecurityTools.forEach(tool => this.registerTool(tool));
-      // Code Security tools registered
-    }
-
-    // Register search tools
-    const searchTools = createSearchTools(this.octokit);
-    searchTools.forEach(tool => this.registerTool(tool));
-    // Search tools registered
-
-    // Register user tools
-    if (this.enabledToolsets.has('users')) {
-      const userTools = createUserTools(this.octokit, this.readOnly);
-      userTools.forEach(tool => this.registerTool(tool));
-      // User tools registered
-    }
-
-    // Register organization tools
-    if (this.enabledToolsets.has('orgs')) {
-      const orgTools = createOrganizationTools(this.octokit, this.readOnly);
-      orgTools.forEach(tool => this.registerTool(tool));
-      // Organization tools registered
-    }
-
-    // Register notification tools
-    if (this.enabledToolsets.has('notifications')) {
-      const notificationTools = createNotificationTools(this.octokit, this.readOnly);
-      notificationTools.forEach(tool => this.registerTool(tool));
-      // Notification tools registered
-    }
-
-    // Register discussion tools
-    if (this.enabledToolsets.has('discussions')) {
-      const discussionTools = createDiscussionTools(
-        this.optimizedClient.getOctokit(),
-        this.readOnly
-      );
-      discussionTools.forEach(tool => this.registerTool(tool));
-      // Discussion tools registered
-    }
-
-    // Register Dependabot tools
-    if (this.enabledToolsets.has('dependabot')) {
-      const dependabotTools = createDependabotTools(this.octokit, this.readOnly);
-      dependabotTools.forEach(tool => this.registerTool(tool));
-      // Dependabot tools registered
-    }
-
-    // Register secret scanning tools
-    if (this.enabledToolsets.has('secret_protection')) {
-      const secretScanningTools = createSecretScanningTools(this.octokit, this.readOnly);
-      secretScanningTools.forEach(tool => this.registerTool(tool));
-      // Secret Scanning tools registered
-    }
-
-    // GraphQL repository insights tools
-    if (this.enabledToolsets.has('graphql_insights')) {
-      const insightsTools = createRepositoryInsightsTools(
-        this.optimizedClient.getOctokit(),
-        this.readOnly
-      );
-      insightsTools.forEach(tool => this.registerTool(tool));
-      // Repository Insights tools registered
-    }
-
-    // Advanced search tools
-    if (this.enabledToolsets.has('advanced_search')) {
-      const advancedSearchTools = createAdvancedSearchTools(this.optimizedClient, this.readOnly);
-      advancedSearchTools.forEach(tool => this.registerTool(tool));
-      // Advanced Search tools registered
-    }
-
-    // Project management tools
-    if (this.enabledToolsets.has('project_management')) {
-      const projectTools = createProjectManagementTools(this.octokit, this.readOnly);
-      projectTools.forEach(tool => this.registerTool(tool));
-      // Project Management tools registered
-    }
-
-    // Batch operations tools
-    if (this.enabledToolsets.has('batch_operations')) {
-      const batchTools = createBatchOperationsTools(this.octokit, this.readOnly);
-      batchTools.forEach(tool => this.registerTool(tool));
-      // Batch Operations tools registered
-    }
-
-    // Register health monitoring tools
-    const healthTools = createHealthTools(this.healthManager);
-    healthTools.forEach(tool => this.registerTool(tool));
-    // Health monitoring tools registered
-
-    // Register cache management tools
-    const cacheManagementTools = createCacheManagementTools(this.optimizedClient);
-    cacheManagementTools.forEach(tool => this.registerTool(tool));
-    logger.info(`Cache management tools registered`, { count: cacheManagementTools.length });
-
-    // Register monitoring and observability tools
-    if (this.enabledToolsets.has('monitoring')) {
-      // Register health tools
-      const healthTools = createHealthTools(this.healthManager);
-      healthTools.forEach((tool: any) => this.registerTool(tool));
-      // Health tools registered
-    }
-
-    // Register performance monitoring tools
-    const perfTools = [
-      {
-        tool: {
-          name: 'get_performance_metrics',
-          description: 'Get current performance metrics and statistics',
-          inputSchema: { type: 'object' as const, properties: {} },
-        },
-        handler: async () => globalPerformanceMonitor.getMetrics(),
-      },
-      {
-        tool: {
-          name: 'get_performance_report',
-          description: 'Generate a comprehensive performance report',
-          inputSchema: { type: 'object' as const, properties: {} },
-        },
-        handler: async () => globalPerformanceMonitor.generateReport(),
-      },
-      {
-        tool: {
-          name: 'clear_api_cache',
-          description: 'Clear all API response caches',
-          inputSchema: { type: 'object' as const, properties: {} },
-        },
-        handler: async () => {
-          this.optimizedClient.clearCache();
-          return { success: true, message: 'All caches cleared' };
-        },
-      },
-    ];
-    perfTools.forEach(tool => this.registerTool(tool));
-    // Performance monitoring tools registered
-
-    // Register code analysis agent tools
-    const agentTools = createAgentTools();
-    agentTools.forEach(tool => this.registerTool(tool));
-    // Code analysis agent tools registered
-
-    // Total tools registered successfully
-  }
 
   /**
    * Start the MCP server
