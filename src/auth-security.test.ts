@@ -2,7 +2,7 @@
  * Authentication and security tests
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { validateEnvironmentConfiguration } from './validation.js';
+import { validateEnvironmentConfiguration } from './config.js';
 
 describe('Authentication Security Tests', () => {
   let originalEnv: NodeJS.ProcessEnv;
