@@ -3,6 +3,8 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { validateEnvironmentConfiguration } from './config.js';
+import sanitizeHtml from 'sanitize-html';
+import sanitizeFilename from 'sanitize-filename';
 
 describe('Authentication Security Tests', () => {
   let originalEnv: NodeJS.ProcessEnv;
@@ -113,26 +115,22 @@ describe('Authentication Security Tests', () => {
       ];
 
       maliciousInputs.forEach(input => {
-        // Enhanced sanitization with iterative processing to prevent bypass attempts
-        let sanitized = input;
-        let previousValue;
-        const maxIterations = 10;
-        let iterations = 0;
-        
-        // Iteratively sanitize until no more changes occur or max iterations reached
-        do {
-          previousValue = sanitized;
-          sanitized = sanitized
-            .replace(/<script[^>]*>[\s\S]*?<\/script[^>]*>/gi, '') // Remove complete script tags
-            .replace(/<[^>]*>/g, '') // Remove all HTML tags
-            .replace(/javascript:/gi, '') // Remove javascript: protocol
-            .replace(/data:[^,]*,/gi, '') // Remove data: URLs
-            .replace(/vbscript:/gi, '') // Remove vbscript: protocol
-            .replace(/\${[^}]*}/g, '') // Remove template injection patterns
-            .replace(/\.\.\//g, '') // Remove path traversal patterns
-            .replace(/DROP\s+TABLE|DELETE\s+FROM|INSERT\s+INTO|UPDATE\s+SET|SELECT\s+FROM/gi, ''); // Remove SQL injection patterns
-          iterations++;
-        } while (previousValue !== sanitized && iterations < maxIterations);
+        // Use well-vetted libraries for sanitization
+        let sanitized = sanitizeHtml(input, {
+          allowedTags: [],                       // Remove all HTML tags
+          allowedAttributes: {},                 // Remove all attributes
+          allowedSchemes: [],                    // Remove all protocols like javascript:, vbscript:, data:, etc.
+          parser: { lowerCaseAttributeNames: true, lowerCaseTags: true },
+        });
+
+        // Sanitize template injection patterns
+        sanitized = sanitized.replace(/\${[^}]*}/g, '');
+
+        // Sanitize SQL injection patterns
+        sanitized = sanitized.replace(/DROP\s+TABLE|DELETE\s+FROM|INSERT\s+INTO|UPDATE\s+SET|SELECT\s+FROM/gi, '');
+
+        // Path traversal: sanitize using sanitize-filename
+        sanitized = sanitizeFilename(sanitized);
 
         // Additional validation after sanitization
         expect(sanitized.toLowerCase()).not.toContain('<script');
