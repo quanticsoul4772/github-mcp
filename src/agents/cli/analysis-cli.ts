@@ -22,6 +22,37 @@ interface CliOptions {
 }
 
 /**
+ * Escapes special regex characters in a string
+ * This prevents regex injection attacks when using user input in RegExp
+ */
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Creates a safe RegExp from user input
+ * Escapes special characters to prevent regex injection
+ */
+function createSafeRegExp(pattern: string, flags?: string): RegExp {
+  try {
+    // Try to parse as a regex pattern if it looks like one
+    if (pattern.startsWith('/') && pattern.includes('/', 1)) {
+      const lastSlash = pattern.lastIndexOf('/');
+      const regexPattern = pattern.slice(1, lastSlash);
+      const regexFlags = pattern.slice(lastSlash + 1);
+      // Validate the pattern before creating RegExp
+      new RegExp(regexPattern, regexFlags);
+      return new RegExp(regexPattern, regexFlags || flags);
+    }
+    // Otherwise treat as literal string and escape it
+    return new RegExp(escapeRegExp(pattern), flags);
+  } catch {
+    // If invalid regex, treat as literal string
+    return new RegExp(escapeRegExp(pattern), flags);
+  }
+}
+
+/**
  * Command-line interface for the code analysis system
  */
 export class AnalysisCLI {
@@ -182,7 +213,9 @@ export class AnalysisCLI {
     // Check exclude patterns first
     if (exclude) {
       for (const pattern of exclude) {
-        if (new RegExp(pattern).test(filePath)) {
+        // Fix: Use safe regex creation to prevent regex injection
+        const regex = createSafeRegExp(pattern);
+        if (regex.test(filePath)) {
           return false;
         }
       }
@@ -190,7 +223,8 @@ export class AnalysisCLI {
 
     // Check include patterns
     if (include && include.length > 0) {
-      return include.some(pattern => new RegExp(pattern).test(filePath));
+      // Fix: Use safe regex creation to prevent regex injection
+      return include.some(pattern => createSafeRegExp(pattern).test(filePath));
     }
 
     // Default: include common source file extensions
