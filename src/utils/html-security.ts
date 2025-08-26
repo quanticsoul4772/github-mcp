@@ -122,7 +122,7 @@ export function isHtmlSafe(text: string): boolean {
   }
 
   // Check for dangerous characters
-  return !/[&<>"'`=\/:]/`.test(text);
+  return !/[&<>"'`=\/:]/.test(text);
 }
 
 /**
