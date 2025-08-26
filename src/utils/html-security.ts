@@ -150,8 +150,13 @@ export function stripHtmlTags(html: string): string {
     throw new TypeError('stripHtmlTags expects a string input');
   }
 
-  // First, remove all HTML tags
-  let result = html.replace(/<[^>]*>/g, '');
+  // First, repeatedly remove all HTML tags (fix incomplete multi-character sanitization)
+  let result = html;
+  let previous;
+  do {
+    previous = result;
+    result = result.replace(/<[^>]*>/g, '');
+  } while (result !== previous);
   
   // Then decode HTML entities in a safe single pass
   // This prevents double unescaping vulnerabilities
