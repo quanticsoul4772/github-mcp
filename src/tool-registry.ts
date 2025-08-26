@@ -74,22 +74,25 @@ export class ToolRegistry {
             return;
         }
 
-        let zodSchema: z.ZodType;
+        let zodSchema: z.ZodTypeAny | undefined;
         try {
-            const schemaString = jsonSchemaToZod(config.tool.inputSchema as any);
-            zodSchema = new Function('z', `return ${schemaString}`)(z);
+          const schemaString = jsonSchemaToZod(config.tool.inputSchema as any);
+          // Avoid dynamic code execution. Fall back to permissive schema for now.
+          logger.warn(`Skipping dynamic evaluation of generated schema for tool ${config.tool.name}`);
+          zodSchema = z.object({}).passthrough();
         } catch (error) {
-            logger.error(`Failed to convert JSON schema to Zod for tool ${config.tool.name}`, { error });
-            // Fallback to a generic object schema
-            zodSchema = z.object({}).passthrough();
+          logger.error(`Failed to convert JSON schema to Zod for tool ${config.tool.name}`, { error });
+          zodSchema = z.object({}).passthrough();
         }
 
+        // Use the Zod object directly if available, otherwise use empty shape
+        const inputSchema = zodSchema && zodSchema instanceof z.ZodObject ? zodSchema.shape : {};
 
         this.server.tool(
-            config.tool.name,
-            config.tool.description || 'GitHub API operation',
-            zodSchema instanceof z.ZodObject ? zodSchema.shape : {},
-            async (args: Record<string, unknown>, extra: unknown) => {
+          config.tool.name,
+          config.tool.description || 'GitHub API operation',
+          inputSchema,
+          async (args: Record<string, unknown>, extra: unknown) => {
                 const startTime = Date.now();
                 const toolName = config.tool.name;
                 try {
