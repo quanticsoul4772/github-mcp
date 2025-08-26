@@ -122,7 +122,9 @@ export function isHtmlSafe(text: string): boolean {
   }
 
   // Check for dangerous characters
-  return !/[&<>"'`=\/:]/.test(text);
+  return !/[&<>"'`=\/:]/
+
+.test(text);
 }
 
 /**
@@ -130,6 +132,9 @@ export function isHtmlSafe(text: string): boolean {
  *
  * This function removes all HTML tags and returns only the text content.
  * It's useful for creating plain text versions of HTML content.
+ * 
+ * SECURITY FIX: This function now properly handles multi-character entities
+ * and prevents double unescaping vulnerabilities.
  *
  * @param html - The HTML string to strip tags from
  * @returns The text content without HTML tags
@@ -145,18 +150,33 @@ export function stripHtmlTags(html: string): string {
     throw new TypeError('stripHtmlTags expects a string input');
   }
 
-  // Remove HTML tags and decode common entities
-  return html
-    .replace(/<[^>]*>/g, '') // Remove all HTML tags
-    .replace(/&amp;/g, '&') // Decode ampersands
-    .replace(/&lt;/g, '<') // Decode less-than
-    .replace(/&gt;/g, '>') // Decode greater-than
-    .replace(/&quot;/g, '"') // Decode quotes
-    .replace(/&#x27;/g, "'") // Decode apostrophes
-    .replace(/&#x2F;/g, '/') // Decode forward slashes
-    .replace(/&#x60;/g, '`') // Decode backticks
-    .replace(/&#x3D;/g, '=') // Decode equals signs
-    .trim(); // Remove leading/trailing whitespace
+  // First, repeatedly remove all HTML tags (fix incomplete multi-character sanitization)
+  let result = html;
+  let previous;
+  do {
+    previous = result;
+    result = result.replace(/<[^>]*>/g, '');
+  } while (result !== previous);
+  
+  // Then decode HTML entities in a safe single pass
+  // This prevents double unescaping vulnerabilities
+  result = result
+    // Decode named entities (ampersand LAST to prevent double unescaping)
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&#x2F;/g, '/')
+    .replace(/&#x60;/g, '`')
+    .replace(/&#x3D;/g, '=')
+    .replace(/&#x3A;/g, ':')
+    // Decode numeric entities
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+    .replace(/&#x([0-9A-Fa-f]+);/g, (_, code) => String.fromCharCode(parseInt(code, 16)))
+    // Decode ampersand LAST
+    .replace(/&amp;/g, '&');
+  
+  return result.trim();
 }
 
 /**

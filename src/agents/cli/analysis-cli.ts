@@ -22,6 +22,41 @@ interface CliOptions {
 }
 
 /**
+ * Convert glob pattern to safe regex pattern
+ * This prevents regex injection by treating all patterns as glob patterns
+ * instead of raw regex patterns
+ */
+function globToRegex(glob: string): RegExp {
+  // Escape special regex characters first
+  let pattern = glob.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  
+  // Convert glob wildcards to regex equivalents
+  pattern = pattern.replace(/\*/g, '.*');  // * matches any characters
+  pattern = pattern.replace(/\?/g, '.');   // ? matches single character
+  
+  // Ensure pattern matches full path
+  pattern = '^' + pattern + '$';
+  
+  return new RegExp(pattern, 'i');
+}
+
+/**
+ * Check if a path matches any of the given glob patterns
+ * Uses glob pattern matching instead of raw regex to prevent injection
+ */
+function matchesPattern(filePath: string, patterns: string[]): boolean {
+  return patterns.some(pattern => {
+    try {
+      const regex = globToRegex(pattern);
+      return regex.test(filePath);
+    } catch {
+      // If pattern conversion fails, treat as literal string match
+      return filePath.includes(pattern);
+    }
+  });
+}
+
+/**
  * Command-line interface for the code analysis system
  */
 export class AnalysisCLI {
@@ -177,20 +212,19 @@ export class AnalysisCLI {
 
   /**
    * Check if file should be included in analysis
+   * Uses safe glob pattern matching instead of raw regex
    */
   private shouldIncludeFile(filePath: string, include?: string[], exclude?: string[]): boolean {
     // Check exclude patterns first
-    if (exclude) {
-      for (const pattern of exclude) {
-        if (new RegExp(pattern).test(filePath)) {
-          return false;
-        }
+    if (exclude && exclude.length > 0) {
+      if (matchesPattern(filePath, exclude)) {
+        return false;
       }
     }
 
     // Check include patterns
     if (include && include.length > 0) {
-      return include.some(pattern => new RegExp(pattern).test(filePath));
+      return matchesPattern(filePath, include);
     }
 
     // Default: include common source file extensions
@@ -478,8 +512,8 @@ Options:
   -o, --output <file>      Output file path
   -f, --format <format>    Output format: text, json, html (default: text)
   -v, --verbose           Verbose output
-  -e, --exclude <patterns> Comma-separated exclude patterns
-  -i, --include <patterns> Comma-separated include patterns
+  -e, --exclude <patterns> Comma-separated exclude patterns (glob patterns)
+  -i, --include <patterns> Comma-separated include patterns (glob patterns)
   -c, --config <file>      Configuration file path
   -h, --help              Show this help
 
@@ -494,7 +528,7 @@ Examples:
   analysis-cli /path/to/project                   # Analyze specific project
   analysis-cli --agents security,type-safety     # Run specific agents
   analysis-cli --format json --output report.json # JSON output to file
-  analysis-cli --exclude "*.test.ts,dist/*"      # Exclude patterns
+  analysis-cli --exclude "*.test.ts,dist/*"      # Exclude patterns (glob)
 `);
 }
 
