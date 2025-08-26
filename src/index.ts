@@ -94,10 +94,9 @@ export class GitHubMCPServer {
 
     // Configure base URL if using GitHub Enterprise
     if (config.GITHUB_HOST) {
-      this.octokit = new Octokit({
-        auth: token,
-        baseUrl: config.GITHUB_HOST,
-      });
+      const rateLimitedSetup = createRateLimitedOctokit(token, { baseUrl: config.GITHUB_HOST });
+      this.octokit = rateLimitedSetup.octokit;
+      this.rateLimiter = rateLimitedSetup.rateLimiter;
     }
 
     // Add logging to Octokit

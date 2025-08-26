@@ -1,5 +1,26 @@
 import { logger } from './logger.js';
-import { shouldBypassValidation, isPrivateOrReservedIP } from './config.js';
+import { isPrivateOrReservedIP } from './network-utils.js';
+
+/**
+ * Check if validation should be bypassed in development mode
+ */
+function shouldBypassValidation(): boolean {
+  // Only allow bypass in development mode with explicit flag
+  return process.env.NODE_ENV === 'development' && process.env.SKIP_VALIDATION === 'true';
+}
+
+// Re-export validation utilities for compatibility
+export {
+  ValidationResult,
+  ValidationErrorDetail,
+  ValidationWarning,
+  createSuccessResult,
+  createErrorResult,
+  createValidationError,
+  createValidationWarning,
+  withRetry,
+  DEFAULT_RETRY_CONFIG
+} from './validation-utils.js';
 
 /**
  * Input validation utilities for GitHub MCP Server

@@ -12,33 +12,19 @@ import {
 // Mock the config module BEFORE it's imported by anything else
 vi.mock('./config.js', () => ({
   config: {
-    github: {
-      token: 'ghp_defaultmocktoken_valid_for_tests',
-      readOnly: false,
-      toolsets: ['all'],
-      telemetry: false,
-      api: {
-        baseUrl: 'https://api.github.com',
-        retries: 3,
-        retryDelay: 1000,
-      },
-      agent: {
-        exclude: [],
-        analysis_depth: 10,
-        max_file_size: 1000000,
-      },
-    },
-    server: {
-      port: 3000,
-      logLevel: 'info',
-    },
-    performance: {
-      enabled: false,
-      reportInterval: 60000,
-    },
-    reliability: {
-      telemetry: 'console',
-    },
+    NODE_ENV: 'test',
+    SKIP_VALIDATION: false,
+    GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp_defaultmocktoken_valid_for_tests',
+    GITHUB_TOKEN: undefined,
+    GITHUB_READ_ONLY: false,
+    GITHUB_TOOLSETS: 'all',
+    GITHUB_HOST: undefined,
+    GITHUB_ENABLE_CACHE: true,
+    GITHUB_ENABLE_GRAPHQL_CACHE: true,
+    GITHUB_ENABLE_DEDUPLICATION: true,
+    GITHUB_ENABLE_MONITORING: true,
+    GITHUB_TELEMETRY_DISABLE: false,
+    GITHUB_TELEMETRY_VERBOSE: false,
   },
   getGitHubToken: vi.fn(() => 'ghp_defaultmocktoken_valid_for_tests'),
   getEnabledToolsets: vi.fn(() => ['all']),
