@@ -33,23 +33,14 @@ function escapeRegExp(str: string): string {
  * Creates a safe RegExp from user input
  * Escapes special characters to prevent regex injection
  */
+/**
+ * Creates a safe RegExp from user input.
+ * All user patterns are treated as literal strings (not as raw regexes).
+ * Escapes all regex special characters to prevent regex injection.
+ */
 function createSafeRegExp(pattern: string, flags?: string): RegExp {
-  try {
-    // Try to parse as a regex pattern if it looks like one
-    if (pattern.startsWith('/') && pattern.includes('/', 1)) {
-      const lastSlash = pattern.lastIndexOf('/');
-      const regexPattern = pattern.slice(1, lastSlash);
-      const regexFlags = pattern.slice(lastSlash + 1);
-      // Validate the pattern before creating RegExp
-      new RegExp(regexPattern, regexFlags);
-      return new RegExp(regexPattern, regexFlags || flags);
-    }
-    // Otherwise treat as literal string and escape it
-    return new RegExp(escapeRegExp(pattern), flags);
-  } catch {
-    // If invalid regex, treat as literal string
-    return new RegExp(escapeRegExp(pattern), flags);
-  }
+  // Always escape user input; do not allow raw regexes from user patterns.
+  return new RegExp(escapeRegExp(pattern), flags);
 }
 
 /**
