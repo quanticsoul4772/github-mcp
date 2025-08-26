@@ -5,6 +5,8 @@ on:
     types: [opened, edited]
   pull_request_target:
     types: [opened, edited, synchronize, ready_for_review]
+  pull_request:
+    types: [opened, synchronize]
   issue_comment:
     types: [created]
 
@@ -189,14 +191,13 @@ jobs:
 
   dependency-review:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request_target'
+    # SECURITY FIX: Changed from pull_request_target to pull_request
+    # to prevent untrusted code execution in privileged context
+    if: github.event_name == 'pull_request'
     
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-
+      # The dependency-review-action handles checkout safely
+      # No explicit checkout needed when using pull_request trigger
       - name: Dependency Review
         uses: actions/dependency-review-action@v4
         with:
