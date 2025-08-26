@@ -38,12 +38,13 @@ function escapeRegExp(str: string): string {
  * All user patterns are treated as literal strings (not as raw regexes).
  * Escapes all regex special characters to prevent regex injection.
  */
-function createSafeRegExp(pattern: string, flags?: string): RegExp {
-  // Always escape user input; do not allow raw regexes from user patterns.
-  return new RegExp(escapeRegExp(pattern), flags);
-}
-
-/**
+      const regexPattern = pattern.slice(1, lastSlash);
+      const regexFlags = pattern.slice(lastSlash + 1); // may be empty string when no flags
+      // Validate the pattern before creating RegExp
+      new RegExp(regexPattern, regexFlags);
+      // Respect explicit flags (including empty string)
+      return new RegExp(regexPattern, regexFlags);
+    }
  * Command-line interface for the code analysis system
  */
 export class AnalysisCLI {
