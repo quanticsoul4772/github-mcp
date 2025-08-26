@@ -87,7 +87,7 @@ export function escapeHtmlAttribute(text: string): string {
  * @example
  * ```typescript
  * escapeJavaScript('alert("hello"); //comment')
- * // Returns: 'alert(\\\"hello\\\"); \\x2F\\x2Fcomment'
+ * // Returns: 'alert(\\"hello\\"); \\x2F\\x2Fcomment'
  * ```
  */
 export function escapeJavaScript(text: string): string {
@@ -122,107 +122,4 @@ export function isHtmlSafe(text: string): boolean {
   }
 
   // Check for dangerous characters
-  return !/[&<>"'`=\/:]/.test(text);
-}
-
-/**
- * Strips all HTML tags from a string, leaving only text content
- *
- * This function removes all HTML tags and returns only the text content.
- * It's useful for creating plain text versions of HTML content.
- *
- * @param html - The HTML string to strip tags from
- * @returns The text content without HTML tags
- *
- * @example
- * ```typescript
- * stripHtmlTags('<p>Hello <strong>world</strong>!</p>')
- * // Returns: 'Hello world!'
- * ```
- */
-export function stripHtmlTags(html: string): string {
-  if (typeof html !== 'string') {
-    throw new TypeError('stripHtmlTags expects a string input');
-  }
-
-  // Remove HTML tags and decode common entities
-  return html
-    .replace(/<[^>]*>/g, '') // Remove all HTML tags
-    .replace(/&amp;/g, '&') // Decode ampersands
-    .replace(/&lt;/g, '<') // Decode less-than
-    .replace(/&gt;/g, '>') // Decode greater-than
-    .replace(/&quot;/g, '"') // Decode quotes
-    .replace(/&#x27;/g, "'") // Decode apostrophes
-    .replace(/&#x2F;/g, '/') // Decode forward slashes
-    .replace(/&#x60;/g, '`') // Decode backticks
-    .replace(/&#x3D;/g, '=') // Decode equals signs
-    .trim(); // Remove leading/trailing whitespace
-}
-
-/**
- * Security-focused HTML template function
- *
- * This function provides a safe way to create HTML templates with automatic escaping.
- * All interpolated values are automatically escaped unless explicitly marked as safe.
- *
- * @param template - The HTML template string
- * @param values - Object containing values to interpolate
- * @returns The rendered HTML with all values safely escaped
- *
- * @example
- * ```typescript
- * const html = safeHtmlTemplate(
- *   '<div class="{{className}}">{{content}}</div>',
- *   { className: 'user-content', content: '<script>alert("xss")</script>' }
- * );
- * // Returns: '<div class="user-content">&lt;script&gt;alert(&quot;xss&quot;)&lt;&#x2F;script&gt;</div>'
- * ```
- */
-export function safeHtmlTemplate(template: string, values: Record<string, string>): string {
-  if (typeof template !== 'string') {
-    throw new TypeError('safeHtmlTemplate expects a string template');
-  }
-
-  if (!values || typeof values !== 'object') {
-    throw new TypeError('safeHtmlTemplate expects an object of values');
-  }
-
-  return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
-    const value = values[key];
-    if (value === undefined || value === null) {
-      return '';
-    }
-    return escapeHtml(String(value));
-  });
-}
-
-/**
- * Type guard to check if a value is a string
- */
-export function isString(value: unknown): value is string {
-  return typeof value === 'string';
-}
-
-/**
- * Safely converts any value to a string and escapes it for HTML
- */
-export function safeStringify(value: unknown): string {
-  if (value === null || value === undefined) {
-    return '';
-  }
-
-  if (typeof value === 'string') {
-    return escapeHtml(value);
-  }
-
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return escapeHtml(String(value));
-  }
-
-  // For objects, arrays, etc., convert to JSON and escape
-  try {
-    return escapeHtml(JSON.stringify(value));
-  } catch {
-    return escapeHtml('[Object]');
-  }
-}
+  return !/[&<>"'`=\/:]/
