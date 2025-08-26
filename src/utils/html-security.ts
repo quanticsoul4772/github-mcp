@@ -87,7 +87,7 @@ export function escapeHtmlAttribute(text: string): string {
  * @example
  * ```typescript
  * escapeJavaScript('alert("hello"); //comment')
- * // Returns: 'alert(\\\"hello\\\"); \\x2F\\x2Fcomment'
+ * // Returns: 'alert(\\"hello\\"); \\x2F\\x2Fcomment'
  * ```
  */
 export function escapeJavaScript(text: string): string {
@@ -122,9 +122,7 @@ export function isHtmlSafe(text: string): boolean {
   }
 
   // Check for dangerous characters
-  return !/[&<>"'`=\/:]/
-
-.test(text);
+  return !/[&<>"'`=\/:]/`.test(text);
 }
 
 /**
