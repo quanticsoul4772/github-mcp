@@ -22,29 +22,41 @@ interface CliOptions {
 }
 
 /**
- * Escapes special regex characters in a string
- * This prevents regex injection attacks when using user input in RegExp
+ * Convert glob pattern to safe regex pattern
+ * This prevents regex injection by treating all patterns as glob patterns
+ * instead of raw regex patterns
  */
-function escapeRegExp(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function globToRegex(glob: string): RegExp {
+  // Escape special regex characters first
+  let pattern = glob.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  
+  // Convert glob wildcards to regex equivalents
+  pattern = pattern.replace(/\*/g, '.*');  // * matches any characters
+  pattern = pattern.replace(/\?/g, '.');   // ? matches single character
+  
+  // Ensure pattern matches full path
+  pattern = '^' + pattern + '$';
+  
+  return new RegExp(pattern, 'i');
 }
 
 /**
- * Creates a safe RegExp from user input
- * Escapes special characters to prevent regex injection
+ * Check if a path matches any of the given glob patterns
+ * Uses glob pattern matching instead of raw regex to prevent injection
  */
-/**
- * Creates a safe RegExp from user input.
- * All user patterns are treated as literal strings (not as raw regexes).
- * Escapes all regex special characters to prevent regex injection.
- */
-      const regexPattern = pattern.slice(1, lastSlash);
-      const regexFlags = pattern.slice(lastSlash + 1); // may be empty string when no flags
-      // Validate the pattern before creating RegExp
-      new RegExp(regexPattern, regexFlags);
-      // Respect explicit flags (including empty string)
-      return new RegExp(regexPattern, regexFlags);
+function matchesPattern(filePath: string, patterns: string[]): boolean {
+  return patterns.some(pattern => {
+    try {
+      const regex = globToRegex(pattern);
+      return regex.test(filePath);
+    } catch {
+      // If pattern conversion fails, treat as literal string match
+      return filePath.includes(pattern);
     }
+  });
+}
+
+/**
  * Command-line interface for the code analysis system
  */
 export class AnalysisCLI {
@@ -200,23 +212,19 @@ export class AnalysisCLI {
 
   /**
    * Check if file should be included in analysis
+   * Uses safe glob pattern matching instead of raw regex
    */
   private shouldIncludeFile(filePath: string, include?: string[], exclude?: string[]): boolean {
     // Check exclude patterns first
-    if (exclude) {
-      for (const pattern of exclude) {
-        // Fix: Use safe regex creation to prevent regex injection
-        const regex = createSafeRegExp(pattern);
-        if (regex.test(filePath)) {
-          return false;
-        }
+    if (exclude && exclude.length > 0) {
+      if (matchesPattern(filePath, exclude)) {
+        return false;
       }
     }
 
     // Check include patterns
     if (include && include.length > 0) {
-      // Fix: Use safe regex creation to prevent regex injection
-      return include.some(pattern => createSafeRegExp(pattern).test(filePath));
+      return matchesPattern(filePath, include);
     }
 
     // Default: include common source file extensions
@@ -504,8 +512,8 @@ Options:
   -o, --output <file>      Output file path
   -f, --format <format>    Output format: text, json, html (default: text)
   -v, --verbose           Verbose output
-  -e, --exclude <patterns> Comma-separated exclude patterns
-  -i, --include <patterns> Comma-separated include patterns
+  -e, --exclude <patterns> Comma-separated exclude patterns (glob patterns)
+  -i, --include <patterns> Comma-separated include patterns (glob patterns)
   -c, --config <file>      Configuration file path
   -h, --help              Show this help
 
@@ -520,7 +528,7 @@ Examples:
   analysis-cli /path/to/project                   # Analyze specific project
   analysis-cli --agents security,type-safety     # Run specific agents
   analysis-cli --format json --output report.json # JSON output to file
-  analysis-cli --exclude "*.test.ts,dist/*"      # Exclude patterns
+  analysis-cli --exclude "*.test.ts,dist/*"      # Exclude patterns (glob)
 `);
 }
 
