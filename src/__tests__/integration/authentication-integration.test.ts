@@ -29,11 +29,17 @@ const shouldSkipIntegrationTests = () => !process.env.GITHUB_TEST_TOKEN;
 function maskOAuthScopes(scopes: string): string {
   if (!scopes) return '';
   
-  // Split scopes and mask all except the first character of each
-  const scopeArray = scopes.split(/[,\s]+/);
+  // Split scopes by comma and/or whitespace
+  const scopeArray = scopes.split(/[,\s]+/).filter(s => s.length > 0);
+  
   return scopeArray
     .map(scope => {
-      if (scope.length <= 2) return '*'.repeat(scope.length);
+      // Completely mask short scopes for security
+      if (scope.length <= 3) {
+        return '*'.repeat(scope.length);
+      }
+      // For longer scopes, show first character only and mask the rest
+      // This provides minimal identification while protecting sensitive information
       return scope[0] + '*'.repeat(scope.length - 1);
     })
     .join(', ');
@@ -219,6 +225,11 @@ describe('Authentication Integration Tests', () => {
 
   describe('Token Scope Detection', function () {
     it.skipIf(shouldSkipIntegrationTests())('should detect available OAuth scopes', async () => {
+      if (!testToken || !octokit) {
+        console.warn('Test skipped: No GITHUB_TEST_TOKEN provided');
+        return;
+      }
+
       try {
         // Make a request that returns OAuth scope headers
         const response = await octokit.rest.users.getAuthenticated();
@@ -227,14 +238,18 @@ describe('Authentication Integration Tests', () => {
         const acceptedScopes = response.headers['x-accepted-oauth-scopes'];
 
         if (scopes) {
-          // Do not log OAuth scopes to avoid sensitive information leakage
-          // console.info('Available scopes (masked):', maskOAuthScopes(scopes));
+          // OAuth scopes should never be logged in clear text
+          // Even for debugging, use the masking function
+          const maskedScopes = maskOAuthScopes(scopes);
+          // Only use masked scopes if absolutely necessary for debugging
+          // console.debug('Masked OAuth scopes:', maskedScopes);
           expect(typeof scopes).toBe('string');
         }
 
         if (acceptedScopes) {
-          // Do not log accepted OAuth scopes to avoid sensitive information leakage
-          // console.info('Accepted scopes for this endpoint (masked):', maskOAuthScopes(acceptedScopes));
+          // Accepted OAuth scopes should also be masked
+          const maskedAcceptedScopes = maskOAuthScopes(acceptedScopes);
+          // console.debug('Masked accepted scopes:', maskedAcceptedScopes);
           expect(typeof acceptedScopes).toBe('string');
         }
       } catch (error) {
@@ -410,22 +425,41 @@ export const integrationTestUtils = {
    */
   maskSensitiveData: (data: any): any => {
     if (typeof data === 'string') {
-      // Also mask OAuth scopes
-      const maskedTokens = data.replace(/gh[porus]_[A-Za-z0-9]{36}/g, 'gh*_****');
-      // Mask OAuth scope headers across the entire line (supports multiple scopes and commas)
-      const maskedScopes = maskedTokens.replace(
-        /^(x-(?:oauth|accepted-oauth)-scopes):\s*([^\r\n]*)/gim,
-        (_match, header: string, scopes: string) => `${header}: ${maskOAuthScopes(scopes.trim())}`
+      // Mask GitHub tokens
+      let masked = data.replace(/gh[porus]_[A-Za-z0-9]{36}/g, 'gh*_****');
+      
+      // Mask OAuth scope headers with proper regex that handles the entire line
+      // This ensures OAuth scopes are properly masked anywhere in the string
+      masked = masked.replace(
+        /\b(x-(?:oauth|accepted-oauth)-scopes):\s*([^\r\n]+)/gi,
+        (match, header: string, scopes: string) => {
+          return `${header}: ${maskOAuthScopes(scopes)}`;
+        }
       );
-      return maskedScopes;
+      
+      // Also mask any standalone OAuth scope patterns that might appear
+      // in logs or error messages
+      masked = masked.replace(
+        /\b(repo|admin|user|gist|delete|workflow|write|read|org)(?::|,|\s)/gi,
+        (match, scope) => {
+          return maskOAuthScopes(scope) + match.slice(scope.length);
+        }
+      );
+      
+      return masked;
     }
+    
     if (typeof data === 'object' && data !== null) {
       const masked = { ...data };
       for (const [key, value] of Object.entries(masked)) {
+        // Mask any field that might contain sensitive information
         if (
           key.toLowerCase().includes('token') || 
           key.toLowerCase().includes('auth') ||
-          key.toLowerCase().includes('scope')
+          key.toLowerCase().includes('scope') ||
+          key.toLowerCase().includes('secret') ||
+          key.toLowerCase().includes('password') ||
+          key.toLowerCase().includes('key')
         ) {
           masked[key] = '****';
         } else {
@@ -434,6 +468,7 @@ export const integrationTestUtils = {
       }
       return masked;
     }
+    
     return data;
   },
 };
