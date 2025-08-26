@@ -227,14 +227,14 @@ describe('Authentication Integration Tests', () => {
         const acceptedScopes = response.headers['x-accepted-oauth-scopes'];
 
         if (scopes) {
-          // Fix: Mask OAuth scopes before logging to prevent sensitive information leakage
-          console.info('Available scopes (masked):', maskOAuthScopes(scopes));
+          // Do not log OAuth scopes to avoid sensitive information leakage
+          // console.info('Available scopes (masked):', maskOAuthScopes(scopes));
           expect(typeof scopes).toBe('string');
         }
 
         if (acceptedScopes) {
-          // Fix: Mask accepted OAuth scopes before logging to prevent sensitive information leakage
-          console.info('Accepted scopes for this endpoint (masked):', maskOAuthScopes(acceptedScopes));
+          // Do not log accepted OAuth scopes to avoid sensitive information leakage
+          // console.info('Accepted scopes for this endpoint (masked):', maskOAuthScopes(acceptedScopes));
           expect(typeof acceptedScopes).toBe('string');
         }
       } catch (error) {
