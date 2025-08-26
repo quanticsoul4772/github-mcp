@@ -161,8 +161,7 @@ export function stripHtmlTags(html: string): string {
   // Then decode HTML entities in a safe single pass
   // This prevents double unescaping vulnerabilities
   result = result
-    // Decode named entities
-    .replace(/&amp;/g, '&')
+    // Decode named entities (ampersand LAST to prevent double unescaping)
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
@@ -173,7 +172,9 @@ export function stripHtmlTags(html: string): string {
     .replace(/&#x3A;/g, ':')
     // Decode numeric entities
     .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
-    .replace(/&#x([0-9A-Fa-f]+);/g, (_, code) => String.fromCharCode(parseInt(code, 16)));
+    .replace(/&#x([0-9A-Fa-f]+);/g, (_, code) => String.fromCharCode(parseInt(code, 16)))
+    // Decode ampersand LAST
+    .replace(/&amp;/g, '&');
   
   return result.trim();
 }
