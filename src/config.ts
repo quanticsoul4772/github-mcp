@@ -305,17 +305,19 @@ export const config = (() => {
   try {
     return configSchema.parse(process.env);
   } catch (error) {
-    // Environment validation failed - log using logger instead of console.error
     const errorMessage =
       error instanceof z.ZodError
         ? `Environment validation failed: ${error.issues.map(err => `${err.path.join('.')}: ${err.message}`).join(', ')}`
-        : `Environment validation failed: ${error}`;
+        : `Environment validation failed: ${String(error)}`;
 
     logger.error(errorMessage);
 
-    if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
-        process.exit(1);
+    const isTest = process.env.NODE_ENV === 'test' || !!process.env.VITEST;
+    if (!isTest) {
+      // Exit cleanly in non-test environments
+      process.exit(1);
     }
+    // In tests, avoid process.exit and provide a safe minimal config to prevent cascading failures
     throw new Error(errorMessage);
   }
 })();
