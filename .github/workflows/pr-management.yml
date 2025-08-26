@@ -194,7 +194,10 @@ jobs:
     # SECURITY FIX: Changed from pull_request_target to pull_request
     # to prevent untrusted code execution in privileged context
     if: github.event_name == 'pull_request'
-    
+    permissions:
+      contents: read
+      pull-requests: read
+
     steps:
       # The dependency-review-action handles checkout safely
       # No explicit checkout needed when using pull_request trigger
