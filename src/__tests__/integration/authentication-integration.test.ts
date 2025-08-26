@@ -412,13 +412,10 @@ export const integrationTestUtils = {
     if (typeof data === 'string') {
       // Also mask OAuth scopes
       const maskedTokens = data.replace(/gh[porus]_[A-Za-z0-9]{36}/g, 'gh*_****');
-      // Mask OAuth scope patterns
+      // Mask OAuth scope headers across the entire line (supports multiple scopes and commas)
       const maskedScopes = maskedTokens.replace(
-        /x-(oauth|accepted-oauth)-scopes:\s*[^,\n]+/gi, 
-        (match) => {
-          const [header, scopes] = match.split(':');
-          return `${header}: ${maskOAuthScopes(scopes.trim())}`;
-        }
+        /^(x-(?:oauth|accepted-oauth)-scopes):\s*([^\r\n]*)/gim,
+        (_match, header: string, scopes: string) => `${header}: ${maskOAuthScopes(scopes.trim())}`
       );
       return maskedScopes;
     }
