@@ -22,6 +22,31 @@ config();
 // Check if we should skip integration tests - evaluate dynamically
 const shouldSkipIntegrationTests = () => !process.env.GITHUB_TEST_TOKEN;
 
+/**
+ * Mask sensitive OAuth information for safe logging
+ */
+const maskOAuthScopes = (scopes: string): string => {
+  // Mask any potential sensitive scope information
+  if (!scopes) return '';
+  
+  // If scopes contain sensitive patterns, mask them
+  const sensitivePatterns = [
+    /admin:[a-z_]+/g,  // Admin scopes
+    /delete:[a-z_]+/g, // Delete scopes
+    /write:[a-z_]+/g,  // Write scopes
+  ];
+  
+  let maskedScopes = scopes;
+  sensitivePatterns.forEach(pattern => {
+    maskedScopes = maskedScopes.replace(pattern, (match) => {
+      const [prefix] = match.split(':');
+      return `${prefix}:***`;
+    });
+  });
+  
+  return maskedScopes;
+};
+
 describe('Authentication Integration Tests', () => {
   let testToken: string | undefined;
   let octokit: Octokit;
@@ -210,12 +235,16 @@ describe('Authentication Integration Tests', () => {
         const acceptedScopes = response.headers['x-accepted-oauth-scopes'];
 
         if (scopes) {
-          console.info('Available scopes:', scopes);
+          // Mask sensitive scope information before logging
+          const maskedScopes = maskOAuthScopes(scopes);
+          console.info('Available scopes (masked):', maskedScopes);
           expect(typeof scopes).toBe('string');
         }
 
         if (acceptedScopes) {
-          console.info('Accepted scopes for this endpoint:', acceptedScopes);
+          // Mask sensitive scope information before logging
+          const maskedAcceptedScopes = maskOAuthScopes(acceptedScopes);
+          console.info('Accepted scopes for this endpoint (masked):', maskedAcceptedScopes);
           expect(typeof acceptedScopes).toBe('string');
         }
       } catch (error) {
@@ -347,8 +376,14 @@ describe('Authentication Integration Tests', () => {
       expect(coreLimit.remaining).toBeGreaterThanOrEqual(0);
       expect(coreLimit.reset).toBeGreaterThan(Date.now() / 1000 - 3600);
 
-      console.info(`Rate limit: ${coreLimit.remaining}/${coreLimit.limit}`);
-      console.info(`Resets at: ${new Date(coreLimit.reset * 1000).toISOString()}`);
+      // Mask any potential sensitive information in rate limit output
+      const maskedInfo = {
+        remaining: coreLimit.remaining,
+        limit: coreLimit.limit,
+        reset: new Date(coreLimit.reset * 1000).toISOString()
+      };
+      
+      console.info('Rate limit status:', JSON.stringify(maskedInfo));
     });
 
     // Note: This test is commented out as it would exhaust rate limits
