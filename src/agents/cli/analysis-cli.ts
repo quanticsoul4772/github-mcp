@@ -74,6 +74,45 @@ export class AnalysisCLI {
   }
 
   /**
+   * Escapes special regex characters in a string to prevent injection
+   */
+  private escapeRegex(str: string): string {
+    // Escape all regex special characters
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  /**
+   * Safely creates a RegExp from user input
+   */
+  private createSafeRegExp(pattern: string, flags?: string): RegExp | null {
+    try {
+      // Escape the pattern to prevent injection
+      const escapedPattern = this.escapeRegex(pattern);
+      return new RegExp(escapedPattern, flags);
+    } catch (error) {
+      console.warn(`Invalid regex pattern: ${pattern}`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Checks if a path matches a glob pattern safely
+   */
+  private matchesPattern(filePath: string, pattern: string): boolean {
+    // Convert glob pattern to safe regex
+    // Replace * with [^/]* and ** with .*
+    let regexPattern = this.escapeRegex(pattern);
+    regexPattern = regexPattern.replace(/\\\*/g, '[^/]*').replace(/\\\*\\\*/g, '.*');
+    
+    try {
+      const regex = new RegExp(`^${regexPattern}$`);
+      return regex.test(filePath);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Run analysis with given options
    */
   public async run(options: CliOptions): Promise<void> {
@@ -182,7 +221,8 @@ export class AnalysisCLI {
     // Check exclude patterns first
     if (exclude) {
       for (const pattern of exclude) {
-        if (new RegExp(pattern).test(filePath)) {
+        // Use safe pattern matching instead of direct regex
+        if (this.matchesPattern(filePath, pattern)) {
           return false;
         }
       }
@@ -190,7 +230,7 @@ export class AnalysisCLI {
 
     // Check include patterns
     if (include && include.length > 0) {
-      return include.some(pattern => new RegExp(pattern).test(filePath));
+      return include.some(pattern => this.matchesPattern(filePath, pattern));
     }
 
     // Default: include common source file extensions
