@@ -156,20 +156,13 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
       },
     },
     handler: async (args: unknown) => {
-      console.error('[HANDLER] get_repository received:', JSON.stringify(args, null, 2));
-      console.error('[HANDLER] args type:', typeof args);
-      
       const params = args as GetRepositoryParams;
-      console.error('[HANDLER] params.owner:', params?.owner);
-      console.error('[HANDLER] params.repo:', params?.repo);
       
       // Validate inputs
       if (!validateOwnerName(params.owner)) {
-        console.error('[HANDLER] Owner validation failed:', params.owner);
         throw new ValidationError('owner', 'Invalid repository owner name');
       }
       if (!validateRepoName(params.repo)) {
-        console.error('[HANDLER] Repo validation failed:', params.repo);
         throw new ValidationError('repo', 'Invalid repository name');
       }
 
@@ -554,10 +547,16 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
     },
     handler: async (args: unknown) => {
       const params = args as SearchRepositoriesParams;
+      
+      // Ensure query is provided
+      if (!params?.query) {
+        throw new Error('Search query is required');
+      }
+      
       const { data } = await octokit.rest.search.repos({
         q: params.query,
-        page: params.page,
-        per_page: params.perPage,
+        page: params.page || 1,
+        per_page: params.perPage || 30,
       });
 
       return {

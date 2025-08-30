@@ -429,8 +429,8 @@ export function validateOwnerName(name: string): boolean {
     return false;
   }
 
-  // Only allow alphanumeric and hyphen
-  const validPattern = /^[a-zA-Z0-9-]+$/;
+  // Only allow alphanumeric, hyphen, and underscore (GitHub allows underscores)
+  const validPattern = /^[a-zA-Z0-9_-]+$/;
   return validPattern.test(name);
 }
 

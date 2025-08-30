@@ -93,21 +93,13 @@ export class ToolRegistry {
                 const startTime = Date.now();
                 const toolName = config.tool.name;
                 
-                // Debug: Log what we receive from MCP
-                console.error(`[DEBUG] Tool ${toolName} invoked`);
-                console.error(`[DEBUG] Received args:`, JSON.stringify(args, null, 2));
-                console.error(`[DEBUG] Args type: ${typeof args}`);
-                console.error(`[DEBUG] Args keys: ${args ? Object.keys(args).join(', ') : 'null/undefined'}`);
-                
                 try {
                     logger.debug(`Tool invoked: ${toolName}`, { args });
                     metrics.recordApiCall({ method: 'TOOL', url: toolName } as any);
 
-                    // The MCP SDK should have already validated the args using the zodSchema
+                    // The MCP SDK should have already validated the args
                     // Ensure args is at least an empty object if undefined
                     const validatedArgs = args ?? {};
-                    
-                    console.error(`[DEBUG] Passing to handler:`, JSON.stringify(validatedArgs, null, 2));
                     
                     // Pass the validated args to the handler
                     const result = await config.handler(validatedArgs);
@@ -145,12 +137,6 @@ export class ToolRegistry {
                     };
                 } catch (error: any) {
                     const duration = Date.now() - startTime;
-                    
-                    // Debug error details
-                    console.error(`[DEBUG] ERROR in ${toolName}:`, error.message);
-                    console.error(`[DEBUG] Error stack:`, error.stack);
-                    console.error(`[DEBUG] Args that caused error:`, JSON.stringify(args, null, 2));
-                    
                     metrics.recordError({ name: 'TOOL_ERROR', message: error.message } as any);
 
                     logger.error(`Tool error: ${toolName}`, {

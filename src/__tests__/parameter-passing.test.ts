@@ -99,9 +99,11 @@ describe('Parameter Passing Tests', () => {
     
     const registered = registeredTools.get('required_params_tool');
     expect(registered).toBeDefined();
+    // With the new approach, we pass the JSON schema directly
     expect(registered.schema).toBeDefined();
-    expect(registered.schema.owner).toBeDefined();
-    expect(registered.schema.repo).toBeDefined();
+    expect(registered.schema.properties).toBeDefined();
+    expect(registered.schema.properties.owner).toBeDefined();
+    expect(registered.schema.properties.repo).toBeDefined();
     
     // Test calling the handler with parameters
     const testParams = { owner: 'test-owner', repo: 'test-repo' };
@@ -140,9 +142,10 @@ describe('Parameter Passing Tests', () => {
     const registered = registeredTools.get('optional_params_tool');
     expect(registered).toBeDefined();
     expect(registered.schema).toBeDefined();
-    expect(registered.schema.query).toBeDefined();
-    expect(registered.schema.limit).toBeDefined();
-    expect(registered.schema.sort).toBeDefined();
+    expect(registered.schema.properties).toBeDefined();
+    expect(registered.schema.properties.query).toBeDefined();
+    expect(registered.schema.properties.limit).toBeDefined();
+    expect(registered.schema.properties.sort).toBeDefined();
     
     // Test with all parameters
     const fullParams = { query: 'test', limit: 10, sort: 'desc' };
@@ -205,11 +208,11 @@ describe('Parameter Passing Tests', () => {
     expect(result4.content[0].text).toContain('"hasValue": "test"');
   });
 
-  it('should convert JSON schema types to Zod correctly', async () => {
+  it('should pass JSON schema correctly', async () => {
     const testTool: ToolConfig = {
       tool: {
         name: 'type_conversion_tool',
-        description: 'Tool to test type conversions',
+        description: 'Tool to test schema passing',
         inputSchema: {
           type: 'object',
           properties: {
@@ -231,13 +234,14 @@ describe('Parameter Passing Tests', () => {
     expect(registered).toBeDefined();
     expect(registered.schema).toBeDefined();
     
-    // Verify each type was converted to Zod
+    // Verify the JSON schema properties are preserved
     const schema = registered.schema;
-    expect(schema.stringProp).toBeDefined();
-    expect(schema.numberProp).toBeDefined();
-    expect(schema.boolProp).toBeDefined();
-    expect(schema.enumProp).toBeDefined();
-    expect(schema.arrayProp).toBeDefined();
-    expect(schema.objectProp).toBeDefined();
+    expect(schema.properties).toBeDefined();
+    expect(schema.properties.stringProp).toBeDefined();
+    expect(schema.properties.numberProp).toBeDefined();
+    expect(schema.properties.boolProp).toBeDefined();
+    expect(schema.properties.enumProp).toBeDefined();
+    expect(schema.properties.arrayProp).toBeDefined();
+    expect(schema.properties.objectProp).toBeDefined();
   });
 });
