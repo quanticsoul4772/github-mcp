@@ -75,88 +75,29 @@ export class ToolRegistry {
         }
 
         try {
-            // The MCP SDK only understands Zod schemas, not JSON schemas
-            // We need to convert JSON Schema to Zod
+            // The MCP SDK needs both JSON Schema (for listing) and Zod (for validation)
             const jsonSchema = config.tool.inputSchema as any;
         
         // Check if we have parameters
         const hasParams = jsonSchema && jsonSchema.properties && Object.keys(jsonSchema.properties).length > 0;
         
         if (hasParams) {
-            // Create Zod schema from JSON schema properties
-            const zodSchemaShape: Record<string, z.ZodTypeAny> = {};
-            
-            for (const [key, prop] of Object.entries(jsonSchema.properties as any)) {
-                const propDef = prop as any;
-                const isRequired = jsonSchema.required?.includes(key);
-                
-                // Create a Zod type based on the JSON schema type
-                let zodType: z.ZodTypeAny;
-                
-                switch (propDef.type) {
-                    case 'string':
-                        if (propDef.enum && Array.isArray(propDef.enum) && propDef.enum.length > 0) {
-                            // For enums, we need at least one value
-                            zodType = z.enum(propDef.enum as [string, ...string[]]);
-                        } else {
-                            zodType = z.string();
-                        }
-                        break;
-                    case 'number':
-                        zodType = z.number();
-                        if (typeof propDef.minimum === 'number') {
-                            zodType = (zodType as z.ZodNumber).min(propDef.minimum);
-                        }
-                        if (typeof propDef.maximum === 'number') {
-                            zodType = (zodType as z.ZodNumber).max(propDef.maximum);
-                        }
-                        break;
-                    case 'boolean':
-                        zodType = z.boolean();
-                        break;
-                    case 'array':
-                        if (propDef.items) {
-                            if (propDef.items.type === 'string') {
-                                zodType = z.array(z.string());
-                            } else if (propDef.items.type === 'number') {
-                                zodType = z.array(z.number());
-                            } else if (propDef.items.type === 'object') {
-                                zodType = z.array(z.object({}).passthrough());
-                            } else {
-                                zodType = z.array(z.unknown());
-                            }
-                        } else {
-                            zodType = z.array(z.unknown());
-                        }
-                        break;
-                    case 'object':
-                        zodType = z.object({}).passthrough();
-                        break;
-                    default:
-                        zodType = z.unknown();
-                }
-                
-                // Add description if present
-                if (propDef.description) {
-                    zodType = zodType.describe(propDef.description);
-                }
-                
-                // Make optional if not required
-                if (!isRequired) {
-                    zodType = zodType.optional();
-                }
-                
-                zodSchemaShape[key] = zodType;
-            }
-            
-            // The MCP SDK expects the raw shape, not a ZodObject
+            // For tools with parameters, we need to pass the JSON Schema directly
+            // The MCP SDK will handle its own validation
+            // We'll validate in the handler ourselves
             this.server.tool(
               config.tool.name,
               config.tool.description || 'GitHub API operation',
-              zodSchemaShape,
+              jsonSchema,
           async (args: any) => {
                 const startTime = Date.now();
                 const toolName = config.tool.name;
+                
+                // Debug: Log what we receive from MCP
+                console.error(`[DEBUG] Tool ${toolName} invoked`);
+                console.error(`[DEBUG] Received args:`, JSON.stringify(args, null, 2));
+                console.error(`[DEBUG] Args type: ${typeof args}`);
+                console.error(`[DEBUG] Args keys: ${args ? Object.keys(args).join(', ') : 'null/undefined'}`);
                 
                 try {
                     logger.debug(`Tool invoked: ${toolName}`, { args });
@@ -165,6 +106,8 @@ export class ToolRegistry {
                     // The MCP SDK should have already validated the args using the zodSchema
                     // Ensure args is at least an empty object if undefined
                     const validatedArgs = args ?? {};
+                    
+                    console.error(`[DEBUG] Passing to handler:`, JSON.stringify(validatedArgs, null, 2));
                     
                     // Pass the validated args to the handler
                     const result = await config.handler(validatedArgs);
@@ -202,6 +145,12 @@ export class ToolRegistry {
                     };
                 } catch (error: any) {
                     const duration = Date.now() - startTime;
+                    
+                    // Debug error details
+                    console.error(`[DEBUG] ERROR in ${toolName}:`, error.message);
+                    console.error(`[DEBUG] Error stack:`, error.stack);
+                    console.error(`[DEBUG] Args that caused error:`, JSON.stringify(args, null, 2));
+                    
                     metrics.recordError({ name: 'TOOL_ERROR', message: error.message } as any);
 
                     logger.error(`Tool error: ${toolName}`, {
