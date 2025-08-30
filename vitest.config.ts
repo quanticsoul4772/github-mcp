@@ -5,6 +5,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     setupFiles: ['./src/__tests__/setup.ts'],
+    exclude: ['build/**', 'node_modules/**', 'dist/**'],
     isolate: true, // Better test isolation
     pool: 'threads',
     poolOptions: {

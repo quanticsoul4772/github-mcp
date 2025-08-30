@@ -86,10 +86,13 @@ describe('GitHubMCPServer', () => {
         description: 'GitHub API integration for MCP',
       });
 
-      expect(OptimizedAPIClient).toHaveBeenCalledWith(
-        'ghp_defaultmocktoken_valid_for_tests',
-        expect.any(Object),
-      );
+      expect(OptimizedAPIClient).toHaveBeenCalledWith({
+        octokit: expect.any(Object),
+        enableCache: expect.any(Boolean),
+        enableGraphQLCache: expect.any(Boolean),
+        enableDeduplication: expect.any(Boolean),
+        enablePerformanceMonitoring: expect.any(Boolean),
+      });
     });
 
     it('should use token from getGitHubToken', async () => {
@@ -99,16 +102,30 @@ describe('GitHubMCPServer', () => {
 
       new (GitHubMCPServer as any)({ start: false });
 
-      expect(OptimizedAPIClient).toHaveBeenCalledWith('gho_secondarytoken_valid_for_tests', expect.any(Object));
+      expect(OptimizedAPIClient).toHaveBeenCalledWith({
+        octokit: expect.any(Object),
+        enableCache: expect.any(Boolean),
+        enableGraphQLCache: expect.any(Boolean),
+        enableDeduplication: expect.any(Boolean),
+        enablePerformanceMonitoring: expect.any(Boolean),
+      });
     });
 
     it('should configure read-only mode correctly', async () => {
-        configMock.config.github.readOnly = true;
+        configMock.config.GITHUB_READ_ONLY = true;
         const { GitHubMCPServer } = await import('./index.js');
 
         new (GitHubMCPServer as any)({ start: false });
 
-        expect(ToolRegistryMock).toHaveBeenCalledWith(expect.any(Object), true, expect.any(Array));
+        expect(ToolRegistryMock).toHaveBeenCalledWith(
+            expect.any(Object), // server
+            expect.any(Object), // octokit
+            expect.any(Object), // optimizedClient
+            expect.any(Object), // reliabilityManager
+            expect.any(Object), // healthManager
+            expect.any(Object), // rateLimiter
+            true // readOnly
+        );
     });
 
     it('should pass enabled toolsets to ToolRegistry', async () => {
@@ -117,7 +134,15 @@ describe('GitHubMCPServer', () => {
 
         new (GitHubMCPServer as any)({ start: false });
 
-        expect(ToolRegistryMock).toHaveBeenCalledWith(expect.any(Object), expect.any(Boolean), ['repos', 'issues']);
+        expect(ToolRegistryMock).toHaveBeenCalledWith(
+            expect.any(Object), // server
+            expect.any(Object), // octokit
+            expect.any(Object), // optimizedClient
+            expect.any(Object), // reliabilityManager
+            expect.any(Object), // healthManager
+            expect.any(Object), // rateLimiter
+            expect.any(Boolean) // readOnly
+        );
     });
   });
 

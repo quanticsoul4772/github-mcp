@@ -156,7 +156,9 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
       },
     },
     handler: async (args: unknown) => {
+      console.error('DEBUG: Raw args received:', JSON.stringify(args));
       const params = args as GetRepositoryParams;
+      console.error('DEBUG: Params after cast:', JSON.stringify(params));
       // Validate inputs
       if (!validateOwnerName(params.owner)) {
         throw new ValidationError('owner', 'Invalid repository owner name');

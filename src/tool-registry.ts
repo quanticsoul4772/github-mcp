@@ -74,31 +74,142 @@ export class ToolRegistry {
             return;
         }
 
-        let zodSchema: z.ZodTypeAny | undefined;
         try {
-          const schemaString = jsonSchemaToZod(config.tool.inputSchema as any);
-          // Avoid dynamic code execution. Fall back to permissive schema for now.
-          logger.warn(`Skipping dynamic evaluation of generated schema for tool ${config.tool.name}`);
-          zodSchema = z.object({}).passthrough();
-        } catch (error) {
-          logger.error(`Failed to convert JSON schema to Zod for tool ${config.tool.name}`, { error });
-          zodSchema = z.object({}).passthrough();
+            // The MCP SDK only understands Zod schemas, not JSON schemas
+            // Try to create a basic Zod schema from the JSON schema properties
+            console.error(`DEBUG: Registering tool ${config.tool.name}, converting JSON to Zod`);
+
+            // Store the original JSON schema for validation
+            const jsonSchema = config.tool.inputSchema as any;
+        
+        // Create a proper Zod object schema from the JSON schema
+        // This converts JSON schema properties to a Zod object schema
+        let zodSchemaShape: Record<string, any> = {};
+        
+        console.error(`DEBUG: JSON schema for ${config.tool.name}:`, JSON.stringify(jsonSchema, null, 2));
+        
+        if (jsonSchema && jsonSchema.properties) {
+            // Convert each property to a Zod type
+            for (const [key, prop] of Object.entries(jsonSchema.properties as any)) {
+                const propDef = prop as any;
+                const required = jsonSchema.required?.includes(key);
+                
+                // Create a Zod type based on the JSON schema type
+                let zodType;
+                switch (propDef.type) {
+                    case 'string':
+                        zodType = z.string();
+                        break;
+                    case 'number':
+                        zodType = z.number();
+                        break;
+                    case 'boolean':
+                        zodType = z.boolean();
+                        break;
+                    case 'array':
+                        zodType = z.array(z.unknown());
+                        break;
+                    case 'object':
+                        zodType = z.object({}).passthrough();
+                        break;
+                    default:
+                        zodType = z.unknown();
+                }
+                
+                // Make optional if not required
+                if (!required) {
+                    zodType = zodType.optional();
+                }
+                
+                zodSchemaShape[key] = zodType;
+            }
         }
-
-        // Use the Zod object directly if available, otherwise use empty shape
-        const inputSchema = zodSchema && zodSchema instanceof z.ZodObject ? zodSchema.shape : {};
-
-        this.server.tool(
-          config.tool.name,
-          config.tool.description || 'GitHub API operation',
-          inputSchema,
-          async (args: Record<string, unknown>, extra: unknown) => {
+        
+        // Register with the Zod shape (MCP SDK creates the schema internally)
+        // Pass undefined for no parameters, or the shape object for parameters
+        const hasParams = Object.keys(zodSchemaShape).length > 0;
+        const schemaToPass = hasParams ? zodSchemaShape : undefined;
+        console.error(`DEBUG: Registering with schema shape:`, hasParams ? 'with params' : 'undefined (no params)');
+        
+        if (hasParams) {
+            this.server.tool(
+              config.tool.name,
+              config.tool.description || 'GitHub API operation',
+              schemaToPass as any,
+          async (...allArgs: any[]) => {
+                console.error(`DEBUG: Callback received ${allArgs.length} arguments:`, allArgs.map((arg, i) => `arg${i}: ${JSON.stringify(arg)}`));
+                
+                // Check if we can access the global context or any other place where params might be
+                console.error('DEBUG: this context:', this);
+                console.error('DEBUG: Global keys:', typeof global !== 'undefined' ? Object.keys(global) : 'no global');
+                
+                // The MCP SDK passes parameters differently based on whether it recognizes the schema
+                let args: Record<string, unknown>;
+                let extra: any;
+                
+                if (allArgs.length === 2) {
+                    // We get 2 arguments but the first is empty
+                    args = allArgs[0] as Record<string, unknown>;
+                    extra = allArgs[1];
+                    
+                    // Try to find params in the extra object
+                    if (Object.keys(args).length === 0 && extra) {
+                        console.error('DEBUG: First arg is empty, checking extra object');
+                        console.error('DEBUG: Extra object full structure:', JSON.stringify(extra, null, 2));
+                        console.error('DEBUG: Extra object keys:', Object.keys(extra));
+                        
+                        // Check if there's a hidden property or getter
+                        const descriptors = Object.getOwnPropertyDescriptors(extra);
+                        console.error('DEBUG: Extra property descriptors:', descriptors);
+                        
+                        // Try to find params in various places
+                        if (extra.params) {
+                            console.error('DEBUG: Found params in extra.params:', extra.params);
+                            args = extra.params;
+                        } else if (extra.arguments) {
+                            console.error('DEBUG: Found params in extra.arguments:', extra.arguments);
+                            args = extra.arguments;
+                        } else if (extra._meta) {
+                            console.error('DEBUG: Checking _meta:', extra._meta);
+                        }
+                        
+                        // Check if we can intercept the raw request
+                        if (extra.sendRequest) {
+                            console.error('DEBUG: sendRequest is a function, trying to intercept');
+                            // Try to hook into the request
+                            const originalSendRequest = extra.sendRequest;
+                            extra.sendRequest = function(...requestArgs: any[]) {
+                                console.error('DEBUG: sendRequest called with:', requestArgs);
+                                return originalSendRequest.apply(this, requestArgs);
+                            };
+                        }
+                        
+                        // Try to get the raw request from the MCP protocol
+                        // The parameters might be in a property we can't see in JSON.stringify
+                        for (const key in extra) {
+                            if (!['signal', 'sessionId', '_meta', 'sendNotification', 'sendRequest', 'authInfo', 'requestId', 'requestInfo'].includes(key)) {
+                                console.error(`DEBUG: Found unexpected key in extra: ${key} =`, extra[key]);
+                            }
+                        }
+                    }
+                } else if (allArgs.length === 1) {
+                    // Single argument case
+                    const context = allArgs[0] as any;
+                    console.error('DEBUG: Single argument, full structure:', JSON.stringify(context, null, 2));
+                    args = context.params || context.arguments || context.args || {};
+                    extra = context;
+                } else {
+                    // Fallback
+                    args = allArgs[0] as Record<string, unknown> || {};
+                    extra = allArgs[1];
+                }
                 const startTime = Date.now();
                 const toolName = config.tool.name;
                 try {
                     logger.debug(`Tool invoked: ${toolName}`, { args });
                     metrics.recordApiCall({ method: 'TOOL', url: toolName } as any);
 
+                    // Pass the actual args (first parameter) to the handler, not the extra
                     const result = await config.handler(args);
 
                     const duration = Date.now() - startTime;
@@ -170,6 +281,10 @@ export class ToolRegistry {
 
         this.registeredTools.add(config.tool.name);
         this.toolCount++;
+        } catch (error) {
+            console.error(`ERROR: Failed to register tool ${config.tool.name}:`, error);
+            logger.error(`Failed to register tool ${config.tool.name}`, { error });
+        }
     }
 
     public registerAllTools() {
@@ -202,10 +317,13 @@ export class ToolRegistry {
             },
             {
                 name: 'repos',
-                createTools: () => [
-                    ...createRepositoryTools(this.octokit, this.readOnly),
-                    ...createOptimizedRepositoryTools(this.optimizedClient, this.readOnly),
-                ],
+                createTools: () => {
+                    const repoTools = createRepositoryTools(this.octokit, this.readOnly);
+                    const optimizedTools = this.optimizedClient 
+                        ? createOptimizedRepositoryTools(this.optimizedClient, this.readOnly)
+                        : [];
+                    return [...repoTools, ...optimizedTools];
+                },
                 condition: this.enabledToolsets.has('repos'),
             },
             { name: 'issues', createTools: () => createIssueTools(this.octokit, this.readOnly), condition: this.enabledToolsets.has('issues') },
@@ -216,15 +334,31 @@ export class ToolRegistry {
             { name: 'users', createTools: () => createUserTools(this.octokit, this.readOnly), condition: this.enabledToolsets.has('users') },
             { name: 'orgs', createTools: () => createOrganizationTools(this.octokit, this.readOnly), condition: this.enabledToolsets.has('orgs') },
             { name: 'notifications', createTools: () => createNotificationTools(this.octokit, this.readOnly), condition: this.enabledToolsets.has('notifications') },
-            { name: 'discussions', createTools: () => createDiscussionTools(this.optimizedClient.getOctokit(), this.readOnly), condition: this.enabledToolsets.has('discussions') },
+            { name: 'discussions', createTools: () => {
+                const octokit = (this.optimizedClient && typeof this.optimizedClient.getOctokit === 'function') 
+                    ? this.optimizedClient.getOctokit() 
+                    : this.octokit;
+                return createDiscussionTools(octokit, this.readOnly);
+            }, condition: this.enabledToolsets.has('discussions') },
             { name: 'dependabot', createTools: () => createDependabotTools(this.octokit, this.readOnly), condition: this.enabledToolsets.has('dependabot') },
             { name: 'secret_protection', createTools: () => createSecretScanningTools(this.octokit, this.readOnly), condition: this.enabledToolsets.has('secret_protection') },
-            { name: 'graphql_insights', createTools: () => createRepositoryInsightsTools(this.optimizedClient.getOctokit(), this.readOnly), condition: this.enabledToolsets.has('graphql_insights') },
-            { name: 'advanced_search', createTools: () => createAdvancedSearchTools(this.optimizedClient, this.readOnly), condition: this.enabledToolsets.has('advanced_search') },
+            { name: 'graphql_insights', createTools: () => {
+                const octokit = (this.optimizedClient && typeof this.optimizedClient.getOctokit === 'function')
+                    ? this.optimizedClient.getOctokit()
+                    : this.octokit;
+                return createRepositoryInsightsTools(octokit, this.readOnly);
+            }, condition: this.enabledToolsets.has('graphql_insights') },
+            { name: 'advanced_search', createTools: () => {
+                // Advanced search needs the optimized client, but can fall back to regular octokit
+                return createAdvancedSearchTools(this.optimizedClient || { getOctokit: () => this.octokit } as any, this.readOnly);
+            }, condition: this.enabledToolsets.has('advanced_search') },
             { name: 'project_management', createTools: () => createProjectManagementTools(this.octokit, this.readOnly), condition: this.enabledToolsets.has('project_management') },
             { name: 'batch_operations', createTools: () => createBatchOperationsTools(this.octokit, this.readOnly), condition: this.enabledToolsets.has('batch_operations') },
             { name: 'health', createTools: () => createHealthTools(this.healthManager), condition: true }, // always enabled
-            { name: 'cache_management', createTools: () => createCacheManagementTools(this.optimizedClient), condition: true }, // always enabled
+            { name: 'cache_management', createTools: () => {
+                // Cache management needs the optimized client, skip if not available
+                return this.optimizedClient ? createCacheManagementTools(this.optimizedClient) : [];
+            }, condition: true }, // always enabled
             { name: 'monitoring', createTools: () => createHealthTools(this.healthManager), condition: this.enabledToolsets.has('monitoring') },
             {
                 name: 'performance',
@@ -240,7 +374,9 @@ export class ToolRegistry {
                     {
                         tool: { name: 'clear_api_cache', description: 'Clear all API response caches', inputSchema: { type: 'object' as const, properties: {} } },
                         handler: async () => {
-                            this.optimizedClient.clearCache();
+                            if (this.optimizedClient && typeof this.optimizedClient.clearCache === 'function') {
+                                this.optimizedClient.clearCache();
+                            }
                             return { success: true, message: 'All caches cleared' };
                         },
                     },

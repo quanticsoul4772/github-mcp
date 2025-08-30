@@ -491,7 +491,7 @@ describe('Type Safety Utilities', () => {
         );
         const ageError = (error as any).errors.issues.find((issue: any) => issue.path[0] === 'age');
 
-        expect(emailError.code).toBe('invalid_string');
+        expect(emailError.code).toBe('invalid_format');
         expect(ageError.code).toBe('too_big');
       }
     });

@@ -88,13 +88,19 @@ export class GitHubMCPServer {
     const token = getGitHubToken();
 
     // Create rate-limited Octokit instance with logging
-    const rateLimitedSetup = createRateLimitedOctokit(token);
-    this.octokit = rateLimitedSetup.octokit;
-    this.rateLimiter = rateLimitedSetup.rateLimiter;
-
-    // Configure base URL if using GitHub Enterprise
+    // For GitHub Enterprise, we need to create a custom Octokit instance
     if (config.GITHUB_HOST) {
-      const rateLimitedSetup = createRateLimitedOctokit(token, { baseUrl: config.GITHUB_HOST });
+      // Create rate limiter separately
+      this.rateLimiter = new GitHubRateLimiter();
+      
+      // Create Octokit with custom base URL and rate limiting
+      this.octokit = new Octokit({
+        auth: token,
+        baseUrl: config.GITHUB_HOST,
+      });
+    } else {
+      // Use the standard rate-limited setup
+      const rateLimitedSetup = createRateLimitedOctokit(token);
       this.octokit = rateLimitedSetup.octokit;
       this.rateLimiter = rateLimitedSetup.rateLimiter;
     }

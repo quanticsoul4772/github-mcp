@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Octokit } from '@octokit/rest';
-import { validateGitHubToken } from '../config.js';
+import { validateGitHubToken, validateEnvironmentConfiguration } from '../config.js';
 import { AuthenticationError, AuthorizationError, formatErrorResponse } from '../errors.js';
 
 describe('Authentication Security Tests', () => {

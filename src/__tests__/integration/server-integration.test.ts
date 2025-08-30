@@ -29,9 +29,9 @@ vi.mock('../../rate-limiter.js', () => ({
 // Mock other dependencies to prevent import errors
 vi.mock('../../optimized-api-client.js', () => ({
   OptimizedAPIClient: vi.fn().mockImplementation(() => ({
-    getOctokit: () => ({
+    getOctokit: vi.fn(() => ({
         graphql: vi.fn()
-    }),
+    })),
     clearCache: vi.fn(),
   })),
 }));

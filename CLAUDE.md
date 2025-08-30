@@ -17,61 +17,62 @@ npm start            # Run the compiled version
 npm run clean        # Remove build artifacts
 ```
 
-### Type Checking and Testing
+### Testing and Quality Checks
 ```bash
-npx tsc --noEmit     # Type check without emitting files
-npm test             # Run tests with Vitest
-npm run test:ui      # Run tests with UI
-npm run test:coverage # Run tests with coverage report
+# Type checking
+npm run typecheck    # Type check without emitting files (alias: npm run type-check)
+
+# Testing
+npm test            # Run all tests with Vitest
+npm run test:ui     # Run tests with UI
+npm run test:coverage  # Run tests with coverage report
+npm run test:unit   # Run unit tests only (excludes integration tests)
+npm run test:integration  # Run integration tests only
+npm run test:watch  # Run tests in watch mode
+
+# Linting and formatting
+npm run lint        # Run ESLint (fails on warnings)
+npm run lint:fix    # Run ESLint with auto-fix
+npm run format      # Format code with Prettier
+npm run format:check  # Check formatting without fixing
+
+# Security
+npm run security:scan  # Run security audit and secret scanning
 ```
 
 ## Architecture
 
-### Core Structure
-- **Entry Point**: `src/index.ts` - MCP server initialization, tool registration, and request handling
-- **Tool Modules**: `src/tools/*.ts` - Separate modules for each GitHub feature category
-- **Type Definitions**: `src/types.ts` - Shared TypeScript interfaces and types
-- **Tool Types**: `src/tool-types.ts` - Comprehensive parameter and result types for all tools
-- **Validation**: `src/validation.ts` - Input validation and sanitization utilities
-- **Error Handling**: `src/errors.ts` - Standardized error types and handling
+### Entry Points
+- **Main Server**: `src/main.ts` - Production entry point (loads .env, starts server)
+- **Server Class**: `src/index.ts` - GitHubMCPServer class with MCP protocol implementation
+- **Tool Registry**: `src/tool-registry.ts` - Dynamic tool registration and management
 
-### Performance Optimization Features
-- **Caching**: `src/cache.ts` - API response caching with LRU eviction
-- **Batch Operations**: `src/batch-operations.ts` - Efficient batch processing utilities  
-- **Request Deduplication**: `src/request-deduplication.ts` - Prevents duplicate API calls
-- **Performance Monitor**: `src/performance-monitor.ts` - Comprehensive metrics and monitoring
-- **Pagination Handler**: `src/pagination-handler.ts` - Smart pagination with streaming support
-- **Optimized API Client**: `src/optimized-api-client.ts` - Integrated performance optimizations
-
-### Reliability & Health Features
-- **Reliability**: `src/reliability.ts` - Circuit breaker, retry logic, and telemetry
-- **Health Monitoring**: `src/health.ts` - Health checks and system status monitoring
+### Core Modules
+- **Performance**: `src/optimized-api-client.ts` - Centralized client with caching, deduplication, and monitoring
+- **Reliability**: `src/reliability.ts` - Circuit breaker pattern and exponential backoff retry
+- **Health**: `src/health.ts` - System health checks and GitHub API connectivity monitoring
+- **GraphQL**: `src/graphql-utils.ts` - GraphQL query builder with complexity analysis
+- **Validation**: `src/validation.ts` - Input sanitization and schema validation
 
 ### Tool Organization
-The server organizes GitHub functionality into toolsets:
+Tools are organized in `src/tools/` by feature area. Each module exports a `create*Tools()` function:
 - `repositories.ts` - File operations, branches, commits, releases
-- `optimized-repositories.ts` - Performance-optimized repository operations
-- `issues.ts` - Issue management and comments
+- `issues.ts` - Issue management (uses modular architecture in `issues/` subdirectory)
 - `pull-requests.ts` - PR creation, review, merge operations
 - `actions.ts` - GitHub Actions workflows and runs
-- `code-security.ts` - Code scanning alerts
-- `secret-scanning.ts` - Secret scanning alerts
-- `dependabot.ts` - Vulnerability alerts
 - `discussions.ts` - GraphQL-based discussion management
-- `notifications.ts` - Notification management
-- `users.ts` - User profile operations
-- `organizations.ts` - Organization management
-- `search.ts` - Code and repository search
-- `health.ts` - System health monitoring and diagnostics
+- `advanced-search.ts` - Enhanced search with GraphQL
+- `project-management.ts` - GitHub Projects V2 integration
+- `repository-insights.ts` - Repository analytics and statistics
 
-### Key Patterns
-1. **Tool Registration**: Each tool module exports a `create*Tools()` function that returns an array of `ToolConfig` objects
-2. **Schema Conversion**: The main server converts JSON schemas to Zod schemas for validation
-3. **Read-Only Mode**: Tools check the `readOnly` flag to prevent write operations when enabled
-4. **Error Handling**: Consistent error responses with status codes and messages
-5. **Performance Optimization**: Integrated caching, deduplication, and monitoring for all API operations
-6. **Reliability Features**: All API operations use circuit breakers, exponential backoff retry, and telemetry tracking
-7. **Health Monitoring**: Continuous monitoring of GitHub API connectivity and rate limits
+### Key Architectural Patterns
+1. **Tool Registration**: Each tool module exports `create*Tools()` returning `ToolConfig[]`
+2. **Schema Conversion**: JSON schemas are converted to Zod schemas for runtime validation
+3. **Unified Error Handling**: All tools use `formatErrorResponse()` for consistent error messages
+4. **Performance by Default**: All API calls go through OptimizedAPIClient with caching/deduplication
+5. **Reliability Pattern**: Circuit breaker + exponential backoff on all external calls
+6. **GraphQL Integration**: Complex queries use GraphQL with automatic pagination and complexity analysis
+7. **Modular Tool Architecture**: Complex tools (like issues) use separate handler files for each operation
 
 ## Configuration
 
@@ -95,67 +96,60 @@ GITHUB_ENABLE_DEDUPLICATION=true      # Enable request deduplication (default: t
 GITHUB_ENABLE_MONITORING=true         # Enable performance monitoring (default: true)
 ```
 
-## MCP Server Integration
+## Testing Strategy
 
-The server implements the MCP protocol with:
-- **Tools**: Exposed GitHub operations as callable tools
-- **Resources**: Browseable GitHub data (repositories, user info)
-- **Performance Monitoring**: Real-time metrics and performance tracking
-- **Health Checks**: System status and GitHub API connectivity monitoring
+### Test Organization
+Tests are located alongside source files (`*.test.ts`) and in `src/__tests__/` for integration tests:
+- Unit tests: Test individual functions and classes in isolation
+- Integration tests: Test API interactions with mocked Octokit
+- Performance tests: Benchmark critical paths and memory usage
+- Load tests: Simulate concurrent API requests
 
-## Key Features
-
-### Performance Optimizations
-- **Smart Caching**: LRU cache with TTL for API responses
-- **Request Deduplication**: Prevents duplicate concurrent API calls
-- **Batch Operations**: Efficient processing of multiple items
-- **Streaming Pagination**: Memory-efficient handling of large result sets
-- **Connection Pooling**: Reuses HTTP connections for better performance
-- **Parallel Processing**: Concurrent execution with configurable limits
-
-### Reliability Features
-- **Circuit Breaker**: Prevents cascading failures
-- **Exponential Backoff**: Smart retry logic for transient failures
-- **Health Monitoring**: Continuous system health checks
-- **Rate Limit Management**: Proactive rate limit tracking
-- **Telemetry**: Comprehensive monitoring and logging
-
-## Error Handling
-
-The server implements comprehensive error handling:
-- Custom error types for different failure scenarios
-- Automatic retry for transient failures
-- Circuit breaker to prevent system overload
-- Detailed error messages with remediation hints
-- Error telemetry and monitoring
-
-## Testing
-
+### Running Specific Tests
 ```bash
-npm test                  # Run all tests
-npm run test:unit         # Unit tests only
-npm run test:integration  # Integration tests
-npm run test:coverage     # Generate coverage report
+# Run a single test file
+npm test src/tools/issues.test.ts
+
+# Run tests matching a pattern
+npm test -- --grep "should create issue"
+
+# Debug a specific test
+npm test -- --inspect-brk src/tools/issues.test.ts
 ```
 
-## Debugging
+## Agent System
 
-Enable verbose logging:
+The codebase includes an AI agent system (`src/agents/`) for automated analysis:
+- **Code Analysis Agent**: Static analysis and code quality checks
+- **Security Agent**: Security vulnerability scanning
+- **Testing Agent**: Test generation and coverage analysis
+- **Type Safety Agent**: TypeScript type checking and inference
+
+Use agent commands:
 ```bash
-GITHUB_TELEMETRY_VERBOSE=true npm run dev
+npm run agents:analyze        # Run comprehensive analysis
+npm run agents:security-scan  # Security-focused scan
+npm run agents:generate-tests # Generate tests for a file
 ```
 
-Monitor performance metrics:
-```bash
-GITHUB_ENABLE_MONITORING=true npm run dev
-```
+## Common Development Tasks
 
-## Best Practices
+### Adding a New Tool
+1. Create tool module in `src/tools/your-tool.ts`
+2. Export `createYourTools()` function returning `ToolConfig[]`
+3. Add to `TOOLSET_MAPPING` in `src/tool-registry.ts`
+4. Write tests in `src/tools/your-tool.test.ts`
+5. Update type definitions in `src/tool-types.ts`
 
-1. Always validate environment configuration before starting
-2. Use the optimized API client for better performance
-3. Enable caching for read-heavy workloads
-4. Monitor health status for production deployments
-5. Configure appropriate retry and circuit breaker settings
-6. Use batch operations for processing multiple items
-7. Enable telemetry for production monitoring
+### Debugging API Issues
+1. Enable verbose telemetry: `GITHUB_TELEMETRY_VERBOSE=true`
+2. Check rate limits: Look for `X-RateLimit-*` headers in logs
+3. Use health endpoint to verify connectivity
+4. Review circuit breaker status in telemetry output
+
+### Working with GraphQL
+GraphQL queries are used for complex operations (discussions, projects, insights):
+1. Define query in tool implementation
+2. Use `GraphQLQueryBuilder` for dynamic queries
+3. Complexity is automatically calculated and validated
+4. Pagination is handled by `GraphQLPaginationHandler`

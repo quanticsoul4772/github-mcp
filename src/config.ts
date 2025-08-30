@@ -383,7 +383,9 @@ export function displayConfig(): void {
  */
 export function shouldBypassValidation(): boolean {
     // Only allow bypass in development mode with explicit flag
-    return config.NODE_ENV === 'development' && config.SKIP_VALIDATION;
+    // Check process.env directly for test compatibility
+    return (process.env.NODE_ENV === 'development' || config.NODE_ENV === 'development') && 
+           (process.env.SKIP_VALIDATION === 'true' || config.SKIP_VALIDATION);
 }
 
 /**
@@ -448,9 +450,9 @@ export function validateGitHubTokenWithResult(
   if (shouldBypassValidation()) {
     warnings.push(
       createValidationWarning(
-        'DEV_BYPASS',
-        'Validation bypassed in development mode',
         'githubToken',
+        'Validation bypassed in development mode',
+        'DEV_BYPASS',
         'Only use this in development environments'
       )
     );
@@ -464,12 +466,9 @@ export function validateGitHubTokenWithResult(
   if (!sanitizedToken || typeof sanitizedToken !== 'string') {
     errors.push(
       createValidationError(
-        'MISSING_TOKEN',
-        'GitHub token is required',
         'githubToken',
-        'error',
-        true,
-        'Provide a valid GitHub Personal Access Token'
+        'GitHub token is required',
+        'MISSING_TOKEN'
       )
     );
     return createErrorResult(errors, warnings, [
@@ -486,12 +485,9 @@ export function validateGitHubTokenWithResult(
   if (hasWhitespace) {
     errors.push(
       createValidationError(
-        'TOKEN_CONTAINS_WHITESPACE',
-        'Token contains whitespace characters',
         'githubToken',
-        'error',
-        true,
-        'Remove any spaces, tabs, or newlines from the token'
+        'Token contains whitespace characters',
+        'TOKEN_CONTAINS_WHITESPACE'
       )
     );
   }
@@ -501,12 +497,9 @@ export function validateGitHubTokenWithResult(
   if (typeof formatResult === 'object' && !formatResult.isValid) {
     errors.push(
       createValidationError(
-        'INVALID_TOKEN_FORMAT',
-        formatResult.error || 'Invalid token format',
         'githubToken',
-        'error',
-        true,
-        "Ensure the token follows GitHub's format requirements"
+        formatResult.error || 'Invalid token format',
+        'INVALID_TOKEN_FORMAT'
       )
     );
   }
@@ -531,7 +524,7 @@ export async function validateGitHubTokenWithAPI(
 ): Promise<ValidationResult<{ token: string; user: any }>> {
   // First check format using the comprehensive validation
   const formatResult = validateGitHubTokenWithResult(token);
-  if (!formatResult.valid) {
+  if (!formatResult.isValid) {
     return createErrorResult<{ token: string; user: any }>(
       formatResult.errors,
       formatResult.warnings,
@@ -545,9 +538,9 @@ export async function validateGitHubTokenWithAPI(
       { token, user: { login: 'dev-user' } },
       [
         createValidationWarning(
-          'DEV_BYPASS',
+          'githubToken',
           'API validation bypassed in development mode',
-          'githubToken'
+          'DEV_BYPASS'
         ),
       ],
       ['Set NODE_ENV=production to enable full API validation']
@@ -558,12 +551,9 @@ export async function validateGitHubTokenWithAPI(
   if (typeof fetch === 'undefined' && typeof global !== 'undefined' && !global.fetch) {
     return createErrorResult<{ token: string; user: any }>([
       createValidationError(
-        'FETCH_NOT_AVAILABLE',
-        'Fetch API not available in this environment',
         'githubToken',
-        'error',
-        true,
-        'API validation requires fetch support (Node.js 18+ or modern browser)'
+        'Fetch API not available in this environment',
+        'FETCH_NOT_AVAILABLE'
       ),
     ]);
   }
@@ -584,12 +574,9 @@ export async function validateGitHubTokenWithAPI(
         if (response.status === 401) {
           return createErrorResult<{ token: string; user: any }>([
             createValidationError(
-              'TOKEN_UNAUTHORIZED',
-              'Token is invalid or expired',
               'githubToken',
-              'error',
-              true, // Recoverable - user can get new token
-              'Create a new token at https://github.com/settings/tokens'
+              'Token is invalid or expired',
+              'TOKEN_UNAUTHORIZED'
             ),
           ]);
         }
@@ -602,12 +589,9 @@ export async function validateGitHubTokenWithAPI(
 
           return createErrorResult<{ token: string; user: any }>([
             createValidationError(
-              'RATE_LIMITED',
-              'API rate limit exceeded',
               'githubToken',
-              'warning',
-              true,
-              `Wait until ${resetTime} before trying again`
+              'API rate limit exceeded',
+              'RATE_LIMITED'
             ),
           ]);
         }
@@ -615,12 +599,9 @@ export async function validateGitHubTokenWithAPI(
         if (!response.ok) {
           return createErrorResult<{ token: string; user: any }>([
             createValidationError(
-              'API_ERROR',
-              `GitHub API returned ${response.status}: ${response.statusText}`,
               'githubToken',
-              'warning',
-              true,
-              'Check GitHub status at https://www.githubstatus.com/'
+              `GitHub API returned ${response.status}: ${response.statusText}`,
+              'API_ERROR'
             ),
           ]);
         }
@@ -631,12 +612,9 @@ export async function validateGitHubTokenWithAPI(
       } catch (error) {
         return createErrorResult<{ token: string; user: any }>([
           createValidationError(
-            'NETWORK_ERROR',
-            `Network error during validation: ${error instanceof Error ? error.message : String(error)}`,
             'githubToken',
-            'warning',
-            true,
-            'Check your internet connection and try again'
+            `Network error during validation: ${error instanceof Error ? error.message : String(error)}`,
+            'NETWORK_ERROR'
           ),
         ]);
       }
@@ -810,9 +788,9 @@ export function validateEnvironmentConfiguration(): {
 } {
   const result = validateEnvironmentConfigurationWithResult();
   return {
-    isValid: result.valid,
+    isValid: result.isValid,
     errors: result.errors.map(e => e.message),
-    sanitizedValues: result.value || {},
+    sanitizedValues: result.data || {},
   };
 }
 
@@ -833,9 +811,9 @@ export function validateEnvironmentConfigurationWithResult(): ValidationResult<
       mockValues,
       [
         createValidationWarning(
-          'DEV_BYPASS',
+          'environment',
           'Environment validation bypassed in development mode',
-          'environment'
+          'DEV_BYPASS'
         ),
       ],
       ['Set NODE_ENV=production to enable full environment validation']
@@ -860,25 +838,22 @@ export function validateEnvironmentConfigurationWithResult(): ValidationResult<
   if (!token) {
     errors.push(
       createValidationError(
-        'MISSING_REQUIRED_TOKEN',
-        'GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN environment variable is required',
         'GITHUB_TOKEN',
-        'error',
-        false,
-        'Set one of these environment variables with your GitHub Personal Access Token'
+        'GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN environment variable is required',
+        'MISSING_REQUIRED_TOKEN'
       )
     );
     suggestions.push('Create a token at: https://github.com/settings/tokens');
     suggestions.push('Required scopes: repo, workflow, user, notifications');
   } else {
     const tokenResult = validateGitHubTokenWithResult(token);
-    if (!tokenResult.valid) {
+    if (!tokenResult.isValid) {
       // Propagate token validation errors
       errors.push(...tokenResult.errors);
       warnings.push(...tokenResult.warnings);
       suggestions.push(...tokenResult.suggestions);
     } else {
-      sanitizedValues.GITHUB_TOKEN = tokenResult.value!;
+      sanitizedValues.GITHUB_TOKEN = tokenResult.data!;
       warnings.push(...tokenResult.warnings);
     }
   }
@@ -899,12 +874,9 @@ export function validateEnvironmentConfigurationWithResult(): ValidationResult<
       if (sanitized === null) {
         errors.push(
           createValidationError(
-            'INVALID_ENV_VAR_FORMAT',
-            `Invalid format for environment variable ${name}`,
             name,
-            'error',
-            false,
-            `Check the format requirements for ${name}`
+            `Invalid format for environment variable ${name}`,
+            'INVALID_ENV_VAR_FORMAT'
           )
         );
       } else {
@@ -914,9 +886,10 @@ export function validateEnvironmentConfigurationWithResult(): ValidationResult<
         if (name === 'GITHUB_READ_ONLY' && sanitized === 'true') {
           warnings.push(
             createValidationWarning(
-              'READ_ONLY_MODE',
-              'Running in read-only mode - write operations will be disabled',
               name,
+              'Running in read-only mode - write operations will be disabled',
+              'READ_ONLY_MODE',
+              undefined,
               'Set to false to enable write operations'
             )
           );
@@ -930,9 +903,9 @@ export function validateEnvironmentConfigurationWithResult(): ValidationResult<
   if (!nodeEnv) {
     warnings.push(
       createValidationWarning(
-        'NODE_ENV_NOT_SET',
-        'NODE_ENV environment variable is not set',
         'NODE_ENV',
+        'NODE_ENV environment variable is not set',
+        'NODE_ENV_NOT_SET',
         'Set NODE_ENV=production for production deployments'
       )
     );
@@ -941,9 +914,9 @@ export function validateEnvironmentConfigurationWithResult(): ValidationResult<
   if (nodeEnv === 'development') {
     warnings.push(
       createValidationWarning(
-        'DEVELOPMENT_MODE',
-        'Running in development mode',
         'NODE_ENV',
+        'Running in development mode',
+        'DEVELOPMENT_MODE',
         'Use NODE_ENV=production for production deployments'
       )
     );
@@ -953,9 +926,9 @@ export function validateEnvironmentConfigurationWithResult(): ValidationResult<
   if (getEnvVar('DEBUG') && nodeEnv === 'production') {
     warnings.push(
       createValidationWarning(
-        'DEBUG_IN_PRODUCTION',
-        'DEBUG environment variable is set in production mode',
         'DEBUG',
+        'DEBUG environment variable is set in production mode',
+        'DEBUG_IN_PRODUCTION',
         'Remove DEBUG variable in production for security'
       )
     );
@@ -978,10 +951,10 @@ export function validateEnvironmentConfigurationGraceful(): ValidationResult<{
   const result = validateEnvironmentConfigurationWithResult();
 
   // If validation passed normally, return success
-  if (result.valid) {
+  if (result.isValid) {
     return createSuccessResult(
       {
-        sanitizedValues: result.value!,
+        sanitizedValues: result.data!,
         degradedMode: false,
         missingFeatures: [],
       },
@@ -996,12 +969,8 @@ export function validateEnvironmentConfigurationGraceful(): ValidationResult<{
   const warnings: ValidationWarning[] = [...result.warnings];
   const suggestions: string[] = [...result.suggestions];
 
-  // Check for critical vs non-critical errors
-  const criticalErrors = result.errors.filter(e => !e.recoverable);
-  const recoverableErrors = result.errors.filter(e => e.recoverable);
-
-  // If there are critical errors (like missing token), we can't proceed
-  if (criticalErrors.length > 0) {
+  // If there are any errors, we can't proceed
+  if (result.errors.length > 0) {
     return createErrorResult(result.errors, warnings, suggestions);
   }
 
@@ -1021,9 +990,9 @@ export function validateEnvironmentConfigurationGraceful(): ValidationResult<{
     missingFeatures.push('Token validation');
     warnings.push(
       createValidationWarning(
-        'DEGRADED_TOKEN_VALIDATION',
-        'Token format validation failed, proceeding with degraded validation',
         'GITHUB_TOKEN',
+        'Token format validation failed, proceeding with degraded validation',
+        'DEGRADED_TOKEN_VALIDATION',
         'Fix token format issues for full functionality'
       )
     );

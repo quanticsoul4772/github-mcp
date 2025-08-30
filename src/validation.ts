@@ -9,8 +9,8 @@ function shouldBypassValidation(): boolean {
   return process.env.NODE_ENV === 'development' && process.env.SKIP_VALIDATION === 'true';
 }
 
-// Re-export validation utilities for compatibility
-export {
+// Import validation utilities
+import {
   ValidationResult,
   ValidationErrorDetail,
   ValidationWarning,
@@ -19,46 +19,25 @@ export {
   createValidationError,
   createValidationWarning,
   withRetry,
-  DEFAULT_RETRY_CONFIG
+  DEFAULT_RETRY_CONFIG as IMPORTED_RETRY_CONFIG
+} from './validation-utils.js';
+
+// Re-export for compatibility
+export {
+  ValidationResult,
+  ValidationErrorDetail,
+  ValidationWarning,
+  createSuccessResult,
+  createErrorResult,
+  createValidationError,
+  createValidationWarning,
+  withRetry
 } from './validation-utils.js';
 
 /**
  * Input validation utilities for GitHub MCP Server
  * Provides security-focused validation for user inputs with error recovery and graceful degradation
  */
-
-/**
- * Validation error detail with context information
- */
-export interface ValidationErrorDetail {
-  code: string;
-  message: string;
-  field: string;
-  severity: 'error' | 'warning' | 'info';
-  recoverable: boolean;
-  suggestion?: string | undefined;
-}
-
-/**
- * Validation warning with helpful context
- */
-export interface ValidationWarning {
-  code: string;
-  message: string;
-  field: string;
-  suggestion?: string | undefined;
-}
-
-/**
- * Comprehensive validation result
- */
-export interface ValidationResult<T = any> {
-  valid: boolean;
-  value?: T;
-  errors: ValidationErrorDetail[];
-  warnings: ValidationWarning[];
-  suggestions: string[];
-}
 
 /**
  * Circuit breaker state for validation operations
@@ -80,14 +59,9 @@ interface RetryConfig {
 }
 
 /**
- * Default retry configuration
+ * Default retry configuration (re-export from validation-utils)
  */
-export const DEFAULT_RETRY_CONFIG: RetryConfig = {
-  maxAttempts: 3,
-  baseDelayMs: 1000,
-  maxDelayMs: 10000,
-  backoffMultiplier: 2,
-};
+export const DEFAULT_RETRY_CONFIG: RetryConfig = IMPORTED_RETRY_CONFIG;
 
 /**
  * Circuit breaker registry for different validation types
@@ -99,7 +73,7 @@ const circuitBreakers = new Map<string, CircuitBreakerState>();
  */
 const validationCache = new Map<
   string,
-  { result: ValidationResult; timestamp: number; ttl: number }
+  { result: ValidationResult<any>; timestamp: number; ttl: number }
 >();
 
 /**
@@ -152,64 +126,7 @@ if (typeof process !== 'undefined' && typeof setInterval !== 'undefined') {
   }
 }
 
-/**
- * Creates a validation result with success
- */
-export function createSuccessResult<T>(
-  value: T,
-  warnings: ValidationWarning[] = [],
-  suggestions: string[] = []
-): ValidationResult<T> {
-  return {
-    valid: true,
-    value,
-    errors: [],
-    warnings,
-    suggestions,
-  };
-}
-
-/**
- * Creates a validation result with errors
- */
-export function createErrorResult<T>(
-  errors: ValidationErrorDetail[],
-  warnings: ValidationWarning[] = [],
-  suggestions: string[] = []
-): ValidationResult<T> {
-  return {
-    valid: false,
-    errors,
-    warnings,
-    suggestions,
-  };
-}
-
-/**
- * Creates a validation error
- */
-export function createValidationError(
-  code: string,
-  message: string,
-  field: string,
-  severity: 'error' | 'warning' | 'info' = 'error',
-  recoverable = false,
-  suggestion?: string
-): ValidationErrorDetail {
-  return { code, message, field, severity, recoverable, suggestion };
-}
-
-/**
- * Creates a validation warning
- */
-export function createValidationWarning(
-  code: string,
-  message: string,
-  field: string,
-  suggestion?: string
-): ValidationWarning {
-  return { code, message, field, suggestion };
-}
+// These functions are now imported from validation-utils.js and re-exported above
 
 /**
  * Gets or creates a circuit breaker for a validation type
@@ -267,97 +184,7 @@ async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/**
- * Executes a validation function with retry logic and exponential backoff
- */
-export async function withRetry<T>(
-  validationFn: () => Promise<ValidationResult<T>> | ValidationResult<T>,
-  config: RetryConfig = DEFAULT_RETRY_CONFIG,
-  circuitBreakerType?: string
-): Promise<ValidationResult<T>> {
-  let lastResult: ValidationResult<T> | null = null;
-  let delay = config.baseDelayMs;
-
-  for (let attempt = 1; attempt <= config.maxAttempts; attempt++) {
-    try {
-      // Check circuit breaker if specified
-      if (circuitBreakerType && isCircuitBreakerOpen(circuitBreakerType)) {
-        return createErrorResult([
-          createValidationError(
-            'CIRCUIT_BREAKER_OPEN',
-            `Validation circuit breaker is open for ${circuitBreakerType}. Service may be experiencing issues.`,
-            circuitBreakerType,
-            'warning',
-            true,
-            'Wait a few minutes and try again, or check service status'
-          ),
-        ]);
-      }
-
-      const result = await validationFn();
-
-      // Update circuit breaker on success
-      if (circuitBreakerType) {
-        updateCircuitBreaker(circuitBreakerType, result.valid);
-      }
-
-      // Return immediately if validation succeeded
-      if (result.valid) {
-        return result;
-      }
-
-      lastResult = result;
-
-      // Check if any errors are non-recoverable
-      const hasNonRecoverableError = result.errors.some(error => !error.recoverable);
-      if (hasNonRecoverableError) {
-        break;
-      }
-
-      // Wait before retry (except on last attempt)
-      if (attempt < config.maxAttempts) {
-        await sleep(Math.min(delay, config.maxDelayMs));
-        delay *= config.backoffMultiplier;
-      }
-    } catch (error) {
-      // Update circuit breaker on exception
-      if (circuitBreakerType) {
-        updateCircuitBreaker(circuitBreakerType, false);
-      }
-
-      // On last attempt, return the error
-      if (attempt === config.maxAttempts) {
-        return createErrorResult([
-          createValidationError(
-            'VALIDATION_EXCEPTION',
-            `Validation failed with exception: ${error instanceof Error ? error.message : String(error)}`,
-            'unknown',
-            'error',
-            true,
-            'Check input format and try again'
-          ),
-        ]);
-      }
-
-      // Wait before retry
-      await sleep(Math.min(delay, config.maxDelayMs));
-      delay *= config.backoffMultiplier;
-    }
-  }
-
-  return (
-    lastResult ||
-    createErrorResult([
-      createValidationError(
-        'VALIDATION_FAILED',
-        'Validation failed after all retry attempts',
-        'unknown',
-        'error',
-        true
-      ),
-    ])
-  );
-}
+// withRetry is now imported from validation-utils.js and re-exported above
 
 /**
  * Gets cached validation result if available and not expired
@@ -459,12 +286,9 @@ export function validateRepoNameWithResult(name: string): ValidationResult<strin
     const result = createErrorResult<string>(
       [
         createValidationError(
-          'INVALID_TYPE',
-          'Repository name must be a non-empty string',
           'repoName',
-          'error',
-          false,
-          'Provide a valid repository name as a string'
+          'Repository name must be a non-empty string',
+          'INVALID_TYPE'
         ),
       ],
       [],
@@ -479,12 +303,9 @@ export function validateRepoNameWithResult(name: string): ValidationResult<strin
     const result = createErrorResult<string>(
       [
         createValidationError(
-          'EMPTY_NAME',
-          'Repository name cannot be empty',
           'repoName',
-          'error',
-          false,
-          'Provide a repository name'
+          'Repository name cannot be empty',
+          'EMPTY_NAME'
         ),
       ],
       [],
@@ -498,12 +319,9 @@ export function validateRepoNameWithResult(name: string): ValidationResult<strin
     const result = createErrorResult<string>(
       [
         createValidationError(
-          'NAME_TOO_LONG',
-          `Repository name is ${name.length} characters, maximum is 100`,
           'repoName',
-          'error',
-          false,
-          'Shorten the repository name to 100 characters or less'
+          `Repository name is ${name.length} characters, maximum is 100`,
+          'NAME_TOO_LONG'
         ),
       ],
       [],
@@ -517,12 +335,9 @@ export function validateRepoNameWithResult(name: string): ValidationResult<strin
   if (name.startsWith('.')) {
     errors.push(
       createValidationError(
-        'STARTS_WITH_DOT',
-        'Repository name cannot start with a dot',
         'repoName',
-        'error',
-        false,
-        'Remove the leading dot from the repository name'
+        'Repository name cannot start with a dot',
+        'STARTS_WITH_DOT'
       )
     );
   }
@@ -530,12 +345,9 @@ export function validateRepoNameWithResult(name: string): ValidationResult<strin
   if (name.endsWith('.')) {
     errors.push(
       createValidationError(
-        'ENDS_WITH_DOT',
-        'Repository name cannot end with a dot',
         'repoName',
-        'error',
-        false,
-        'Remove the trailing dot from the repository name'
+        'Repository name cannot end with a dot',
+        'ENDS_WITH_DOT'
       )
     );
   }
@@ -544,12 +356,9 @@ export function validateRepoNameWithResult(name: string): ValidationResult<strin
   if (name.includes('..')) {
     errors.push(
       createValidationError(
-        'CONSECUTIVE_DOTS',
-        'Repository name cannot contain consecutive dots (..)',
         'repoName',
-        'error',
-        false,
-        'Replace consecutive dots with a single dot or another character'
+        'Repository name cannot contain consecutive dots (..)',
+        'CONSECUTIVE_DOTS'
       )
     );
   }
@@ -560,12 +369,9 @@ export function validateRepoNameWithResult(name: string): ValidationResult<strin
     const invalidChars = name.split('').filter(char => !/[a-zA-Z0-9._-]/.test(char));
     errors.push(
       createValidationError(
-        'INVALID_CHARACTERS',
-        `Repository name contains invalid characters: ${[...new Set(invalidChars)].join(', ')}`,
         'repoName',
-        'error',
-        false,
-        'Repository names can only contain letters, numbers, dots, hyphens, and underscores'
+        `Repository name contains invalid characters: ${[...new Set(invalidChars)].join(', ')}`,
+        'INVALID_CHARACTERS'
       )
     );
     suggestions.push(
@@ -591,7 +397,7 @@ export function validateRepoNameWithResult(name: string): ValidationResult<strin
       : createSuccessResult(name, warnings, suggestions);
 
   // Cache successful results for longer
-  setCachedValidationResult(cacheKey, result, result.valid ? 300000 : 30000); // 5 min success, 30 sec failure
+  setCachedValidationResult(cacheKey, result, result.isValid ? 300000 : 30000); // 5 min success, 30 sec failure
 
   return result;
 }

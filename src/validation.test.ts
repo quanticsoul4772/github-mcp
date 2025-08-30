@@ -414,14 +414,14 @@ describe('Validation Module', () => {
       it('should return detailed validation result', () => {
         const token = createTestToken('classic');
         const result = validateGitHubTokenWithResult(token);
-        expect(result.valid).toBe(true);
-        expect(result.value).toBe(token);
+        expect(result.isValid).toBe(true);
+        expect(result.data).toBe(token);
         expect(result.errors).toHaveLength(0);
       });
 
       it('should return errors for invalid token', () => {
         const result = validateGitHubTokenWithResult('invalid');
-        expect(result.valid).toBe(false);
+        expect(result.isValid).toBe(false);
         expect(result.errors.length).toBeGreaterThan(0);
         expect(result.errors[0].code).toBeDefined();
         expect(result.errors[0].field).toBe('githubToken');
@@ -430,14 +430,14 @@ describe('Validation Module', () => {
       it('should detect whitespace in token', () => {
         const invalidToken = ['ghp', '_abc def123'].join('');
         const result = validateGitHubTokenWithResult(invalidToken);
-        expect(result.valid).toBe(false);
-        expect(result.errors.some((e: ValidationErrorDetail) => e.code === 'TOKEN_CONTAINS_WHITESPACE')).toBe(true);
+        expect(result.isValid).toBe(false);
+        expect(result.errors.some(e => e.code === 'TOKEN_CONTAINS_WHITESPACE')).toBe(true);
       });
 
       it('should detect missing token', () => {
         const result = validateGitHubTokenWithResult('');
-        expect(result.valid).toBe(false);
-        expect(result.errors.some((e: ValidationErrorDetail) => e.code === 'MISSING_TOKEN')).toBe(true);
+        expect(result.isValid).toBe(false);
+        expect(result.errors.some(e => e.code === 'MISSING_TOKEN')).toBe(true);
       });
 
       it('should provide suggestions', () => {
@@ -453,7 +453,7 @@ describe('Validation Module', () => {
         process.env.SKIP_VALIDATION = 'true';
 
         const result = await validateGitHubTokenWithAPI('invalid');
-        expect(result.valid).toBe(true);
+        expect(result.isValid).toBe(true);
         expect(result.warnings.some((w: ValidationWarning) => w.code === 'DEV_BYPASS')).toBe(true);
       });
 
@@ -465,8 +465,8 @@ describe('Validation Module', () => {
 
         const testToken = createTestToken('classic');
         const result = await validateGitHubTokenWithAPI(testToken);
-        expect(result.valid).toBe(false);
-        expect(result.errors.some((e: ValidationErrorDetail) => e.code === 'FETCH_NOT_AVAILABLE')).toBe(true);
+        expect(result.isValid).toBe(false);
+        expect(result.errors.some(e => e.code === 'FETCH_NOT_AVAILABLE')).toBe(true);
 
         global.fetch = originalFetch;
       });
@@ -480,8 +480,8 @@ describe('Validation Module', () => {
 
         const token = createTestToken('classic');
         const result = await validateGitHubTokenWithAPI(token);
-        expect(result.valid).toBe(true);
-        expect(result.value).toHaveProperty('user');
+        expect(result.isValid).toBe(true);
+        expect(result.data).toHaveProperty('user');
       });
     });
   });
@@ -680,7 +680,7 @@ describe('Validation Module', () => {
       const result = await validateGitHubTokenWithAPI(['ghp', '_test123'].join(''));
       const duration = Date.now() - start;
 
-      expect(result.valid).toBe(false);
+      expect(result.isValid).toBe(false);
       expect(duration).toBeLessThan(100); // Should fail fast
     });
   });

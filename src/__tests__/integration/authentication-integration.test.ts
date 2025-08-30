@@ -26,11 +26,14 @@ const shouldSkipIntegrationTests = () => !process.env.GITHUB_TEST_TOKEN;
  * Masks OAuth scopes to prevent sensitive information leakage
  * OAuth scopes can reveal authorization levels and should not be logged in clear text
  */
-function maskOAuthScopes(scopes: string): string {
+function maskOAuthScopes(scopes: string | number): string {
   if (!scopes) return '';
   
+  // Convert to string if it's a number
+  const scopeString = typeof scopes === 'string' ? scopes : String(scopes);
+  
   // Split scopes by comma and/or whitespace
-  const scopeArray = scopes.split(/[,\s]+/).filter(s => s.length > 0);
+  const scopeArray = scopeString.split(/[,\s]+/).filter(s => s.length > 0);
   
   return scopeArray
     .map(scope => {
