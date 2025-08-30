@@ -83,11 +83,32 @@ vi.mock('../../logger.js', () => ({
 vi.mock('../../tools/repositories.js', () => ({
   createRepositoryTools: () => [
     {
-      tool: { name: 'get_file_contents', description: 'Get file contents' },
+      tool: { 
+        name: 'get_file_contents', 
+        description: 'Get file contents',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            owner: { type: 'string' },
+            repo: { type: 'string' },
+            path: { type: 'string' }
+          },
+          required: ['owner', 'repo', 'path']
+        }
+      },
       handler: vi.fn(),
     },
     {
-      tool: { name: 'list_repositories', description: 'List repositories' },
+      tool: { 
+        name: 'list_repositories', 
+        description: 'List repositories',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            visibility: { type: 'string' }
+          }
+        }
+      },
       handler: vi.fn(),
     },
   ],
@@ -224,7 +245,11 @@ describe('GitHub MCP Server Integration', () => {
     // Mock MCP server with tool registration tracking
     registeredTools = new Map();
     mockServer = {
-      tool: vi.fn((name, description, schema, handler) => {
+      tool: vi.fn((name, description, schemaOrHandler, handlerOrUndefined) => {
+        // Handle both overloads: with schema (4 params) and without (3 params)
+        const hasSchema = typeof schemaOrHandler !== 'function';
+        const handler = hasSchema ? handlerOrUndefined : schemaOrHandler;
+        const schema = hasSchema ? schemaOrHandler : undefined;
         registeredTools.set(name, { description, schema, handler });
       }),
       connect: vi.fn(),

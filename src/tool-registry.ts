@@ -158,15 +158,19 @@ export class ToolRegistry {
               config.tool.name,
               config.tool.description || 'GitHub API operation',
               zodSchemaShape,
-          async (args: Record<string, unknown>) => {
+          async (args: any) => {
                 const startTime = Date.now();
                 const toolName = config.tool.name;
                 try {
                     logger.debug(`Tool invoked: ${toolName}`, { args });
                     metrics.recordApiCall({ method: 'TOOL', url: toolName } as any);
 
-                    // Pass the args to the handler
-                    const result = await config.handler(args);
+                    // The MCP SDK should have already validated the args using the zodSchemaShape
+                    // But we ensure args is at least an empty object if undefined
+                    const validatedArgs = args ?? {};
+                    
+                    // Pass the validated args to the handler
+                    const result = await config.handler(validatedArgs);
 
                     const duration = Date.now() - startTime;
                     logger.info(`Tool completed: ${toolName}`, {
