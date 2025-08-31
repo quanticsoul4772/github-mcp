@@ -2,6 +2,8 @@
 
 A comprehensive Model Context Protocol (MCP) server for GitHub integration, enabling AI assistants to interact with GitHub repositories, issues, pull requests, actions, and more.
 
+> **Note**: This project uses a patched version of the MCP SDK to fix parameter passing for JSON Schema-based tools. See [docs/PARAMETER_BUG_RESOLUTION.md](docs/PARAMETER_BUG_RESOLUTION.md) for details.
+
 ## Features
 
 This MCP server provides comprehensive GitHub integration with 100+ tools organized into specialized modules:
@@ -115,6 +117,7 @@ For detailed deployment instructions, see [docs/deployment/DEPLOYMENT.md](docs/d
 - Node.js 18.0.0 or later
 - npm 8.0.0 or later
 - GitHub Personal Access Token with appropriate scopes
+- **Important**: The patched MCP SDK fork (included via local dependency)
 
 1. Clone the repository:
 ```bash
@@ -122,12 +125,18 @@ git clone https://github.com/quanticsoul4772/github-mcp.git
 cd github-mcp
 ```
 
-2. Install dependencies:
+2. Ensure the MCP SDK fork is available:
+```bash
+# The SDK fork should be at ../mcp-sdk-fork relative to this project
+# If not present, it will need to be cloned from the fork repository
+```
+
+3. Install dependencies:
 ```bash
 npm install
 ```
 
-3. Build the project:
+4. Build the project:
 ```bash
 npm run build
 ```
@@ -449,6 +458,11 @@ The server includes helpful prompts for common workflows:
    - GitHub API has rate limits
    - Authenticated requests: 5,000 per hour
    - Consider caching or batching requests
+
+3. **Parameter Passing Issues**
+   - This project uses a patched MCP SDK to fix JSON Schema parameter handling
+   - If you encounter `keyValidator._parse is not a function`, ensure you're using the forked SDK
+   - See [docs/PARAMETER_BUG_RESOLUTION.md](docs/PARAMETER_BUG_RESOLUTION.md) for details
 
 3. **Permission Errors**
    - Check repository permissions

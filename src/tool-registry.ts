@@ -1,8 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Octokit } from '@octokit/rest';
-import { z } from 'zod';
+import { z, ZodTypeAny } from 'zod';
 import { JSONSchema, JSONSchemaProperty, ToolConfig } from './types.js';
-import { jsonSchemaToZod } from 'json-schema-to-zod';
 import { ResponseSizeLimiter } from './rate-limiter.js';
 import { OptimizedAPIClient } from './optimized-api-client.js';
 import { ReliabilityManager } from './reliability.js';
@@ -48,6 +47,7 @@ export class ToolRegistry {
     private enabledToolsets: Set<string>;
     private registeredTools = new Set<string>();
     public toolCount = 0;
+    
 
     constructor(
         server: McpServer,
@@ -75,192 +75,96 @@ export class ToolRegistry {
         }
 
         try {
-            // The MCP SDK needs both JSON Schema (for listing) and Zod (for validation)
-            const jsonSchema = config.tool.inputSchema as any;
-        
-        // Check if we have parameters
-        const hasParams = jsonSchema && jsonSchema.properties && Object.keys(jsonSchema.properties).length > 0;
-        
-        if (hasParams) {
-            // For tools with parameters, we need to pass the JSON Schema directly
-            // The MCP SDK will handle its own validation
-            // We'll validate in the handler ourselves
+            // Register tool with proper parameter validation using fixed SDK
             this.server.tool(
-              config.tool.name,
-              config.tool.description || 'GitHub API operation',
-              jsonSchema,
-          async (args: any) => {
-                const startTime = Date.now();
-                const toolName = config.tool.name;
-                
-                try {
-                    logger.debug(`Tool invoked: ${toolName}`, { args });
-                    metrics.recordApiCall({ method: 'TOOL', url: toolName } as any);
-
-                    // The MCP SDK should have already validated the args
-                    // Ensure args is at least an empty object if undefined
-                    const validatedArgs = args ?? {};
+                config.tool.name,
+                config.tool.description || 'GitHub API operation',
+                config.tool.inputSchema || {},
+                async (params: any, context: any) => {
+                    const startTime = Date.now();
+                    const toolName = config.tool.name;
                     
-                    // Pass the validated args to the handler
-                    const result = await config.handler(validatedArgs);
+                    try {
+                        logger.debug(`Tool invoked: ${toolName}`, { params });
+                        metrics.recordApiCall({ method: 'TOOL', url: toolName } as any);
+                        
+                        // Pass the actual parameters to the handler
+                        const result = await config.handler(params);
+                        
+                        const duration = Date.now() - startTime;
+                        logger.info(`Tool completed: ${toolName}`, {
+                            duration,
+                            success: true,
+                        });
 
-                    const duration = Date.now() - startTime;
-                    logger.info(`Tool completed: ${toolName}`, {
-                        duration,
-                        success: true,
-                    });
+                        const {
+                            data: limitedResult,
+                            truncated,
+                            originalSize,
+                        } = ResponseSizeLimiter.limitResponseSize(result);
 
-                    const {
-                        data: limitedResult,
-                        truncated,
-                        originalSize,
-                    } = ResponseSizeLimiter.limitResponseSize(result);
-
-                    let responseText: string;
-                    if (typeof limitedResult === 'string') {
-                        responseText = limitedResult;
-                    } else {
-                        responseText = JSON.stringify(limitedResult, null, 2);
-                        if (truncated) {
-                            const warningMsg = `\n\n[Response truncated - original size: ${originalSize ? Math.round(originalSize / 1024) + 'KB' : 'unknown'}]`;
-                            responseText += warningMsg;
+                        let responseText: string;
+                        if (typeof limitedResult === 'string') {
+                            responseText = limitedResult;
+                        } else {
+                            responseText = JSON.stringify(limitedResult, null, 2);
+                            if (truncated) {
+                                const warningMsg = `\n\n[Response truncated - original size: ${originalSize ? Math.round(originalSize / 1024) + 'KB' : 'unknown'}]`;
+                                responseText += warningMsg;
+                            }
                         }
+
+                        return {
+                            content: [
+                                {
+                                    type: 'text' as const,
+                                    text: responseText,
+                                },
+                            ],
+                        };
+                    } catch (error: any) {
+                        const duration = Date.now() - startTime;
+                        metrics.recordError({ name: 'TOOL_ERROR', message: error.message } as any);
+
+                        logger.error(`Tool error: ${toolName}`, {
+                            error: error.message,
+                            duration,
+                        });
+
+                        const errorResponse = formatErrorResponse(error);
+                        const errorMessage = errorResponse.error.message;
+                        const errorCode = errorResponse.error.code;
+                        const errorDetails = errorResponse.error.details;
+
+                        let errorText = `Error: ${errorMessage}`;
+                        if (errorCode && errorCode !== 'UNKNOWN_ERROR') {
+                            errorText += `\nCode: ${errorCode}`;
+                        }
+                        if (errorDetails?.statusCode) {
+                            errorText += `\nStatus: ${errorDetails.statusCode}`;
+                        }
+
+                        return {
+                            content: [
+                                {
+                                    type: 'text' as const,
+                                    text: errorText,
+                                },
+                            ],
+                            isError: true,
+                        };
                     }
-
-                    return {
-                        content: [
-                            {
-                                type: 'text' as const,
-                                text: responseText,
-                            },
-                        ],
-                    };
-                } catch (error: any) {
-                    const duration = Date.now() - startTime;
-                    metrics.recordError({ name: 'TOOL_ERROR', message: error.message } as any);
-
-                    logger.error(`Tool error: ${toolName}`, {
-                        error: error.message,
-                        duration,
-                        args,
-                    });
-
-                    const errorResponse = formatErrorResponse(error);
-                    const errorMessage = errorResponse.error.message;
-                    const errorCode = errorResponse.error.code;
-                    const errorDetails = errorResponse.error.details;
-
-                    let errorText = `Error: ${errorMessage}`;
-                    if (errorCode && errorCode !== 'UNKNOWN_ERROR') {
-                        errorText += `\nCode: ${errorCode}`;
-                    }
-                    if (errorDetails?.statusCode) {
-                        errorText += `\nStatus: ${errorDetails.statusCode}`;
-                    }
-
-                    return {
-                        content: [
-                            {
-                                type: 'text' as const,
-                                text: errorText,
-                            },
-                        ],
-                        isError: true,
-                    };
                 }
-            }
-        );
-
-            } else {
-                // No parameters - register without schema
-                this.server.tool(
-                    config.tool.name,
-                    config.tool.description || 'GitHub API operation',
-                    async () => {
-                        const startTime = Date.now();
-                        const toolName = config.tool.name;
-                        try {
-                            logger.debug(`Tool invoked: ${toolName}`, { args: {} });
-                            metrics.recordApiCall({ method: 'TOOL', url: toolName } as any);
-
-                            // Call handler with empty object for no-params tools
-                            const result = await config.handler({});
-
-                            const duration = Date.now() - startTime;
-                            logger.info(`Tool completed: ${toolName}`, {
-                                duration,
-                                success: true,
-                            });
-
-                            const {
-                                data: limitedResult,
-                                truncated,
-                                originalSize,
-                            } = ResponseSizeLimiter.limitResponseSize(result);
-
-                            let responseText: string;
-                            if (typeof limitedResult === 'string') {
-                                responseText = limitedResult;
-                            } else {
-                                responseText = JSON.stringify(limitedResult, null, 2);
-                                if (truncated) {
-                                    const warningMsg = `\n\n[Response truncated - original size: ${originalSize ? Math.round(originalSize / 1024) + 'KB' : 'unknown'}]`;
-                                    responseText += warningMsg;
-                                }
-                            }
-
-                            return {
-                                content: [
-                                    {
-                                        type: 'text' as const,
-                                        text: responseText,
-                                    },
-                                ],
-                            };
-                        } catch (error: any) {
-                            const duration = Date.now() - startTime;
-                            metrics.recordError({ name: 'TOOL_ERROR', message: error.message } as any);
-
-                            logger.error(`Tool error: ${toolName}`, {
-                                error: error.message,
-                                duration,
-                                args: {},
-                            });
-
-                            const errorResponse = formatErrorResponse(error);
-                            const errorMessage = errorResponse.error.message;
-                            const errorCode = errorResponse.error.code;
-                            const errorDetails = errorResponse.error.details;
-
-                            let errorText = `Error: ${errorMessage}`;
-                            if (errorCode && errorCode !== 'UNKNOWN_ERROR') {
-                                errorText += `\nCode: ${errorCode}`;
-                            }
-                            if (errorDetails?.statusCode) {
-                                errorText += `\nStatus: ${errorDetails.statusCode}`;
-                            }
-
-                            return {
-                                content: [
-                                    {
-                                        type: 'text' as const,
-                                        text: errorText,
-                                    },
-                                ],
-                                isError: true,
-                            };
-                        }
-                    }
-                );
-            }
-
-        this.registeredTools.add(config.tool.name);
-        this.toolCount++;
+            );
+            
+            this.registeredTools.add(config.tool.name);
+            this.toolCount++;
+            logger.info(`Tool registered: ${config.tool.name}`);
         } catch (error) {
-            console.error(`ERROR: Failed to register tool ${config.tool.name}:`, error);
             logger.error(`Failed to register tool ${config.tool.name}`, { error });
         }
     }
+
 
     public registerAllTools() {
         interface ToolSet {

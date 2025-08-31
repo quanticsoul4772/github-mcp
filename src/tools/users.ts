@@ -127,6 +127,12 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
     },
     handler: async (args: unknown) => {
       const params = args as GetUserParams;
+      
+      // Ensure username is provided
+      if (!params || !params.username) {
+        throw new Error(`Username is required. Received: ${JSON.stringify(params)}`);
+      }
+      
       const { data } = await octokit.users.getByUsername({
         username: params.username,
       });

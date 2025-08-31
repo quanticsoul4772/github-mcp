@@ -158,9 +158,17 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
     handler: async (args: unknown) => {
       const params = args as GetRepositoryParams;
       
+      // Ensure we have the required parameters
+      if (!params || !params.owner) {
+        throw new ValidationError('owner', 'Repository owner is required');
+      }
+      if (!params.repo) {
+        throw new ValidationError('repo', 'Repository name is required');
+      }
+      
       // Validate inputs
       if (!validateOwnerName(params.owner)) {
-        throw new ValidationError('owner', 'Invalid repository owner name');
+        throw new ValidationError('owner', `Invalid repository owner name: "${params.owner}"`);
       }
       if (!validateRepoName(params.repo)) {
         throw new ValidationError('repo', 'Invalid repository name');
@@ -549,8 +557,8 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
       const params = args as SearchRepositoriesParams;
       
       // Ensure query is provided
-      if (!params?.query) {
-        throw new Error('Search query is required');
+      if (!params || !params.query) {
+        throw new Error(`Search query is required. Received: ${JSON.stringify(params)}`);
       }
       
       const { data } = await octokit.rest.search.repos({
