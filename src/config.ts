@@ -55,7 +55,7 @@ const TOKEN_FORMATS: TokenFormat[] = [
     prefix: 'github_pat_',
     minLength: 82,
     maxLength: 255,
-    pattern: /^github_pat_[A-Za-z0-9]{70,}$/,
+    pattern: /^github_pat_[A-Za-z0-9_]{70,}$/,
     description: 'GitHub Fine-grained Personal Access Token',
   },
   {
