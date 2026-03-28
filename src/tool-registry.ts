@@ -2,6 +2,25 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Octokit } from '@octokit/rest';
 import { z, ZodTypeAny } from 'zod';
 import { JSONSchema, JSONSchemaProperty, ToolConfig } from './types.js';
+
+function jsonSchemaPropertyToZod(prop: JSONSchemaProperty): ZodTypeAny {
+    switch (prop.type) {
+        case 'string': return z.string().optional();
+        case 'number': return z.number().optional();
+        case 'boolean': return z.boolean().optional();
+        case 'array': return z.array(z.unknown()).optional();
+        default: return z.unknown().optional();
+    }
+}
+
+function jsonSchemaToZodShape(schema: JSONSchema): Record<string, ZodTypeAny> {
+    const shape: Record<string, ZodTypeAny> = {};
+    if (!schema.properties) return shape;
+    for (const [key, prop] of Object.entries(schema.properties)) {
+        shape[key] = jsonSchemaPropertyToZod(prop as JSONSchemaProperty);
+    }
+    return shape;
+}
 import { ResponseSizeLimiter } from './rate-limiter.js';
 import { OptimizedAPIClient } from './optimized-api-client.js';
 import { ReliabilityManager } from './reliability.js';
@@ -76,10 +95,11 @@ export class ToolRegistry {
 
         try {
             // Register tool with proper parameter validation using fixed SDK
+            const zodShape = jsonSchemaToZodShape((config.tool.inputSchema as JSONSchema) || ({ type: 'object', properties: {} } as JSONSchema));
             this.server.tool(
                 config.tool.name,
                 config.tool.description || 'GitHub API operation',
-                config.tool.inputSchema || {},
+                zodShape,
                 async (params: any, context: any) => {
                     const startTime = Date.now();
                     const toolName = config.tool.name;

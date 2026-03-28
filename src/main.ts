@@ -24,7 +24,7 @@ async function main() {
 
 // Only run if this file is being executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main();
+  void main();
 }
 
 export { main };

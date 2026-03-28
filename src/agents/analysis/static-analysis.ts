@@ -4,7 +4,7 @@
  */
 
 import { BaseAgent } from '../base/agent-base.js';
-import { AnalysisTarget, Finding, Severity, FindingCategory, AgentCapabilities } from '../types.js';
+import { AnalysisTarget, Finding, Severity, FindingCategory } from '../types.js';
 import { logger } from '../../logger.js';
 import * as path from 'path';
 import * as fs from 'fs/promises';
@@ -322,7 +322,7 @@ export class StaticAnalysisAgent extends BaseAgent {
   private async analyzeComplexity(
     filePath: string,
     content: string,
-    lines: string[]
+    _lines: string[]
   ): Promise<Finding[]> {
     const findings: Finding[] = [];
 
@@ -582,7 +582,7 @@ export class StaticAnalysisAgent extends BaseAgent {
         );
       }
 
-      // @ts-ignore comments
+      // ts-ignore directives
       if (trimmedLine.includes('@ts-ignore')) {
         findings.push(
           this.createFinding(

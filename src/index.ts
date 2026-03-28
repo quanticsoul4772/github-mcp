@@ -3,21 +3,17 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { Octokit } from '@octokit/rest';
-import { z } from 'zod';
-import { JSONSchema, JSONSchemaProperty, ToolConfig } from './types.js';
 import {
   createRateLimitedOctokit,
   GitHubRateLimiter,
-  ResponseSizeLimiter,
 } from './rate-limiter.js';
 
 // Environment configuration
-import { config, getGitHubToken, getEnabledToolsets, displayConfig } from './config.js';
+import { config, getGitHubToken, getEnabledToolsets } from './config.js';
 import { ToolRegistry } from './tool-registry.js';
 
 // Performance optimizations
 import { OptimizedAPIClient } from './optimized-api-client.js';
-import { globalPerformanceMonitor } from './performance-monitor.js';
 
 // Reliability and health monitoring
 import {
@@ -27,8 +23,7 @@ import {
   NoOpTelemetry,
   DEFAULT_RETRY_CONFIG,
 } from './reliability.js';
-import { HealthManager, createHealthTools } from './health.js';
-import { formatErrorResponse } from './errors.js';
+import { HealthManager } from './health.js';
 
 // Monitoring and observability
 import { metrics } from './metrics.js';
@@ -66,7 +61,7 @@ export class GitHubMCPServer {
    * Sets up the MCP server, configures GitHub authentication,
    * parses environment variables, and registers tools.
    */
-  constructor(testMode: boolean = false) {
+  constructor(_testMode: boolean = false) {
     // The 'config' object is initialized on import and will throw an error
     // if validation fails. The try/catch in the config module handles logging
     // and process exit for non-test environments.

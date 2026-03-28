@@ -3,7 +3,6 @@
  */
 
 import { Octokit } from '@octokit/rest';
-import { GitHubMCPError } from './errors.js';
 import { ReliabilityManager } from './reliability.js';
 
 /**

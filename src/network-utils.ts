@@ -17,7 +17,7 @@ export function isDisallowedHost(host: string): boolean {
   return disallowedHosts.has(host);
 }
 
-export function isPrivateIPv4(a: number, b: number, c: number, d: number): boolean {
+export function isPrivateIPv4(a: number, b: number, _c: number, _d: number): boolean {
   // 10.0.0.0/8 - Private
   if (a === 10) return true;
 
@@ -30,7 +30,7 @@ export function isPrivateIPv4(a: number, b: number, c: number, d: number): boole
   return false;
 }
 
-export function isReservedIPv4(a: number, b: number, c: number, d: number): boolean {
+export function isReservedIPv4(a: number, b: number, _c: number, _d: number): boolean {
   // 127.0.0.0/8 - Loopback
   if (a === 127) return true;
 

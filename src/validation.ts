@@ -18,7 +18,6 @@ import {
   createErrorResult,
   createValidationError,
   createValidationWarning,
-  withRetry,
   DEFAULT_RETRY_CONFIG as IMPORTED_RETRY_CONFIG
 } from './validation-utils.js';
 
@@ -126,65 +125,7 @@ if (typeof process !== 'undefined' && typeof setInterval !== 'undefined') {
   }
 }
 
-// These functions are now imported from validation-utils.js and re-exported above
-
-/**
- * Gets or creates a circuit breaker for a validation type
- */
-function getCircuitBreaker(type: string): CircuitBreakerState {
-  if (!circuitBreakers.has(type)) {
-    circuitBreakers.set(type, {
-      failures: 0,
-      lastFailureTime: 0,
-      state: 'closed',
-    });
-  }
-  return circuitBreakers.get(type)!;
-}
-
-/**
- * Updates circuit breaker state based on validation result
- */
-function updateCircuitBreaker(type: string, success: boolean): void {
-  const breaker = getCircuitBreaker(type);
-  const now = Date.now();
-
-  if (success) {
-    breaker.failures = 0;
-    breaker.state = 'closed';
-  } else {
-    breaker.failures++;
-    breaker.lastFailureTime = now;
-
-    // Open circuit after 5 failures
-    if (breaker.failures >= 5) {
-      breaker.state = 'open';
-    }
-  }
-
-  // Auto-recovery after 5 minutes
-  if (breaker.state === 'open' && now - breaker.lastFailureTime > 5 * 60 * 1000) {
-    breaker.state = 'half-open';
-    breaker.failures = 0;
-  }
-}
-
-/**
- * Checks if circuit breaker allows validation
- */
-function isCircuitBreakerOpen(type: string): boolean {
-  const breaker = getCircuitBreaker(type);
-  return breaker.state === 'open';
-}
-
-/**
- * Sleeps for specified milliseconds
- */
-async function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// withRetry is now imported from validation-utils.js and re-exported above
+// withRetry is imported from validation-utils.js and re-exported above
 
 /**
  * Gets cached validation result if available and not expired
