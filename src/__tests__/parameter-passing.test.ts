@@ -99,11 +99,10 @@ describe('Parameter Passing Tests', () => {
     
     const registered = registeredTools.get('required_params_tool');
     expect(registered).toBeDefined();
-    // With the new approach, we pass the JSON schema directly
+    // Schema is passed as Zod shape (required by MCP SDK v1.28+)
     expect(registered.schema).toBeDefined();
-    expect(registered.schema.properties).toBeDefined();
-    expect(registered.schema.properties.owner).toBeDefined();
-    expect(registered.schema.properties.repo).toBeDefined();
+    expect(registered.schema.owner).toBeDefined();
+    expect(registered.schema.repo).toBeDefined();
     
     // Test calling the handler with parameters
     const testParams = { owner: 'test-owner', repo: 'test-repo' };
@@ -142,10 +141,9 @@ describe('Parameter Passing Tests', () => {
     const registered = registeredTools.get('optional_params_tool');
     expect(registered).toBeDefined();
     expect(registered.schema).toBeDefined();
-    expect(registered.schema.properties).toBeDefined();
-    expect(registered.schema.properties.query).toBeDefined();
-    expect(registered.schema.properties.limit).toBeDefined();
-    expect(registered.schema.properties.sort).toBeDefined();
+    expect(registered.schema.query).toBeDefined();
+    expect(registered.schema.limit).toBeDefined();
+    expect(registered.schema.sort).toBeDefined();
     
     // Test with all parameters
     const fullParams = { query: 'test', limit: 10, sort: 'desc' };
@@ -234,14 +232,13 @@ describe('Parameter Passing Tests', () => {
     expect(registered).toBeDefined();
     expect(registered.schema).toBeDefined();
     
-    // Verify the JSON schema properties are preserved
+    // Verify schema is passed as Zod shape (MCP SDK v1.28+ requires Zod)
     const schema = registered.schema;
-    expect(schema.properties).toBeDefined();
-    expect(schema.properties.stringProp).toBeDefined();
-    expect(schema.properties.numberProp).toBeDefined();
-    expect(schema.properties.boolProp).toBeDefined();
-    expect(schema.properties.enumProp).toBeDefined();
-    expect(schema.properties.arrayProp).toBeDefined();
-    expect(schema.properties.objectProp).toBeDefined();
+    expect(schema.stringProp).toBeDefined();
+    expect(schema.numberProp).toBeDefined();
+    expect(schema.boolProp).toBeDefined();
+    expect(schema.enumProp).toBeDefined();
+    expect(schema.arrayProp).toBeDefined();
+    expect(schema.objectProp).toBeDefined();
   });
 });

@@ -4,7 +4,7 @@
  */
 
 import { Octokit } from '@octokit/rest';
-import { withErrorHandling, withRetry } from './errors.js';
+import { withRetry } from './errors.js';
 
 interface BatchResult<T> {
   success: boolean;
@@ -313,7 +313,7 @@ export async function batchGetIssuesWithComments(
       issues.set(issue.number, issue);
     }
     return issues;
-  } catch (error) {
+  } catch {
     // Fallback to REST API if GraphQL fails
     const issues = new Map<number, any>();
     const results = await batchExecute(

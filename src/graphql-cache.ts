@@ -4,7 +4,6 @@
  * and cache invalidation strategies
  */
 
-import { GitHubAPICache } from './cache.js';
 import { logger } from './logger.js';
 
 interface GraphQLCacheEntry<T> {

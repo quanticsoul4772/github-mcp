@@ -94,89 +94,60 @@ export class ToolRegistry {
         }
 
         try {
-            // Register tool with proper parameter validation using fixed SDK
-            const zodShape = jsonSchemaToZodShape((config.tool.inputSchema as JSONSchema) || ({ type: 'object', properties: {} } as JSONSchema));
-            this.server.tool(
-                config.tool.name,
-                config.tool.description || 'GitHub API operation',
-                zodShape,
-                async (params: any, context: any) => {
-                    const startTime = Date.now();
-                    const toolName = config.tool.name;
-                    
-                    try {
-                        logger.debug(`Tool invoked: ${toolName}`, { params });
-                        metrics.recordApiCall({ method: 'TOOL', url: toolName } as any);
-                        
-                        // Pass the actual parameters to the handler
-                        const result = await config.handler(params);
-                        
-                        const duration = Date.now() - startTime;
-                        logger.info(`Tool completed: ${toolName}`, {
-                            duration,
-                            success: true,
-                        });
+            const jsonSchema = config.tool.inputSchema as JSONSchema;
+            const zodShape = jsonSchemaToZodShape(jsonSchema || { type: 'object', properties: {} });
+            const hasParams = Object.keys(zodShape).length > 0;
+            const toolName = config.tool.name;
 
-                        const {
-                            data: limitedResult,
-                            truncated,
-                            originalSize,
-                        } = ResponseSizeLimiter.limitResponseSize(result);
+            const handler = async (params: any) => {
+                const startTime = Date.now();
+                try {
+                    const validatedParams = params ?? {};
+                    logger.debug(`Tool invoked: ${toolName}`, { params: validatedParams });
+                    metrics.recordApiCall({ method: 'TOOL', url: toolName } as any);
 
-                        let responseText: string;
-                        if (typeof limitedResult === 'string') {
-                            responseText = limitedResult;
-                        } else {
-                            responseText = JSON.stringify(limitedResult, null, 2);
-                            if (truncated) {
-                                const warningMsg = `\n\n[Response truncated - original size: ${originalSize ? Math.round(originalSize / 1024) + 'KB' : 'unknown'}]`;
-                                responseText += warningMsg;
-                            }
+                    const result = await config.handler(validatedParams);
+
+                    const duration = Date.now() - startTime;
+                    logger.info(`Tool completed: ${toolName}`, { duration, success: true });
+
+                    const { data: limitedResult, truncated, originalSize } = ResponseSizeLimiter.limitResponseSize(result);
+
+                    let responseText: string;
+                    if (typeof limitedResult === 'string') {
+                        responseText = limitedResult;
+                    } else {
+                        responseText = JSON.stringify(limitedResult, null, 2);
+                        if (truncated) {
+                            responseText += `\n\n[Response truncated - original size: ${originalSize ? Math.round(originalSize / 1024) + 'KB' : 'unknown'}]`;
                         }
-
-                        return {
-                            content: [
-                                {
-                                    type: 'text' as const,
-                                    text: responseText,
-                                },
-                            ],
-                        };
-                    } catch (error: any) {
-                        const duration = Date.now() - startTime;
-                        metrics.recordError({ name: 'TOOL_ERROR', message: error.message } as any);
-
-                        logger.error(`Tool error: ${toolName}`, {
-                            error: error.message,
-                            duration,
-                        });
-
-                        const errorResponse = formatErrorResponse(error);
-                        const errorMessage = errorResponse.error.message;
-                        const errorCode = errorResponse.error.code;
-                        const errorDetails = errorResponse.error.details;
-
-                        let errorText = `Error: ${errorMessage}`;
-                        if (errorCode && errorCode !== 'UNKNOWN_ERROR') {
-                            errorText += `\nCode: ${errorCode}`;
-                        }
-                        if (errorDetails?.statusCode) {
-                            errorText += `\nStatus: ${errorDetails.statusCode}`;
-                        }
-
-                        return {
-                            content: [
-                                {
-                                    type: 'text' as const,
-                                    text: errorText,
-                                },
-                            ],
-                            isError: true,
-                        };
                     }
+
+                    return { content: [{ type: 'text' as const, text: responseText }] };
+                } catch (error: any) {
+                    const duration = Date.now() - startTime;
+                    metrics.recordError({ name: 'TOOL_ERROR', message: error.message } as any);
+                    logger.error(`Tool error: ${toolName}`, { error: error.message, duration });
+
+                    const errorResponse = formatErrorResponse(error);
+                    const errorMessage = errorResponse.error.message;
+                    const errorCode = errorResponse.error.code;
+                    const errorDetails = errorResponse.error.details;
+
+                    let errorText = `Error: ${errorMessage}`;
+                    if (errorCode && errorCode !== 'UNKNOWN_ERROR') errorText += `\nCode: ${errorCode}`;
+                    if (errorDetails?.statusCode) errorText += `\nStatus: ${errorDetails.statusCode}`;
+
+                    return { content: [{ type: 'text' as const, text: errorText }], isError: true };
                 }
-            );
-            
+            };
+
+            if (hasParams) {
+                this.server.tool(toolName, config.tool.description || 'GitHub API operation', zodShape, handler);
+            } else {
+                this.server.tool(toolName, config.tool.description || 'GitHub API operation', handler);
+            }
+
             this.registeredTools.add(config.tool.name);
             this.toolCount++;
             logger.info(`Tool registered: ${config.tool.name}`);

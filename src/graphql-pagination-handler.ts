@@ -62,10 +62,7 @@ export class GraphQLPaginationHandler {
     const {
       first = this.defaultFirst,
       after,
-      maxPages = this.defaultMaxPages,
-      maxItems,
       autoPage = false,
-      onProgress,
     } = options;
 
     if (autoPage) {
@@ -662,7 +659,7 @@ export class GraphQLPaginationHandler {
       queryBuilder: GraphQLQueryBuilder,
       options: GraphQLPaginationOptions = {}
     ): Promise<GraphQLPaginationResponse<T>> => {
-      const { onProgress, ...serializableOptions } = options;
+      const { onProgress: _onProgress, ...serializableOptions } = options;
       const cacheKey = JSON.stringify({
         query: queryBuilder.query,
         variables: queryBuilder.variables,

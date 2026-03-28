@@ -1,5 +1,3 @@
-import { Octokit } from '@octokit/rest';
-
 /**
  * GitHub API client abstraction interface
  */
