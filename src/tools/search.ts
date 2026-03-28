@@ -2,9 +2,6 @@ import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
 import {
   SearchCodeParams,
-  SearchReposParams,
-  SearchIssuesParams,
-  SearchUsersParams,
 } from '../tool-types.js';
 
 export function createSearchTools(octokit: Octokit): ToolConfig[] {

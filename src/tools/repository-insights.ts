@@ -3,9 +3,7 @@ import { z } from 'zod';
 import { ToolConfig } from '../types.js';
 import { createTypeSafeHandler } from '../utils/type-safety.js';
 import {
-  validateGraphQLInput,
   validateGraphQLVariableValue,
-  GraphQLValidationError,
 } from '../graphql-validation.js';
 import { withErrorHandling } from '../errors.js';
 
@@ -70,7 +68,7 @@ const CommitActivitySchema = z.object({
  *
  * @see https://docs.github.com/en/graphql/reference/objects#repository
  */
-export function createRepositoryInsightsTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
+export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
 
   // Get repository statistics tool

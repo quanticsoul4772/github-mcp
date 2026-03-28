@@ -96,7 +96,7 @@ const ListPullRequestsOptimizedSchema = z.object({
 
 export function createOptimizedRepositoryTools(
   optimizedClient: OptimizedAPIClient,
-  readOnly: boolean
+  _readOnly: boolean
 ): ToolConfig[] {
   const tools: ToolConfig[] = [];
 

@@ -27,26 +27,6 @@ interface GetJobLogsParams {
   tail_lines?: number;
 }
 
-interface ListRepositorySecretsParams {
-  owner: string;
-  repo: string;
-  page?: number;
-  perPage?: number;
-}
-
-interface CreateRepositorySecretParams {
-  owner: string;
-  repo: string;
-  secret_name: string;
-  encrypted_value: string;
-  key_id: string;
-}
-
-interface DeleteRepositorySecretParams {
-  owner: string;
-  repo: string;
-  secret_name: string;
-}
 
 interface ListWorkflowRunsWithFilterParams {
   owner: string;

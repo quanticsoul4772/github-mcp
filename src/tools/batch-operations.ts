@@ -2,14 +2,6 @@ import { Octokit } from '@octokit/rest';
 import { z } from 'zod';
 import { ToolConfig } from '../types.js';
 import { createTypeSafeHandler } from '../utils/type-safety.js';
-import {
-  validateGraphQLInput,
-  validateGraphQLVariableValue,
-  BatchRepositoryQuerySchema,
-  BatchUserQuerySchema,
-  BatchGraphQLQuerySchema as ImportedBatchGraphQLQuerySchema,
-  GraphQLValidationError,
-} from '../graphql-validation.js';
 import { withErrorHandling } from '../errors.js';
 
 // Type definitions for batch operations
@@ -85,7 +77,7 @@ const BatchGraphQLQuerySchema = z.object({
     .max(10, 'Maximum 10 queries allowed'),
 });
 
-export function createBatchOperationsTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
+export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
 
   // Batch query multiple repositories

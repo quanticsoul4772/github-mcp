@@ -1,6 +1,5 @@
 import { AbstractBaseAgent } from '../base/base-agent.js';
 import { AnalysisContext, AnalysisResult, Finding } from '../types/agent-interfaces.js';
-import * as fs from 'fs/promises';
 import * as path from 'path';
 
 /**
@@ -23,7 +22,6 @@ export class CodeAnalysisAgent extends AbstractBaseAgent {
   }
 
   public async analyze(context: AnalysisContext): Promise<AnalysisResult> {
-    const startTime = Date.now();
     const findings: Finding[] = [];
     const metrics: Record<string, number> = {
       filesAnalyzed: 0,

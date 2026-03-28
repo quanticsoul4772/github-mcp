@@ -1,9 +1,7 @@
-import { Octokit } from '@octokit/rest';
 import { z } from 'zod';
 import { ToolConfig } from '../types.js';
 import { createTypeSafeHandler } from '../utils/type-safety.js';
 import { withErrorHandling } from '../errors.js';
-import { GraphQLPaginationHandler } from '../graphql-pagination-handler.js';
 import { OptimizedAPIClient } from '../optimized-api-client.js';
 
 // Type definitions for advanced search
@@ -91,10 +89,9 @@ const SearchWithRelationshipsSchema = z.object({
  */
 export function createAdvancedSearchTools(
   client: OptimizedAPIClient,
-  readOnly: boolean
+  _readOnly: boolean
 ): ToolConfig[] {
   const tools: ToolConfig[] = [];
-  const paginationHandler = new GraphQLPaginationHandler(client.getOctokit());
 
   // Cross-repository search tool
   tools.push({

@@ -8,19 +8,19 @@ import { ErrorDetectionAgent } from './analysis/error-detection.js';
 import { TestGenerationAgent } from './testing/test-generation.js';
 import { DefaultAgentCoordinator } from './base/coordinator.js';
 import { DefaultAgentRegistry } from './base/agent-registry.js';
-import { ReportGenerator, ReportData } from './reporting/report-generator.js';
+import { ReportGenerator } from './reporting/report-generator.js';
 import { AnalysisTarget, Severity, FindingCategory, AnalysisReport } from './types.js';
 
 describe('Agent System', () => {
   let registry: DefaultAgentRegistry;
-  let coordinator: DefaultAgentCoordinator;
+  let _coordinator: DefaultAgentCoordinator;
   let staticAgent: StaticAnalysisAgent;
   let errorAgent: ErrorDetectionAgent;
   let testAgent: TestGenerationAgent;
 
   beforeEach(() => {
     registry = new DefaultAgentRegistry();
-    coordinator = new DefaultAgentCoordinator(registry);
+    _coordinator = new DefaultAgentCoordinator(registry);
     staticAgent = new StaticAnalysisAgent();
     errorAgent = new ErrorDetectionAgent();
     testAgent = new TestGenerationAgent();
@@ -270,11 +270,6 @@ describe('Agent System', () => {
       // Mock agent to throw error
       vi.spyOn(staticAgent, 'analyze').mockRejectedValue(new Error('Analysis failed'));
 
-      const target: AnalysisTarget = {
-        type: 'file',
-        path: 'test.ts',
-      };
-
       // Mock analysis since coordinator doesn't have runAnalysis method
       const result = {
         reports: [
@@ -306,11 +301,6 @@ describe('Agent System', () => {
       vi.spyOn(staticAgent as any, 'fileExists').mockResolvedValue(true);
       vi.spyOn(errorAgent as any, 'readFileContent').mockResolvedValue('const x = 1;');
       vi.spyOn(errorAgent as any, 'fileExists').mockResolvedValue(true);
-
-      const target: AnalysisTarget = {
-        type: 'file',
-        path: 'test.ts',
-      };
 
       // Mock analysis since coordinator doesn't have runAnalysis method
       const result = {

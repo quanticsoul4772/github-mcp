@@ -6,8 +6,6 @@
 import { Octokit } from '@octokit/rest';
 import { RateLimitError, withRetry } from './errors.js';
 import {
-  estimateGraphQLPoints,
-  isQueryComplexitySafe,
   githubComplexityCalculator,
 } from './graphql-complexity.js';
 import { logger } from './logger.js';
@@ -591,7 +589,7 @@ export class ResponseSizeLimiter {
     }
   }
 
-  private static truncateObjectStrings<T>(obj: T, maxSize: number): T {
+  private static truncateObjectStrings<T>(obj: T, _maxSize: number): T {
     const MAX_STRING_LENGTH = 1000; // Maximum length for individual string fields
 
     function truncateRecursive(value: any): any {

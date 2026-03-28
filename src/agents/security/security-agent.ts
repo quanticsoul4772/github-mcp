@@ -1,6 +1,5 @@
 import { AbstractBaseAgent } from '../base/base-agent.js';
 import { AnalysisContext, AnalysisResult, Finding } from '../types/agent-interfaces.js';
-import * as fs from 'fs/promises';
 import * as path from 'path';
 
 /**
@@ -199,7 +198,7 @@ export class SecurityAgent extends AbstractBaseAgent {
               })
             );
           }
-        } catch (error) {
+        } catch {
           findings.push(
             this.createFinding('low', 'package-analysis', 'Could not parse package.json', {
               file: 'package.json',

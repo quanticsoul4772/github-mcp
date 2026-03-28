@@ -4,7 +4,7 @@
  */
 
 import { BaseAgent } from '../base/agent-base.js';
-import { AnalysisTarget, Finding, Severity, FindingCategory, AgentCapabilities } from '../types.js';
+import { AnalysisTarget, Finding, Severity, FindingCategory } from '../types.js';
 import { logger } from '../../logger.js';
 import * as path from 'path';
 import * as fs from 'fs/promises';
@@ -91,7 +91,6 @@ export class ErrorDetectionAgent extends BaseAgent {
 
     lines.forEach((line, index) => {
       const lineNumber = index + 1;
-      const trimmedLine = line.trim();
 
       // Direct property access without null check
       const propertyAccessRegex = /(\w+)\.(\w+)/g;

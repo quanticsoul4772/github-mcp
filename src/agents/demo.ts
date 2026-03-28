@@ -7,7 +7,6 @@
 import { createAgentSystem, quickAnalyze } from './index.js';
 import {
   analyzeFile,
-  analyzeProject,
   generateTestsForFile,
   generateAnalysisReport,
   quickSecurityScan,
@@ -359,7 +358,7 @@ async function runDemo() {
     logger.info('Running Agent System API Demo');
     
     // Demonstrate the agent system API
-    const { coordinator, registry, agents } = createAgentSystem();
+    const { coordinator, registry: _registry, agents } = createAgentSystem();
     
     logger.info('Agent System initialized', {
       availableAgents: agents.map((a: any) => a.name),

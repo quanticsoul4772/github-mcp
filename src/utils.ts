@@ -4,7 +4,7 @@
  */
 
 import { components } from '@octokit/openapi-types';
-import { formatErrorResponse, normalizeError } from './errors.js';
+import { normalizeError } from './errors.js';
 
 // Common GitHub entity types
 export type SimpleUser = components['schemas']['simple-user'];

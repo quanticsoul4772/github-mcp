@@ -9,7 +9,6 @@ import {
   Finding,
   Severity,
   FindingCategory,
-  AgentCapabilities,
   TestGenerationRequest,
   GeneratedTest,
 } from '../types.js';
@@ -389,7 +388,7 @@ export class TestGenerationAgent extends BaseAgent {
   /**
    * Generate tests for a function
    */
-  private generateFunctionTests(func: FunctionInfo, framework: string, testType: string): string {
+  private generateFunctionTests(func: FunctionInfo, _framework: string, _testType: string): string {
     let content = `describe('${func.name}', () => {\n`;
 
     // Basic functionality test
@@ -419,7 +418,7 @@ export class TestGenerationAgent extends BaseAgent {
   /**
    * Generate tests for a class
    */
-  private generateClassTests(cls: ClassInfo, framework: string, testType: string): string {
+  private generateClassTests(cls: ClassInfo, _framework: string, _testType: string): string {
     let content = `describe('${cls.name}', () => {\n`;
     content += `  let instance: ${cls.name};\n\n`;
 
@@ -526,7 +525,6 @@ export class TestGenerationAgent extends BaseAgent {
    */
   private generateMockParameters(parameters: string[]): string[] {
     return parameters.map(param => {
-      const cleanParam = param.split(':')[0].trim();
       const type = param.includes(':') ? param.split(':')[1].trim() : 'any';
 
       // Generate mock values based on type
@@ -675,7 +673,7 @@ export class TestGenerationAgent extends BaseAgent {
     return complexity;
   }
 
-  private generateTestFilePath(sourceFile: string, framework: string): string {
+  private generateTestFilePath(sourceFile: string, _framework: string): string {
     const ext = path.extname(sourceFile);
     const baseName = path.basename(sourceFile, ext);
     const dir = path.dirname(sourceFile);

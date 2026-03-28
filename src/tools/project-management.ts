@@ -2,15 +2,8 @@ import { Octokit } from '@octokit/rest';
 import { z } from 'zod';
 import { ToolConfig } from '../types.js';
 import { createTypeSafeHandler } from '../utils/type-safety.js';
-import {
-  validateGraphQLInput,
-  validateGraphQLVariableValue,
-  ProjectBoardsSchema,
-  MilestonesWithIssuesSchema,
-  CrossRepoProjectViewSchema,
-  GraphQLValidationError,
-} from '../graphql-validation.js';
 import { withErrorHandling } from '../errors.js';
+import { validateGraphQLVariableValue } from '../graphql-validation.js';
 
 // Type definitions for project management tools
 interface GetProjectBoardsParams {
@@ -88,7 +81,7 @@ const GetCrossRepoProjectViewSchema = z.object({
  *
  * @see https://docs.github.com/en/graphql/reference/objects#project
  */
-export function createProjectManagementTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
+export function createProjectManagementTools(octokit: Octokit, _readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
 
   // Get project boards (GitHub Projects V2)

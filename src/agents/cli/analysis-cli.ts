@@ -240,7 +240,7 @@ export class AnalysisCLI {
       const content = await fs.readFile(configPath, 'utf-8');
       const config = JSON.parse(content);
       return new Map(Object.entries(config));
-    } catch (error) {
+    } catch {
       console.warn(`Warning: Could not load configuration from ${configPath}`);
       return new Map();
     }

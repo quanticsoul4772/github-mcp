@@ -1,6 +1,5 @@
 import { AbstractBaseAgent } from '../base/base-agent.js';
 import { AnalysisContext, AnalysisResult, Finding } from '../types/agent-interfaces.js';
-import * as fs from 'fs/promises';
 import * as path from 'path';
 
 /**
@@ -145,7 +144,7 @@ export class TypeSafetyAgent extends AbstractBaseAgent {
           })
         );
       }
-    } catch (error) {
+    } catch {
       findings.push(
         this.createFinding('medium', 'configuration', 'Invalid tsconfig.json format', {
           file: 'tsconfig.json',

@@ -1,24 +1,5 @@
 import { Octokit } from '@octokit/rest';
 import { ToolConfig } from '../types.js';
-import {
-  GraphQLPaginationHandler,
-  GraphQLPaginationOptions,
-  GraphQLPaginationUtils,
-} from '../graphql-pagination-handler.js';
-import { OptimizedAPIClient } from '../optimized-api-client.js';
-import { cachedGraphQL, smartGraphQL, GraphQLTTL } from '../graphql-utils.js';
-import { typedGraphQL, createTypedHandler } from '../graphql-utils.js';
-import {
-  ListDiscussionsResponse,
-  GetDiscussionResponse,
-  GetDiscussionCommentsResponse,
-  ListDiscussionCategoriesResponse,
-  SearchDiscussionsResponse,
-  CreateDiscussionResponse,
-  AddDiscussionCommentResponse,
-  UpdateDiscussionResponse,
-  SimpleRepositoryResponse,
-} from '../graphql-types.js';
 
 interface ListDiscussionsParams {
   owner: string;
@@ -104,8 +85,6 @@ interface DeleteDiscussionParams {
  */
 export function createDiscussionTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
   const tools: ToolConfig[] = [];
-  const paginationHandler = new GraphQLPaginationHandler(octokit);
-
   // List discussions tool
   tools.push({
     tool: {

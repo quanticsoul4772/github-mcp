@@ -517,7 +517,7 @@ export function validateGitHubTokenWithResult(
  */
 export async function validateGitHubTokenWithAPI(
   token: string,
-  options: {
+  _options: {
     timeout?: number;
     retries?: number;
   } = {}
@@ -582,11 +582,6 @@ export async function validateGitHubTokenWithAPI(
         }
 
         if (response.status === 403) {
-          const rateLimitReset = response.headers.get('x-ratelimit-reset');
-          const resetTime = rateLimitReset
-            ? new Date(parseInt(rateLimitReset) * 1000).toISOString()
-            : 'unknown';
-
           return createErrorResult<{ token: string; user: any }>([
             createValidationError(
               'githubToken',

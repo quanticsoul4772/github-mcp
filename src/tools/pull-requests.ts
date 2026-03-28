@@ -19,13 +19,6 @@ interface GetPullRequestParams {
   expected_head_sha?: string;
 }
 
-interface GetPullRequestCommitsParams {
-  owner: string;
-  repo: string;
-  pull_number: number;
-  page?: number;
-  perPage?: number;
-}
 
 interface GetPullRequestFilesParams {
   owner: string;
@@ -57,20 +50,6 @@ interface CreatePullRequestReviewParams {
   commitID?: string;
 }
 
-interface AddPullRequestCommentParams {
-  owner: string;
-  repo: string;
-  pull_number: number;
-  body: string;
-}
-
-interface RequestPullRequestReviewersParams {
-  owner: string;
-  repo: string;
-  pull_number: number;
-  reviewers?: string[];
-  team_reviewers?: string[];
-}
 
 interface SearchPullRequestsParams {
   query: string;

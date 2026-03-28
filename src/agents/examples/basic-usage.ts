@@ -262,7 +262,7 @@ export async function monitorAgentHealth() {
   console.log('🏥 Checking agent health...');
 
   const healthRegistry = new DefaultAgentRegistry();
-  const coordinator = new DefaultAgentCoordinator(healthRegistry);
+  const _coordinator = new DefaultAgentCoordinator(healthRegistry);
   healthRegistry.register(new StaticAnalysisAgent() as any);
   healthRegistry.register(new ErrorDetectionAgent() as any);
   healthRegistry.register(new TestGenerationAgent() as any);

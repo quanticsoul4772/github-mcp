@@ -302,7 +302,7 @@ async function discoverSourceFiles(projectPath: string): Promise<string[]> {
           files.push(relativePath);
         }
       }
-    } catch (error) {
+    } catch {
       // Skip directories we can't read
     }
   };

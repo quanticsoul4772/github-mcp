@@ -226,21 +226,11 @@ export function createAgentTools(): ToolConfig<unknown, unknown>[] {
             // Agent doesn't have configure method
           }
 
-          const target: AnalysisTarget = {
-            type: args.type,
-            path: args.target,
-            depth: args.depth || 'deep',
-          };
-
           logger.info('Starting single agent analysis', {
             agent: args.agent,
             target: args.target,
           });
 
-          const context: AnalysisContext = {
-            projectPath: target.path || '.',
-            files: [],
-          };
           // Agent doesn't have performAnalysis method, mock the result
           const report = {
             findings: [],
@@ -414,7 +404,7 @@ export function createAgentTools(): ToolConfig<unknown, unknown>[] {
           const analysisResult = await coordinator.runFullAnalysis(request as any);
 
           // Generate report
-          const reportOptions: ReportOptions = {
+          const _reportOptions: ReportOptions = {
             format: args.format,
             outputPath: args.outputPath,
             includeDetails: args.includeDetails !== false,
@@ -484,40 +474,14 @@ export function createAgentTools(): ToolConfig<unknown, unknown>[] {
       },
       handler: async (args: any) => {
         try {
-          const target: AnalysisTarget = {
+          const _target: AnalysisTarget = {
             type: args.type,
             path: args.target,
             depth: 'shallow',
           };
 
-          // Configure agents for quick scan
-          const config = {
-            enabled: true,
-            depth: 'shallow' as const,
-            maxFindings: 20,
-            minSeverity: Severity.MEDIUM,
-          };
-
-          // Select agents based on focus
-          let agents: string[] = [];
-          switch (args.focus) {
-            case 'errors':
-              agents = ['error-detection'];
-              break;
-            case 'security':
-              agents = ['static-analysis']; // Would include security agent if we had one
-              break;
-            case 'performance':
-              agents = ['static-analysis'];
-              // config.includeCategories = [FindingCategory.PERFORMANCE_ISSUE];
-              break;
-            case 'style':
-              agents = ['static-analysis'];
-              // config.includeCategories = [FindingCategory.CODE_SMELL, FindingCategory.BEST_PRACTICE];
-              break;
-            default:
-              agents = []; // Use all agents
-          }
+          // Configure agents for quick scan (unused, kept for future use)
+          // const config = { enabled: true, depth: 'shallow', maxFindings: 20, minSeverity: Severity.MEDIUM };
 
           const context: AnalysisContext = {
             projectPath: args.target,

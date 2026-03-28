@@ -1,6 +1,5 @@
 import { AbstractBaseAgent } from '../base/base-agent.js';
 import { AnalysisContext, AnalysisResult, Finding } from '../types/agent-interfaces.js';
-import * as fs from 'fs/promises';
 import * as path from 'path';
 
 /**
@@ -112,7 +111,7 @@ export class TestingAgent extends AbstractBaseAgent {
   private async analyzeTestCoverage(
     sourceFiles: string[],
     testFiles: string[],
-    context: AnalysisContext
+    _context: AnalysisContext
   ): Promise<Finding[]> {
     const findings: Finding[] = [];
     const testedFiles = new Set<string>();
@@ -169,8 +168,6 @@ export class TestingAgent extends AbstractBaseAgent {
     if (!content) {
       return findings;
     }
-
-    const lines = content.split('\n');
 
     // Test structure analysis
     findings.push(...this.analyzeTestStructure(testFile, content));
@@ -395,16 +392,11 @@ export class TestingAgent extends AbstractBaseAgent {
     const findings: Finding[] = [];
     const lines = content.split('\n');
 
-    let hasBeforeEach = false;
     let hasAfterEach = false;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const lineNumber = i + 1;
-
-      if (line.includes('beforeEach')) {
-        hasBeforeEach = true;
-      }
 
       if (line.includes('afterEach')) {
         hasAfterEach = true;

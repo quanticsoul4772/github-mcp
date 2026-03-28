@@ -8,8 +8,6 @@
 
 import {
   escapeHtml,
-  escapeHtmlAttribute,
-  safeHtmlTemplate,
   safeStringify,
   stripHtmlTags,
 } from '../../utils/html-security.js';
@@ -1016,7 +1014,7 @@ export class ReportGenerator {
   /**
    * Generate CSV report
    */
-  private generateCsvReport(findings: Finding[], options: ReportOptions): string {
+  private generateCsvReport(findings: Finding[], _options: ReportOptions): string {
     const headers = [
       'ID',
       'Severity',
