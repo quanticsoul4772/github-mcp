@@ -2,6 +2,9 @@ import { ToolConfig } from '../../types.js';
 import { IIssueService } from '../../foundation/interfaces.js';
 import { createGetIssueTool } from './get-issue-tool.js';
 import { createListIssuesTool } from './list-issues-tool.js';
+import { createCreateIssueTool } from './create-issue-tool.js';
+import { createUpdateIssueTool } from './update-issue-tool.js';
+import { createCloseIssueTool } from './close-issue-tool.js';
 
 /**
  * Factory function to create all issue-related tools
@@ -23,11 +26,9 @@ export function createIssueToolsModular(
 
   // Write tools (only when not in read-only mode)
   if (!readOnly) {
-    // TODO: Add create, update, close issue tools
-    // These would follow the same pattern:
-    // tools.push(createCreateIssueTool(octokit, issueService));
-    // tools.push(createUpdateIssueTool(octokit, issueService));
-    // tools.push(createCloseIssueTool(octokit, issueService));
+    tools.push(createCreateIssueTool(octokit, issueService));
+    tools.push(createUpdateIssueTool(octokit, issueService));
+    tools.push(createCloseIssueTool(octokit, issueService));
   }
 
   return tools;
