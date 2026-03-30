@@ -42,7 +42,7 @@ jobs:
         run: npm run lint || echo "::warning::Linting failed - please fix linting issues"
 
       - name: Run tests with coverage
-        run: npm test -- --coverage --watchAll=false || echo "::warning::Some tests failed"
+        run: npm run test:coverage -- --run || echo "::warning::Some tests failed"
         env:
           CI: true
 
