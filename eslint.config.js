@@ -42,6 +42,24 @@ export default [
     }
   },
   {
+    // Test files have different quality standards: mocks need `any`, assertions
+    // use non-null, helper functions can be long, and test setup is complex.
+    files: [
+      'src/**/*.test.ts',
+      'src/**/*.spec.ts',
+      'src/__tests__/**/*.ts'
+    ],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/prefer-nullish-coalescing': 'off',
+      '@typescript-eslint/prefer-optional-chain': 'off',
+      'max-lines-per-function': 'off',
+      'complexity': 'off',
+      'max-depth': 'off'
+    }
+  },
+  {
     ignores: [
       'build/**',
       'node_modules/**',
