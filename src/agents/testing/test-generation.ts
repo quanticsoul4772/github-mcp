@@ -475,16 +475,25 @@ export class TestGenerationAgent extends BaseAgent {
 
     // Null/undefined tests
     if (func.parameters.length > 0) {
+      const nullArgs = func.parameters.map(() => 'null').join(', ');
+      const undefinedArgs = func.parameters.map(() => 'undefined').join(', ');
       content += `  it('should handle null/undefined inputs', ${func.isAsync ? 'async ' : ''}() => {\n`;
-      content += `    // Test with null/undefined parameters\n`;
-      content += `    // TODO: Add specific null/undefined test cases\n`;
+      content += `    expect(() => ${func.name}(${nullArgs})).not.toThrow();\n`;
+      content += `    expect(() => ${func.name}(${undefinedArgs})).not.toThrow();\n`;
       content += `  });\n\n`;
     }
 
     // Boundary value tests
     content += `  it('should handle boundary values', ${func.isAsync ? 'async ' : ''}() => {\n`;
-    content += `    // Test with boundary values (empty arrays, zero, negative numbers, etc.)\n`;
-    content += `    // TODO: Add specific boundary value test cases\n`;
+    if (func.parameters.length > 0) {
+      const emptyArgs = func.parameters.map(() => '""').join(', ');
+      const zeroArgs = func.parameters.map(() => '0').join(', ');
+      content += `    // Empty/zero boundary values\n`;
+      content += `    expect(${func.name}(${emptyArgs})).toBeDefined();\n`;
+      content += `    expect(${func.name}(${zeroArgs})).toBeDefined();\n`;
+    } else {
+      content += `    expect(${func.name}()).toBeDefined();\n`;
+    }
     content += `  });\n\n`;
 
     return content;
@@ -498,8 +507,8 @@ export class TestGenerationAgent extends BaseAgent {
 
     func.parameters.forEach((param, index) => {
       content += `  it('should validate parameter ${index + 1} (${param})', () => {\n`;
-      content += `    // Test parameter validation for ${param}\n`;
-      content += `    // TODO: Add specific validation tests\n`;
+      const invalidArgs = func.parameters.map((_, i) => i === index ? 'null' : '"valid"').join(', ');
+      content += `    expect(() => ${func.name}(${invalidArgs})).not.toThrow();\n`;
       content += `  });\n\n`;
     });
 
