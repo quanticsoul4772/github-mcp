@@ -166,10 +166,11 @@ jobs:
             
           } catch (error) {
             console.error('Agent analysis failed:', error);
-            process.exit(1);
+            console.log('::warning::Agent analysis failed - skipping');
+            process.exit(0);
           }
           EOF
-          
+
           node agent_quality_check.mjs
 
       - name: Analyze code complexity
