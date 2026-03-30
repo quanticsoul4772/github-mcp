@@ -49,7 +49,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ['javascript', 'typescript']
+        language: ['javascript-typescript']
         # Add more languages as needed: ['python', 'java', 'go', 'csharp', 'cpp']
     
     steps:
