@@ -11,11 +11,9 @@ on:
 
 permissions:
   contents: read
-  security-events: write
   id-token: write
   actions: read
   checks: write
-  statuses: write
   pull-requests: write
 
 jobs:
@@ -99,6 +97,7 @@ jobs:
   scorecard:
     name: OpenSSF Scorecard
     runs-on: ubuntu-latest
+    continue-on-error: true  # publish_results requires specific repo configuration
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       security-events: write
