@@ -1,9 +1,9 @@
 /**
  * Tests for issue tools
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createIssueTools } from './issues.js';
-import { createMockOctokit, staticMockResponses } from '../__tests__/mocks/octokit.js';
+import { createMockOctokit } from '../__tests__/mocks/octokit.js';
 import { testFixtures } from '../__tests__/fixtures/test-data.js';
 
 describe('Issue Tools', () => {

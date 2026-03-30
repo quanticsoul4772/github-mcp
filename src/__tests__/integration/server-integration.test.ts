@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { createMockOctokit, staticMockResponses } from '../mocks/octokit.js';
+import { createMockOctokit } from '../mocks/octokit.js';
 import { mockEnvVars, mockProcessExit, restoreProcessExit } from '../helpers/test-helpers.js';
 
 // Mock external dependencies
@@ -335,11 +335,11 @@ describe('GitHub MCP Server Integration', () => {
   });
 
   describe('Tool Execution Flow', () => {
-    let server: any;
+    let _server: any;
 
     beforeEach(async () => {
       const { GitHubMCPServer } = await import('../../index.js');
-      server = new (GitHubMCPServer as any)(true);
+      _server = new (GitHubMCPServer as any)(true);
     });
 
     it('should execute get_me tool successfully', async () => {

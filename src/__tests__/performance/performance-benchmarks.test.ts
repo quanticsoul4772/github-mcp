@@ -1,9 +1,8 @@
-import { Octokit } from '@octokit/rest';
 /**
  * Performance Benchmarks Test Suite
  * Tests performance metrics, response times, memory usage, and concurrent processing
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { performance } from 'perf_hooks';
 import { createIssueTools } from '../../tools/issues.js';
 import { createRepositoryTools } from '../../tools/repositories.js';
@@ -141,7 +140,7 @@ describe('Performance Benchmarks', () => {
 
     it('should handle concurrent requests with different operations', async () => {
       const listIssues = issueTools.find(tool => tool.tool.name === 'list_issues');
-      const getFileContents = repoTools.find(tool => tool.tool.name === 'get_file_contents');
+      const _getFileContents = repoTools.find(tool => tool.tool.name === 'get_file_contents');
       const listPRs = prTools.find(tool => tool.tool.name === 'list_pull_requests');
 
       mockOctokit.issues.listForRepo.mockResolvedValue({ data: [] });
@@ -304,7 +303,7 @@ describe('Performance Benchmarks', () => {
             repo: 'test-repo',
             state: 'all',
           });
-        } catch (error) {
+        } catch {
           errorCount++;
         }
       }

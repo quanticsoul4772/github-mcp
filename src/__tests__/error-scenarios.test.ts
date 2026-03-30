@@ -2,9 +2,9 @@
  * Comprehensive error scenario tests
  * Tests network failures, timeouts, and various edge cases
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createMockOctokit } from './mocks/octokit.js';
-import { generateRandomApiError, generateNetworkError } from './fixtures/test-data.js';
+import { generateNetworkError } from './fixtures/test-data.js';
 import { retry, withTimeout, waitFor } from './helpers/test-helpers.js';
 import { createRepositoryTools } from '../tools/repositories.js';
 

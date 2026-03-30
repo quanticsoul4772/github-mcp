@@ -192,7 +192,7 @@ describe('GraphQLPaginationHandler', () => {
       mockOctokit.graphql.mockResolvedValueOnce(page1Response).mockResolvedValueOnce(page2Response);
 
       const queryBuilder = handler.createDiscussionsQuery('owner', 'repo');
-      const result = await handler.paginate(queryBuilder, {
+      const _result = await handler.paginate(queryBuilder, {
         first: 5,
         autoPage: true,
         onProgress,

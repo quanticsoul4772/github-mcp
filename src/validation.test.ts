@@ -5,9 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   ValidationError,
-  ValidationErrorDetail,
   ValidationWarning,
-  ValidationResult,
   validateOwnerName,
   validateRepoName,
   validateBranchName,
@@ -15,7 +13,6 @@ import {
   validateRef,
   validateCommitSha,
   validateSHA,
-  validateWorkflowFileName,
   validateURL,
   validateIssueNumber,
   validatePerPage,
@@ -31,8 +28,6 @@ import {
     validateGitHubTokenWithResult,
     validateGitHubTokenFormat,
     validateGitHubTokenWithAPI,
-    validateEnvironmentConfiguration,
-    shouldBypassValidation,
 } from './config.js';
 
 // Test token factory to avoid hardcoded secrets
@@ -460,7 +455,7 @@ describe('Validation Module', () => {
       it('should handle missing fetch API', async () => {
         // Mock fetch as undefined
         const originalFetch = global.fetch;
-        // @ts-ignore
+        // @ts-expect-error - intentionally setting fetch to undefined for test
         global.fetch = undefined;
 
         const testToken = createTestToken('classic');

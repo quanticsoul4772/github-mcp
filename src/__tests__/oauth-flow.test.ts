@@ -2,7 +2,7 @@
  * OAuth Flow Testing Infrastructure for GitHub MCP Server
  * Tests OAuth authentication flow components and security
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { validateGitHubToken } from '../config.js';
 import { AuthenticationError, AuthorizationError } from '../errors.js';
 
@@ -140,7 +140,7 @@ describe('OAuth Flow Testing Infrastructure', () => {
       };
 
       // Simulate token exchange function
-      const exchangeCodeForToken = async (code: string, config: any) => {
+      const exchangeCodeForToken = async (code: string, _config: any) => {
         // In real implementation, this would make HTTP request to GitHub
         if (code === 'valid-auth-code') {
           return mockTokenResponse;
@@ -192,7 +192,7 @@ describe('OAuth Flow Testing Infrastructure', () => {
         refresh_token: 'ghr_' + 'R'.repeat(36),
       };
 
-      const refreshToken = async (refreshToken: string, config: any) => {
+      const refreshToken = async (refreshToken: string, _config: any) => {
         if (validateGitHubToken(refreshToken) && refreshToken.startsWith('ghr_')) {
           return mockRefreshResponse;
         }

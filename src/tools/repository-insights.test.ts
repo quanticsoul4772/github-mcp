@@ -1,10 +1,9 @@
 /**
  * Tests for repository insights tools (GraphQL)
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createRepositoryInsightsTools } from './repository-insights.js';
 import { createMockOctokit } from '../__tests__/mocks/octokit.js';
-import { ValidationError } from '../validation.js';
 
 describe('Repository Insights Tools', () => {
   let mockOctokit: any;

@@ -1,11 +1,10 @@
 /**
  * Tests for pull request tools
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createPullRequestTools } from './pull-requests.js';
 import { createMockOctokit } from '../__tests__/mocks/octokit.js';
 import { testFixtures } from '../__tests__/fixtures/test-data.js';
-import { ValidationError } from '../validation.js';
 
 describe('Pull Request Tools', () => {
   let mockOctokit: any;

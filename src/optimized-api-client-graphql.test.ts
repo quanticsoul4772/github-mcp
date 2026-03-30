@@ -2,7 +2,7 @@
  * Tests for OptimizedAPIClient GraphQL functionality
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OptimizedAPIClient } from './optimized-api-client.js';
 import { createMockOctokit } from './__tests__/mocks/octokit.js';
 

@@ -5,12 +5,11 @@
  * IMPORTANT: These tests require actual network calls and valid tokens
  * They should be run separately from unit tests and may be skipped in CI
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Octokit } from '@octokit/rest';
 import {
   AuthenticationError,
   AuthorizationError,
-  RateLimitError,
   normalizeError,
 } from '../../errors.js';
 import { validateGitHubToken } from '../../config.js';
@@ -243,19 +242,19 @@ describe('Authentication Integration Tests', () => {
         if (scopes) {
           // OAuth scopes should never be logged in clear text
           // Even for debugging, use the masking function
-          const maskedScopes = maskOAuthScopes(scopes);
+          const _maskedScopes = maskOAuthScopes(scopes);
           // Only use masked scopes if absolutely necessary for debugging
-          // console.debug('Masked OAuth scopes:', maskedScopes);
+          // console.debug('Masked OAuth scopes:', _maskedScopes);
           expect(typeof scopes).toBe('string');
         }
 
         if (acceptedScopes) {
           // Accepted OAuth scopes should also be masked
-          const maskedAcceptedScopes = maskOAuthScopes(acceptedScopes);
-          // console.debug('Masked accepted scopes:', maskedAcceptedScopes);
+          const _maskedAcceptedScopes = maskOAuthScopes(acceptedScopes);
+          // console.debug('Masked accepted scopes:', _maskedAcceptedScopes);
           expect(typeof acceptedScopes).toBe('string');
         }
-      } catch (error) {
+      } catch {
         // OAuth scope headers may not be present for all token types
         console.warn('OAuth scope detection not available for this token type');
       }

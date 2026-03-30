@@ -1,7 +1,7 @@
 /**
  * Tests for repository tools
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createRepositoryTools } from './repositories.js';
 import { createMockOctokit, staticMockResponses } from '../__tests__/mocks/octokit.js';
 import { ValidationError } from '../validation.js';

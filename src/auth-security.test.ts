@@ -1,7 +1,7 @@
 /**
  * Authentication and security tests
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { validateEnvironmentConfiguration } from './config.js';
 import sanitizeHtml from 'sanitize-html';
 import sanitizeFilename from 'sanitize-filename';

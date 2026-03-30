@@ -8,12 +8,11 @@ import { createRepositoryTools } from '../../tools/repositories.js';
 import { createSearchTools } from '../../tools/search.js';
 import { createMockOctokit } from '../mocks/octokit.js';
 import { ReliabilityManager, RetryManager, ConsoleTelemetry } from '../../reliability.js';
-import { GitHubMCPError } from '../../errors.js';
 
 describe('Rate Limiting', () => {
   let mockOctokit: any;
   let issueTools: any[];
-  let repoTools: any[];
+  let _repoTools: any[];
   let searchTools: any[];
   let reliabilityManager: ReliabilityManager;
   let telemetry: ConsoleTelemetry;
@@ -21,7 +20,7 @@ describe('Rate Limiting', () => {
   beforeEach(() => {
     mockOctokit = createMockOctokit();
     issueTools = createIssueTools(mockOctokit, false);
-    repoTools = createRepositoryTools(mockOctokit, false);
+    _repoTools = createRepositoryTools(mockOctokit, false);
     searchTools = createSearchTools(mockOctokit);
 
     telemetry = new ConsoleTelemetry(true);

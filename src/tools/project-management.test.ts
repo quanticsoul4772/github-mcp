@@ -1,7 +1,7 @@
 /**
  * Tests for project management tools (GraphQL)
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createProjectManagementTools } from './project-management.js';
 import { createMockOctokit } from '../__tests__/mocks/octokit.js';
 

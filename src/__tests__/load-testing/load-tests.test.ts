@@ -9,11 +9,9 @@ import { createMockOctokit } from '../mocks/octokit.js';
 import { testFixtures } from '../fixtures/test-data.js';
 import {
   LoadTestRunner,
-  MemoryMonitor,
   CircuitBreakerTester,
   RegressionDetector,
   LoadTestConfig,
-  LoadTestResult,
 } from './load-test-runner.js';
 import { ReliabilityManager, RetryManager, ConsoleTelemetry } from '../../reliability.js';
 
@@ -249,11 +247,11 @@ describe('Load Testing Suite', () => {
     it('should recover from circuit breaker trips', async () => {
       const listIssues = issueTools.find(tool => tool.tool.name === 'list_issues');
 
-      let requestCount = 0;
+      let _requestCount = 0;
       let totalApiCalls = 0;
       mockOctokit.issues.listForRepo.mockImplementation(() => {
         totalApiCalls++;
-        requestCount++;
+        _requestCount++;
         // Fail for first 20 calls, succeed after that
         if (totalApiCalls <= 20) {
           throw new Error('Simulated API failure');

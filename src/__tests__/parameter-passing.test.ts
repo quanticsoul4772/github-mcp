@@ -1,6 +1,4 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import { ToolRegistry } from '../tool-registry.js';
 import { ToolConfig } from '../types.js';
 

@@ -262,7 +262,7 @@ describe('Memory Profiling Tests', () => {
             repo: 'test-repo',
             state: 'all',
           });
-        } catch (error) {
+        } catch {
           errorCount++;
         }
       }
@@ -300,7 +300,7 @@ describe('Memory Profiling Tests', () => {
               state: 'all',
             })
           );
-        } catch (error) {
+        } catch {
           // Expected - some will fail due to retry logic
         }
       }

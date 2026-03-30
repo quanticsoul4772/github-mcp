@@ -1,7 +1,7 @@
 /**
  * Tests for batch operations tools (GraphQL)
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createBatchOperationsTools } from './batch-operations.js';
 import { createMockOctokit } from '../__tests__/mocks/octokit.js';
 

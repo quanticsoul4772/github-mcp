@@ -261,7 +261,7 @@ describe('Edge Cases and Error Handling', () => {
         files: [],
       };
 
-      const report = await coordinator.runFullAnalysis(context);
+      const _report = await coordinator.runFullAnalysis(context);
       const result = await coordinator.coordinate({
         target: {
           type: 'project',
