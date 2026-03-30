@@ -174,6 +174,7 @@ export interface UpdateIssueParams {
   title?: string;
   body?: string;
   state?: 'open' | 'closed';
+  state_reason?: 'completed' | 'not_planned' | 'reopened';
   milestone?: number | null;
   assignees?: string[];
   labels?: string[];

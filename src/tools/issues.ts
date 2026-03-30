@@ -454,6 +454,11 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
               description: 'New state',
               enum: ['open', 'closed'],
             },
+            state_reason: {
+              type: 'string',
+              description: 'Reason for state change — use with state:"closed" to distinguish completed work from issues closed as not planned',
+              enum: ['completed', 'not_planned', 'reopened'],
+            },
             labels: {
               type: 'array',
               description: 'New labels',
@@ -481,6 +486,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           title: params.title,
           body: params.body,
           state: params.state as any,
+          state_reason: params.state_reason,
           labels: params.labels,
           assignees: params.assignees,
           milestone: params.milestone,
@@ -490,6 +496,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           number: data.number,
           title: data.title,
           state: data.state,
+          state_reason: (data as any).state_reason ?? null,
           body: data.body,
           html_url: data.html_url,
           updated_at: data.updated_at,

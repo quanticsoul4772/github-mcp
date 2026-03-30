@@ -278,6 +278,7 @@ describe('Issue Tools', () => {
         title: 'Updated Title',
         body: undefined,
         state: 'closed',
+        state_reason: undefined,
         assignees: undefined,
         labels: undefined,
         milestone: undefined,
@@ -285,6 +286,66 @@ describe('Issue Tools', () => {
 
       expect(result.title).toBe('Updated Title');
       expect(result.state).toBe('closed');
+    });
+
+    it('should close issue as not_planned', async () => {
+      const updatedIssue = {
+        ...testFixtures.issues.open,
+        state: 'closed',
+        state_reason: 'not_planned',
+      };
+      mockOctokit.issues.update.mockResolvedValue({ data: updatedIssue });
+
+      const result = await updateIssue.handler({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        issue_number: 1,
+        state: 'closed',
+        state_reason: 'not_planned',
+      });
+
+      expect(mockOctokit.issues.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          state: 'closed',
+          state_reason: 'not_planned',
+        })
+      );
+      expect(result.state).toBe('closed');
+      expect(result.state_reason).toBe('not_planned');
+    });
+
+    it('should close issue as completed', async () => {
+      const updatedIssue = {
+        ...testFixtures.issues.open,
+        state: 'closed',
+        state_reason: 'completed',
+      };
+      mockOctokit.issues.update.mockResolvedValue({ data: updatedIssue });
+
+      const result = await updateIssue.handler({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        issue_number: 1,
+        state: 'closed',
+        state_reason: 'completed',
+      });
+
+      expect(result.state_reason).toBe('completed');
+    });
+
+    it('should return null state_reason when not set by API', async () => {
+      const updatedIssue = { ...testFixtures.issues.open, title: 'Retitled' };
+      // state_reason not present in response — should default to null
+      mockOctokit.issues.update.mockResolvedValue({ data: updatedIssue });
+
+      const result = await updateIssue.handler({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        issue_number: 1,
+        title: 'Retitled',
+      });
+
+      expect(result.state_reason).toBeNull();
     });
   });
 
