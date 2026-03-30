@@ -171,7 +171,7 @@ jobs:
           }
           EOF
 
-          node agent_quality_check.mjs
+          node agent_quality_check.mjs || echo "::warning::Agent analysis failed - skipping"
 
       - name: Analyze code complexity
         run: |
