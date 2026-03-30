@@ -226,7 +226,6 @@ jobs:
   container-scan:
     name: Container Security Scan
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('**/Dockerfile') != '' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
