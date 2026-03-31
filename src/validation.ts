@@ -196,150 +196,76 @@ export function validateRepoName(name: string): boolean {
  * - Cannot contain consecutive dots
  * - Maximum 100 characters
  */
-export function validateRepoNameWithResult(name: string): ValidationResult<string> {
-  // Development mode bypass with safe check
-  if (shouldBypassValidation()) {
-    return createSuccessResult(
-      name,
-      [
-        createValidationWarning(
-          'DEV_BYPASS',
-          'Validation bypassed in development mode',
-          'repoName'
-        ),
-      ],
-      ['Set NODE_ENV=production to enable full validation']
-    );
-  }
-
-  // Check cache first
-  const cacheKey = `repo-name:${name}`;
-  const cached = getCachedValidationResult<string>(cacheKey);
-  if (cached) {
-    return cached;
-  }
-
+/** Validate a repo name string against GitHub naming rules, collecting all errors. */
+function collectRepoNameErrors(name: string): {
+  errors: ValidationErrorDetail[];
+  warnings: ValidationWarning[];
+  suggestions: string[];
+} {
   const errors: ValidationErrorDetail[] = [];
   const warnings: ValidationWarning[] = [];
   const suggestions: string[] = [];
 
-  if (!name || typeof name !== 'string') {
-    const result = createErrorResult<string>(
-      [
-        createValidationError(
-          'repoName',
-          'Repository name must be a non-empty string',
-          'INVALID_TYPE'
-        ),
-      ],
-      [],
-      ['Repository names must be strings']
-    );
-    setCachedValidationResult(cacheKey, result, 30000); // Cache errors for 30 seconds
-    return result;
-  }
-
-  // Check length
-  if (name.length === 0) {
-    const result = createErrorResult<string>(
-      [
-        createValidationError(
-          'repoName',
-          'Repository name cannot be empty',
-          'EMPTY_NAME'
-        ),
-      ],
-      [],
-      ['Repository names must be at least 1 character']
-    );
-    setCachedValidationResult(cacheKey, result, 30000);
-    return result;
-  }
-
-  if (name.length > 100) {
-    const result = createErrorResult<string>(
-      [
-        createValidationError(
-          'repoName',
-          `Repository name is ${name.length} characters, maximum is 100`,
-          'NAME_TOO_LONG'
-        ),
-      ],
-      [],
-      ['Repository names have a maximum length of 100 characters']
-    );
-    setCachedValidationResult(cacheKey, result, 30000);
-    return result;
-  }
-
-  // Cannot start or end with a dot
   if (name.startsWith('.')) {
-    errors.push(
-      createValidationError(
-        'repoName',
-        'Repository name cannot start with a dot',
-        'STARTS_WITH_DOT'
-      )
-    );
+    errors.push(createValidationError('repoName', 'Repository name cannot start with a dot', 'STARTS_WITH_DOT'));
   }
-
   if (name.endsWith('.')) {
-    errors.push(
-      createValidationError(
-        'repoName',
-        'Repository name cannot end with a dot',
-        'ENDS_WITH_DOT'
-      )
-    );
+    errors.push(createValidationError('repoName', 'Repository name cannot end with a dot', 'ENDS_WITH_DOT'));
   }
-
-  // Cannot contain consecutive dots
   if (name.includes('..')) {
-    errors.push(
-      createValidationError(
-        'repoName',
-        'Repository name cannot contain consecutive dots (..)',
-        'CONSECUTIVE_DOTS'
-      )
-    );
+    errors.push(createValidationError('repoName', 'Repository name cannot contain consecutive dots (..)', 'CONSECUTIVE_DOTS'));
   }
 
-  // Only allow alphanumeric, hyphen, underscore, and dot
   const validPattern = /^[a-zA-Z0-9._-]+$/;
   if (!validPattern.test(name)) {
-    const invalidChars = name.split('').filter(char => !/[a-zA-Z0-9._-]/.test(char));
-    errors.push(
-      createValidationError(
-        'repoName',
-        `Repository name contains invalid characters: ${[...new Set(invalidChars)].join(', ')}`,
-        'INVALID_CHARACTERS'
-      )
-    );
-    suggestions.push(
-      'Use only alphanumeric characters, dots (.), hyphens (-), and underscores (_)'
-    );
+    const invalidChars = [...new Set(name.split('').filter(c => !/[a-zA-Z0-9._-]/.test(c)))];
+    errors.push(createValidationError(
+      'repoName',
+      `Repository name contains invalid characters: ${invalidChars.join(', ')}`,
+      'INVALID_CHARACTERS'
+    ));
+    suggestions.push('Use only alphanumeric characters, dots (.), hyphens (-), and underscores (_)');
   }
 
-  // Add general suggestions
   if (name.length > 50) {
-    warnings.push(
-      createValidationWarning(
-        'LONG_NAME',
-        'Repository name is quite long, consider using a shorter name',
-        'repoName',
-        'Shorter names are easier to remember and type'
-      )
-    );
+    warnings.push(createValidationWarning('LONG_NAME', 'Repository name is quite long, consider using a shorter name', 'repoName', 'Shorter names are easier to remember and type'));
   }
 
-  const result =
-    errors.length > 0
-      ? createErrorResult<string>(errors, warnings, suggestions)
-      : createSuccessResult(name, warnings, suggestions);
+  return { errors, warnings, suggestions };
+}
 
-  // Cache successful results for longer
-  setCachedValidationResult(cacheKey, result, result.isValid ? 300000 : 30000); // 5 min success, 30 sec failure
+export function validateRepoNameWithResult(name: string): ValidationResult<string> {
+  if (shouldBypassValidation()) {
+    return createSuccessResult(name, [createValidationWarning('DEV_BYPASS', 'Validation bypassed in development mode', 'repoName')], ['Set NODE_ENV=production to enable full validation']);
+  }
 
+  const cacheKey = `repo-name:${name}`;
+  const cached = getCachedValidationResult<string>(cacheKey);
+  if (cached) return cached;
+
+  // Early-exit checks for structural invalidity
+  if (!name || typeof name !== 'string') {
+    const r = createErrorResult<string>([createValidationError('repoName', 'Repository name must be a non-empty string', 'INVALID_TYPE')], [], ['Repository names must be strings']);
+    setCachedValidationResult(cacheKey, r, 30000);
+    return r;
+  }
+  if (name.length === 0) {
+    const r = createErrorResult<string>([createValidationError('repoName', 'Repository name cannot be empty', 'EMPTY_NAME')], [], ['Repository names must be at least 1 character']);
+    setCachedValidationResult(cacheKey, r, 30000);
+    return r;
+  }
+  if (name.length > 100) {
+    const r = createErrorResult<string>([createValidationError('repoName', `Repository name is ${name.length} characters, maximum is 100`, 'NAME_TOO_LONG')], [], ['Repository names have a maximum length of 100 characters']);
+    setCachedValidationResult(cacheKey, r, 30000);
+    return r;
+  }
+
+  const { errors, warnings, suggestions } = collectRepoNameErrors(name);
+  const result = errors.length > 0
+    ? createErrorResult<string>(errors, warnings, suggestions)
+    : createSuccessResult(name, warnings, suggestions);
+
+  setCachedValidationResult(cacheKey, result, result.isValid ? 300000 : 30000);
   return result;
 }
 
@@ -421,39 +347,23 @@ export function validateFilePath(path: string): string | null {
  * - Follows Git ref naming rules
  */
 export function validateRef(ref: string): boolean {
-  if (!ref || typeof ref !== 'string') {
+  if (!ref || typeof ref !== 'string' || ref.length === 0 || ref.length > 255) {
     return false;
   }
 
-  // Cannot be empty or too long
-  if (ref.length === 0 || ref.length > 255) {
+  // Cannot contain certain characters (replaces per-char loop to reduce complexity)
+  if (/[~^:\\ \t\n]/.test(ref)) {
     return false;
   }
 
-  // Cannot contain certain characters
-  const invalidChars = ['~', '^', ':', '\\', ' ', '\t', '\n'];
-  for (const char of invalidChars) {
-    if (ref.includes(char)) {
-      return false;
-    }
-  }
-
-  // Cannot start with a dot or dash
-  if (ref.startsWith('.') || ref.startsWith('-')) {
-    return false;
-  }
-
-  // Cannot end with .lock
-  if (ref.endsWith('.lock')) {
-    return false;
-  }
-
-  // Cannot contain consecutive dots or @{
-  if (ref.includes('..') || ref.includes('@{')) {
-    return false;
-  }
-
-  return true;
+  // Cannot start with a dot or dash; cannot end with .lock; no consecutive dots or @{
+  return (
+    !ref.startsWith('.') &&
+    !ref.startsWith('-') &&
+    !ref.endsWith('.lock') &&
+    !ref.includes('..') &&
+    !ref.includes('@{')
+  );
 }
 
 /**
@@ -499,40 +409,18 @@ export function sanitizeText(text: string, maxLength: number = 1000): string {
  * - Cannot end with .lock
  * - Cannot contain consecutive dots or @{
  */
+// Matches any branch name that violates Git naming rules:
+// - invalid chars: ~ ^ : \ space tab newline ? * [
+// - starts with . or -
+// - ends with . or .lock
+// - contains .. or @{
+const INVALID_BRANCH_RE = /[~^:\\ \t\n?*[]|^\.|^-|\.$|\.lock$|\.\.|@\{/;
+
 export function validateBranchName(branch: string): boolean {
-  if (!branch || typeof branch !== 'string') {
+  if (!branch || typeof branch !== 'string' || branch.length === 0 || branch.length > 255) {
     return false;
   }
-
-  // Cannot be empty or too long
-  if (branch.length === 0 || branch.length > 255) {
-    return false;
-  }
-
-  // Cannot contain certain characters
-  const invalidChars = ['~', '^', ':', '\\', ' ', '\t', '\n', '?', '*', '['];
-  for (const char of invalidChars) {
-    if (branch.includes(char)) {
-      return false;
-    }
-  }
-
-  // Cannot start or end with a dot or dash
-  if (branch.startsWith('.') || branch.startsWith('-') || branch.endsWith('.')) {
-    return false;
-  }
-
-  // Cannot end with .lock
-  if (branch.endsWith('.lock')) {
-    return false;
-  }
-
-  // Cannot contain consecutive dots or @{
-  if (branch.includes('..') || branch.includes('@{')) {
-    return false;
-  }
-
-  return true;
+  return !INVALID_BRANCH_RE.test(branch);
 }
 
 /**
