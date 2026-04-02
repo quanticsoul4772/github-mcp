@@ -93,6 +93,11 @@ describe('Validation Module', () => {
   });
 
   describe('validateFilePath', () => {
+    it('should return null for empty or non-string input', () => {
+      expect(validateFilePath('')).toBe(null);
+      expect(validateFilePath(null as any)).toBe(null);
+    });
+
     it('should accept valid file paths', () => {
       expect(validateFilePath('README.md')).toBe('README.md');
       expect(validateFilePath('src/index.ts')).toBe('src/index.ts');
@@ -647,6 +652,11 @@ describe('Validation Module', () => {
         expect(validateGitOperation('clean -fdx')).toBe(false);
         expect(validateGitOperation('rm -rf')).toBe(false);
       });
+
+      it('should return false for empty or non-string input', () => {
+        expect(validateGitOperation('')).toBe(false);
+        expect(validateGitOperation(null as any)).toBe(false);
+      });
     });
 
     describe('validateCommandOptions', () => {
@@ -658,6 +668,11 @@ describe('Validation Module', () => {
       it('should reject disallowed options', () => {
         expect(validateCommandOptions('--force')).toBe(false);
         expect(validateCommandOptions('--exec=rm -rf /')).toBe(false);
+      });
+
+      it('should return true for empty or null options', () => {
+        expect(validateCommandOptions('')).toBe(true);
+        expect(validateCommandOptions(null as any)).toBe(true);
       });
     });
   });
