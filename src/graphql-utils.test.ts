@@ -15,6 +15,7 @@ import {
   validateResponseFields,
   formatGraphQLError,
   createTypedHandler,
+  paginatedGraphQL,
 } from './graphql-utils.js';
 import { OptimizedAPIClient } from './optimized-api-client.js';
 import { createMockOctokit } from './__tests__/mocks/octokit.js';
@@ -413,6 +414,42 @@ describe('GraphQL Utils', () => {
       const result = await typed({ param: 'value' });
       expect(result).toEqual({ result: 'ok' });
       expect(handler).toHaveBeenCalledWith({ param: 'value' });
+    });
+  });
+
+  describe('paginatedGraphQL', () => {
+    it('should fetch all pages when hasNextPage is true then false', async () => {
+      const page1 = { data: [1], pageInfo: { hasNextPage: true, endCursor: 'cursor1' } };
+      const page2 = { data: [2], pageInfo: { hasNextPage: false, endCursor: null } };
+      mockOctokit.graphql = vi.fn()
+        .mockResolvedValueOnce(page1)
+        .mockResolvedValueOnce(page2);
+
+      const results = await paginatedGraphQL(
+        mockOctokit,
+        '{ items(first: $first, after: $after) { pageInfo { hasNextPage endCursor } } }',
+        {},
+        25,
+        10
+      );
+      expect(results).toHaveLength(2);
+      expect(mockOctokit.graphql).toHaveBeenCalledTimes(2);
+    });
+
+    it('should stop after maxPages', async () => {
+      const page = { data: [1], pageInfo: { hasNextPage: true, endCursor: 'c' } };
+      mockOctokit.graphql = vi.fn().mockResolvedValue(page);
+
+      const results = await paginatedGraphQL(mockOctokit, '{ query }', {}, 25, 3);
+      expect(results).toHaveLength(3);
+      expect(mockOctokit.graphql).toHaveBeenCalledTimes(3);
+    });
+
+    it('should return single page when hasNextPage is false', async () => {
+      const page = { data: [1, 2], pageInfo: { hasNextPage: false, endCursor: null } };
+      mockOctokit.graphql = vi.fn().mockResolvedValue(page);
+      const results = await paginatedGraphQL(mockOctokit, '{ query }');
+      expect(results).toHaveLength(1);
     });
   });
 });
