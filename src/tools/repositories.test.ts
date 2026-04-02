@@ -1,7 +1,7 @@
 /**
  * Tests for repository tools
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createRepositoryTools } from './repositories.js';
 import { createMockOctokit, staticMockResponses } from '../__tests__/mocks/octokit.js';
 import { ValidationError } from '../validation.js';
@@ -560,6 +560,102 @@ describe('Repository Tools', () => {
       expect(mockOctokit.rest.repos.createOrUpdateFileContents).toHaveBeenCalledWith(
         expect.objectContaining({ sha: undefined })
       );
+    });
+  });
+
+  describe('delete_file (directory path)', () => {
+    it('should throw when path points to a directory', async () => {
+      const writeTools = createRepositoryTools(mockOctokit, false);
+      const deleteFile = writeTools.find((t: any) => t.tool.name === 'delete_file');
+      mockOctokit.rest.repos.getContent.mockResolvedValue({
+        data: [{ type: 'dir', name: 'src' }],
+      });
+      await expect(
+        deleteFile.handler({
+          owner: 'owner',
+          repo: 'test-repo',
+          path: 'src',
+          message: 'delete dir',
+          branch: 'main',
+        })
+      ).rejects.toThrow('Path does not point to a file');
+    });
+  });
+
+  describe('create_branch', () => {
+    let createBranch: any;
+
+    beforeEach(() => {
+      // Add git namespace mock if missing
+      if (!mockOctokit.rest.git) {
+        mockOctokit.rest.git = {
+          getRef: vi.fn(),
+          createRef: vi.fn(),
+        };
+      }
+      const writeTools = createRepositoryTools(mockOctokit, false);
+      createBranch = writeTools.find((t: any) => t.tool.name === 'create_branch');
+    });
+
+    it('should be registered when not read-only', () => {
+      expect(createBranch).toBeDefined();
+    });
+
+    it('should not be registered in read-only mode', () => {
+      const readOnlyTools = createRepositoryTools(mockOctokit, true);
+      expect(readOnlyTools.find((t: any) => t.tool.name === 'create_branch')).toBeUndefined();
+    });
+
+    it('should create a branch from a specified from_branch', async () => {
+      mockOctokit.rest.git.getRef.mockResolvedValue({
+        data: { object: { sha: 'from-sha-abc' } },
+      });
+      mockOctokit.rest.git.createRef.mockResolvedValue({
+        data: {
+          ref: 'refs/heads/new-feature',
+          node_id: 'node1',
+          url: 'https://api.github.com/repos/owner/repo/git/refs/heads/new-feature',
+          object: { sha: 'from-sha-abc', type: 'commit', url: 'https://...' },
+        },
+      });
+
+      const result = await createBranch.handler({
+        owner: 'owner', repo: 'repo',
+        branch: 'new-feature', from_branch: 'main',
+      });
+
+      expect(mockOctokit.rest.git.getRef).toHaveBeenCalledWith({
+        owner: 'owner', repo: 'repo', ref: 'heads/main',
+      });
+      expect(mockOctokit.rest.git.createRef).toHaveBeenCalledWith({
+        owner: 'owner', repo: 'repo',
+        ref: 'refs/heads/new-feature', sha: 'from-sha-abc',
+      });
+      expect(result.ref).toBe('refs/heads/new-feature');
+    });
+
+    it('should create a branch from default branch when from_branch not specified', async () => {
+      mockOctokit.rest.repos.get.mockResolvedValue({
+        data: { default_branch: 'main' },
+      });
+      mockOctokit.rest.git.getRef.mockResolvedValue({
+        data: { object: { sha: 'default-sha' } },
+      });
+      mockOctokit.rest.git.createRef.mockResolvedValue({
+        data: {
+          ref: 'refs/heads/new-branch',
+          node_id: 'node2',
+          url: 'https://...',
+          object: { sha: 'default-sha', type: 'commit', url: 'https://...' },
+        },
+      });
+
+      const result = await createBranch.handler({
+        owner: 'owner', repo: 'repo', branch: 'new-branch',
+      });
+
+      expect(mockOctokit.rest.repos.get).toHaveBeenCalledWith({ owner: 'owner', repo: 'repo' });
+      expect(result.ref).toBe('refs/heads/new-branch');
     });
   });
 });
