@@ -32,8 +32,12 @@ vi.mock('./config.js', () => ({
 }));
 
 // Mock other external dependencies
-vi.mock('@modelcontextprotocol/sdk/server/mcp.js');
-vi.mock('@modelcontextprotocol/sdk/server/stdio.js');
+vi.mock('@modelcontextprotocol/sdk/server/mcp.js', () => ({
+  McpServer: vi.fn(),
+}));
+vi.mock('@modelcontextprotocol/sdk/server/stdio.js', () => ({
+  StdioServerTransport: vi.fn(),
+}));
 vi.mock('./optimized-api-client.js');
 vi.mock('./tool-registry.js');
 
@@ -45,10 +49,14 @@ describe('GitHubMCPServer', () => {
   let ToolRegistryMock: any;
 
   beforeEach(async () => {
-    vi.resetModules(); // This is crucial to re-evaluate modules with new mocks
-
     // Re-import the mocked config to get access to the mock functions
     configMock = await import('./config.js');
+
+    // Reset mutable config fields that individual tests may override
+    configMock.config.GITHUB_READ_ONLY = false;
+    configMock.config.GITHUB_TOOLSETS = 'all';
+    vi.mocked(configMock.getGitHubToken).mockReturnValue('ghp_defaultmocktoken_valid_for_tests');
+    vi.mocked(configMock.getEnabledToolsets).mockReturnValue(['all']);
     const { ToolRegistry } = await import('./tool-registry.js');
     ToolRegistryMock = ToolRegistry;
     ToolRegistryMock.prototype.registerAllTools = vi.fn();
@@ -58,11 +66,11 @@ describe('GitHubMCPServer', () => {
       tool: vi.fn(),
       connect: vi.fn(),
     };
-    (McpServer as any).mockImplementation(() => mockMcpServer);
+    (McpServer as any).mockImplementation(function() { return mockMcpServer; });
 
     // Mock transport
     mockTransport = { connect: vi.fn() };
-    (StdioServerTransport as any).mockImplementation(() => mockTransport);
+    (StdioServerTransport as any).mockImplementation(function() { return mockTransport; });
 
     // Mock process.exit
     exitSpy = mockProcessExit();
