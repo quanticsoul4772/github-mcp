@@ -103,6 +103,50 @@ describe('createRateLimitedOctokit', () => {
     expect(rateLimiter).toBeInstanceOf(GitHubRateLimiter);
     expect(typeof (octokit as any).graphqlWithComplexity).toBe('function');
   });
+
+  it('graphqlWithComplexity should execute query when points available', async () => {
+    const { octokit, rateLimiter } = createRateLimitedOctokit('test-token');
+    const mockResult = { repository: { name: 'test' } };
+    // Mock the underlying octokit.graphql
+    vi.spyOn(octokit as any, 'graphql').mockResolvedValue(mockResult);
+    // Mock canExecuteGraphQLQuery to allow execution
+    vi.spyOn(rateLimiter, 'canExecuteGraphQLQuery').mockReturnValue({
+      canExecute: true,
+      estimatedPoints: 10,
+    });
+    // Mock wrapGraphQLRequest to pass through
+    vi.spyOn(rateLimiter, 'wrapGraphQLRequest').mockImplementation(async (fn) => fn());
+
+    const result = await (octokit as any).graphqlWithComplexity('{ repository { name } }');
+    expect(result).toEqual(mockResult);
+  });
+
+  it('graphqlWithComplexity should throw when query blocked', async () => {
+    const { octokit, rateLimiter } = createRateLimitedOctokit('test-token');
+    vi.spyOn(rateLimiter, 'canExecuteGraphQLQuery').mockReturnValue({
+      canExecute: false,
+      reason: 'rate limit exceeded',
+      estimatedPoints: 500,
+      waitTime: 30000,
+    });
+
+    await expect(
+      (octokit as any).graphqlWithComplexity('{ repository { name } }')
+    ).rejects.toThrow('GraphQL query blocked');
+  });
+
+  it('graphqlWithComplexity should handle blocked query without waitTime', async () => {
+    const { octokit, rateLimiter } = createRateLimitedOctokit('test-token');
+    vi.spyOn(rateLimiter, 'canExecuteGraphQLQuery').mockReturnValue({
+      canExecute: false,
+      reason: 'too complex',
+      estimatedPoints: 1000,
+    });
+
+    await expect(
+      (octokit as any).graphqlWithComplexity('{ expensive { query } }')
+    ).rejects.toThrow('unknown');
+  });
 });
 
 describe('ResponseSizeLimiter', () => {
