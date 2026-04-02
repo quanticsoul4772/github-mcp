@@ -1,7 +1,7 @@
 /**
  * Tests for GitHub Actions tools
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createActionTools } from './actions.js';
 import { createMockOctokit } from '../__tests__/mocks/octokit.js';
 import { testFixtures } from '../__tests__/fixtures/test-data.js';
@@ -617,6 +617,199 @@ describe('Actions Tools', () => {
         // Document that re-run functionality might not be implemented
         expect(rerunWorkflow).toBeUndefined();
       }
+    });
+  });
+
+  describe('get_job_logs', () => {
+    let getJobLogs: any;
+
+    beforeEach(() => {
+      mockOctokit.actions.downloadJobLogsForWorkflowRun = vi.fn().mockResolvedValue({
+        url: 'https://example.com/job-logs',
+        data: 'line1\nline2\nline3\nline4\nline5',
+      });
+      getJobLogs = tools.find((t: any) => t.tool.name === 'get_job_logs');
+    });
+
+    it('should be registered', () => {
+      expect(getJobLogs).toBeDefined();
+    });
+
+    it('should get logs for a specific job_id', async () => {
+      const result = await getJobLogs.handler({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        job_id: 42,
+      });
+      expect(mockOctokit.actions.downloadJobLogsForWorkflowRun).toHaveBeenCalledWith({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        job_id: 42,
+      });
+      expect(result.logs).toBe('https://example.com/job-logs');
+    });
+
+    it('should return log content when return_content is true', async () => {
+      const result = await getJobLogs.handler({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        job_id: 42,
+        return_content: true,
+      });
+      expect(result.logs).toBe('line1\nline2\nline3\nline4\nline5');
+    });
+
+    it('should tail lines when tail_lines is specified', async () => {
+      const result = await getJobLogs.handler({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        job_id: 42,
+        return_content: true,
+        tail_lines: 2,
+      });
+      expect(result.logs).toBe('line4\nline5');
+    });
+
+    it('should get logs for failed jobs with failed_only + run_id', async () => {
+      mockOctokit.actions.listJobsForWorkflowRun.mockResolvedValue({
+        data: {
+          jobs: [
+            { id: 1, name: 'build', conclusion: 'failure', status: 'completed' },
+            { id: 2, name: 'test', conclusion: 'success', status: 'completed' },
+          ],
+        },
+      });
+      const result = await getJobLogs.handler({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        run_id: 99,
+        failed_only: true,
+      });
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBe(1);
+      expect(result[0].job_id).toBe(1);
+    });
+
+    it('should handle log download error for individual failed job', async () => {
+      mockOctokit.actions.listJobsForWorkflowRun.mockResolvedValue({
+        data: {
+          jobs: [{ id: 1, name: 'build', conclusion: 'failure', status: 'completed' }],
+        },
+      });
+      mockOctokit.actions.downloadJobLogsForWorkflowRun.mockRejectedValue(new Error('log error'));
+      const result = await getJobLogs.handler({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        run_id: 99,
+        failed_only: true,
+      });
+      expect(result[0].error).toContain('Failed to retrieve');
+    });
+
+    it('should throw when neither job_id nor run_id+failed_only provided', async () => {
+      await expect(getJobLogs.handler({ owner: 'a', repo: 'b' })).rejects.toThrow();
+    });
+  });
+
+  describe('list_workflow_run_artifacts', () => {
+    let listArtifacts: any;
+
+    beforeEach(() => {
+      mockOctokit.actions.listWorkflowRunArtifacts = vi.fn().mockResolvedValue({
+        data: {
+          total_count: 1,
+          artifacts: [{
+            id: 1, node_id: 'n1', name: 'my-artifact', size_in_bytes: 1024,
+            url: 'https://api.github.com/repos/owner/repo/actions/artifacts/1',
+            archive_download_url: 'https://api.github.com/repos/owner/repo/actions/artifacts/1/zip',
+            expired: false, created_at: '2024-01-01T00:00:00Z',
+            updated_at: '2024-01-01T00:01:00Z', expires_at: '2024-04-01T00:00:00Z',
+          }],
+        },
+      });
+      listArtifacts = tools.find((t: any) => t.tool.name === 'list_workflow_run_artifacts');
+    });
+
+    it('should be registered', () => {
+      expect(listArtifacts).toBeDefined();
+    });
+
+    it('should list artifacts for a workflow run', async () => {
+      const result = await listArtifacts.handler({
+        owner: 'test-owner', repo: 'test-repo', run_id: 55,
+      });
+      expect(result.total_count).toBe(1);
+      expect(result.artifacts[0].name).toBe('my-artifact');
+    });
+  });
+
+  describe('get_workflow_run_usage', () => {
+    let getUsage: any;
+
+    beforeEach(() => {
+      mockOctokit.actions.getWorkflowRunUsage = vi.fn().mockResolvedValue({
+        data: { billable: { UBUNTU: { total_ms: 5000 } }, run_duration_ms: 5000 },
+      });
+      getUsage = tools.find((t: any) => t.tool.name === 'get_workflow_run_usage');
+    });
+
+    it('should be registered', () => {
+      expect(getUsage).toBeDefined();
+    });
+
+    it('should return workflow run usage', async () => {
+      const result = await getUsage.handler({ owner: 'test-owner', repo: 'test-repo', run_id: 77 });
+      expect(result.run_duration_ms).toBe(5000);
+      expect(result.billable).toBeDefined();
+    });
+  });
+
+  describe('write tools (readOnly=false)', () => {
+    let writeTools: any[];
+
+    beforeEach(() => {
+      mockOctokit.actions.createWorkflowDispatch = vi.fn().mockResolvedValue({});
+      mockOctokit.actions.reRunWorkflowFailedJobs.mockResolvedValue({});
+      mockOctokit.actions.deleteWorkflowRunLogs.mockResolvedValue({});
+      writeTools = createActionTools(mockOctokit, false);
+    });
+
+    it('run_workflow should trigger dispatch', async () => {
+      const runWorkflow = writeTools.find((t: any) => t.tool.name === 'run_workflow');
+      expect(runWorkflow).toBeDefined();
+      const result = await runWorkflow.handler({
+        owner: 'test-owner', repo: 'test-repo',
+        workflow_id: 'ci.yml', ref: 'main',
+      });
+      expect(mockOctokit.actions.createWorkflowDispatch).toHaveBeenCalledWith({
+        owner: 'test-owner', repo: 'test-repo',
+        workflow_id: 'ci.yml', ref: 'main', inputs: undefined,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('rerun_failed_jobs should call reRunWorkflowFailedJobs', async () => {
+      const rerunFailed = writeTools.find((t: any) => t.tool.name === 'rerun_failed_jobs');
+      expect(rerunFailed).toBeDefined();
+      const result = await rerunFailed.handler({ owner: 'a', repo: 'b', run_id: 10 });
+      expect(mockOctokit.actions.reRunWorkflowFailedJobs).toHaveBeenCalled();
+      expect(result.success).toBe(true);
+    });
+
+    it('delete_workflow_run_logs should call deleteWorkflowRunLogs', async () => {
+      const deleteLogs = writeTools.find((t: any) => t.tool.name === 'delete_workflow_run_logs');
+      expect(deleteLogs).toBeDefined();
+      const result = await deleteLogs.handler({ owner: 'a', repo: 'b', run_id: 10 });
+      expect(mockOctokit.actions.deleteWorkflowRunLogs).toHaveBeenCalled();
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('write tools excluded in readOnly mode', () => {
+    it('run_workflow should not be registered when readOnly=true', () => {
+      const readOnlyTools = createActionTools(mockOctokit, true);
+      const runWorkflow = readOnlyTools.find((t: any) => t.tool.name === 'run_workflow');
+      expect(runWorkflow).toBeUndefined();
     });
   });
 });
