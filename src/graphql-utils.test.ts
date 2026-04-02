@@ -16,6 +16,8 @@ import {
   formatGraphQLError,
   createTypedHandler,
   paginatedGraphQL,
+  typedGraphQL,
+  validatedGraphQL,
 } from './graphql-utils.js';
 import { OptimizedAPIClient } from './optimized-api-client.js';
 import { createMockOctokit } from './__tests__/mocks/octokit.js';
@@ -450,6 +452,83 @@ describe('GraphQL Utils', () => {
       mockOctokit.graphql = vi.fn().mockResolvedValue(page);
       const results = await paginatedGraphQL(mockOctokit, '{ query }');
       expect(results).toHaveLength(1);
+    });
+  });
+
+  // ============================================================================
+  // typedGraphQL
+  // ============================================================================
+
+  describe('typedGraphQL', () => {
+    it('should return response on success', async () => {
+      const mockResponse = { repository: { name: 'test' } };
+      mockOctokit.graphql = vi.fn().mockResolvedValue(mockResponse);
+      const result = await typedGraphQL(mockOctokit, '{ repository { name } }');
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should re-throw non-GraphQL errors', async () => {
+      mockOctokit.graphql = vi.fn().mockRejectedValue(new Error('network error'));
+      await expect(typedGraphQL(mockOctokit, '{ repo }')).rejects.toThrow('network error');
+    });
+
+    it('should format GraphQL response errors', async () => {
+      const graphqlError = {
+        response: { data: { errors: [{ message: 'Field not found' }, { message: 'Syntax error' }] } },
+      };
+      mockOctokit.graphql = vi.fn().mockRejectedValue(graphqlError);
+      await expect(typedGraphQL(mockOctokit, '{ repo }')).rejects.toThrow(
+        'GraphQL errors: Field not found, Syntax error'
+      );
+    });
+
+    it('should re-throw error objects without response field', async () => {
+      const err = { code: 'SOME_ERROR', message: 'some error' };
+      mockOctokit.graphql = vi.fn().mockRejectedValue(err);
+      await expect(typedGraphQL(mockOctokit, '{ repo }')).rejects.toEqual(err);
+    });
+  });
+
+  // ============================================================================
+  // validatedGraphQL
+  // ============================================================================
+
+  describe('validatedGraphQL', () => {
+    it('should return result when validator passes', async () => {
+      const mockResponse = { data: { name: 'hello' } };
+      mockOctokit.graphql = vi.fn().mockResolvedValue(mockResponse);
+      const result = await validatedGraphQL(
+        mockOctokit,
+        '{ data { name } }',
+        {},
+        (d): d is typeof mockResponse => d !== null
+      );
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should throw when validator fails', async () => {
+      mockOctokit.graphql = vi.fn().mockResolvedValue({ data: null });
+      await expect(
+        validatedGraphQL(mockOctokit, '{ data }', {}, (d): d is never => false)
+      ).rejects.toThrow('GraphQL response failed validation');
+    });
+
+    it('should return result when no validator provided', async () => {
+      const mockResponse = { name: 'test' };
+      mockOctokit.graphql = vi.fn().mockResolvedValue(mockResponse);
+      const result = await validatedGraphQL(mockOctokit, '{ name }');
+      expect(result).toEqual(mockResponse);
+    });
+  });
+
+  // ============================================================================
+  // createGraphQLWrapper getClient
+  // ============================================================================
+
+  describe('createGraphQLWrapper getClient', () => {
+    it('should return the underlying client', () => {
+      const wrapper = createGraphQLWrapper(mockOptimizedClient);
+      expect(wrapper.getClient()).toBe(mockOptimizedClient);
     });
   });
 });

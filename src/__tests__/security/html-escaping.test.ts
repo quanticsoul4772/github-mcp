@@ -10,6 +10,7 @@ import {
   escapeHtmlAttribute,
   escapeJavaScript,
   isHtmlSafe,
+  isString,
   stripHtmlTags,
   safeHtmlTemplate,
   safeStringify,
@@ -385,5 +386,40 @@ describe('Security Regression Tests', () => {
     // Should complete within reasonable time (less than 100ms for 10k repetitions)
     expect(duration).toBeLessThan(100);
     expect(escaped).not.toContain('<script>');
+  });
+});
+
+describe('isString', () => {
+  it('should return true for string values', () => {
+    expect(isString('')).toBe(true);
+    expect(isString('hello')).toBe(true);
+  });
+
+  it('should return false for non-string values', () => {
+    expect(isString(123)).toBe(false);
+    expect(isString(null)).toBe(false);
+    expect(isString(undefined)).toBe(false);
+    expect(isString({})).toBe(false);
+  });
+});
+
+describe('stripHtmlTags - numeric entity decoding', () => {
+  it('should decode decimal numeric entities', () => {
+    // &#65; = 'A', &#66; = 'B'
+    expect(stripHtmlTags('&#65;&#66;&#67;')).toBe('ABC');
+  });
+
+  it('should decode hex numeric entities', () => {
+    // &#x41; = 'A', &#x42; = 'B'
+    expect(stripHtmlTags('&#x41;&#x42;&#x43;')).toBe('ABC');
+  });
+});
+
+describe('safeStringify - circular reference', () => {
+  it('should handle circular reference objects', () => {
+    const obj: any = { a: 1 };
+    obj.self = obj;
+    const result = safeStringify(obj);
+    expect(result).toContain('[Object]');
   });
 });
