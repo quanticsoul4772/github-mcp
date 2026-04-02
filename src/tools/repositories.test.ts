@@ -712,4 +712,86 @@ describe('Repository Tools', () => {
       expect(result.ref).toBe('refs/heads/new-branch');
     });
   });
+
+  describe('search_repositories', () => {
+    let searchRepos: any;
+
+    beforeEach(() => {
+      searchRepos = tools.find(tool => tool.tool.name === 'search_repositories');
+    });
+
+    it('should be registered', () => {
+      expect(searchRepos).toBeDefined();
+    });
+
+    it('should return search results', async () => {
+      mockOctokit.rest.search.repos.mockResolvedValue({
+        data: {
+          total_count: 1,
+          incomplete_results: false,
+          items: [{
+            name: 'my-repo',
+            full_name: 'owner/my-repo',
+            owner: { login: 'owner', type: 'User' },
+            description: 'Test repo',
+            html_url: 'https://github.com/owner/my-repo',
+            stargazers_count: 5,
+            forks_count: 2,
+            language: 'TypeScript',
+            updated_at: '2024-01-01T00:00:00Z',
+            open_issues_count: 0,
+            private: false,
+          }],
+        },
+      });
+
+      const result = await searchRepos.handler({ query: 'test' }) as any;
+      expect(result.total_count).toBe(1);
+      expect(result.items[0].name).toBe('my-repo');
+    });
+
+    it('should throw when query is missing', async () => {
+      await expect(searchRepos.handler({})).rejects.toThrow('Search query is required');
+    });
+  });
+
+  describe('create_or_update_file validation errors', () => {
+    let createOrUpdateFile: any;
+
+    beforeEach(() => {
+      createOrUpdateFile = tools.find(tool => tool.tool.name === 'create_or_update_file');
+    });
+
+    it('should throw ValidationError for invalid repo name', async () => {
+      await expect(
+        createOrUpdateFile.handler({
+          owner: 'valid-owner',
+          repo: '',
+          path: 'file.txt',
+          content: 'hello',
+          message: 'test',
+        })
+      ).rejects.toThrow(ValidationError);
+    });
+  });
+
+  describe('delete_file validation errors', () => {
+    let deleteFile: any;
+
+    beforeEach(() => {
+      deleteFile = tools.find(tool => tool.tool.name === 'delete_file');
+    });
+
+    it('should throw ValidationError for invalid repo name', async () => {
+      await expect(
+        deleteFile.handler({
+          owner: 'valid-owner',
+          repo: '',
+          path: 'file.txt',
+          message: 'delete',
+          sha: 'abc123',
+        })
+      ).rejects.toThrow(ValidationError);
+    });
+  });
 });
