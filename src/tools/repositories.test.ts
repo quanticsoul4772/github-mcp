@@ -563,6 +563,60 @@ describe('Repository Tools', () => {
     });
   });
 
+  describe('create_repository', () => {
+    let createRepo: any;
+
+    beforeEach(() => {
+      const writeTools = createRepositoryTools(mockOctokit, false);
+      createRepo = writeTools.find((t: any) => t.tool.name === 'create_repository');
+      mockOctokit.rest.repos.createForAuthenticatedUser = vi.fn().mockResolvedValue({
+        data: {
+          id: 1,
+          name: 'new-repo',
+          full_name: 'owner/new-repo',
+          html_url: 'https://github.com/owner/new-repo',
+          ssh_url: 'git@github.com:owner/new-repo.git',
+          clone_url: 'https://github.com/owner/new-repo.git',
+          created_at: '2024-01-01T00:00:00Z',
+        },
+      });
+    });
+
+    it('should be registered when not read-only', () => {
+      expect(createRepo).toBeDefined();
+    });
+
+    it('should not be registered in read-only mode', () => {
+      const readOnlyTools = createRepositoryTools(mockOctokit, true);
+      expect(readOnlyTools.find((t: any) => t.tool.name === 'create_repository')).toBeUndefined();
+    });
+
+    it('should create a repository and return details', async () => {
+      const result = await createRepo.handler({
+        name: 'new-repo', description: 'desc', private: true, autoInit: true,
+      });
+      expect(result.name).toBe('new-repo');
+      expect(result.html_url).toBe('https://github.com/owner/new-repo');
+    });
+  });
+
+  describe('create_or_update_file (branch validation)', () => {
+    it('should reject invalid branch name', async () => {
+      const writeTools = createRepositoryTools(mockOctokit, false);
+      const createUpdateFile = writeTools.find((t: any) => t.tool.name === 'create_or_update_file');
+      await expect(
+        createUpdateFile.handler({
+          owner: 'owner',
+          repo: 'test-repo',
+          path: 'file.txt',
+          message: 'msg',
+          content: 'data',
+          branch: '..invalid-branch',
+        })
+      ).rejects.toThrow(ValidationError);
+    });
+  });
+
   describe('delete_file (directory path)', () => {
     it('should throw when path points to a directory', async () => {
       const writeTools = createRepositoryTools(mockOctokit, false);
