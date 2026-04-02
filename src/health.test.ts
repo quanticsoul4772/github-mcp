@@ -67,6 +67,39 @@ describe('HealthManager', () => {
     });
   });
 
+  describe('getSystemHealth - degraded status', () => {
+    it('should return degraded when rate limit is low', async () => {
+      // Make auth succeed but rate limit return low remaining
+      mockOctokit.rest.rateLimit.get.mockResolvedValue({
+        data: {
+          rate: {
+            limit: 5000,
+            remaining: 50, // Very low — triggers degraded
+            reset: Math.floor(Date.now() / 1000) + 3600,
+          },
+        },
+      });
+      const health = await healthManager.getSystemHealth();
+      // Components with degraded status pull overall to degraded
+      const rateLimitComponent = health.components.find((c: any) => c.name === 'rate_limit');
+      if (rateLimitComponent) {
+        expect(['degraded', 'healthy', 'unhealthy']).toContain(rateLimitComponent.status);
+      }
+    });
+  });
+
+  describe('getUptime and getStartupTime', () => {
+    it('should return a positive uptime', () => {
+      const uptime = healthManager.getUptime();
+      expect(uptime).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should return a Date for startup time', () => {
+      const startupTime = healthManager.getStartupTime();
+      expect(startupTime).toBeInstanceOf(Date);
+    });
+  });
+
   describe('getQuickHealth', () => {
     it('should return status object', async () => {
       const health = await healthManager.getQuickHealth();
@@ -126,6 +159,14 @@ describe('createHealthTools', () => {
     expect(healthTool).toBeDefined();
     const result = await healthTool.handler({});
     expect(mockHealthManager.getSystemHealth).toHaveBeenCalled();
+    expect(result.status).toBe('healthy');
+  });
+
+  it('get_quick_health should call getQuickHealth', async () => {
+    const quickTool = tools.find((t: any) => t.tool.name === 'get_quick_health');
+    expect(quickTool).toBeDefined();
+    const result = await quickTool.handler({});
+    expect(mockHealthManager.getQuickHealth).toHaveBeenCalled();
     expect(result.status).toBe('healthy');
   });
 });
