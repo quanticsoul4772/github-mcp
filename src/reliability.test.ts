@@ -7,6 +7,8 @@ import {
   RetryManager,
   DEFAULT_RETRY_CONFIG,
   NoOpTelemetry,
+  ReliabilityManager,
+  CorrelationManager,
 } from './reliability.js';
 
 describe('reliability', () => {
@@ -214,6 +216,90 @@ describe('reliability', () => {
     it('should expose retryConfig', () => {
       const retryMgr = new RetryManager();
       expect(retryMgr.retryConfig.maxAttempts).toBeGreaterThan(0);
+    });
+  });
+
+  // ============================================================================
+  // CorrelationManager
+  // ============================================================================
+
+  describe('CorrelationManager', () => {
+    it('should be a singleton', () => {
+      const a = CorrelationManager.getInstance();
+      const b = CorrelationManager.getInstance();
+      expect(a).toBe(b);
+    });
+
+    it('should generate unique IDs', () => {
+      const mgr = CorrelationManager.getInstance();
+      const id1 = mgr.generateId();
+      const id2 = mgr.generateId();
+      expect(id1).not.toBe(id2);
+    });
+
+    it('should set and get correlation ID in context', async () => {
+      const mgr = CorrelationManager.getInstance();
+      let capturedId = '';
+      await mgr.withCorrelationId('test-id-123', async () => {
+        capturedId = mgr.getCorrelationId();
+      });
+      expect(capturedId).toBe('test-id-123');
+    });
+
+    it('should restore previous ID after withCorrelationId', async () => {
+      const mgr = CorrelationManager.getInstance();
+      const before = mgr.getCorrelationId();
+      await mgr.withCorrelationId('inner-id', async () => {});
+      expect(mgr.getCorrelationId()).toBe(before);
+    });
+
+    it('should generate new ID in withNewCorrelationId', async () => {
+      const mgr = CorrelationManager.getInstance();
+      let capturedId = '';
+      await mgr.withNewCorrelationId(async () => {
+        capturedId = mgr.getCorrelationId();
+      });
+      expect(capturedId).toBeTruthy();
+      expect(capturedId).not.toBe('');
+    });
+  });
+
+  // ============================================================================
+  // ReliabilityManager
+  // ============================================================================
+
+  describe('ReliabilityManager', () => {
+    let mgr: ReliabilityManager;
+
+    beforeEach(() => {
+      mgr = new ReliabilityManager(new RetryManager({ ...DEFAULT_RETRY_CONFIG, maxAttempts: 2, baseDelayMs: 1 }));
+    });
+
+    it('should execute successfully and return result', async () => {
+      const result = await mgr.executeWithReliability('test-op', async () => 'result');
+      expect(result).toBe('result');
+    });
+
+    it('should propagate errors from operation', async () => {
+      await expect(
+        mgr.executeWithReliability('test-op', async () => { throw new Error('op failed'); })
+      ).rejects.toThrow('op failed');
+    });
+
+    it('getHealthStatus should return status with circuit breakers', async () => {
+      await mgr.executeWithReliability('health-op', async () => 'ok');
+      const status = mgr.getHealthStatus();
+      expect(status.circuitBreakers).toBeDefined();
+      expect(status.retryConfig).toBeDefined();
+      expect(status.timestamp).toBeTruthy();
+    });
+
+    it('resetCircuitBreakers should clear all breakers', async () => {
+      await mgr.executeWithReliability('test-op', async () => 'ok');
+      mgr.resetCircuitBreakers();
+      // After reset, a new op should succeed with a fresh breaker
+      const result = await mgr.executeWithReliability('test-op', async () => 'fresh');
+      expect(result).toBe('fresh');
     });
   });
 });
