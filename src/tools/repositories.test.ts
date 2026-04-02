@@ -447,4 +447,119 @@ describe('Repository Tools', () => {
       });
     });
   });
+
+  describe('push_files', () => {
+    let pushFiles: any;
+
+    beforeEach(() => {
+      pushFiles = tools.find(tool => tool.tool.name === 'push_files');
+    });
+
+    it('should be registered', () => {
+      expect(pushFiles).toBeDefined();
+    });
+
+    it('should push a new file (no existing sha)', async () => {
+      // Simulate file not existing (getContent throws)
+      mockOctokit.rest.repos.getContent.mockRejectedValue({ status: 404 });
+      mockOctokit.rest.repos.createOrUpdateFileContents.mockResolvedValue({
+        data: { content: { sha: 'newsha123' } },
+      });
+
+      const result = await pushFiles.handler({
+        owner: 'owner',
+        repo: 'repo',
+        branch: 'main',
+        message: 'Add file',
+        files: [{ path: 'src/new.ts', content: 'export const x = 1;' }],
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].success).toBe(true);
+      expect(result[0].path).toBe('src/new.ts');
+    });
+
+    it('should push an existing file with its sha', async () => {
+      mockOctokit.rest.repos.getContent.mockResolvedValue({
+        data: { type: 'file', sha: 'existingsha' },
+      });
+      mockOctokit.rest.repos.createOrUpdateFileContents.mockResolvedValue({
+        data: { content: { sha: 'updatedsha' } },
+      });
+
+      const result = await pushFiles.handler({
+        owner: 'owner',
+        repo: 'repo',
+        branch: 'feature',
+        message: 'Update file',
+        files: [{ path: 'README.md', content: '# Updated' }],
+      });
+
+      expect(result[0].success).toBe(true);
+      expect(mockOctokit.rest.repos.createOrUpdateFileContents).toHaveBeenCalledWith(
+        expect.objectContaining({ sha: 'existingsha' })
+      );
+    });
+
+    it('should handle multiple files', async () => {
+      mockOctokit.rest.repos.getContent.mockRejectedValue({ status: 404 });
+      mockOctokit.rest.repos.createOrUpdateFileContents.mockResolvedValue({
+        data: { content: { sha: 'sha1' } },
+      });
+
+      const result = await pushFiles.handler({
+        owner: 'owner',
+        repo: 'repo',
+        branch: 'main',
+        message: 'Add files',
+        files: [
+          { path: 'a.ts', content: 'a' },
+          { path: 'b.ts', content: 'b' },
+        ],
+      });
+
+      expect(result).toHaveLength(2);
+      expect(result[0].success).toBe(true);
+      expect(result[1].success).toBe(true);
+    });
+
+    it('should report failure when createOrUpdateFileContents fails', async () => {
+      mockOctokit.rest.repos.getContent.mockRejectedValue({ status: 404 });
+      mockOctokit.rest.repos.createOrUpdateFileContents.mockRejectedValue(new Error('API error'));
+
+      const result = await pushFiles.handler({
+        owner: 'owner',
+        repo: 'repo',
+        branch: 'main',
+        message: 'Add file',
+        files: [{ path: 'fail.ts', content: 'x' }],
+      });
+
+      expect(result[0].success).toBe(false);
+      expect(result[0].error).toBeDefined();
+    });
+
+    it('should not include sha when getContent returns a directory', async () => {
+      mockOctokit.rest.repos.getContent.mockResolvedValue({
+        data: [{ type: 'dir', name: 'src' }], // array = directory
+      });
+      mockOctokit.rest.repos.createOrUpdateFileContents.mockResolvedValue({
+        data: { content: { sha: 'newsha' } },
+      });
+
+      const result = await pushFiles.handler({
+        owner: 'owner',
+        repo: 'repo',
+        branch: 'main',
+        message: 'Add file',
+        files: [{ path: 'src/new.ts', content: 'x' }],
+      });
+
+      expect(result[0].success).toBe(true);
+      // sha should be undefined (not passed) since getContent returned a directory
+      expect(mockOctokit.rest.repos.createOrUpdateFileContents).toHaveBeenCalledWith(
+        expect.objectContaining({ sha: undefined })
+      );
+    });
+  });
 });
