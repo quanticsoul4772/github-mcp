@@ -794,4 +794,60 @@ describe('Repository Tools', () => {
       ).rejects.toThrow(ValidationError);
     });
   });
+
+  describe('get_commit', () => {
+    let getCommit: any;
+
+    beforeEach(() => {
+      getCommit = tools.find(tool => tool.tool.name === 'get_commit');
+    });
+
+    it('should be registered', () => {
+      expect(getCommit).toBeDefined();
+    });
+
+    it('should return commit details', async () => {
+      mockOctokit.rest.repos.getCommit.mockResolvedValue({
+        data: {
+          sha: 'abc123',
+          commit: {
+            message: 'Fix bug',
+            author: { name: 'user', date: '2024-01-01T00:00:00Z' },
+            committer: { name: 'user', date: '2024-01-01T00:00:00Z' },
+          },
+          stats: { additions: 10, deletions: 5 },
+          files: [
+            { filename: 'src/a.ts', status: 'modified', additions: 10, deletions: 5, changes: 15, patch: '@@ ...' },
+          ],
+        },
+      });
+      const result = await getCommit.handler({ owner: 'owner', repo: 'repo', sha: 'abc123' }) as any;
+      expect(result.sha).toBe('abc123');
+      expect(result.message).toBe('Fix bug');
+      expect(result.files).toHaveLength(1);
+    });
+  });
+
+  describe('list_tags', () => {
+    let listTags: any;
+
+    beforeEach(() => {
+      mockOctokit.rest.repos.listTags = vi.fn().mockResolvedValue({
+        data: [
+          { name: 'v1.0.0', commit: { sha: 'tag-sha-1', url: 'https://...' }, zipball_url: 'https://...', tarball_url: 'https://...' },
+        ],
+      });
+      listTags = tools.find(tool => tool.tool.name === 'list_tags');
+    });
+
+    it('should be registered', () => {
+      expect(listTags).toBeDefined();
+    });
+
+    it('should return list of tags', async () => {
+      const result = await listTags.handler({ owner: 'owner', repo: 'repo' }) as any[];
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('v1.0.0');
+    });
+  });
 });
