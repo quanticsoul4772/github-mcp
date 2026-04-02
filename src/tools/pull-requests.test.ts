@@ -1,7 +1,7 @@
 /**
  * Tests for pull request tools
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createPullRequestTools } from './pull-requests.js';
 import { createMockOctokit } from '../__tests__/mocks/octokit.js';
 import { testFixtures } from '../__tests__/fixtures/test-data.js';
@@ -621,6 +621,155 @@ describe('Pull Request Tools', () => {
       expect(result[1].body).toBe('Consider using const here');
       expect(result[1].path).toBe('src/utils.ts');
       expect(result[1].line).toBe(5);
+    });
+  });
+
+  describe('get_pull_request_diff', () => {
+    let getPRDiff: any;
+
+    beforeEach(() => {
+      getPRDiff = tools.find(t => t.tool.name === 'get_pull_request_diff');
+    });
+
+    it('should be registered', () => {
+      expect(getPRDiff).toBeDefined();
+    });
+
+    it('should return diff from pull request', async () => {
+      mockOctokit.pulls.get.mockResolvedValue({
+        data: 'diff --git a/file.ts b/file.ts\n+new line',
+      });
+
+      const result = await getPRDiff.handler({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        pull_number: 1,
+      });
+
+      expect(result.diff).toBeDefined();
+      expect(mockOctokit.pulls.get).toHaveBeenCalledWith(
+        expect.objectContaining({
+          owner: 'test-owner',
+          repo: 'test-repo',
+          pull_number: 1,
+          mediaType: { format: 'diff' },
+        })
+      );
+    });
+  });
+
+  describe('get_pull_request_status', () => {
+    let getPRStatus: any;
+
+    beforeEach(() => {
+      getPRStatus = tools.find(t => t.tool.name === 'get_pull_request_status');
+    });
+
+    it('should be registered', () => {
+      expect(getPRStatus).toBeDefined();
+    });
+
+    it('should return combined status for PR head SHA', async () => {
+      mockOctokit.pulls.get.mockResolvedValue({
+        data: { head: { sha: 'abc123' } },
+      });
+      mockOctokit.repos.getCombinedStatusForRef = (mockOctokit.repos.getCombinedStatusForRef || (() => {}));
+      mockOctokit.repos.getCombinedStatusForRef = vi.fn().mockResolvedValue({
+        data: {
+          state: 'success',
+          sha: 'abc123',
+          total_count: 2,
+          statuses: [
+            { state: 'success', description: 'Tests passed', context: 'ci/tests', target_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+          ],
+        },
+      });
+
+      const result = await getPRStatus.handler({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        pull_number: 1,
+      });
+
+      expect(result.state).toBe('success');
+      expect(result.sha).toBe('abc123');
+      expect(result.statuses).toHaveLength(1);
+    });
+  });
+
+  describe('search_pull_requests', () => {
+    let searchPRs: any;
+
+    beforeEach(() => {
+      searchPRs = tools.find(t => t.tool.name === 'search_pull_requests');
+    });
+
+    it('should be registered', () => {
+      expect(searchPRs).toBeDefined();
+    });
+
+    it('should search pull requests with query', async () => {
+      mockOctokit.search.issuesAndPullRequests.mockResolvedValue({
+        data: {
+          total_count: 1,
+          incomplete_results: false,
+          items: [{
+            number: 42,
+            title: 'Fix bug',
+            state: 'open',
+            user: { login: 'alice' },
+            created_at: '2024-01-01T00:00:00Z',
+            updated_at: '2024-01-02T00:00:00Z',
+            html_url: 'https://github.com/owner/repo/pull/42',
+            repository_url: 'https://api.github.com/repos/owner/repo',
+          }],
+        },
+      });
+
+      const result = await searchPRs.handler({ query: 'is:open fix bug' });
+      expect(result.total_count).toBe(1);
+      expect(result.items[0].number).toBe(42);
+      expect(result.items[0].title).toBe('Fix bug');
+    });
+
+    it('should add repo filter when owner and repo provided', async () => {
+      mockOctokit.search.issuesAndPullRequests.mockResolvedValue({
+        data: { total_count: 0, incomplete_results: false, items: [] },
+      });
+
+      await searchPRs.handler({ query: 'fix', owner: 'myorg', repo: 'myrepo' });
+
+      expect(mockOctokit.search.issuesAndPullRequests).toHaveBeenCalledWith(
+        expect.objectContaining({
+          q: expect.stringContaining('repo:myorg/myrepo'),
+        })
+      );
+    });
+  });
+
+  describe('update_pull_request_branch', () => {
+    let updateBranch: any;
+
+    beforeEach(() => {
+      updateBranch = tools.find(t => t.tool.name === 'update_pull_request_branch');
+    });
+
+    it('should be registered when not in read-only mode', () => {
+      expect(updateBranch).toBeDefined();
+    });
+
+    it('should update PR branch', async () => {
+      mockOctokit.pulls.updateBranch = vi.fn().mockResolvedValue({
+        data: { message: 'Updating pull request branch.', url: 'https://api.github.com/repos/owner/repo/pulls/1/update-branch' },
+      });
+
+      const result = await updateBranch.handler({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        pull_number: 1,
+      });
+
+      expect(result.message).toBeDefined();
     });
   });
 });
