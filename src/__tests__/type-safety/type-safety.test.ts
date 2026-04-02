@@ -373,6 +373,49 @@ describe('Type Safety Utilities', () => {
         ParameterValidationError
       );
     });
+
+    it('should rethrow non-Zod errors', () => {
+      const schema = z.object({ name: z.string() });
+      vi.spyOn(schema, 'parse').mockImplementationOnce(() => { throw new TypeError('custom error'); });
+      expect(() => validateParameters(schema, { name: 'x' }, 'tool')).toThrow(TypeError);
+    });
+  });
+
+  describe('TypeSafeHandlerFactory - additional methods', () => {
+    it('createListIssuesHandler should call handler with valid params', async () => {
+      const handler = vi.fn().mockResolvedValue([]);
+      const typeSafeHandler = TypeSafeHandlerFactory.createListIssuesHandler(handler);
+      await typeSafeHandler({ owner: 'o', repo: 'r' });
+      expect(handler).toHaveBeenCalledWith({ owner: 'o', repo: 'r' });
+    });
+
+    it('createUpdateIssueHandler should call handler with valid params', async () => {
+      const handler = vi.fn().mockResolvedValue({ number: 1 });
+      const typeSafeHandler = TypeSafeHandlerFactory.createUpdateIssueHandler(handler);
+      await typeSafeHandler({ owner: 'o', repo: 'r', issue_number: 1 });
+      expect(handler).toHaveBeenCalled();
+    });
+
+    it('createGetPullRequestHandler should call handler with valid params', async () => {
+      const handler = vi.fn().mockResolvedValue({ number: 5 });
+      const typeSafeHandler = TypeSafeHandlerFactory.createGetPullRequestHandler(handler);
+      await typeSafeHandler({ owner: 'o', repo: 'r', pull_number: 5 });
+      expect(handler).toHaveBeenCalled();
+    });
+
+    it('createListPullRequestsHandler should call handler with valid params', async () => {
+      const handler = vi.fn().mockResolvedValue([]);
+      const typeSafeHandler = TypeSafeHandlerFactory.createListPullRequestsHandler(handler);
+      await typeSafeHandler({ owner: 'o', repo: 'r' });
+      expect(handler).toHaveBeenCalled();
+    });
+
+    it('createCreatePullRequestHandler should call handler with valid params', async () => {
+      const handler = vi.fn().mockResolvedValue({ number: 10 });
+      const typeSafeHandler = TypeSafeHandlerFactory.createCreatePullRequestHandler(handler);
+      await typeSafeHandler({ owner: 'o', repo: 'r', title: 'PR', head: 'feat', base: 'main' });
+      expect(handler).toHaveBeenCalled();
+    });
   });
 
   describe('Real-world GitHub API scenarios', () => {
