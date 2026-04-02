@@ -225,6 +225,12 @@ describe('Notification Tools', () => {
       expect(result.subscribed).toBe(false);
       expect(result.message).toContain('Not watching');
     });
+
+    it('should rethrow non-404 errors', async () => {
+      const error = Object.assign(new Error('Server Error'), { status: 500 });
+      mockOctokit.activity.getRepoSubscription.mockRejectedValue(error);
+      await expect(handler({ owner: 'owner', repo: 'repo' })).rejects.toThrow('Server Error');
+    });
   });
 
   // ============================================================================
@@ -354,6 +360,36 @@ describe('Notification Tools', () => {
       expect(
         tools.find(t => t.tool.name === 'manage_repository_notification_subscription')
       ).toBeDefined();
+    });
+
+    it('should unsubscribe (delete) from a repo', async () => {
+      mockOctokit.activity.deleteRepoSubscription.mockResolvedValue({});
+      const result = (await handler({ owner: 'owner', repo: 'repo', action: 'delete' })) as any;
+      expect(mockOctokit.activity.deleteRepoSubscription).toHaveBeenCalledWith({ owner: 'owner', repo: 'repo' });
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('Unsubscribed');
+    });
+
+    it('should watch a repo', async () => {
+      mockOctokit.activity.setRepoSubscription.mockResolvedValue({
+        data: { subscribed: true, ignored: false, reason: 'watching', created_at: '2024-01-01T00:00:00Z' },
+      });
+      const result = (await handler({ owner: 'owner', repo: 'repo', action: 'watch' })) as any;
+      expect(mockOctokit.activity.setRepoSubscription).toHaveBeenCalledWith(
+        expect.objectContaining({ subscribed: true, ignored: false })
+      );
+      expect(result.subscribed).toBe(true);
+    });
+
+    it('should ignore a repo', async () => {
+      mockOctokit.activity.setRepoSubscription.mockResolvedValue({
+        data: { subscribed: false, ignored: true, reason: null, created_at: '2024-01-01T00:00:00Z' },
+      });
+      const result = (await handler({ owner: 'owner', repo: 'repo', action: 'ignore' })) as any;
+      expect(mockOctokit.activity.setRepoSubscription).toHaveBeenCalledWith(
+        expect.objectContaining({ subscribed: false, ignored: true })
+      );
+      expect(result.ignored).toBe(true);
     });
   });
 });
