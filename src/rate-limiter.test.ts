@@ -2,7 +2,7 @@
  * Tests for GitHubRateLimiter and ResponseSizeLimiter
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { GitHubRateLimiter, ResponseSizeLimiter } from './rate-limiter.js';
+import { GitHubRateLimiter, ResponseSizeLimiter, createRateLimitedOctokit } from './rate-limiter.js';
 
 describe('GitHubRateLimiter', () => {
   let rateLimiter: GitHubRateLimiter;
@@ -76,6 +76,32 @@ describe('GitHubRateLimiter', () => {
       const result = await rateLimiter.wrapGraphQLRequest(fn, 'query { viewer { login } }');
       expect((result as any).data.viewer.login).toBe('test');
     });
+  });
+
+  describe('getGraphQLStatus', () => {
+    it('should return graphql status with defaults', () => {
+      const status = (rateLimiter as any).getGraphQLStatus();
+      expect(status.pointsRemaining).toBe(5000);
+      expect(status.isApproachingLimit).toBe(false);
+      expect(status.recommendedDelay).toBe(0);
+    });
+  });
+
+  describe('canExecuteGraphQLQuery', () => {
+    it('should allow execution when points available', () => {
+      const result = rateLimiter.canExecuteGraphQLQuery('{ viewer { login } }');
+      expect(result.canExecute).toBe(true);
+      expect(result.estimatedPoints).toBeGreaterThanOrEqual(1);
+    });
+  });
+});
+
+describe('createRateLimitedOctokit', () => {
+  it('should return octokit and rateLimiter', () => {
+    const { octokit, rateLimiter } = createRateLimitedOctokit('test-token');
+    expect(octokit).toBeDefined();
+    expect(rateLimiter).toBeInstanceOf(GitHubRateLimiter);
+    expect(typeof (octokit as any).graphqlWithComplexity).toBe('function');
   });
 });
 
