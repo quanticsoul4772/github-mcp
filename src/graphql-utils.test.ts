@@ -11,6 +11,10 @@ import {
   getQueryOperation,
   createGraphQLWrapper,
   GraphQLQueries,
+  safeAccess,
+  validateResponseFields,
+  formatGraphQLError,
+  createTypedHandler,
 } from './graphql-utils.js';
 import { OptimizedAPIClient } from './optimized-api-client.js';
 import { createMockOctokit } from './__tests__/mocks/octokit.js';
@@ -302,6 +306,113 @@ describe('GraphQL Utils', () => {
       vi.spyOn(mockOptimizedClient, 'graphql').mockRejectedValue(new Error('GraphQL Error'));
 
       await expect(wrapper.query('query { test }')).rejects.toThrow('GraphQL Error');
+    });
+  });
+
+  // ============================================================================
+  // safeAccess
+  // ============================================================================
+
+  describe('safeAccess', () => {
+    it('should access a nested field', () => {
+      const obj = { a: { b: { c: 42 } } };
+      expect(safeAccess(obj, ['a', 'b', 'c'], 0)).toBe(42);
+    });
+
+    it('should return defaultValue when path does not exist', () => {
+      expect(safeAccess({ a: {} }, ['a', 'b', 'c'], 'default')).toBe('default');
+    });
+
+    it('should return defaultValue for null object', () => {
+      expect(safeAccess(null, ['a'], 'fallback')).toBe('fallback');
+    });
+
+    it('should return defaultValue for null intermediate', () => {
+      expect(safeAccess({ x: null }, ['x', 'y'], -1)).toBe(-1);
+    });
+
+    it('should return defaultValue when final value is null', () => {
+      expect(safeAccess({ a: null }, ['a'], 'default')).toBe('default');
+    });
+
+    it('should handle non-object intermediary', () => {
+      expect(safeAccess({ a: 'string' }, ['a', 'b'], 'default')).toBe('default');
+    });
+  });
+
+  // ============================================================================
+  // validateResponseFields
+  // ============================================================================
+
+  describe('validateResponseFields', () => {
+    it('should return true when all required paths exist', () => {
+      const response = { data: { viewer: { login: 'octocat' } } };
+      expect(validateResponseFields(response, [['data', 'viewer', 'login']])).toBe(true);
+    });
+
+    it('should return false when a required path is missing', () => {
+      expect(validateResponseFields({ data: { viewer: {} } }, [['data', 'viewer', 'login']])).toBe(false);
+    });
+
+    it('should return true for empty required fields list', () => {
+      expect(validateResponseFields({}, [])).toBe(true);
+    });
+
+    it('should return false when response is null', () => {
+      expect(validateResponseFields(null, [['a']])).toBe(false);
+    });
+
+    it('should return false when one of multiple paths is missing', () => {
+      expect(validateResponseFields({ data: { a: 1 } }, [['data', 'a'], ['data', 'b']])).toBe(false);
+    });
+  });
+
+  // ============================================================================
+  // formatGraphQLError
+  // ============================================================================
+
+  describe('formatGraphQLError', () => {
+    it('should format error from response.data.errors array', () => {
+      const error = {
+        response: { data: { errors: [{ message: 'Field not found' }, { message: 'Access denied' }] } },
+      };
+      expect(formatGraphQLError(error)).toBe('Field not found; Access denied');
+    });
+
+    it('should return error.message when no response errors', () => {
+      expect(formatGraphQLError({ message: 'GraphQL error' })).toBe('GraphQL error');
+    });
+
+    it('should return default message for unknown errors', () => {
+      expect(formatGraphQLError({})).toBe('An unknown error occurred while executing GraphQL query');
+    });
+
+    it('should return default message for null', () => {
+      expect(formatGraphQLError(null)).toBe('An unknown error occurred while executing GraphQL query');
+    });
+
+    it('should handle errors array item with missing message', () => {
+      const error = { response: { data: { errors: [{}] } } };
+      expect(formatGraphQLError(error)).toBe('Unknown GraphQL error');
+    });
+
+    it('should fall through to message when errors array is empty', () => {
+      const error = { response: { data: { errors: [] } }, message: 'fallback' };
+      expect(formatGraphQLError(error)).toBe('fallback');
+    });
+  });
+
+  // ============================================================================
+  // createTypedHandler
+  // ============================================================================
+
+  describe('createTypedHandler', () => {
+    it('should wrap a handler to accept unknown args', async () => {
+      const handler = vi.fn().mockResolvedValue({ result: 'ok' });
+      const typed = createTypedHandler(handler);
+      const result = await typed({ param: 'value' });
+      expect(result).toEqual({ result: 'ok' });
+      expect(handler).toHaveBeenCalledWith({ param: 'value' });
     });
   });
 });
