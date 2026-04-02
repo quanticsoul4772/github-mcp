@@ -2,7 +2,7 @@
  * Tests for ErrorHandler
  */
 import { describe, it, expect } from 'vitest';
-import { ErrorHandler } from './error-handler.js';
+import { ErrorHandler, withErrorHandling } from './error-handler.js';
 import { ValidationError } from '../validation.js';
 
 describe('ErrorHandler', () => {
@@ -75,6 +75,26 @@ describe('ErrorHandler', () => {
       const err = ErrorHandler.createValidationError('owner', 'is required');
       expect(err).toBeInstanceOf(ValidationError);
       expect(err.message).toContain('is required');
+    });
+  });
+
+  describe('withErrorHandling decorator', () => {
+    it('should pass through on success', async () => {
+      // Apply the decorator manually (without @-syntax)
+      const descriptor: PropertyDescriptor = {
+        value: async () => 'done',
+      };
+      const decorated = withErrorHandling('test')({}, 'doWork', descriptor);
+      const result = await decorated.value.call({});
+      expect(result).toBe('done');
+    });
+
+    it('should convert GitHub errors via handleGitHubError', async () => {
+      const descriptor: PropertyDescriptor = {
+        value: async () => { throw { status: 404 }; },
+      };
+      const decorated = withErrorHandling('test')({}, 'doWork', descriptor);
+      await expect(decorated.value.call({})).rejects.toThrow('Resource not found');
     });
   });
 });
