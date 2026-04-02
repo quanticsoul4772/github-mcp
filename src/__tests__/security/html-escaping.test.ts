@@ -100,6 +100,10 @@ describe('HTML Security - XSS Prevention', () => {
       );
       expect(escaped).not.toContain('onmouseover="alert'); // Should not contain unescaped version
     });
+
+    it('should throw TypeError for non-string input', () => {
+      expect(() => escapeHtmlAttribute(123 as any)).toThrow(TypeError);
+    });
   });
 
   describe('escapeJavaScript', () => {
@@ -119,6 +123,10 @@ describe('HTML Security - XSS Prevention', () => {
       const malicious = '"; alert("xss"); //';
       const escaped = escapeJavaScript(malicious);
       expect(escaped).toBe('\\\"; alert(\\\"xss\\\"); \\x2F\\x2F');
+    });
+
+    it('should throw TypeError for non-string input', () => {
+      expect(() => escapeJavaScript(null as any)).toThrow(TypeError);
     });
   });
 
@@ -143,6 +151,10 @@ describe('HTML Security - XSS Prevention', () => {
   });
 
   describe('stripHtmlTags', () => {
+    it('should throw TypeError for non-string input', () => {
+      expect(() => stripHtmlTags(42 as any)).toThrow(TypeError);
+    });
+
     it('should remove HTML tags', () => {
       const html = '<p>Hello <strong>world</strong>!</p>';
       expect(stripHtmlTags(html)).toBe('Hello world!');

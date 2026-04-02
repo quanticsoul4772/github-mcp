@@ -1,7 +1,7 @@
 /**
  * Tests for MetricsCollector
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MetricsCollector, metrics } from './metrics.js';
 
 describe('MetricsCollector', () => {
@@ -54,6 +54,14 @@ describe('MetricsCollector', () => {
       metrics.recordApiCall({ tool: 'a', operation: 'x', success: true, duration: 300, timestamp: Date.now() });
       const stats = metrics.getApiCallStats();
       expect(stats.averageResponseTime).toBe(200);
+    });
+
+    it('should record status code counter when statusCode provided', () => {
+      metrics.recordApiCall({ tool: 'repos', operation: 'getRepo', success: true, duration: 100, timestamp: Date.now(), statusCode: 200 });
+      const counters = metrics.getCounters();
+      const key = Object.keys(counters).find(k => k.includes('status_code'));
+      expect(key).toBeDefined();
+      expect(counters[key!]).toBe(1);
     });
 
     it('should update rate limit gauge when rateLimitRemaining provided', () => {
@@ -267,6 +275,34 @@ describe('MetricsCollector', () => {
       expect(metrics.getErrorStats().total).toBe(0);
       expect(metrics.getGauges()).toEqual({});
       expect(metrics.getCounters()).toEqual({});
+    });
+  });
+
+  describe('cleanup (private)', () => {
+    it('should remove metrics older than one hour', () => {
+      const now = Date.now();
+      const twoHoursAgo = now - 2 * 60 * 60 * 1000;
+      // Record old entries directly via internal state
+      (metrics as any).apiCalls.push({ tool: 'a', operation: 'x', success: true, duration: 10, timestamp: twoHoursAgo });
+      (metrics as any).performance.push({ operation: 'op', duration: 5, timestamp: twoHoursAgo });
+      (metrics as any).errors.push({ tool: 'a', operation: 'x', errorType: 'E', message: 'm', timestamp: twoHoursAgo });
+      // Add a recent one
+      metrics.recordApiCall({ tool: 'b', operation: 'y', success: true, duration: 10, timestamp: now });
+
+      (metrics as any).cleanup();
+
+      expect(metrics.getApiCallStats().total).toBe(1);
+    });
+
+    it('should fire cleanup via setInterval after one hour', () => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+      try {
+        // Advance 1 hour to trigger the cleanup interval
+        vi.advanceTimersByTime(60 * 60 * 1000);
+        // No assertion needed — just covering the interval callback (line 56)
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

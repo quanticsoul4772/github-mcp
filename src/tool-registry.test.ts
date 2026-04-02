@@ -1,7 +1,7 @@
 /**
  * Tests for ToolRegistry
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock heavy dependencies before importing ToolRegistry
 vi.mock('./agents/tools/agent-tools.js', () => ({ createAgentTools: () => [] }));
@@ -192,6 +192,41 @@ describe('ToolRegistry', () => {
       const result = await capturedTools['err_tool'].handler({});
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Error');
+    });
+
+    it('should append truncation notice when response is truncated', async () => {
+      const { mockServer, mockOctokit, mockOptimizedClient, mockReliabilityManager, mockHealthManager, mockRateLimiter, capturedTools } = makeMocks();
+
+      const registry = new ToolRegistry(
+        mockServer as any, mockOctokit as any, mockOptimizedClient as any,
+        mockReliabilityManager as any, mockHealthManager as any, mockRateLimiter as any, false
+      );
+
+      // Return an array with > 1000 items to trigger truncation (DEFAULT_MAX_ITEMS = 1000)
+      const largeArray = Array.from({ length: 1001 }, (_, i) => ({ id: i, name: `item-${i}` }));
+      registry.registerTool({
+        tool: { name: 'big_tool', description: '', inputSchema: { type: 'object', properties: {} } },
+        handler: async () => largeArray,
+      });
+
+      const result = await capturedTools['big_tool'].handler({});
+      expect(result.content[0].text).toContain('[Response truncated');
+    });
+
+    it('should log error when server.tool throws during registration', async () => {
+      const { mockServer, mockOctokit, mockOptimizedClient, mockReliabilityManager, mockHealthManager, mockRateLimiter } = makeMocks();
+      mockServer.tool.mockImplementationOnce(() => { throw new Error('server.tool failed'); });
+
+      const registry = new ToolRegistry(
+        mockServer as any, mockOctokit as any, mockOptimizedClient as any,
+        mockReliabilityManager as any, mockHealthManager as any, mockRateLimiter as any, false
+      );
+
+      // Should NOT throw — error is caught and logged
+      expect(() => registry.registerTool({
+        tool: { name: 'fail_tool', description: '', inputSchema: { type: 'object', properties: {} } },
+        handler: async () => 'ok',
+      })).not.toThrow();
     });
   });
 

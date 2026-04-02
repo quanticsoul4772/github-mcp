@@ -135,6 +135,10 @@ describe('IssueService', () => {
     it('should throw for invalid owner', async () => {
       await expect(service.getIssue('bad owner', 'repo', 1)).rejects.toThrow();
     });
+
+    it('should throw for invalid repo', async () => {
+      await expect(service.getIssue('owner', '', 1)).rejects.toThrow();
+    });
   });
 
   // ============================================================================
@@ -173,6 +177,10 @@ describe('IssueService', () => {
       const callArgs = mockRepo.create.mock.calls[0][2];
       expect(callArgs.assignees).toEqual(['user1']);
       expect(callArgs.labels).toEqual(['bug']);
+    });
+
+    it('should throw for invalid repo', async () => {
+      await expect(service.createIssue('owner', '', { title: 'Test' })).rejects.toThrow();
     });
 
     it('should throw for empty title', async () => {
@@ -222,6 +230,10 @@ describe('IssueService', () => {
 
     it('should throw for invalid owner', async () => {
       await expect(service.updateIssue('bad owner', 'repo', 1, {})).rejects.toThrow();
+    });
+
+    it('should throw for invalid repo', async () => {
+      await expect(service.updateIssue('owner', '', 1, {})).rejects.toThrow();
     });
   });
 });

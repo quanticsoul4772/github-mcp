@@ -501,6 +501,7 @@ describe('Validation Module', () => {
         expect(validateOwnerName('a')).toBe(false); // Too short
         expect(validateOwnerName('-invalid')).toBe(false); // Starts with dash
         expect(validateOwnerName('invalid-')).toBe(false); // Ends with dash
+        expect(validateOwnerName('user--name')).toBe(false); // Consecutive hyphens
         expect(validateOwnerName('in valid')).toBe(false); // Contains space
         expect(validateOwnerName('in/valid')).toBe(false); // Contains slash
       });

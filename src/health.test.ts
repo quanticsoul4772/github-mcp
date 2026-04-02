@@ -86,6 +86,37 @@ describe('HealthManager', () => {
         expect(['degraded', 'healthy', 'unhealthy']).toContain(rateLimitComponent.status);
       }
     });
+
+    it('should set degraded status when API returns 403', async () => {
+      const forbiddenError = Object.assign(new Error('Forbidden'), { status: 403 });
+      mockOctokit.rest.users.getAuthenticated.mockRejectedValue(forbiddenError);
+      const health = await healthManager.getSystemHealth();
+      const githubComponent = health.components.find((c: any) => c.name === 'github_api');
+      expect(githubComponent?.status).toBe('degraded');
+    });
+
+    it('should set unhealthy status when API returns 500', async () => {
+      const serverError = Object.assign(new Error('Server Error'), { status: 500 });
+      mockOctokit.rest.users.getAuthenticated.mockRejectedValue(serverError);
+      const health = await healthManager.getSystemHealth();
+      const githubComponent = health.components.find((c: any) => c.name === 'github_api');
+      expect(githubComponent?.status).toBe('unhealthy');
+    });
+
+    it('should set degraded status when rate limit is exhausted', async () => {
+      mockOctokit.rest.rateLimit.get.mockResolvedValue({
+        data: {
+          rate: {
+            limit: 5000,
+            remaining: 0,
+            reset: Math.floor(Date.now() / 1000) + 3600,
+          },
+        },
+      });
+      const health = await healthManager.getSystemHealth();
+      const rateLimitComponent = health.components.find((c: any) => c.name === 'rate_limit');
+      expect(rateLimitComponent?.status).toBe('degraded');
+    });
   });
 
   describe('getUptime and getStartupTime', () => {
