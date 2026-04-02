@@ -9,6 +9,7 @@ const makeOctokit = () => ({
     get: vi.fn(),
     getContent: vi.fn(),
     createOrUpdateFileContents: vi.fn(),
+    deleteFile: vi.fn(),
   },
   issues: {
     listForRepo: vi.fn(),
@@ -70,6 +71,47 @@ describe('GitHubClient', () => {
         })
       );
       expect(result.commit.sha).toBe('abc');
+    });
+  });
+
+  describe('updateFile', () => {
+    it('should update file with base64 content and sha', async () => {
+      mockOctokit.repos.createOrUpdateFileContents.mockResolvedValue({ data: { commit: { sha: 'new-sha' } } });
+      const result = await client.updateFile('owner', 'repo', 'file.ts', 'content', 'Update', 'old-sha');
+      expect(mockOctokit.repos.createOrUpdateFileContents).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sha: 'old-sha',
+          content: Buffer.from('content').toString('base64'),
+        })
+      );
+      expect(result.commit.sha).toBe('new-sha');
+    });
+
+    it('should pass branch when provided', async () => {
+      mockOctokit.repos.createOrUpdateFileContents.mockResolvedValue({ data: {} });
+      await client.updateFile('owner', 'repo', 'file.ts', 'content', 'Update', 'sha', 'main');
+      expect(mockOctokit.repos.createOrUpdateFileContents).toHaveBeenCalledWith(
+        expect.objectContaining({ branch: 'main' })
+      );
+    });
+  });
+
+  describe('deleteFile', () => {
+    it('should delete file with sha', async () => {
+      mockOctokit.repos.deleteFile.mockResolvedValue({ data: { commit: { sha: 'del-sha' } } });
+      const result = await client.deleteFile('owner', 'repo', 'file.ts', 'Remove file', 'file-sha');
+      expect(mockOctokit.repos.deleteFile).toHaveBeenCalledWith(
+        expect.objectContaining({ sha: 'file-sha', message: 'Remove file' })
+      );
+      expect(result.commit.sha).toBe('del-sha');
+    });
+
+    it('should pass branch when provided', async () => {
+      mockOctokit.repos.deleteFile.mockResolvedValue({ data: {} });
+      await client.deleteFile('owner', 'repo', 'file.ts', 'Delete', 'sha', 'feature-branch');
+      expect(mockOctokit.repos.deleteFile).toHaveBeenCalledWith(
+        expect.objectContaining({ branch: 'feature-branch' })
+      );
     });
   });
 
