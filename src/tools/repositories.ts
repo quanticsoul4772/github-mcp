@@ -159,7 +159,7 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
       const params = args as GetRepositoryParams;
       
       // Ensure we have the required parameters
-      if (!params || !params.owner) {
+      if (!params?.owner) {
         throw new ValidationError('owner', 'Repository owner is required');
       }
       if (!params.repo) {
@@ -557,7 +557,7 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
       const params = args as SearchRepositoriesParams;
       
       // Ensure query is provided
-      if (!params || !params.query) {
+      if (!params?.query) {
         throw new Error(`Search query is required. Received: ${JSON.stringify(params)}`);
       }
       
