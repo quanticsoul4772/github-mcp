@@ -136,6 +136,14 @@ describe('GitHubMCPServer', () => {
         );
     });
 
+    it('should use GITHUB_HOST for enterprise configuration', async () => {
+      configMock.config.GITHUB_HOST = 'https://github.example.com/api/v3';
+      const { GitHubMCPServer } = await import('./index.js');
+      // Should not throw when using GITHUB_HOST path
+      expect(() => new (GitHubMCPServer as any)({ start: false })).not.toThrow();
+      configMock.config.GITHUB_HOST = undefined;
+    });
+
     it('should pass enabled toolsets to ToolRegistry', async () => {
         configMock.getEnabledToolsets.mockReturnValue(['repos', 'issues']);
         const { GitHubMCPServer } = await import('./index.js');
