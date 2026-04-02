@@ -1,0 +1,219 @@
+/**
+ * Tests for reliability utilities: CircuitBreaker, RetryManager
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import {
+  CircuitBreaker,
+  RetryManager,
+  DEFAULT_RETRY_CONFIG,
+  NoOpTelemetry,
+} from './reliability.js';
+
+describe('reliability', () => {
+
+  // ============================================================================
+  // NoOpTelemetry
+  // ============================================================================
+
+  describe('NoOpTelemetry', () => {
+    it('should have methods that do nothing', () => {
+      const t = new NoOpTelemetry();
+      expect(() => t.trackRequest('op', 100, true)).not.toThrow();
+      expect(() => t.trackError(new Error('x'), {})).not.toThrow();
+      expect(() => t.trackRetry('op', 1, new Error('x'))).not.toThrow();
+      expect(() => t.trackCircuitBreakerState('op', 'open')).not.toThrow();
+    });
+  });
+
+  // ============================================================================
+  // CircuitBreaker
+  // ============================================================================
+
+  describe('CircuitBreaker', () => {
+    let breaker: CircuitBreaker;
+
+    beforeEach(() => {
+      breaker = new CircuitBreaker('test-op', {
+        failureThreshold: 3,
+        resetTimeout: 1000,
+      });
+    });
+
+    it('should execute successfully and return result', async () => {
+      const result = await breaker.execute(async () => 'ok');
+      expect(result).toBe('ok');
+    });
+
+    it('should start in closed state', () => {
+      expect(breaker.getState()).toBe('closed');
+    });
+
+    it('should open after failureThreshold failures', async () => {
+      for (let i = 0; i < 3; i++) {
+        await expect(breaker.execute(async () => { throw new Error('fail'); })).rejects.toThrow();
+      }
+      expect(breaker.getState()).toBe('open');
+    });
+
+    it('should throw CIRCUIT_BREAKER_OPEN when open', async () => {
+      // Trip the breaker
+      for (let i = 0; i < 3; i++) {
+        await expect(breaker.execute(async () => { throw new Error('fail'); })).rejects.toThrow();
+      }
+      // Next call should throw circuit breaker error
+      await expect(breaker.execute(async () => 'should not run')).rejects.toThrow(
+        'Circuit breaker is open'
+      );
+    });
+
+    it('should close after successful half-open call', async () => {
+      // Record the fail time before tripping
+      const originalNow = Date.now;
+      let mockTime = Date.now();
+      vi.spyOn(Date, 'now').mockImplementation(() => mockTime);
+
+      const shortBreaker = new CircuitBreaker('op', { failureThreshold: 1, resetTimeout: 100 });
+      await expect(shortBreaker.execute(async () => { throw new Error('fail'); })).rejects.toThrow();
+      // Advance fake time past resetTimeout
+      mockTime += 200;
+      await shortBreaker.execute(async () => 'ok');
+      expect(shortBreaker.getState()).toBe('closed');
+
+      vi.restoreAllMocks();
+    });
+
+    it('should reopen on failure in half-open state', async () => {
+      let mockTime = Date.now();
+      vi.spyOn(Date, 'now').mockImplementation(() => mockTime);
+
+      const shortBreaker = new CircuitBreaker('op', { failureThreshold: 1, resetTimeout: 100 });
+      await expect(shortBreaker.execute(async () => { throw new Error('fail'); })).rejects.toThrow();
+      mockTime += 200;
+      await expect(shortBreaker.execute(async () => { throw new Error('fail again'); })).rejects.toThrow();
+      expect(shortBreaker.getState()).toBe('open');
+
+      vi.restoreAllMocks();
+    });
+
+    it('should return stats', () => {
+      const stats = breaker.getStats();
+      expect(stats.state).toBe('closed');
+      expect(stats.failures).toBe(0);
+    });
+  });
+
+  // ============================================================================
+  // RetryManager
+  // ============================================================================
+
+  describe('RetryManager', () => {
+    it('should return result on first success', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout'] });
+      const retryMgr = new RetryManager({ ...DEFAULT_RETRY_CONFIG, maxAttempts: 3, baseDelayMs: 1, jitter: false });
+      const fn = vi.fn().mockResolvedValue('success');
+      const result = await retryMgr.withRetry('op', fn);
+      expect(result).toBe('success');
+      expect(fn).toHaveBeenCalledTimes(1);
+      vi.useRealTimers();
+    });
+
+    it('should retry on retryable error and succeed', async () => {
+      // Use 503 (retryable by determineRetryability) and fake only setTimeout
+      vi.useFakeTimers({ toFake: ['setTimeout'] });
+      const retryMgr = new RetryManager({
+        maxAttempts: 3,
+        baseDelayMs: 1,
+        maxDelayMs: 10,
+        backoffType: 'constant',
+        jitter: false,
+      });
+      const fn = vi.fn()
+        .mockRejectedValueOnce({ status: 503, message: 'service unavailable' })
+        .mockResolvedValueOnce('ok');
+      const promise = retryMgr.withRetry('op', fn);
+      await vi.runAllTimersAsync();
+      const result = await promise;
+      expect(result).toBe('ok');
+      expect(fn).toHaveBeenCalledTimes(2);
+      vi.useRealTimers();
+    });
+
+    it('should throw after max attempts', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout'] });
+      const retryMgr = new RetryManager({
+        maxAttempts: 2,
+        baseDelayMs: 1,
+        maxDelayMs: 10,
+        backoffType: 'constant',
+        jitter: false,
+      });
+      const fn = vi.fn().mockRejectedValue({ status: 503, message: 'always fails' });
+      const promise = retryMgr.withRetry('op', fn);
+      await vi.runAllTimersAsync();
+      await expect(promise).rejects.toBeDefined();
+      expect(fn).toHaveBeenCalledTimes(2);
+      vi.useRealTimers();
+    });
+
+    it('should not retry non-retryable errors', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout'] });
+      const retryMgr = new RetryManager({
+        maxAttempts: 3,
+        baseDelayMs: 1,
+        maxDelayMs: 10,
+        backoffType: 'constant',
+        jitter: false,
+      });
+      // 404 is not retryable
+      const fn = vi.fn().mockRejectedValue({ status: 404, message: 'not found' });
+      const promise = retryMgr.withRetry('op', fn);
+      await vi.runAllTimersAsync();
+      await expect(promise).rejects.toBeDefined();
+      expect(fn).toHaveBeenCalledTimes(1);
+      vi.useRealTimers();
+    });
+
+    it('should use exponential backoff type', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout'] });
+      const retryMgr = new RetryManager({
+        maxAttempts: 2,
+        baseDelayMs: 100,
+        maxDelayMs: 5000,
+        backoffType: 'exponential',
+        jitter: false,
+      });
+      const fn = vi.fn()
+        .mockRejectedValueOnce({ status: 503, message: 'error' })
+        .mockResolvedValueOnce('done');
+      const promise = retryMgr.withRetry('op', fn);
+      await vi.runAllTimersAsync();
+      const result = await promise;
+      expect(result).toBe('done');
+      vi.useRealTimers();
+    });
+
+    it('should use linear backoff type', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout'] });
+      const retryMgr = new RetryManager({
+        maxAttempts: 2,
+        baseDelayMs: 50,
+        maxDelayMs: 5000,
+        backoffType: 'linear',
+        jitter: false,
+      });
+      const fn = vi.fn()
+        .mockRejectedValueOnce({ status: 503, message: 'error' })
+        .mockResolvedValueOnce('done');
+      const promise = retryMgr.withRetry('op', fn);
+      await vi.runAllTimersAsync();
+      const result = await promise;
+      expect(result).toBe('done');
+      vi.useRealTimers();
+    });
+
+    it('should expose retryConfig', () => {
+      const retryMgr = new RetryManager();
+      expect(retryMgr.retryConfig.maxAttempts).toBeGreaterThan(0);
+    });
+  });
+});
