@@ -530,5 +530,13 @@ describe('GraphQL Utils', () => {
       const wrapper = createGraphQLWrapper(mockOptimizedClient);
       expect(wrapper.getClient()).toBe(mockOptimizedClient);
     });
+
+    it('execute should call smartGraphQL with options', async () => {
+      const mockResponse = { data: 'result' };
+      vi.spyOn(mockOptimizedClient, 'graphql').mockResolvedValue(mockResponse);
+      const wrapper = createGraphQLWrapper(mockOptimizedClient);
+      const result = await wrapper.execute('{ data }', { id: 1 }, { ttl: 500 });
+      expect(result).toEqual(mockResponse);
+    });
   });
 });
