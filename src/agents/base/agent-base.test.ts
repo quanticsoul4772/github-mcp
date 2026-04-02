@@ -74,6 +74,30 @@ describe('BaseAgent', () => {
       expect(report.summary.totalFindings).toBe(1);
       expect(report.summary.findingsBySeverity[Severity.HIGH]).toBe(1);
     });
+
+    it('should filter out excluded categories', async () => {
+      agent.configure({ excludeCategories: [FindingCategory.CODE_SMELL] });
+      agent.findings = [
+        { id: 'f1', severity: Severity.HIGH, category: FindingCategory.SECURITY_VULNERABILITY, title: 'X', description: 'X', file: 'a.ts' },
+        { id: 'f2', severity: Severity.LOW, category: FindingCategory.CODE_SMELL, title: 'Y', description: 'Y', file: 'b.ts' },
+      ];
+      const report = await agent.analyze({ type: 'project', path: '/test' });
+      expect(report.findings.length).toBe(1);
+      expect(report.findings[0].category).toBe(FindingCategory.SECURITY_VULNERABILITY);
+    });
+
+    it('should limit findings to maxFindings and sort by severity', async () => {
+      agent.configure({ maxFindings: 2 });
+      agent.findings = [
+        { id: 'f1', severity: Severity.INFO, category: FindingCategory.SECURITY_VULNERABILITY, title: 'info', description: 'i', file: 'a.ts' },
+        { id: 'f2', severity: Severity.CRITICAL, category: FindingCategory.SECURITY_VULNERABILITY, title: 'crit', description: 'c', file: 'b.ts' },
+        { id: 'f3', severity: Severity.HIGH, category: FindingCategory.SECURITY_VULNERABILITY, title: 'high', description: 'h', file: 'c.ts' },
+      ];
+      const report = await agent.analyze({ type: 'project', path: '/test' });
+      expect(report.findings.length).toBe(2);
+      expect(report.findings[0].severity).toBe(Severity.CRITICAL);
+      expect(report.findings[1].severity).toBe(Severity.HIGH);
+    });
   });
 
   describe('analyze - error path', () => {
@@ -121,6 +145,18 @@ describe('BaseAgent', () => {
       const health = await agent.getHealth();
       expect(health.healthy).toBe(true);
       expect(health.status).toBe('Healthy');
+    });
+
+    it('should return unhealthy when performHealthCheck throws', async () => {
+      class FailingHealthAgent extends ConcreteAgent {
+        protected async performHealthCheck(): Promise<boolean> {
+          throw new Error('health check failed');
+        }
+      }
+      const failingAgent = new FailingHealthAgent();
+      const health = await failingAgent.getHealth();
+      expect(health.healthy).toBe(false);
+      expect(health.status).toContain('health check failed');
     });
   });
 
