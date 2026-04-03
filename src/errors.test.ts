@@ -11,6 +11,7 @@ import {
   NetworkError,
   TimeoutError,
   ConfigurationError,
+  APIError,
   withErrorHandling,
   normalizeError,
   withRetry,
@@ -153,6 +154,23 @@ describe('Error Classes', () => {
       expect(error.context).toEqual({ missingConfig: ['GITHUB_TOKEN'] });
     });
   });
+
+  describe('APIError', () => {
+    it('should create APIError with correct properties', () => {
+      const error = new APIError('Bad request', 400, { detail: 'info' });
+
+      expect(error.name).toBe('APIError');
+      expect(error.code).toBe('API_ERROR');
+      expect(error.statusCode).toBe(400);
+      expect(error.message).toBe('Bad request');
+    });
+
+    it('should create APIError with default status 500', () => {
+      const error = new APIError('Server error');
+
+      expect(error.statusCode).toBe(500);
+    });
+  });
 });
 
 describe('Error Handling Utilities', () => {
@@ -289,6 +307,16 @@ describe('Error Handling Utilities', () => {
       expect(normalized).toBeInstanceOf(GitHubMCPError);
       expect(normalized.code).toBe('UNKNOWN_ERROR');
       expect(normalized.originalError).toBe(genericError);
+    });
+
+    it('should normalize GitHub API 500 error to GitHubMCPError with GITHUB_API_ERROR code', () => {
+      const apiError = { status: 500, message: 'Internal Server Error' };
+
+      const normalized = normalizeError(apiError, 'server-op');
+
+      expect(normalized).toBeInstanceOf(GitHubMCPError);
+      expect(normalized.code).toBe('GITHUB_API_ERROR');
+      expect(normalized.statusCode).toBe(500);
     });
   });
 

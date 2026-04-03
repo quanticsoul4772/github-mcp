@@ -522,6 +522,7 @@ describe('Validation Module', () => {
         expect(validateRepoName('invalid.')).toBe(false); // Ends with dot
         expect(validateRepoName('in valid')).toBe(false); // Contains space
         expect(validateRepoName('in/valid')).toBe(false); // Contains slash
+        expect(validateRepoName('bad..name')).toBe(false); // Consecutive dots
       });
     });
 
@@ -757,6 +758,11 @@ describe('Validation Module', () => {
       expect(result.isValid).toBe(false);
     });
 
+    it('should return invalid for name ending with dot', () => {
+      const result = validateRepoNameWithResult('badname.');
+      expect(result.isValid).toBe(false);
+    });
+
     it('should return invalid for name with consecutive dots', () => {
       const result = validateRepoNameWithResult('bad..name');
       expect(result.isValid).toBe(false);
@@ -777,6 +783,24 @@ describe('Validation Module', () => {
       const result1 = validateRepoNameWithResult('cached-repo');
       const result2 = validateRepoNameWithResult('cached-repo');
       expect(result1).toEqual(result2);
+    });
+
+    it('should evict expired cache entry and recompute', () => {
+      vi.useFakeTimers();
+      try {
+        cleanupValidation();
+        // Cache a valid result (TTL = 300000ms)
+        const r1 = validateRepoNameWithResult('expiry-repo');
+        expect(r1.isValid).toBe(true);
+        // Advance time past the TTL so the cache entry expires
+        vi.advanceTimersByTime(300001);
+        // Second call should find the entry expired, delete it, and recompute
+        const r2 = validateRepoNameWithResult('expiry-repo');
+        expect(r2.isValid).toBe(true);
+      } finally {
+        vi.useRealTimers();
+        cleanupValidation();
+      }
     });
 
     it('should bypass validation in development mode when SKIP_VALIDATION=true', () => {

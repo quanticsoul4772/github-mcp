@@ -515,6 +515,16 @@ describe('Actions Tools', () => {
       expect(result.logs_url).toBe('https://github.com/download/logs/url');
     });
 
+    it('should use fallback URL when response.url is undefined', async () => {
+      mockOctokit.actions.downloadWorkflowRunLogs.mockResolvedValue({ url: undefined });
+      const result = await downloadLogs.handler({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        run_id: 123,
+      });
+      expect(result.logs_url).toContain('test-owner/test-repo/actions/runs/123/logs');
+    });
+
     it('should validate input parameters', async () => {
       mockOctokit.actions.downloadWorkflowRunLogs.mockRejectedValue(
         new Error('Invalid parameters')
@@ -690,6 +700,23 @@ describe('Actions Tools', () => {
       expect(result[0].job_id).toBe(1);
     });
 
+    it('should tail lines for failed jobs when tail_lines is specified', async () => {
+      mockOctokit.actions.listJobsForWorkflowRun.mockResolvedValue({
+        data: {
+          jobs: [{ id: 1, name: 'build', conclusion: 'failure', status: 'completed' }],
+        },
+      });
+      const result = await getJobLogs.handler({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        run_id: 99,
+        failed_only: true,
+        return_content: true,
+        tail_lines: 2,
+      });
+      expect(result[0].logs).toBe('line4\nline5');
+    });
+
     it('should handle log download error for individual failed job', async () => {
       mockOctokit.actions.listJobsForWorkflowRun.mockResolvedValue({
         data: {
@@ -708,6 +735,21 @@ describe('Actions Tools', () => {
 
     it('should throw when neither job_id nor run_id+failed_only provided', async () => {
       await expect(getJobLogs.handler({ owner: 'a', repo: 'b' })).rejects.toThrow();
+    });
+
+    it('should handle non-Error thrown during job log download (String(error) branch)', async () => {
+      mockOctokit.actions.listJobsForWorkflowRun.mockResolvedValue({
+        data: { jobs: [{ id: 1, name: 'build', conclusion: 'failure', status: 'completed' }] },
+      });
+      // Throw a non-Error value to trigger String(error) branch on line 521
+      mockOctokit.actions.downloadJobLogsForWorkflowRun.mockRejectedValue('raw string error');
+      const result = await getJobLogs.handler({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        run_id: 99,
+        failed_only: true,
+      });
+      expect(result[0].error).toContain('Failed to retrieve');
     });
   });
 

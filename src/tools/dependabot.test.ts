@@ -178,6 +178,13 @@ describe('Dependabot Tools', () => {
       const result = (await handler({ owner: 'owner', repo: 'repo', alertNumber: 999 })) as any;
       expect(result.error).toContain('not found');
     });
+
+    it('should rethrow non-404 errors', async () => {
+      const error = Object.assign(new Error('Server error'), { status: 500 });
+      mockOctokit.dependabot.getAlert.mockRejectedValue(error);
+
+      await expect(handler({ owner: 'owner', repo: 'repo', alertNumber: 1 })).rejects.toThrow('Server error');
+    });
   });
 
   // ============================================================================
@@ -216,6 +223,13 @@ describe('Dependabot Tools', () => {
 
       const result = (await handler({ owner: 'owner', repo: 'repo' })) as any;
       expect(result.error).toBeDefined();
+    });
+
+    it('should rethrow non-404/403 errors', async () => {
+      const error = Object.assign(new Error('Server error'), { status: 500 });
+      mockOctokit.dependabot.listRepoSecrets.mockRejectedValue(error);
+
+      await expect(handler({ owner: 'owner', repo: 'repo' })).rejects.toThrow('Server error');
     });
   });
 

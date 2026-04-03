@@ -18,7 +18,7 @@ describe('SecurityAgent', () => {
   };
 
   const analyzeFile = async (name: string, content: string) => {
-    const p = await writeFile(name, content);
+    await writeFile(name, content);
     return agent.analyze({
       projectPath: tempDir,
       files: [name],

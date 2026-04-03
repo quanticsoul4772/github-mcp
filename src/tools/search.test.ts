@@ -63,7 +63,7 @@ describe('search tools', () => {
     tools = createSearchTools(mockOctokit as any);
   });
 
-  const getHandler = (name: string) => tools.find(t => t.tool.name === name)!.handler;
+  const getHandler = (name: string) => tools.find(t => t.tool.name === name)!.handler as (args: any) => Promise<any>;
 
   // ============================================================================
   // search_code

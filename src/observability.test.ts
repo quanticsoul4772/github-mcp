@@ -171,6 +171,29 @@ describe('observability', () => {
       expect(metrics.recordError).not.toHaveBeenCalled();
     });
 
+    it('should skip rateLimit gauge when x-ratelimit-remaining is absent (line 106 false)', async () => {
+      const apiCall = vi.fn().mockResolvedValue({
+        data: {},
+        headers: { 'x-ratelimit-reset': '1700000000' }, // no remaining header
+      });
+      const wrapped = withRateLimitTracking(apiCall, 'repos.get');
+      await wrapped();
+      expect(metrics.setGauge).not.toHaveBeenCalledWith('github_rate_limit_remaining', expect.any(Number));
+    });
+
+    it('should include rateLimitReset in warn when both headers present with low limit (line 117 truthy)', async () => {
+      const apiCall = vi.fn().mockResolvedValue({
+        data: {},
+        headers: { 'x-ratelimit-remaining': '5', 'x-ratelimit-reset': '1700000000' },
+      });
+      const wrapped = withRateLimitTracking(apiCall, 'repos.get');
+      await wrapped();
+      expect(logger.warn).toHaveBeenCalledWith(
+        'GitHub rate limit running low',
+        expect.objectContaining({ resetTimestamp: 1700000000 })
+      );
+    });
+
     it('should record error and rethrow rate limit errors', async () => {
       const error = new Error('API rate limit exceeded');
       const apiCall = vi.fn().mockRejectedValue(error);
@@ -216,6 +239,38 @@ describe('observability', () => {
       expect(metrics.setGauge).toHaveBeenCalledWith('memory_heap_total_bytes', expect.any(Number));
       expect(metrics.setGauge).toHaveBeenCalledWith('memory_external_bytes', expect.any(Number));
       expect(metrics.setGauge).toHaveBeenCalledWith('memory_rss_bytes', expect.any(Number));
+    });
+
+    it('should log error when heap usage exceeds 90%', () => {
+      vi.spyOn(process, 'memoryUsage').mockReturnValue({
+        heapUsed: 950 * 1024 * 1024,
+        heapTotal: 1000 * 1024 * 1024,
+        external: 0,
+        rss: 0,
+        arrayBuffers: 0,
+      });
+      monitorMemoryUsage();
+      expect(logger.error).toHaveBeenCalledWith(
+        'Critical memory usage detected',
+        expect.objectContaining({ usagePercent: expect.any(Number) })
+      );
+      vi.restoreAllMocks();
+    });
+
+    it('should log warn when heap usage is between 80% and 90%', () => {
+      vi.spyOn(process, 'memoryUsage').mockReturnValue({
+        heapUsed: 850 * 1024 * 1024,
+        heapTotal: 1000 * 1024 * 1024,
+        external: 0,
+        rss: 0,
+        arrayBuffers: 0,
+      });
+      monitorMemoryUsage();
+      expect(logger.warn).toHaveBeenCalledWith(
+        'High memory usage detected',
+        expect.objectContaining({ usagePercent: expect.any(Number) })
+      );
+      vi.restoreAllMocks();
     });
   });
 

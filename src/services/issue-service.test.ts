@@ -179,6 +179,10 @@ describe('IssueService', () => {
       expect(callArgs.labels).toEqual(['bug']);
     });
 
+    it('should throw for invalid owner', async () => {
+      await expect(service.createIssue('bad owner!', 'repo', { title: 'Test' })).rejects.toThrow();
+    });
+
     it('should throw for invalid repo', async () => {
       await expect(service.createIssue('owner', '', { title: 'Test' })).rejects.toThrow();
     });

@@ -242,6 +242,21 @@ describe('GraphQL Utils', () => {
       expect(result).toEqual(mockResponse);
       expect(invalidateSpy).toHaveBeenCalled();
     });
+
+    it('should call mutate without variables (|| {} branch on line 213)', async () => {
+      const wrapper = createGraphQLWrapper(mockOptimizedClient);
+      vi.spyOn(mockOptimizedClient, 'graphql').mockResolvedValue({ done: true });
+      vi.spyOn(mockOptimizedClient, 'invalidateGraphQLCacheForMutation').mockReturnValue(0);
+      const result = await wrapper.mutate('mutation DoSomething { doSomething { ok } }');
+      expect(result).toEqual({ done: true });
+    });
+
+    it('should call execute without variables (|| {} branch on line 231)', async () => {
+      const wrapper = createGraphQLWrapper(mockOptimizedClient);
+      vi.spyOn(mockOptimizedClient, 'graphql').mockResolvedValue({ data: 'ok' });
+      const result = await wrapper.execute('query { viewer { login } }');
+      expect(result).toEqual({ data: 'ok' });
+    });
   });
 
   describe('GraphQLQueries helpers', () => {

@@ -436,7 +436,7 @@ describe('Agent System', () => {
 
       expect(result.status).toBe('success');
       // Should have recommendations for complexity and/or duplication
-      expect(result.recommendations.length).toBeGreaterThanOrEqual(0);
+      expect((result.recommendations ?? []).length).toBeGreaterThanOrEqual(0);
     });
   });
 
@@ -633,7 +633,7 @@ describe('Agent System', () => {
       const result = await agent.analyze(context);
       expect(result.status).toBe('success');
       // Recommendations should include focused-test and quality score items
-      expect(result.recommendations.length).toBeGreaterThanOrEqual(0);
+      expect((result.recommendations ?? []).length).toBeGreaterThanOrEqual(0);
     });
 
     test('should detect setTimeout/setInterval and mock without afterEach', async () => {

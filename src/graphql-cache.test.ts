@@ -346,5 +346,25 @@ describe('GraphQLCache', () => {
       expect(Object.keys(metrics.queryTypes)).toContain('GetRepository');
       expect(Object.keys(metrics.queryTypes)).toContain('CreateDiscussion');
     });
+
+    it('should use exact GRAPHQL_CACHE_CONFIG match for query name TTL', async () => {
+      // A query named 'get_repository_insights' should match the config exactly (line 175)
+      const fetcher = vi.fn().mockResolvedValue({ data: 'insights' });
+      await cache.get(
+        'query get_repository_insights { repository { name } }',
+        { owner: 'test', repo: 'repo' },
+        fetcher
+      );
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    });
+
+    it('should bypass cache when skipCache option is true (line 220)', async () => {
+      const fetcher = vi.fn().mockResolvedValue({ data: 'fresh' });
+      // First call — populates cache
+      await cache.get('query FetchSomething { viewer { login } }', {}, fetcher);
+      // Second call with skipCache — should re-fetch despite cached result
+      await cache.get('query FetchSomething { viewer { login } }', {}, fetcher, { skipCache: true });
+      expect(fetcher).toHaveBeenCalledTimes(2);
+    });
   });
 });

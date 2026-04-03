@@ -1,7 +1,7 @@
 /**
  * Tests for BaseToolHandler
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { BaseToolHandler } from './base-tool-handler.js';
 import { ValidationError } from '../validation.js';
 

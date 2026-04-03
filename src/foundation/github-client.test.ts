@@ -72,6 +72,14 @@ describe('GitHubClient', () => {
       );
       expect(result.commit.sha).toBe('abc');
     });
+
+    it('should pass branch when provided', async () => {
+      mockOctokit.repos.createOrUpdateFileContents.mockResolvedValue({ data: { commit: { sha: 'abc' } } });
+      await client.createFile('owner', 'repo', 'new.ts', 'hello', 'Add file', 'feature-branch');
+      expect(mockOctokit.repos.createOrUpdateFileContents).toHaveBeenCalledWith(
+        expect.objectContaining({ branch: 'feature-branch' })
+      );
+    });
   });
 
   describe('updateFile', () => {

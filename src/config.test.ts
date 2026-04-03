@@ -1,7 +1,7 @@
 /**
  * Tests for config module — functions not covered by validation.test.ts
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import {
   getPort,
   isProduction,

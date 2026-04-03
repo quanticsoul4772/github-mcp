@@ -531,6 +531,17 @@ describe('ReportGenerator', () => {
       const result = await generator.generateAnalysisReport(data, options);
       expect(typeof result).toBe('string');
     });
+
+    it('should include detailed findings in console report when includeDetails is true', async () => {
+      const findings = [
+        makeFinding({ id: 'c', severity: Severity.CRITICAL }),
+        makeFinding({ id: 'h', severity: Severity.HIGH, suggestion: undefined }),
+      ];
+      const data = makeAnalysisReport(findings);
+      const options: ReportOptions = { format: 'console', includeDetails: true, groupBy: 'severity' };
+      const result = await generator.generateAnalysisReport(data, options);
+      expect(result).toContain('DETAILED FINDINGS');
+    });
   });
 
   // ============================================================================
@@ -559,6 +570,15 @@ describe('ReportGenerator', () => {
       const options: ReportOptions = { format: 'csv', includeMetrics: true };
       const result = await generator.generateAnalysisReport(data, options);
       expect(typeof result).toBe('string');
+    });
+
+    it('should include plain text fields in CSV output', async () => {
+      const finding = makeFinding({ title: 'PlainTitle', description: 'PlainDesc', suggestion: 'PlainFix' });
+      const data = makeAnalysisReport([finding]);
+      const options: ReportOptions = { format: 'csv' };
+      const result = await generator.generateAnalysisReport(data, options);
+      expect(result).toContain('PlainTitle');
+      expect(result).toContain('PlainDesc');
     });
 
     it('should generate CSV from CoordinationResult', async () => {
@@ -638,6 +658,16 @@ describe('ReportGenerator', () => {
       const parsed = JSON.parse(result);
       expect(parsed.findings).toHaveLength(0);
     });
+
+    it('should rethrow error when outputPath is unwritable (saveReport catch path)', async () => {
+      // Create a regular file then try to use it as a directory
+      const blockerFile = path.join(tempDir, 'not-a-dir');
+      await fs.writeFile(blockerFile, 'blocker');
+      const outputPath = path.join(blockerFile, 'report.json');
+      const data = makeAnalysisReport([makeFinding()]);
+      const options: ReportOptions = { format: 'json', outputPath };
+      await expect(generator.generateAnalysisReport(data, options)).rejects.toThrow();
+    });
   });
 
   // ============================================================================
@@ -667,6 +697,16 @@ describe('ReportGenerator', () => {
   // ============================================================================
 
   describe('generateReport validation (exercises validateReportData)', () => {
+    it('should throw for invalid summary (not a string)', () => {
+      const data = { title: 'T', summary: null, sections: [], metadata: { generatedAt: new Date(), generatedBy: 'test', version: '1.0.0' } } as any;
+      expect(() => generator.generateReport(data)).toThrow('summary');
+    });
+
+    it('should throw for sections not being an array', () => {
+      const data = { title: 'T', summary: 'S', sections: 'not-an-array', metadata: { generatedAt: new Date(), generatedBy: 'test', version: '1.0.0' } } as any;
+      expect(() => generator.generateReport(data)).toThrow('sections');
+    });
+
     it('should handle data with empty sections', () => {
       const data = makeReportData({ sections: [] });
       const result = generator.generateReport(data);

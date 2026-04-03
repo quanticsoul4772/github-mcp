@@ -65,7 +65,7 @@ describe('createAgentTools (success paths with mocked coordinator)', () => {
     tools = createAgentTools();
   });
 
-  const findTool = (name: string) => {
+  const findTool = (name: string): { tool: any; handler: (args: any) => Promise<any> } => {
     const t = tools.find((t: any) => t.tool.name === name);
     if (!t) throw new Error(`Tool '${name}' not found`);
     return t;
@@ -156,7 +156,7 @@ describe('createAgentTools (success paths with mocked coordinator)', () => {
 
       // Re-create tools to pick up the new mock implementation
       const freshTools = createAgentTools();
-      const tool = freshTools.find((t: any) => t.tool.name === 'analyze_code')!;
+      const tool = freshTools.find((t: any) => t.tool.name === 'analyze_code')! as { tool: any; handler: (args: any) => Promise<any> };
       const result = await tool.handler({ target: '/tmp', type: 'directory' });
 
       expect(result.summary.totalFindings).toBe(250);
@@ -201,7 +201,7 @@ describe('createAgentTools (success paths with mocked coordinator)', () => {
       });
 
       const freshTools = createAgentTools();
-      const tool = freshTools.find((t: any) => t.tool.name === 'quick_code_scan')!;
+      const tool = freshTools.find((t: any) => t.tool.name === 'quick_code_scan')! as { tool: any; handler: (args: any) => Promise<any> };
       const result = await tool.handler({ target: '/tmp', type: 'directory' });
 
       expect(result.topFindings).toHaveLength(0);

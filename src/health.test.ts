@@ -38,7 +38,7 @@ describe('HealthManager', () => {
       expect(health.timestamp).toBeTruthy();
       expect(health.uptime).toBeGreaterThanOrEqual(0);
       expect(Array.isArray(health.components)).toBe(true);
-      expect(health.metadata.nodeVersion).toBeTruthy();
+      expect(health.metadata?.nodeVersion).toBeTruthy();
     });
 
     it('should include github_api component', async () => {
@@ -95,9 +95,27 @@ describe('HealthManager', () => {
       expect(githubComponent?.status).toBe('degraded');
     });
 
+    it('should set unhealthy status with auth message when API returns 401', async () => {
+      const authError = Object.assign(new Error('Unauthorized'), { status: 401 });
+      mockOctokit.rest.users.getAuthenticated.mockRejectedValue(authError);
+      const health = await healthManager.getSystemHealth();
+      const githubComponent = health.components.find((c: any) => c.name === 'github_api');
+      expect(githubComponent?.status).toBe('unhealthy');
+      expect(githubComponent?.message).toContain('authentication failed');
+    });
+
     it('should set unhealthy status when API returns 500', async () => {
       const serverError = Object.assign(new Error('Server Error'), { status: 500 });
       mockOctokit.rest.users.getAuthenticated.mockRejectedValue(serverError);
+      const health = await healthManager.getSystemHealth();
+      const githubComponent = health.components.find((c: any) => c.name === 'github_api');
+      expect(githubComponent?.status).toBe('unhealthy');
+    });
+
+    it('should handle non-Error thrown from getAuthenticated (String branch on line 141, 163)', async () => {
+      // Throw a non-Error (string) to cover the false branch of instanceof Error
+      mockOctokit.rest.users.getAuthenticated.mockRejectedValue('plain string error');
+      mockOctokit.rest.rateLimit.get.mockRejectedValue('plain string error');
       const health = await healthManager.getSystemHealth();
       const githubComponent = health.components.find((c: any) => c.name === 'github_api');
       expect(githubComponent?.status).toBe('unhealthy');
@@ -153,6 +171,16 @@ describe('HealthManager', () => {
       // Second call should use cache (no additional API call)
       await healthManager.getQuickHealth();
       expect(mockOctokit.rest.users.getAuthenticated).toHaveBeenCalledTimes(callCount);
+    });
+
+    it('should use cached non-healthy status on second call', async () => {
+      // First call with error — caches unhealthy status
+      mockOctokit.rest.users.getAuthenticated.mockRejectedValue(new Error('Network error'));
+      mockOctokit.rest.rateLimit.get.mockRejectedValue(new Error('Network error'));
+      await healthManager.getQuickHealth();
+      // Second call immediately — uses cache, hits line 105
+      const health = await healthManager.getQuickHealth();
+      expect(health.status).toBe('unhealthy');
     });
   });
 });

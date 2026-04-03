@@ -1,7 +1,7 @@
 /**
  * Tests for BaseAgent abstract class
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { BaseAgent, DEFAULT_AGENT_CONFIG } from './agent-base.js';
 import { Severity, FindingCategory } from '../types.js';
 import type { AnalysisTarget, Finding, AgentCapabilities } from '../types.js';
@@ -114,6 +114,14 @@ describe('BaseAgent', () => {
       agent.configure({ enabled: false });
       const report = await agent.analyze({ type: 'project', path: '/test' });
       // Throws internally, caught and returned as error report
+      expect(report.errors?.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('analyze - unsupported target', () => {
+    it('should return error report when canAnalyze returns false', async () => {
+      // README.md is not a supported file type — canAnalyze returns false
+      const report = await agent.analyze({ type: 'file', path: 'README.md' });
       expect(report.errors?.length).toBeGreaterThan(0);
     });
   });

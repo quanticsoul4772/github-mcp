@@ -89,7 +89,7 @@ describe('AbstractBaseAgent', () => {
 
   describe('createResult', () => {
     it('should create a result with the agent name and status', async () => {
-      const result = await agent.analyze({ projectPath: '/test' });
+      const result = await agent.analyze({ projectPath: '/test', files: [] });
       expect(result.agentName).toBe('test-agent');
       expect(result.status).toBe('success');
     });
@@ -109,19 +109,19 @@ describe('AbstractBaseAgent', () => {
   describe('filterFiles', () => {
     it('should filter files by extension', () => {
       const files = ['a.ts', 'b.js', 'c.ts'];
-      const result = agent.testFilterFiles(files, { projectPath: '/test' });
+      const result = agent.testFilterFiles(files, { projectPath: '/test', files: [] });
       expect(result).toEqual(['a.ts', 'c.ts']);
     });
 
     it('should apply excludePatterns', () => {
       const files = ['a.ts', 'node_modules/x.ts', 'c.ts'];
-      const result = agent.testFilterFiles(files, { projectPath: '/test', excludePatterns: ['node_modules'] });
+      const result = agent.testFilterFiles(files, { projectPath: '/test', files: [], excludePatterns: ['node_modules'] });
       expect(result).toEqual(['a.ts', 'c.ts']);
     });
 
     it('should apply targetFiles filter', () => {
       const files = ['a.ts', 'b.ts', 'c.ts'];
-      const result = agent.testFilterFiles(files, { projectPath: '/test', targetFiles: ['a.ts'] });
+      const result = agent.testFilterFiles(files, { projectPath: '/test', files: [], targetFiles: ['a.ts'] });
       expect(result).toEqual(['a.ts']);
     });
   });

@@ -20,10 +20,10 @@ describe('reliability', () => {
   describe('NoOpTelemetry', () => {
     it('should have methods that do nothing', () => {
       const t = new NoOpTelemetry();
-      expect(() => t.trackRequest('op', 100, true)).not.toThrow();
-      expect(() => t.trackError(new Error('x'), {})).not.toThrow();
-      expect(() => t.trackRetry('op', 1, new Error('x'))).not.toThrow();
-      expect(() => t.trackCircuitBreakerState('op', 'open')).not.toThrow();
+      expect(() => (t as any).trackRequest('op', 100, true)).not.toThrow();
+      expect(() => (t as any).trackError(new Error('x'), {})).not.toThrow();
+      expect(() => (t as any).trackRetry('op', 1, new Error('x'))).not.toThrow();
+      expect(() => (t as any).trackCircuitBreakerState('op', 'open')).not.toThrow();
     });
   });
 
@@ -70,7 +70,7 @@ describe('reliability', () => {
 
     it('should close after successful half-open call', async () => {
       // Record the fail time before tripping
-      const originalNow = Date.now;
+      const _originalNow = Date.now;
       let mockTime = Date.now();
       vi.spyOn(Date, 'now').mockImplementation(() => mockTime);
 
@@ -217,6 +217,66 @@ describe('reliability', () => {
       const retryMgr = new RetryManager();
       expect(retryMgr.retryConfig.maxAttempts).toBeGreaterThan(0);
     });
+
+    it('should throw lastError when maxAttempts is 0 (loop never executes)', async () => {
+      const retryMgr = new RetryManager({
+        maxAttempts: 0,
+        baseDelayMs: 1,
+        maxDelayMs: 10,
+        backoffType: 'constant',
+        jitter: false,
+      });
+      const fn = vi.fn().mockRejectedValue({ status: 503, message: 'error' });
+      // Loop body never runs, lastError is undefined, throws undefined
+      await expect(retryMgr.withRetry('op', fn)).rejects.toBeUndefined();
+      expect(fn).toHaveBeenCalledTimes(0);
+    });
+
+    it('should handle network errors (ECONNREFUSED)', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout'] });
+      const retryMgr = new RetryManager({ maxAttempts: 1, baseDelayMs: 1, maxDelayMs: 10, backoffType: 'constant', jitter: false });
+      const networkError = Object.assign(new Error('connection refused'), { code: 'ECONNREFUSED' });
+      const fn = vi.fn().mockRejectedValue(networkError);
+      const promise = retryMgr.withRetry('network-op', fn);
+      await vi.runAllTimersAsync();
+      await expect(promise).rejects.toBeDefined();
+      vi.useRealTimers();
+    });
+
+    it('should use retryableErrors config when error.isRetryable is not set', () => {
+      const retryMgr = new RetryManager({
+        maxAttempts: 2,
+        baseDelayMs: 1,
+        maxDelayMs: 10,
+        backoffType: 'constant',
+        jitter: false,
+        retryableErrors: ['CUSTOM_CODE'],
+      });
+      // Call private isRetryable directly with an error where isRetryable is undefined
+      const fakeError = { code: 'CUSTOM_CODE', isRetryable: undefined } as any;
+      const config = (retryMgr as any).config;
+      const result = (retryMgr as any).isRetryable(fakeError, config);
+      expect(result).toBe(true);
+    });
+
+    it('should use default delay for unknown backoffType', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout'] });
+      const retryMgr = new RetryManager({
+        maxAttempts: 2,
+        baseDelayMs: 1,
+        maxDelayMs: 10,
+        backoffType: 'unknown' as any,
+        jitter: false,
+      });
+      const fn = vi.fn()
+        .mockRejectedValueOnce({ status: 503, message: 'error' })
+        .mockResolvedValueOnce('done');
+      const promise = retryMgr.withRetry('op', fn);
+      await vi.runAllTimersAsync();
+      const result = await promise;
+      expect(result).toBe('done');
+      vi.useRealTimers();
+    });
   });
 
   // ============================================================================
@@ -241,7 +301,7 @@ describe('reliability', () => {
       const mgr = CorrelationManager.getInstance();
       let capturedId = '';
       await mgr.withCorrelationId('test-id-123', async () => {
-        capturedId = mgr.getCorrelationId();
+        capturedId = mgr.getCorrelationId() ?? '';
       });
       expect(capturedId).toBe('test-id-123');
     });
@@ -257,10 +317,16 @@ describe('reliability', () => {
       const mgr = CorrelationManager.getInstance();
       let capturedId = '';
       await mgr.withNewCorrelationId(async () => {
-        capturedId = mgr.getCorrelationId();
+        capturedId = mgr.getCorrelationId() ?? '';
       });
       expect(capturedId).toBeTruthy();
       expect(capturedId).not.toBe('');
+    });
+
+    it('should set correlation ID directly via setCorrelationId', () => {
+      const mgr = CorrelationManager.getInstance();
+      mgr.setCorrelationId('direct-set-id');
+      expect(mgr.getCorrelationId()).toBe('direct-set-id');
     });
   });
 

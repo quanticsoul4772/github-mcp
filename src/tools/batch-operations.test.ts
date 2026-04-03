@@ -438,6 +438,13 @@ describe('Batch Operations Tools', () => {
         })
       ).rejects.toThrow('GraphQL Error: Repository access denied');
     });
+
+    it('should throw when graphql returns null', async () => {
+      mockOctokit.graphql.mockResolvedValue(null);
+      await expect(
+        batchQueryRepositories.handler({ repositories: [{ owner: 'o', repo: 'r' }] })
+      ).rejects.toThrow('Batch repository query returned no results');
+    });
   });
 
   describe('batch_query_users', () => {
@@ -706,6 +713,13 @@ describe('Batch Operations Tools', () => {
       expect(result.entities[1].login).toBe('existinguser');
       expect(result.entities[1].type).toBe('user');
     });
+
+    it('should throw when graphql returns null', async () => {
+      mockOctokit.graphql.mockResolvedValue(null);
+      await expect(
+        batchQueryUsers.handler({ usernames: ['user1'] })
+      ).rejects.toThrow('Batch user query returned no results');
+    });
   });
 
   describe('batch_graphql_query', () => {
@@ -908,6 +922,14 @@ describe('Batch Operations Tools', () => {
         query1_name: 'repo1',
         query2_login: 'user1',
       });
+    });
+
+    it('should return unsuccessful when graphql returns null', async () => {
+      mockOctokit.graphql.mockResolvedValue(null);
+      const result = await batchGraphQLQuery.handler({
+        queries: [{ query: 'query { viewer { login } }', alias: 'q1' }],
+      });
+      expect(result.successful).toBe(false);
     });
   });
 });

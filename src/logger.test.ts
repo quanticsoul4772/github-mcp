@@ -1,7 +1,7 @@
 /**
  * Tests for Logger
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { Logger, LogLevel, logger } from './logger.js';
 
 describe('Logger', () => {
@@ -55,5 +55,25 @@ describe('Logger', () => {
     const nested = child.child({ operation: 'nested' });
     expect(nested).toBeDefined();
     expect(() => nested.debug('nested message')).not.toThrow();
+  });
+
+  it('should apply LOG_LEVEL env var when valid during construction', () => {
+    const prevEnv = process.env.LOG_LEVEL;
+    const prevInstance = (Logger as any).instance;
+    try {
+      process.env.LOG_LEVEL = 'warn';
+      // Clear singleton to force re-creation
+      (Logger as any).instance = undefined;
+      const freshLogger = Logger.getInstance();
+      expect(freshLogger.getLogLevel()).toBe(LogLevel.WARN);
+    } finally {
+      // Restore state
+      (Logger as any).instance = prevInstance;
+      if (prevEnv === undefined) {
+        delete process.env.LOG_LEVEL;
+      } else {
+        process.env.LOG_LEVEL = prevEnv;
+      }
+    }
   });
 });

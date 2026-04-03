@@ -1,7 +1,7 @@
 /**
  * Tests for ToolRegistry
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Mock heavy dependencies before importing ToolRegistry
 vi.mock('./agents/tools/agent-tools.js', () => ({ createAgentTools: () => [] }));
@@ -42,6 +42,7 @@ vi.mock('./config.js', () => ({
 }));
 
 import { ToolRegistry } from './tool-registry.js';
+import { GitHubMCPError } from './errors.js';
 
 function makeMocks() {
   const capturedTools: Record<string, { handler: (params: any) => Promise<any> }> = {};
@@ -85,7 +86,7 @@ function makeMocks() {
 describe('ToolRegistry', () => {
   describe('registerTool', () => {
     it('should register a tool with schema params', async () => {
-      const { mockServer, mockOctokit, mockOptimizedClient, mockReliabilityManager, mockHealthManager, mockRateLimiter, capturedTools } = makeMocks();
+      const { mockServer, mockOctokit, mockOptimizedClient, mockReliabilityManager, mockHealthManager, mockRateLimiter } = makeMocks();
 
       const registry = new ToolRegistry(
         mockServer as any, mockOctokit as any, mockOptimizedClient as any,
@@ -134,8 +135,8 @@ describe('ToolRegistry', () => {
         handler: async () => 'ok',
       };
 
-      registry.registerTool(config);
-      registry.registerTool(config);
+      registry.registerTool(config as any);
+      registry.registerTool(config as any);
 
       expect(registry.toolCount).toBe(1);
       expect(mockServer.tool).toHaveBeenCalledTimes(1);
@@ -211,6 +212,25 @@ describe('ToolRegistry', () => {
 
       const result = await capturedTools['big_tool'].handler({});
       expect(result.content[0].text).toContain('[Response truncated');
+    });
+
+    it('should include error code and statusCode in error text for GitHubMCPError', async () => {
+      const { mockServer, mockOctokit, mockOptimizedClient, mockReliabilityManager, mockHealthManager, mockRateLimiter, capturedTools } = makeMocks();
+
+      const registry = new ToolRegistry(
+        mockServer as any, mockOctokit as any, mockOptimizedClient as any,
+        mockReliabilityManager as any, mockHealthManager as any, mockRateLimiter as any, false
+      );
+
+      registry.registerTool({
+        tool: { name: 'err_code_tool', description: '', inputSchema: { type: 'object', properties: {} } },
+        handler: async () => { throw new GitHubMCPError('Not found', 'NOT_FOUND', 404); },
+      });
+
+      const result = await capturedTools['err_code_tool'].handler({});
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('NOT_FOUND');
+      expect(result.content[0].text).toContain('404');
     });
 
     it('should log error when server.tool throws during registration', async () => {

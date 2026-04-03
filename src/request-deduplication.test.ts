@@ -157,7 +157,7 @@ describe('RequestDeduplicator', () => {
       const promise = new Promise<string>(r => { resolve = r; });
       const executor = vi.fn().mockReturnValue(promise);
 
-      dedup.deduplicate('op', {}, executor);
+      void dedup.deduplicate('op', {}, executor);
       expect(dedup.getPendingCount()).toBe(1);
       dedup.clear();
       expect(dedup.getPendingCount()).toBe(0);

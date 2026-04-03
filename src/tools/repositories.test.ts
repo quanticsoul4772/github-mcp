@@ -38,6 +38,12 @@ describe('Repository Tools', () => {
       ).rejects.toThrow(ValidationError);
     });
 
+    it('should throw ValidationError for invalid file path (directory traversal)', async () => {
+      await expect(
+        getFileContents.handler({ owner: 'test-owner', repo: 'test-repo', path: '../etc/passwd' })
+      ).rejects.toThrow(ValidationError);
+    });
+
     it('should get file contents successfully', async () => {
       mockOctokit.rest.repos.getContent.mockResolvedValue({
         data: staticMockResponses.fileContent,
@@ -90,6 +96,30 @@ describe('Repository Tools', () => {
           path: 'nonexistent.txt',
         })
       ).rejects.toThrow('File not found');
+    });
+
+    it('should throw ValidationError for invalid ref', async () => {
+      await expect(
+        getFileContents.handler({
+          owner: 'test-owner',
+          repo: 'test-repo',
+          path: 'README.md',
+          ref: 'invalid ref with spaces',
+        })
+      ).rejects.toThrow(ValidationError);
+    });
+
+    it('should return raw data for non-file non-array content (e.g. symlink)', async () => {
+      const symlinkData = { type: 'symlink', target: '/some/other/path', name: 'link', path: 'link', sha: 'abc' };
+      mockOctokit.rest.repos.getContent.mockResolvedValue({ data: symlinkData });
+
+      const result = await getFileContents.handler({
+        owner: 'test-owner',
+        repo: 'test-repo',
+        path: 'link',
+      });
+
+      expect(result).toEqual(symlinkData);
     });
   });
 
@@ -179,6 +209,18 @@ describe('Repository Tools', () => {
       );
 
       await expect(getRepo.handler({ owner: 'test-owner', repo: '' })).rejects.toThrow(
+        ValidationError
+      );
+    });
+
+    it('should throw ValidationError for invalid owner name format', async () => {
+      await expect(getRepo.handler({ owner: 'bad owner!', repo: 'test-repo' })).rejects.toThrow(
+        ValidationError
+      );
+    });
+
+    it('should throw ValidationError for invalid repo name format', async () => {
+      await expect(getRepo.handler({ owner: 'test-owner', repo: 'bad/repo' })).rejects.toThrow(
         ValidationError
       );
     });
@@ -605,7 +647,7 @@ describe('Repository Tools', () => {
       const writeTools = createRepositoryTools(mockOctokit, false);
       const createUpdateFile = writeTools.find((t: any) => t.tool.name === 'create_or_update_file');
       await expect(
-        createUpdateFile.handler({
+        createUpdateFile!.handler({
           owner: 'owner',
           repo: 'test-repo',
           path: 'file.txt',
@@ -625,7 +667,7 @@ describe('Repository Tools', () => {
         data: [{ type: 'dir', name: 'src' }],
       });
       await expect(
-        deleteFile.handler({
+        deleteFile!.handler({
           owner: 'owner',
           repo: 'test-repo',
           path: 'src',
@@ -848,6 +890,39 @@ describe('Repository Tools', () => {
       const result = await listTags.handler({ owner: 'owner', repo: 'repo' }) as any[];
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('v1.0.0');
+    });
+  });
+
+  describe('list_commits', () => {
+    let listCommits: any;
+
+    beforeEach(() => {
+      listCommits = tools.find(tool => tool.tool.name === 'list_commits');
+      mockOctokit.rest.repos.listCommits = vi.fn().mockResolvedValue({
+        data: [
+          {
+            sha: 'abc123',
+            commit: {
+              message: 'Initial commit',
+              author: { name: 'Alice', email: 'alice@example.com', date: '2024-01-01T00:00:00Z' },
+              committer: { name: 'Alice', email: 'alice@example.com', date: '2024-01-01T00:00:00Z' },
+            },
+            html_url: 'https://github.com/owner/repo/commit/abc123',
+          },
+        ],
+      });
+    });
+
+    it('should be registered', () => {
+      expect(listCommits).toBeDefined();
+    });
+
+    it('should return list of commits', async () => {
+      const result = await listCommits.handler({ owner: 'owner', repo: 'repo' }) as any[];
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(1);
+      expect(result[0].sha).toBe('abc123');
+      expect(result[0].message).toBe('Initial commit');
     });
   });
 });

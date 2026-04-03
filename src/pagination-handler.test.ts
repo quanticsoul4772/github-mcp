@@ -85,7 +85,7 @@ describe('PaginationHandler', () => {
         .mockRejectedValueOnce(new Error('API error'));
       const results: number[] = [];
       for await (const item of handler.paginateAll(fetcher)) {
-        results.push(item);
+        results.push(item as number);
       }
       expect(results).toEqual([1, 2]);
     });
@@ -104,7 +104,7 @@ describe('PaginationHandler', () => {
       const promise = (async () => {
         const results: number[] = [];
         for await (const item of handler.paginateAll(fetcher)) {
-          results.push(item);
+          results.push(item as number);
         }
         return results;
       })();

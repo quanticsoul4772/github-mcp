@@ -215,6 +215,67 @@ describe('Repository Insights Tools', () => {
       expect(result.basic.topics).toEqual([]);
       expect(result.basic.license).toBeNull();
     });
+
+    it('should throw when result.repository is null', async () => {
+      mockOctokit.graphql.mockResolvedValue({ repository: null });
+      await expect(
+        getInsights.handler({ owner: 'test-owner', repo: 'test-repo' })
+      ).rejects.toThrow('Repository not found or insights query failed');
+    });
+
+    it('should include commit data when history nodes are non-empty', async () => {
+      mockOctokit.graphql.mockResolvedValue({
+        repository: {
+          id: '1',
+          name: 'test-repo',
+          nameWithOwner: 'test-owner/test-repo',
+          description: null,
+          url: 'https://github.com/test-owner/test-repo',
+          stargazerCount: 0,
+          forkCount: 0,
+          watchers: { totalCount: 0 },
+          issues: { totalCount: 0 },
+          openIssues: { totalCount: 0 },
+          pullRequests: { totalCount: 0 },
+          openPullRequests: { totalCount: 0 },
+          releases: { totalCount: 0 },
+          collaborators: { totalCount: 0 },
+          diskUsage: 0,
+          primaryLanguage: null,
+          languages: { totalSize: 0, edges: [] },
+          repositoryTopics: { nodes: [] },
+          licenseInfo: null,
+          defaultBranchRef: {
+            name: 'main',
+            target: {
+              history: {
+                totalCount: 1,
+                nodes: [
+                  {
+                    committedDate: '2024-01-01T00:00:00Z',
+                    messageHeadline: 'Initial commit',
+                    author: { user: { login: 'dev' } },
+                    additions: 5,
+                    deletions: 0,
+                  },
+                ],
+              },
+            },
+          },
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z',
+          pushedAt: '2024-01-01T00:00:00Z',
+          isPrivate: false,
+          isArchived: false,
+          isFork: false,
+          isTemplate: false,
+          visibility: 'PUBLIC',
+        },
+      });
+      const result = await getInsights.handler({ owner: 'test-owner', repo: 'test-repo' });
+      expect(result.activity.recentCommits).toHaveLength(1);
+      expect(result.activity.recentCommits[0].author).toBe('dev');
+    });
   });
 
   describe('get_contribution_stats', () => {
@@ -421,6 +482,13 @@ describe('Repository Insights Tools', () => {
 
       expect(result.totalContributors).toBe(1);
       expect(result.contributors).toEqual([]);
+    });
+
+    it('should throw when result.repository is null', async () => {
+      mockOctokit.graphql.mockResolvedValue({ repository: null });
+      await expect(
+        getContributions.handler({ owner: 'test-owner', repo: 'test-repo' })
+      ).rejects.toThrow('Repository not found or contribution stats query failed');
     });
   });
 
@@ -650,6 +718,13 @@ describe('Repository Insights Tools', () => {
       });
 
       expect(result.patterns.byAuthor).toEqual([{ author: 'unknown', commits: 2 }]);
+    });
+
+    it('should throw when result.repository is null', async () => {
+      mockOctokit.graphql.mockResolvedValue({ repository: null });
+      await expect(
+        getCommitActivity.handler({ owner: 'test-owner', repo: 'test-repo' })
+      ).rejects.toThrow('Repository not found or commit activity query failed');
     });
   });
 });

@@ -105,7 +105,7 @@ describe('OptimizedAPIClient', () => {
         .mockReturnValueOnce(p1)
         .mockReturnValueOnce(p2);
 
-      const [r1, r2] = await Promise.all([
+      const [_r1, _r2] = await Promise.all([
         client.call('op', { x: 1 }, fn, { skipDeduplication: true }),
         client.call('op', { x: 1 }, fn, { skipDeduplication: true }),
       ].map((p, i) => {

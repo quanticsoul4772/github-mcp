@@ -1,7 +1,7 @@
 /**
  * Tests for MetricsCollector
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MetricsCollector, metrics } from './metrics.js';
 
 describe('MetricsCollector', () => {

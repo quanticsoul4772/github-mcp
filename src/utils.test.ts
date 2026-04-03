@@ -1,7 +1,7 @@
 /**
  * Tests for shared utilities (src/utils.ts)
  */
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   extractPagination,
   mapUser,
@@ -10,6 +10,7 @@ import {
   mapIssue,
   mapPullRequest,
   checkReadOnly,
+  handleToolError,
   decodeBase64Content,
   encodeBase64Content,
   parseCommaSeparated,
@@ -165,6 +166,11 @@ describe('Utils', () => {
       expect(result.user).toBeNull();
       expect(result.assignee).toBeNull();
     });
+
+    it('should handle undefined assignees (|| [] branch)', () => {
+      const result = mapIssue(makeIssue({ assignees: undefined }));
+      expect(result.assignees).toEqual([]);
+    });
   });
 
   // ============================================================================
@@ -223,6 +229,12 @@ describe('Utils', () => {
       expect(result.head).toBeUndefined();
       expect(result.base).toBeUndefined();
     });
+
+    it('should handle undefined assignees and requested_reviewers (|| [] branches)', () => {
+      const result = mapPullRequest(makePR({ assignees: undefined, requested_reviewers: undefined }));
+      expect(result.assignees).toEqual([]);
+      expect(result.requested_reviewers).toEqual([]);
+    });
   });
 
   // ============================================================================
@@ -236,6 +248,22 @@ describe('Utils', () => {
 
     it('should not throw when readOnly is false', () => {
       expect(() => checkReadOnly(false, 'create_issue')).not.toThrow();
+    });
+  });
+
+  // ============================================================================
+  // handleToolError
+  // ============================================================================
+
+  describe('handleToolError', () => {
+    it('should normalize and rethrow the error', async () => {
+      const rawError = { status: 404, message: 'Not Found' };
+      await expect(handleToolError('get-repo', rawError)).rejects.toBeDefined();
+    });
+
+    it('should propagate generic errors', async () => {
+      const err = new Error('something broke');
+      await expect(handleToolError('op', err)).rejects.toThrow('something broke');
     });
   });
 
