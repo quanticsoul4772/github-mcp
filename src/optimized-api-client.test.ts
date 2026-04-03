@@ -382,5 +382,50 @@ describe('OptimizedAPIClient', () => {
       const r = await bare.graphql('query {}');
       expect(r).toEqual({ result: 'ok' });
     });
+
+    it('should return cachedExecutor() when cache enabled but monitoring disabled (line 407)', async () => {
+      const cacheOnly = new OptimizedAPIClient({
+        octokit: mockOctokit as any,
+        enableGraphQLCache: true,
+        enablePerformanceMonitoring: false,
+        enableDeduplication: false,
+      });
+      mockOctokit.graphql.mockResolvedValue({ viewer: { login: 'test' } });
+      const r = await cacheOnly.graphql('query { viewer { login } }', {});
+      expect(r).toEqual({ viewer: { login: 'test' } });
+    });
+  });
+
+  // ============================================================================
+  // call() — write operation with cacheTTL === 0 (line 152)
+  // ============================================================================
+
+  describe('call() — write operations bypass cache', () => {
+    it('should bypass cache for write operations (cacheTTL === 0, line 152)', async () => {
+      const fn = vi.fn().mockResolvedValue({ id: 1, title: 'Issue' });
+      // 'issues.create' has cacheTTL 0 in CACHE_CONFIG → bypasses cache
+      const result = await client.call('issues.create', { owner: 'test', repo: 'repo' }, fn);
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ id: 1, title: 'Issue' });
+    });
+  });
+
+  // ============================================================================
+  // batchCall() — lines 343-352
+  // ============================================================================
+
+  describe('batchCall()', () => {
+    it('should execute batch calls and return results with operation field (lines 343-352)', async () => {
+      const fn1 = vi.fn().mockResolvedValue({ name: 'repo1' });
+      const fn2 = vi.fn().mockResolvedValue({ name: 'repo2' });
+      const results = await client.batchCall([
+        { operation: 'repos.get', params: { owner: 'a', repo: 'r1' }, apiCall: fn1 },
+        { operation: 'repos.get', params: { owner: 'a', repo: 'r2' }, apiCall: fn2 },
+      ]);
+      expect(results).toHaveLength(2);
+      expect(results[0].operation).toBe('repos.get');
+      expect(results[1].operation).toBe('repos.get');
+      expect(results.every(r => r.success)).toBe(true);
+    });
   });
 });
