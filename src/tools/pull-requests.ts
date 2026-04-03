@@ -271,7 +271,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
   tools.push({
     tool: {
       name: 'list_pull_request_files',
-      description: 'Get files changed in a pull request',
+      description: 'Get the list of files modified in a pull request with per-file diff statistics and unified diff patches. Returns [{filename, status (added/modified/removed/renamed), additions, deletions, patch (unified diff)}]. Does NOT return review comments or overall PR metadata — use list_pull_request_comments for review feedback. For PRs with >300 changed files, GitHub returns only the first 300. Use this for file manifest and per-file diffs; use get_pull_request for overall PR metadata.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -621,7 +621,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
     tools.push({
       tool: {
         name: 'create_pull_request',
-        description: 'Create a new pull request',
+        description: 'Create a new pull request to merge changes from head branch into base branch. Both branches must already exist in the repository — this does NOT create branches. Returns PR number, title, state, and URLs. Does NOT return mergeable status, review status, or CI check results; use get_pull_request after creation to check merge readiness. draft=true marks as draft (reviewers not auto-notified). Requires: push access to the repository. Auth scope: repo.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -765,7 +765,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
     tools.push({
       tool: {
         name: 'merge_pull_request',
-        description: 'Merge a pull request',
+        description: '[DESTRUCTIVE] Merge a pull request into its base branch. Permanently merges changes, closes the PR, and triggers post-merge CI/CD. Returns {merged, message, sha}. Does NOT return updated branch state or CI results after merge. MERGE MAY FAIL (returns error) if: required status checks are not passing, branch protection rules block it, there are merge conflicts, PR is in draft state, or caller lacks push access. merge_method options: "merge" (merge commit), "squash" (single commit), "rebase" (rebase onto base). Auth scope: repo.',
         inputSchema: {
           type: 'object',
           properties: {

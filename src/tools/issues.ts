@@ -256,7 +256,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
   tools.push({
     tool: {
       name: 'search_issues',
-      description: 'Search for GitHub issues and pull requests',
+      description: 'Search for GitHub issues and pull requests using GitHub search syntax. Returns basic metadata (number, title, state, labels, url) — does NOT return issue body text or comment content; use get_issue for full details. Results may be truncated (incomplete_results=true) for queries matching >1000 items. Supports operators: is:open, is:pr, is:issue, label:bug, assignee:user, repo:owner/name, created:>2023-01-01. Use list_issues to list issues on a specific repo without search syntax. Auth: read access.',
       inputSchema: {
         type: 'object',
         properties: {
