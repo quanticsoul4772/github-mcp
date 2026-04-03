@@ -105,7 +105,7 @@ export function createOptimizedRepositoryTools(
     tool: {
       name: 'get_file_contents_optimized',
       description:
-        'Get file or directory contents from a GitHub repository with performance optimizations (caching, deduplication)',
+        'Get file or directory contents with automatic caching and request deduplication. Returns same structure as get_file_contents (file → {content}; directory → [{name, path, type}]). Use skipCache=true to bypass cache for fresh data. Does NOT stream large files or support binary viewing. Prefer this over get_file_contents for repeated reads of the same path.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -295,7 +295,7 @@ export function createOptimizedRepositoryTools(
   tools.push({
     tool: {
       name: 'list_issues_optimized',
-      description: 'List repository issues with smart pagination and caching',
+      description: 'List repository issues with cached pagination (default: up to 5 pages × 100 items). Supports filters: state, labels, assignee (AND-combined). Does NOT return full issue body text — use get_issue for complete details. Prefer over list_issues for repeated or paginated reads; cache reduces API rate limit usage.',
       inputSchema: {
         type: 'object',
         properties: {

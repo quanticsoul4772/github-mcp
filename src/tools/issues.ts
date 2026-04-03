@@ -508,7 +508,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
     tools.push({
       tool: {
         name: 'create_issue_comment',
-        description: 'Add a comment to a GitHub issue',
+        description: 'Create a new comment on an issue or PR. Supports Markdown formatting. Returns comment ID, URL, and created_at. Does NOT support inline code suggestions (use PR review comments for that) or comment reactions — reactions must be added separately after creation. Requires write access.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -606,7 +606,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
     tools.push({
       tool: {
         name: 'delete_issue_comment',
-        description: 'Delete an issue comment',
+        description: '[DESTRUCTIVE] Permanently delete an issue comment — cannot be recovered. Does NOT return the deleted comment content. Requires write access to the repository. Side effect: decrements the issue\'s comment count.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -645,7 +645,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
     tools.push({
       tool: {
         name: 'add_issue_labels',
-        description: 'Add labels to an issue',
+        description: 'Add one or more labels to an issue (appends — does NOT replace existing labels). Labels must already exist in the repository; this does NOT create new labels. Returns the complete updated label list. Side effect: updates issue\'s updated_at timestamp. To replace all labels use update_issue instead.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -735,7 +735,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
     tools.push({
       tool: {
         name: 'lock_issue',
-        description: 'Lock an issue',
+        description: 'Lock an issue to prevent new comments. Locked issues cannot receive comments or reactions until unlocked. Optional lock_reason: off-topic, too heated, resolved, spam. Does NOT close the issue — use close_issue separately if needed. Requires: collaborator write access or triage role.',
         inputSchema: {
           type: 'object',
           properties: {
