@@ -1,13 +1,17 @@
 /**
  * Tests for agents/index.ts utility functions
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as os from 'os';
+import * as path from 'path';
+import * as fs from 'fs/promises';
 import {
   shouldSkipDirectory,
   shouldIncludeFile,
   generateTextReport,
   generateHtmlReport,
   createAgentSystem,
+  discoverFiles,
 } from './index.js';
 
 describe('shouldSkipDirectory', () => {
@@ -147,5 +151,66 @@ describe('createAgentSystem', () => {
     expect(system.reportGenerator).toBeDefined();
     expect(Array.isArray(system.agents)).toBe(true);
     expect(system.agents.length).toBeGreaterThan(0);
+  });
+});
+
+describe('discoverFiles', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-index-test-'));
+  });
+
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('should discover .ts and .js files', async () => {
+    await fs.writeFile(path.join(tmpDir, 'a.ts'), 'const x = 1;');
+    await fs.writeFile(path.join(tmpDir, 'b.js'), 'const y = 2;');
+    await fs.writeFile(path.join(tmpDir, 'README.md'), '# Doc');
+
+    const files = await discoverFiles(tmpDir);
+    expect(files).toContain('a.ts');
+    expect(files).toContain('b.js');
+    expect(files).not.toContain('README.md');
+  });
+
+  it('should skip node_modules directory', async () => {
+    const nmDir = path.join(tmpDir, 'node_modules');
+    await fs.mkdir(nmDir);
+    await fs.writeFile(path.join(nmDir, 'dep.ts'), 'export {};');
+    await fs.writeFile(path.join(tmpDir, 'main.ts'), 'export {};');
+
+    const files = await discoverFiles(tmpDir);
+    expect(files.every((f: string) => !f.startsWith('node_modules'))).toBe(true);
+    expect(files).toContain('main.ts');
+  });
+
+  it('should apply exclude patterns', async () => {
+    await fs.writeFile(path.join(tmpDir, 'main.ts'), 'export {};');
+    await fs.writeFile(path.join(tmpDir, 'main.test.ts'), 'test("x", () => {});');
+
+    const files = await discoverFiles(tmpDir, undefined, ['\\.test\\.ts$']);
+    expect(files).toContain('main.ts');
+    expect(files).not.toContain('main.test.ts');
+  });
+
+  it('should apply include patterns', async () => {
+    await fs.writeFile(path.join(tmpDir, 'a.ts'), 'export {};');
+    await fs.writeFile(path.join(tmpDir, 'b.js'), 'module.exports = {};');
+
+    const files = await discoverFiles(tmpDir, ['\\.ts$']);
+    expect(files).toContain('a.ts');
+    expect(files).not.toContain('b.js');
+  });
+
+  it('should recurse into subdirectories', async () => {
+    const subDir = path.join(tmpDir, 'src');
+    await fs.mkdir(subDir);
+    await fs.writeFile(path.join(subDir, 'nested.ts'), 'export {};');
+
+    const files = await discoverFiles(tmpDir);
+    expect(files.some((f: string) => f.includes('nested.ts'))).toBe(true);
   });
 });
