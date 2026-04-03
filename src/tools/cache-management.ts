@@ -189,7 +189,7 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
       }
 
       // Analyze GraphQL cache
-      if (graphqlStats && graphqlStats.general) {
+      if (graphqlStats?.general) {
         const graphqlHitRate = graphqlStats.cacheEfficiency.overall;
 
         if (graphqlHitRate < 40) {

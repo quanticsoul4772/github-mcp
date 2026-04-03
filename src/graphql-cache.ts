@@ -137,7 +137,7 @@ export class GraphQLCache {
   private extractQueryName(query: string): string | null {
     // Only extract explicit operation names: "query Name" or "mutation Name"
     const opMatch = query.match(/^\s*(?:query|mutation)\s+([A-Za-z_][A-Za-z0-9_]*)/i);
-    if (opMatch && opMatch[1]) {
+    if (opMatch?.[1]) {
       return opMatch[1];
     }
     return null;
@@ -406,7 +406,7 @@ export class GraphQLCache {
 
       if (keyOp && affectedOps[keyOp]) {
         invalidate = true;
-      } else if (repoPattern && repoPattern.test(key)) {
+      } else if (repoPattern?.test(key)) {
         invalidate = true;
       } else if (entry?.query) {
         // Check if the actual query contains related keywords

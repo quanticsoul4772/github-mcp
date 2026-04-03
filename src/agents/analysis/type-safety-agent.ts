@@ -250,7 +250,7 @@ export class TypeSafetyAgent extends AbstractBaseAgent {
       // Implicit any (when noImplicitAny is disabled)
       if (line.includes('function') && line.includes('(') && !line.includes(':')) {
         const hasParams = line.match(/\(([^)]+)\)/);
-        if (hasParams && hasParams[1].trim() && !hasParams[1].includes(':')) {
+        if (hasParams?.[1].trim() && !hasParams[1].includes(':')) {
           findings.push(
             this.createFinding(
               'medium',
