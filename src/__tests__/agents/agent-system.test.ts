@@ -691,6 +691,44 @@ describe('Agent System', () => {
       const result = await agent.analyze(context);
       expect(result.status).toBe('success');
     });
+
+    test('should detect too-many-assertions and shared-state with afterEach', async () => {
+      await fs.writeFile(
+        path.join(tempDir, 'widget.ts'),
+        `export function widget() { return 42; }`
+      );
+
+      // Test file with >5 assertions, shared let state, and afterEach
+      await fs.writeFile(
+        path.join(tempDir, 'widget.test.ts'),
+        `
+        import { widget } from './widget';
+        let sharedValue = 0;
+        describe('widget', () => {
+          afterEach(() => {
+            sharedValue = 0;
+          });
+          it('has many assertions', () => {
+            expect(widget()).toBe(42);
+            expect(widget()).toBe(42);
+            expect(widget()).toBe(42);
+            expect(widget()).toBe(42);
+            expect(widget()).toBe(42);
+            expect(widget()).toBe(42);
+          });
+        });
+        `
+      );
+
+      const context: AnalysisContext = {
+        projectPath: tempDir,
+        files: ['widget.ts', 'widget.test.ts'],
+      };
+
+      const result = await agent.analyze(context);
+      expect(result.status).toBe('success');
+      expect(Array.isArray(result.findings)).toBe(true);
+    });
   });
 
   describe('Security Agent', () => {
@@ -768,45 +806,6 @@ describe('Agent System', () => {
 
       // Should detect wildcard versions
       expect(result.findings.some(f => f.category === 'dependency-version')).toBe(true);
-    });
-
-    test('should detect too-many-assertions and shared-state with afterEach', async () => {
-      await fs.writeFile(
-        path.join(tempDir, 'widget.ts'),
-        `export function widget() { return 42; }`
-      );
-
-      // Test file with >5 assertions, shared let state, and afterEach
-      await fs.writeFile(
-        path.join(tempDir, 'widget.test.ts'),
-        `
-        import { widget } from './widget';
-        let sharedValue = 0;
-        describe('widget', () => {
-          afterEach(() => {
-            sharedValue = 0;
-          });
-          it('has many assertions', () => {
-            expect(widget()).toBe(42);
-            expect(widget()).toBe(42);
-            expect(widget()).toBe(42);
-            expect(widget()).toBe(42);
-            expect(widget()).toBe(42);
-            expect(widget()).toBe(42);
-          });
-        });
-        `
-      );
-
-      const context: AnalysisContext = {
-        projectPath: tempDir,
-        files: ['widget.ts', 'widget.test.ts'],
-      };
-
-      const result = await agent.analyze(context);
-      expect(result.status).toBe('success');
-      // Verify shared-state or too-many-assertions findings
-      expect(Array.isArray(result.findings)).toBe(true);
     });
   });
 
