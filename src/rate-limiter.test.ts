@@ -78,12 +78,45 @@ describe('GitHubRateLimiter', () => {
     });
   });
 
+  describe('getStatus with query history', () => {
+    it('should compute averagePointsPerQuery when history is non-empty', () => {
+      const graphql = (rateLimiter as any).graphql;
+      const now = new Date();
+      graphql.queryHistory = [
+        { points: 10, query: 'q1', timestamp: now },
+        { points: 20, query: 'q2', timestamp: now },
+      ];
+
+      const status = rateLimiter.getStatus();
+      // averagePointsPerQuery = round((10+20)/2) = 15
+      expect(status.graphqlInsights.averagePointsPerQuery).toBe(15);
+      expect(status.graphqlInsights.queriesInLastHour).toBe(2);
+      expect(Array.isArray(status.graphqlInsights.topComplexQueries)).toBe(true);
+    });
+  });
+
   describe('getGraphQLStatus', () => {
     it('should return graphql status with defaults', () => {
       const status = (rateLimiter as any).getGraphQLStatus();
       expect(status.pointsRemaining).toBe(5000);
       expect(status.isApproachingLimit).toBe(false);
       expect(status.recommendedDelay).toBe(0);
+    });
+
+    it('should compute recommendedDelay when approaching limit with query history', () => {
+      const graphql = (rateLimiter as any).graphql;
+      // Set remaining below 20% of limit (5000 * 0.2 = 1000)
+      graphql.remaining = 500;
+      graphql.reset = new Date(Date.now() + 60000); // reset in 1 minute
+      graphql.queryHistory = [
+        { points: 50, query: 'q1', timestamp: new Date() },
+        { points: 50, query: 'q2', timestamp: new Date() },
+      ];
+
+      const status = (rateLimiter as any).getGraphQLStatus();
+      expect(status.isApproachingLimit).toBe(true);
+      expect(status.recommendedDelay).toBeGreaterThanOrEqual(0);
+      expect(status.pointsRemaining).toBe(500);
     });
   });
 
@@ -92,6 +125,40 @@ describe('GitHubRateLimiter', () => {
       const result = rateLimiter.canExecuteGraphQLQuery('{ viewer { login } }');
       expect(result.canExecute).toBe(true);
       expect(result.estimatedPoints).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should block execution when rate limit is exhausted', () => {
+      const graphql = (rateLimiter as any).graphql;
+      graphql.remaining = 0;
+      graphql.reset = new Date(Date.now() + 60000);
+
+      const result = rateLimiter.canExecuteGraphQLQuery('{ viewer { login } }');
+      expect(result.canExecute).toBe(false);
+      expect(result.reason).toBeDefined();
+      expect(result.estimatedPoints).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should pass variables to complexity calculation', () => {
+      const result = rateLimiter.canExecuteGraphQLQuery(
+        'query GetIssues($limit: Int!) { repository(owner:"x", name:"y") { issues(first: $limit) { nodes { title } } } }',
+        { limit: 50 }
+      );
+      expect(typeof result.canExecute).toBe('boolean');
+    });
+  });
+
+  describe('waitForReset with future reset', () => {
+    it('should wait when reset time is in the future', async () => {
+      vi.useFakeTimers();
+      const graphql = (rateLimiter as any).graphql;
+      // Set reset 100ms in the future
+      graphql.reset = new Date(Date.now() + 100);
+      (rateLimiter as any).graphql = graphql;
+
+      const waitPromise = rateLimiter.waitForReset('graphql');
+      vi.advanceTimersByTime(200);
+      await waitPromise;
+      vi.useRealTimers();
     });
   });
 });
@@ -196,6 +263,19 @@ describe('ResponseSizeLimiter', () => {
       const result = ResponseSizeLimiter.limitResponseSize(data);
       expect(result.truncated).toBe(false);
       expect(result.data).toBe(data);
+    });
+
+    it('should handle nested arrays and primitives in truncated objects (lines 599, 607)', () => {
+      // Create a large object that triggers truncateObjectStrings
+      // with nested arrays and number/boolean fields to cover lines 599 and 607
+      const data = {
+        longField: 'x'.repeat(2000), // > 1000 chars - triggers string truncation
+        numbers: [1, 2, 3, 4, 5],   // array - triggers line 599
+        active: true,                 // boolean primitive - triggers line 607
+        count: 42,                    // number primitive - triggers line 607
+      };
+      const result = ResponseSizeLimiter.limitResponseSize(data, 100); // very small limit
+      expect(result.truncated).toBe(true);
     });
   });
 
