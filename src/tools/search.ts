@@ -272,8 +272,11 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
     },
     handler: async (args: unknown) => {
       const params = args as SearchCodeParams;
+      if (params.repository_id === undefined) {
+        throw new Error('repository_id is required for label search');
+      }
       const { data } = await octokit.search.labels({
-        repository_id: params.repository_id!,
+        repository_id: params.repository_id,
         q: params.q,
         sort: params.sort as any as any,
         order: params.order as any as any,

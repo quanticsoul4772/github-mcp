@@ -731,13 +731,14 @@ export function createProjectManagementTools(octokit: Octokit, _readOnly: boolea
 
               // Filter by labels
               if (params.labels && params.labels.length > 0) {
+                const filterLabels = params.labels;
                 filteredIssues = filteredIssues.filter((issue: any) =>
-                  params.labels!.some((label: string) =>
+                  filterLabels.some((label: string) =>
                     issue.labels.nodes.some((issueLabel: any) => issueLabel.name === label)
                   )
                 );
                 filteredPRs = filteredPRs.filter((pr: any) =>
-                  params.labels!.some((label: string) =>
+                  filterLabels.some((label: string) =>
                     pr.labels.nodes.some((prLabel: any) => prLabel.name === label)
                   )
                 );

@@ -128,9 +128,9 @@ export async function batchGetFiles(
   const pathToSize = new Map<string, number>();
 
   for (const item of tree.tree) {
-    if (item.type === 'blob' && paths.includes(item.path!)) {
-      pathToSha.set(item.path!, item.sha!);
-      pathToSize.set(item.path!, item.size!);
+    if (item.type === 'blob' && item.path != null && item.sha != null && item.size != null && paths.includes(item.path)) {
+      pathToSha.set(item.path, item.sha);
+      pathToSize.set(item.path, item.size);
     }
   }
 
@@ -224,14 +224,16 @@ export async function batchUpdateFiles(
   );
 
   // Filter successful blob creations
-  const treeItems = blobs
-    .filter(r => r.success && r.data)
-    .map(r => ({
-      path: r.data!.path,
-      mode: r.data!.mode as '100644' | '100755' | '040000' | '160000' | '120000',
-      type: 'blob' as const,
-      sha: r.data!.sha,
-    }));
+  const treeItems = blobs.flatMap(r =>
+    r.success && r.data
+      ? [{
+          path: r.data.path,
+          mode: r.data.mode as '100644' | '100755' | '040000' | '160000' | '120000',
+          type: 'blob' as const,
+          sha: r.data.sha,
+        }]
+      : []
+  );
 
   // Create a new tree
   const { data: newTree } = await octokit.git.createTree({
