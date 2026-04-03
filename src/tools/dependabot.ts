@@ -292,7 +292,7 @@ export function createDependabotTools(octokit: Octokit, readOnly: boolean): Tool
     tools.push({
       tool: {
         name: 'update_dependabot_alert',
-        description: 'Update a Dependabot alert',
+        description: 'Dismiss or reopen a Dependabot security alert. When state="dismissed", dismissed_reason is required (valid values: fix_started, inaccurate, no_bandwidth, not_used, tolerable_risk). Dismissed alerts are preserved in history and can be reopened by setting state="open". Does NOT return full security advisory details — returns updated alert metadata only. Requires: security_events write permission.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -357,7 +357,7 @@ export function createDependabotTools(octokit: Octokit, readOnly: boolean): Tool
     tools.push({
       tool: {
         name: 'set_dependabot_secret',
-        description: 'Create or update a Dependabot secret',
+        description: 'Create or update a Dependabot secret (write-only). Requires the value to be pre-encrypted using the repository\'s public key (RSA-2048); get key_id and public key from the repository\'s Dependabot secrets public key endpoint first. Secret values cannot be retrieved after creation. Secrets set here are available to Dependabot but NOT to Actions workflows — use set_actions_secret for Actions.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -406,7 +406,7 @@ export function createDependabotTools(octokit: Octokit, readOnly: boolean): Tool
     tools.push({
       tool: {
         name: 'delete_dependabot_secret',
-        description: 'Delete a Dependabot secret',
+        description: '[DESTRUCTIVE] Delete a Dependabot secret (irreversible). Returns success only — does NOT return the deleted secret value (secrets are write-only). If the secret is in use by Dependabot, deletion will cause future Dependabot runs to fail until the secret is re-created.',
         inputSchema: {
           type: 'object',
           properties: {

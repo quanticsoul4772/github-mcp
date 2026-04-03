@@ -295,7 +295,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
     tools.push({
       tool: {
         name: 'dismiss_notification',
-        description: 'Mark a notification as read',
+        description: 'Mark a notification thread as read or done. state="read" marks as read; state="done" marks as both read and done (two API calls). Does NOT delete the notification — use manage_notification_subscription with action="delete" to unsubscribe.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -385,7 +385,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
     tools.push({
       tool: {
         name: 'manage_notification_subscription',
-        description: 'Manage subscription for a notification thread',
+        description: 'Subscribe to, ignore, or unsubscribe from a specific notification thread. Actions: "ignore" (mute future notifications), "watch" (subscribe/unmute), "delete" (unsubscribe irreversibly). When action="delete", returns success only — does NOT return subscription object. For repository-level subscriptions, use manage_repository_notification_subscription.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -437,7 +437,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
     tools.push({
       tool: {
         name: 'manage_repository_notification_subscription',
-        description: 'Manage notification subscription for a repository',
+        description: 'Subscribe to, ignore, or unsubscribe from all notifications for a repository. Actions: "ignore" (suppress all), "watch" (subscribe), "delete" (unsubscribe irreversibly). Applies to the entire repository, not individual threads — use manage_notification_subscription to control a specific thread. When action="delete", returns success only.',
         inputSchema: {
           type: 'object',
           properties: {

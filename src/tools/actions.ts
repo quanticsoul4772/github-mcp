@@ -447,7 +447,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
   tools.push({
     tool: {
       name: 'get_job_logs',
-      description: 'Get logs for a workflow job',
+      description: 'Get logs for a specific workflow job. Use job_id to retrieve a specific job\'s logs, OR use run_id with failed_only=true to get logs from all failed jobs in a run. Does NOT return logs for successful jobs when failed_only=true. Log content can be large — use return_content=false to get a download URL instead of inline content. Use download_workflow_run_logs to get all logs for an entire run.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -554,7 +554,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
   tools.push({
     tool: {
       name: 'download_workflow_run_logs',
-      description: 'Get logs for a workflow run',
+      description: 'Download logs for all jobs in a workflow run as a zip archive URL. Returns a redirect URL to the log archive — does NOT return log text inline. For inline log text from a specific job, use get_job_logs instead. Log archives expire after a period; URL is valid at time of call.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -698,7 +698,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
     tools.push({
       tool: {
         name: 'run_workflow',
-        description: 'Trigger a workflow run',
+        description: 'Manually trigger a workflow_dispatch workflow run on a specified branch or tag. ref must be a valid branch or tag that the workflow exists on. inputs must match the workflow\'s defined input schema. Returns success acknowledgment only — does NOT return the created run ID. Use list_workflow_runs after triggering to find the new run. Requires: write access to the repository. Auth scope: repo.',
         inputSchema: {
           type: 'object',
           properties: {
