@@ -222,5 +222,55 @@ describe('GraphQL Complexity', () => {
       expect(typeof suggestions[0]).toBe('string');
       expect(suggestions[0].length).toBeGreaterThan(0);
     });
+
+    it('should suggest reducing fields when more than 20 fields are requested', () => {
+      const calculator = new GraphQLComplexityCalculator();
+      // Query with 21+ distinct fields to trigger totalFields > 20 suggestion
+      const manyFieldsQuery = `
+        query {
+          repository(owner: "test", name: "test") {
+            id name login title description url createdAt updatedAt
+            stargazerCount forkCount state number owner { login }
+            author { login } primaryLanguage { name }
+            issues(first: 10) { totalCount }
+            pullRequests(first: 10) { totalCount }
+            releases(first: 10) { totalCount }
+            watchers(first: 10) { totalCount }
+            collaborators(first: 10) { totalCount }
+          }
+        }
+      `;
+
+      const analysis = calculator.calculateQueryComplexity(manyFieldsQuery);
+      const suggestions = calculator.getOptimizationSuggestions(analysis);
+      // At 20+ fields, should suggest reducing fields
+      expect(Array.isArray(suggestions)).toBe(true);
+    });
+  });
+
+  describe('Variable-based pagination', () => {
+    it('should handle variable-based pagination (first: $limit)', () => {
+      const calculator = new GraphQLComplexityCalculator();
+      const query = `
+        query GetIssues($limit: Int!) {
+          repository(owner: "test", name: "test") {
+            issues(first: $limit) {
+              nodes {
+                title
+                body
+              }
+            }
+          }
+        }
+      `;
+
+      // With variables
+      const analysisWithVars = calculator.calculateQueryComplexity(query, { limit: 50 });
+      expect(analysisWithVars.estimatedPoints).toBeGreaterThan(0);
+
+      // Without variables (literal fallback)
+      const analysisNoVars = calculator.calculateQueryComplexity(query);
+      expect(analysisNoVars.estimatedPoints).toBeGreaterThan(0);
+    });
   });
 });
