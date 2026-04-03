@@ -10,6 +10,7 @@ import {
   ReliabilityManager,
   CorrelationManager,
 } from './reliability.js';
+import { GitHubMCPError } from './errors.js';
 
 describe('reliability', () => {
 
@@ -350,6 +351,13 @@ describe('reliability', () => {
       await expect(
         mgr.executeWithReliability('test-op', async () => { throw new Error('op failed'); })
       ).rejects.toThrow('op failed');
+    });
+
+    it('should pass through GitHubMCPError unchanged (normalizeError line 268)', async () => {
+      const ghError = new GitHubMCPError('Not found', 'NOT_FOUND', 404);
+      await expect(
+        mgr.executeWithReliability('test-op', async () => { throw ghError; })
+      ).rejects.toBeInstanceOf(GitHubMCPError);
     });
 
     it('getHealthStatus should return status with circuit breakers', async () => {

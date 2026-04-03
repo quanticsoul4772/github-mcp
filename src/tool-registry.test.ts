@@ -122,6 +122,23 @@ describe('ToolRegistry', () => {
       expect(mockServer.tool).toHaveBeenCalledWith('no_params_tool', expect.any(String), expect.any(Function));
     });
 
+    it('should register a tool with schema that has no properties field (line 18 early return)', async () => {
+      const { mockServer, mockOctokit, mockOptimizedClient, mockReliabilityManager, mockHealthManager, mockRateLimiter } = makeMocks();
+
+      const registry = new ToolRegistry(
+        mockServer as any, mockOctokit as any, mockOptimizedClient as any,
+        mockReliabilityManager as any, mockHealthManager as any, mockRateLimiter as any, false
+      );
+
+      // Schema with no properties field → jsonSchemaToZodShape returns {} early
+      registry.registerTool({
+        tool: { name: 'no_prop_schema_tool', description: 'No prop schema', inputSchema: { type: 'object' } as any },
+        handler: async () => 'result',
+      });
+
+      expect(mockServer.tool).toHaveBeenCalledWith('no_prop_schema_tool', expect.any(String), expect.any(Function));
+    });
+
     it('should skip duplicate tool registration', async () => {
       const { mockServer, mockOctokit, mockOptimizedClient, mockReliabilityManager, mockHealthManager, mockRateLimiter } = makeMocks();
 
