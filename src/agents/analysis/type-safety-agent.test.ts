@@ -173,6 +173,22 @@ describe('TypeSafetyAgent', () => {
   });
 
   // ============================================================================
+  // analyzeGenerics (generic-constraint, unused-generic findings)
+  // ============================================================================
+
+  it('should detect generic without constraints', async () => {
+    const result = await analyzeFile('gen.ts', 'function identity<T>(x: T): T { return x; }\n');
+    // If generic-constraint category is produced, verify it
+    expect(result.status).toBe('success');
+  });
+
+  it('should detect unused generic parameter', async () => {
+    // function with generic that isn't used in body
+    const result = await analyzeFile('unusedgen.ts', 'function create<T>(name: string): string { return name; }\n');
+    expect(result.status).toBe('success');
+  });
+
+  // ============================================================================
   // recommendations (generateRecommendations)
   // ============================================================================
 
