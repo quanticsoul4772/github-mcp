@@ -319,7 +319,7 @@ describe('Project Management Tools', () => {
       expect(getMilestonesWithIssues).toBeDefined();
       expect(getMilestonesWithIssues.tool.name).toBe('get_milestones_with_issues');
       expect(getMilestonesWithIssues.tool.description).toContain(
-        'repository milestones with their associated issues'
+        'repository milestones (max 25) with up to 50 associated issues'
       );
     });
 
@@ -610,7 +610,7 @@ describe('Project Management Tools', () => {
       expect(getCrossRepoProjectView).toBeDefined();
       expect(getCrossRepoProjectView.tool.name).toBe('get_cross_repo_project_view');
       expect(getCrossRepoProjectView.tool.description).toContain(
-        'unified view of issues and PRs across multiple repositories'
+        'Fetch open issues and PRs across 1-5 repositories'
       );
     });
 

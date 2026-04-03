@@ -24,7 +24,7 @@ describe('Repository Insights Tools', () => {
     it('should be registered', () => {
       expect(getInsights).toBeDefined();
       expect(getInsights.tool.name).toBe('get_repository_insights');
-      expect(getInsights.tool.description).toContain('comprehensive repository statistics');
+      expect(getInsights.tool.description).toContain('repository metadata, statistics');
     });
 
     it('should get repository insights successfully', async () => {
@@ -288,7 +288,7 @@ describe('Repository Insights Tools', () => {
     it('should be registered', () => {
       expect(getContributions).toBeDefined();
       expect(getContributions.tool.name).toBe('get_contribution_stats');
-      expect(getContributions.tool.description).toContain('contribution statistics');
+      expect(getContributions.tool.description).toContain('Analyze contributions');
     });
 
     it('should get contribution statistics successfully', async () => {
@@ -502,7 +502,7 @@ describe('Repository Insights Tools', () => {
     it('should be registered', () => {
       expect(getCommitActivity).toBeDefined();
       expect(getCommitActivity.tool.name).toBe('get_commit_activity');
-      expect(getCommitActivity.tool.description).toContain('commit activity patterns');
+      expect(getCommitActivity.tool.description).toContain('Analyze commit patterns');
     });
 
     it('should get commit activity successfully', async () => {
