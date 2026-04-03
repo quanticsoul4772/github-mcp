@@ -453,11 +453,13 @@ export class ReportGenerator {
     let filtered = findings;
 
     if (options.filterSeverity && options.filterSeverity.length > 0) {
-      filtered = filtered.filter(f => options.filterSeverity!.includes(f.severity));
+      const filterSeverity = options.filterSeverity;
+      filtered = filtered.filter(f => filterSeverity.includes(f.severity));
     }
 
     if (options.filterCategory && options.filterCategory.length > 0) {
-      filtered = filtered.filter(f => options.filterCategory!.includes(f.category));
+      const filterCategory = options.filterCategory;
+      filtered = filtered.filter(f => filterCategory.includes(f.category));
     }
 
     // Sort findings

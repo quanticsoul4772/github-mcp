@@ -248,11 +248,13 @@ export abstract class BaseAgent implements CodeAnalysisAgent {
 
     // Filter by categories
     if (this.config.includeCategories && this.config.includeCategories.length > 0) {
-      filtered = filtered.filter(f => this.config.includeCategories!.includes(f.category));
+      const includeCategories = this.config.includeCategories;
+      filtered = filtered.filter(f => includeCategories.includes(f.category));
     }
 
     if (this.config.excludeCategories && this.config.excludeCategories.length > 0) {
-      filtered = filtered.filter(f => !this.config.excludeCategories!.includes(f.category));
+      const excludeCategories = this.config.excludeCategories;
+      filtered = filtered.filter(f => !excludeCategories.includes(f.category));
     }
 
     // Limit number of findings

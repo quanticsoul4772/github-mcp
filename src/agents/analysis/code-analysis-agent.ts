@@ -311,7 +311,7 @@ export class CodeAnalysisAgent extends AbstractBaseAgent {
         if (!lineCount.has(line)) {
           lineCount.set(line, []);
         }
-        lineCount.get(line)!.push(index + 1);
+        lineCount.get(line)?.push(index + 1);
       }
     });
 
@@ -353,7 +353,7 @@ export class CodeAnalysisAgent extends AbstractBaseAgent {
 
   private findUnusedVariable(line: string): string | null {
     const match = line.match(/(?:const|let|var)\s+(\w+)\s*=/);
-    if (match && !line.includes(match[1], match.index! + match[0].length)) {
+    if (match && !line.includes(match[1], (match.index ?? 0) + match[0].length)) {
       return match[1];
     }
     return null;

@@ -115,14 +115,16 @@ export abstract class AbstractBaseAgent implements BaseAgent {
 
     // Apply exclude patterns
     if (context.excludePatterns) {
+      const excludePatterns = context.excludePatterns;
       filteredFiles = filteredFiles.filter(
-        file => !context.excludePatterns!.some(pattern => new RegExp(pattern).test(file))
+        file => !excludePatterns.some(pattern => new RegExp(pattern).test(file))
       );
     }
 
     // Apply target files filter
     if (context.targetFiles && context.targetFiles.length > 0) {
-      filteredFiles = filteredFiles.filter(file => context.targetFiles!.includes(file));
+      const targetFiles = context.targetFiles;
+      filteredFiles = filteredFiles.filter(file => targetFiles.includes(file));
     }
 
     return filteredFiles;
