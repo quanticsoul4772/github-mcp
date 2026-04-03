@@ -102,6 +102,30 @@ describe('WeakAssertions', () => {
   });
 
   // --------------------------------------------------------
+  // line 260: test file without describe block
+  // --------------------------------------------------------
+  it('should flag test file missing describe block (line 260)', async () => {
+    const testFile = 'no-describe.test.ts';
+    await fs.writeFile(
+      path.join(tmpDir, testFile),
+      `it('standalone test', () => { expect(true).toBe(true); });\n`
+    );
+    const result = await agent.analyze(makeContext([testFile]));
+    expect(result.status).toBe('success');
+    expect(result.findings.some(f => f.message?.toLowerCase().includes('describe'))).toBe(true);
+  });
+
+  // --------------------------------------------------------
+  // lines 79-80: catch block when analyze throws
+  // --------------------------------------------------------
+  it('should return error result when analyze throws (lines 79-80)', async () => {
+    // Pass undefined files array — triggers TypeError in getSourceFiles
+    const result = await agent.analyze({ projectPath: tmpDir, files: undefined as any });
+    expect(result.status).toBe('error');
+    expect(result.findings.some(f => f.category === 'analysis-error')).toBe(true);
+  });
+
+  // --------------------------------------------------------
   // canHandle / getPriority / getDependencies
   // --------------------------------------------------------
   it('should handle source file types', () => {

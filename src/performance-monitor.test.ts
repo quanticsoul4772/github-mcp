@@ -242,6 +242,52 @@ describe('PerformanceMonitor', () => {
   });
 
   // ============================================================================
+  // high memory threshold warning (checkThresholds line 166)
+  // ============================================================================
+
+  describe('high memory threshold', () => {
+    it('should warn when heap usage exceeds highMemoryThreshold (line 166)', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      // Set threshold to 1 byte so any heap usage exceeds it
+      const lowMemMonitor = new PerformanceMonitor({
+        thresholds: { highMemoryThreshold: 1 },
+      });
+      await lowMemMonitor.measure('op', async () => 1);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('High memory usage'));
+      warn.mockRestore();
+    });
+  });
+
+  // ============================================================================
+  // generateReport with slow queries and errors (lines 263-271)
+  // ============================================================================
+
+  describe('generateReport', () => {
+    it('should include slow queries and errors in report (lines 263-271)', async () => {
+      const slowMonitor = new PerformanceMonitor({
+        thresholds: { slowQueryThreshold: 1 },
+      });
+      // Generate a slow query (will always be > 1ms)
+      await slowMonitor.measure('slow-op', async () => {
+        await new Promise(r => setTimeout(r, 5));
+        return 1;
+      });
+      // Generate an error metric
+      await slowMonitor
+        .measure('error-op', async () => {
+          throw new Error('test error');
+        })
+        .catch(() => {});
+
+      const report = slowMonitor.generateReport();
+      expect(report).toContain('Slow Queries');
+      expect(report).toContain('Recent Errors');
+      expect(report).toContain('slow-op');
+      expect(report).toContain('error-op');
+    });
+  });
+
+  // ============================================================================
   // globalPerformanceMonitor
   // ============================================================================
 
