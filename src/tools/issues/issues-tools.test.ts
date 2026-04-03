@@ -254,3 +254,120 @@ describe('Modular Issues Tools', () => {
     });
   });
 });
+
+// ============================================================================
+// Validation error coverage for all issue tools
+// ============================================================================
+describe('Issue tool validation error paths', () => {
+  let mockOctokit: any;
+  let mockIssueService: any;
+
+  beforeEach(() => {
+    mockOctokit = {};
+    mockIssueService = {
+      createIssue: vi.fn(),
+      getIssue: vi.fn(),
+      listIssues: vi.fn(),
+      updateIssue: vi.fn(),
+    };
+  });
+
+  describe('create_issue validation', () => {
+    it('should throw when repo is missing', async () => {
+      const { handler } = createCreateIssueTool(mockOctokit, mockIssueService);
+      await expect(handler({ owner: 'owner', title: 'Test' })).rejects.toBeDefined();
+    });
+  });
+
+  describe('get_issue validation', () => {
+    it('should throw when repo is missing', async () => {
+      const { handler } = createGetIssueTool(mockOctokit, mockIssueService);
+      await expect(handler({ owner: 'owner', issue_number: 1 })).rejects.toBeDefined();
+    });
+
+    it('should throw when issue_number is not a positive integer', async () => {
+      const { handler } = createGetIssueTool(mockOctokit, mockIssueService);
+      await expect(handler({ owner: 'owner', repo: 'repo', issue_number: -1 })).rejects.toBeDefined();
+      await expect(handler({ owner: 'owner', repo: 'repo', issue_number: 0 })).rejects.toBeDefined();
+      await expect(handler({ owner: 'owner', repo: 'repo', issue_number: 1.5 })).rejects.toBeDefined();
+    });
+  });
+
+  describe('update_issue validation', () => {
+    it('should throw when repo is missing', async () => {
+      const { handler } = createUpdateIssueTool(mockOctokit, mockIssueService);
+      await expect(handler({ owner: 'owner', issue_number: 1 })).rejects.toBeDefined();
+    });
+
+    it('should throw when issue_number is not a positive integer', async () => {
+      const { handler } = createUpdateIssueTool(mockOctokit, mockIssueService);
+      await expect(handler({ owner: 'owner', repo: 'repo', issue_number: 0 })).rejects.toBeDefined();
+    });
+
+    it('should throw when state is invalid', async () => {
+      const { handler } = createUpdateIssueTool(mockOctokit, mockIssueService);
+      await expect(
+        handler({ owner: 'owner', repo: 'repo', issue_number: 1, state: 'invalid_state' })
+      ).rejects.toBeDefined();
+    });
+  });
+
+  describe('close_issue validation', () => {
+    it('should throw when repo is missing', async () => {
+      const { handler } = createCloseIssueTool(mockOctokit, mockIssueService);
+      await expect(handler({ owner: 'owner', issue_number: 1 })).rejects.toBeDefined();
+    });
+
+    it('should throw when issue_number is not positive', async () => {
+      const { handler } = createCloseIssueTool(mockOctokit, mockIssueService);
+      await expect(handler({ owner: 'owner', repo: 'repo', issue_number: 0 })).rejects.toBeDefined();
+    });
+
+    it('should throw when state_reason is invalid', async () => {
+      const { handler } = createCloseIssueTool(mockOctokit, mockIssueService);
+      await expect(
+        handler({ owner: 'owner', repo: 'repo', issue_number: 1, state_reason: 'invalid' })
+      ).rejects.toBeDefined();
+    });
+  });
+
+  describe('list_issues validation', () => {
+    it('should throw when state is invalid', async () => {
+      const { handler } = createListIssuesTool(mockOctokit, mockIssueService);
+      await expect(
+        handler({ owner: 'owner', repo: 'repo', state: 'invalid' })
+      ).rejects.toBeDefined();
+    });
+
+    it('should throw when sort is invalid', async () => {
+      const { handler } = createListIssuesTool(mockOctokit, mockIssueService);
+      await expect(
+        handler({ owner: 'owner', repo: 'repo', sort: 'bad_sort' })
+      ).rejects.toBeDefined();
+    });
+
+    it('should throw when direction is invalid', async () => {
+      const { handler } = createListIssuesTool(mockOctokit, mockIssueService);
+      await expect(
+        handler({ owner: 'owner', repo: 'repo', direction: 'sideways' })
+      ).rejects.toBeDefined();
+    });
+
+    it('should throw when per_page is out of range', async () => {
+      const { handler } = createListIssuesTool(mockOctokit, mockIssueService);
+      await expect(
+        handler({ owner: 'owner', repo: 'repo', per_page: 0 })
+      ).rejects.toBeDefined();
+      await expect(
+        handler({ owner: 'owner', repo: 'repo', per_page: 101 })
+      ).rejects.toBeDefined();
+    });
+
+    it('should throw when page is not positive', async () => {
+      const { handler } = createListIssuesTool(mockOctokit, mockIssueService);
+      await expect(
+        handler({ owner: 'owner', repo: 'repo', page: 0 })
+      ).rejects.toBeDefined();
+    });
+  });
+});
