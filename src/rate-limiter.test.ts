@@ -24,6 +24,23 @@ describe('GitHubRateLimiter', () => {
     });
   });
 
+  describe('wrapRequest (throttling path)', () => {
+    it('should wait when minInterval throttle fires (lines 333-338)', async () => {
+      // Set lastRequestTime to now — next request within 100ms triggers minInterval throttle
+      (rateLimiter as any).lastRequestTime = Date.now();
+      const fn = vi.fn().mockResolvedValue({ data: 'ok' });
+      vi.useFakeTimers();
+      try {
+        const promise = rateLimiter.wrapRequest(fn);
+        await vi.runAllTimersAsync();
+        const result = await promise;
+        expect(result).toEqual({ data: 'ok' });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe('wrapRequest', () => {
     it('should execute request and return result', async () => {
       const fn = vi.fn().mockResolvedValue({ status: 200, data: { id: 1 } });
@@ -68,6 +85,23 @@ describe('GitHubRateLimiter', () => {
   });
 
   describe('wrapGraphQLRequest', () => {
+    it('should wait when graphql throttling fires (estimatedPoints > remaining)', async () => {
+      // Set graphql.remaining to 0 so any query triggers throttling
+      const graphql = (rateLimiter as any).graphql;
+      graphql.remaining = 0;
+      graphql.reset = new Date(Date.now() + 100); // 100ms in the future
+      const fn = vi.fn().mockResolvedValue({ data: {}, headers: {} });
+      vi.useFakeTimers();
+      try {
+        const promise = rateLimiter.wrapGraphQLRequest(fn, 'query { viewer { login } }');
+        await vi.runAllTimersAsync();
+        await promise;
+        expect(fn).toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('should execute graphql request and return result', async () => {
       const fn = vi.fn().mockResolvedValue({
         data: { viewer: { login: 'test' } },
