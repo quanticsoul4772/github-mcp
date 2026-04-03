@@ -25,6 +25,21 @@ const mockReport = {
   ],
 };
 
+vi.mock('../testing/test-generation.js', () => {
+  return {
+    TestGenerationAgent: vi.fn(function(this: any) {
+      this.name = 'test-generation';
+      this.version = '1.0.0';
+      this.description = 'Test generation agent';
+      this.generateTests = vi.fn().mockResolvedValue({
+        filePath: '/tmp/output.test.ts',
+        content: 'describe("test", () => { it("works", () => {}); });',
+        metadata: { framework: 'vitest', testCount: 1 },
+      });
+    }),
+  };
+});
+
 vi.mock('../base/coordinator.js', () => {
   return {
     DefaultAgentCoordinator: vi.fn(function(this: any) {
@@ -55,6 +70,48 @@ describe('createAgentTools (success paths with mocked coordinator)', () => {
     if (!t) throw new Error(`Tool '${name}' not found`);
     return t;
   };
+
+  // ============================================================
+  // generate_tests - success path
+  // ============================================================
+  describe('generate_tests (mocked agent)', () => {
+    it('should return generated test content on success', async () => {
+      const tool = findTool('generate_tests');
+      const result = await tool.handler({
+        target: '/tmp/sample.ts',
+        testType: 'unit',
+        framework: 'vitest',
+      });
+
+      expect(result.content).toContain('describe');
+      expect(typeof result.testFile).toBe('string');
+      expect(result.saved).toBe(false);
+      expect(result.outputPath).toBeUndefined();
+    });
+
+    it('should save output file when outputPath is provided', async () => {
+      const fs = await import('fs/promises');
+      const os = await import('os');
+      const path = await import('path');
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-test-'));
+      const outputPath = path.join(tmpDir, 'generated.test.ts');
+
+      const tool = findTool('generate_tests');
+      const result = await tool.handler({
+        target: '/tmp/sample.ts',
+        testType: 'unit',
+        framework: 'vitest',
+        outputPath,
+      });
+
+      expect(result.saved).toBe(true);
+      expect(result.outputPath).toBe(outputPath);
+      const written = await fs.readFile(outputPath, 'utf-8');
+      expect(written).toContain('describe');
+
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    });
+  });
 
   // ============================================================
   // analyze_code - success path
