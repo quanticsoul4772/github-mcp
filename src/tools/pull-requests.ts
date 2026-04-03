@@ -104,7 +104,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
   tools.push({
     tool: {
       name: 'get_pull_request',
-      description: 'Get details of a specific pull request',
+      description: 'Fetch PR metadata: number, title, state, head/base refs, merge status, commit/diff counts, comment counts, and timestamps. Returns current mergeable status and CI state as of query time. Does NOT return review thread comments (use list_pull_request_comments), required checks results (use get_pull_request_status), or full PR body text when truncated.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -180,7 +180,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
   tools.push({
     tool: {
       name: 'list_pull_requests',
-      description: 'List pull requests in a repository',
+      description: 'List PRs in a repository, filterable by state (open/closed/all), head branch, base branch, sort field, and direction. Returns abbreviated PR data (number, title, state, user, head/base refs, dates). Does NOT return commit details, review status, or mergeable status — use get_pull_request for full metadata. Max 100 per page. Use search_pull_requests for cross-repo or keyword-based search.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -523,7 +523,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
   tools.push({
     tool: {
       name: 'search_pull_requests',
-      description: 'Search for pull requests',
+      description: 'Search for PRs across GitHub using search syntax (qualifiers: repo:, state:, label:, author:, is:merged, etc.). Results ranked by relevance then sorted by specified field. Does NOT return per-PR diffs, review comments, or merge status — use get_pull_request for full metadata. Hard cap: 1000 total results; incomplete_results=true if query matches more. Use list_pull_requests for simple repo-scoped listing.',
       inputSchema: {
         type: 'object',
         properties: {
