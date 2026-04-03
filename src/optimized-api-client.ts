@@ -390,8 +390,9 @@ export class OptimizedAPIClient {
 
     // Use GraphQL cache if enabled
     if (this.enableGraphQLCache && !options.skipCache && this.graphqlCache) {
+      const graphqlCache = this.graphqlCache;
       const cachedExecutor = async (): Promise<T> => {
-        return this.graphqlCache!.get(query, variables, fetcher, {
+        return graphqlCache.get(query, variables, fetcher, {
           ttl: options.ttl,
           skipCache: options.skipCache,
           operation: options.operation,

@@ -123,7 +123,7 @@ export async function withRetry<T>(
   config: RetryConfig = DEFAULT_RETRY_CONFIG,
   context: string = 'operation'
 ): Promise<T> {
-  let lastError: Error;
+  let lastError: Error | undefined;
   
   for (let attempt = 1; attempt <= config.maxAttempts; attempt++) {
     try {
@@ -145,5 +145,5 @@ export async function withRetry<T>(
     }
   }
   
-  throw lastError!;
+  throw lastError ?? new Error(`${context} failed after ${config.maxAttempts} attempts`);
 }

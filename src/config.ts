@@ -848,7 +848,7 @@ export function validateEnvironmentConfigurationWithResult(): ValidationResult<
       warnings.push(...tokenResult.warnings);
       suggestions.push(...tokenResult.suggestions);
     } else {
-      sanitizedValues.GITHUB_TOKEN = tokenResult.data!;
+      sanitizedValues.GITHUB_TOKEN = tokenResult.data ?? token;
       warnings.push(...tokenResult.warnings);
     }
   }
@@ -949,7 +949,7 @@ export function validateEnvironmentConfigurationGraceful(): ValidationResult<{
   if (result.isValid) {
     return createSuccessResult(
       {
-        sanitizedValues: result.data!,
+        sanitizedValues: result.data ?? {},
         degradedMode: false,
         missingFeatures: [],
       },
