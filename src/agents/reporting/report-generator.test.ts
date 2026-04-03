@@ -695,6 +695,25 @@ describe('ReportGenerator', () => {
       const result = generator.generateReport(data);
       expect(result).toContain('Sec');
     });
+
+    it('should throw for missing metadata', () => {
+      const data = { title: 'T', summary: 'S', sections: [], metadata: null } as any;
+      expect(() => generator.generateReport(data)).toThrow('metadata');
+    });
+
+    it('should throw for section with missing title', () => {
+      const data = makeReportData({
+        sections: [{ title: '', content: 'content' }],
+      });
+      expect(() => generator.generateReport(data)).toThrow('title');
+    });
+
+    it('should throw for section with missing content', () => {
+      const data = makeReportData({
+        sections: [{ title: 'Valid Title', content: '' }],
+      });
+      expect(() => generator.generateReport(data)).toThrow('content');
+    });
   });
 
   // ============================================================================
