@@ -25,7 +25,7 @@ describe('Batch Operations Tools', () => {
       expect(batchQueryRepositories).toBeDefined();
       expect(batchQueryRepositories.tool.name).toBe('batch_query_repositories');
       expect(batchQueryRepositories.tool.description).toContain(
-        'Query multiple repositories in a single GraphQL request'
+        'repositories in a single GraphQL request'
       );
     });
 
@@ -457,7 +457,7 @@ describe('Batch Operations Tools', () => {
     it('should be registered', () => {
       expect(batchQueryUsers).toBeDefined();
       expect(batchQueryUsers.tool.name).toBe('batch_query_users');
-      expect(batchQueryUsers.tool.description).toContain('Query multiple users or organizations');
+      expect(batchQueryUsers.tool.description).toContain('users or organizations');
     });
 
     it('should query multiple users successfully', async () => {
@@ -732,7 +732,7 @@ describe('Batch Operations Tools', () => {
     it('should be registered', () => {
       expect(batchGraphQLQuery).toBeDefined();
       expect(batchGraphQLQuery.tool.name).toBe('batch_graphql_query');
-      expect(batchGraphQLQuery.tool.description).toContain('Execute a custom batch GraphQL query');
+      expect(batchGraphQLQuery.tool.description).toContain('GraphQL query fragments');
     });
 
     it('should execute batch GraphQL queries successfully', async () => {

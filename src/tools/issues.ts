@@ -735,7 +735,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
     tools.push({
       tool: {
         name: 'lock_issue',
-        description: 'Lock an issue to prevent new comments. Locked issues cannot receive comments or reactions until unlocked. Optional lock_reason: off-topic, too heated, resolved, spam. Does NOT close the issue — use close_issue separately if needed. Requires: collaborator write access or triage role.',
+        description: '[DESTRUCTIVE] Lock an issue to prevent new comments. Locked issues cannot receive comments or reactions until unlocked. Optional lock_reason: off-topic, too heated, resolved, spam. Does NOT close the issue — use close_issue separately if needed. Requires: collaborator write access or triage role.',
         inputSchema: {
           type: 'object',
           properties: {

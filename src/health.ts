@@ -101,8 +101,8 @@ export class HealthManager {
       if (githubHealth.status !== 'healthy') {
         status = githubHealth.status;
       }
-    } else if (this.lastGitHubCheck!.status !== 'healthy') {
-      status = this.lastGitHubCheck!.status;
+    } else if (this.lastGitHubCheck && this.lastGitHubCheck.status !== 'healthy') {
+      status = this.lastGitHubCheck.status;
     }
 
     return {

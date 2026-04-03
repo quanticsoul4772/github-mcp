@@ -453,13 +453,11 @@ export class ReliabilityManager {
   }
 
   private getCircuitBreaker(operation: string): CircuitBreaker {
-    if (!this.circuitBreakers.has(operation)) {
-      this.circuitBreakers.set(
-        operation,
-        new CircuitBreaker(operation, this.circuitBreakerConfig, this.telemetry)
-      );
-    }
-    return this.circuitBreakers.get(operation)!;
+    const existing = this.circuitBreakers.get(operation);
+    if (existing) return existing;
+    const cb = new CircuitBreaker(operation, this.circuitBreakerConfig, this.telemetry);
+    this.circuitBreakers.set(operation, cb);
+    return cb;
   }
 
   private trackSuccess(context: RequestContext): void {

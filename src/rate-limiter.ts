@@ -210,7 +210,8 @@ export class GitHubRateLimiter {
         return (a.estimatedPoints || 1) - (b.estimatedPoints || 1);
       });
 
-      const request = this.requestQueue.shift()!;
+      const request = this.requestQueue.shift();
+      if (!request) break;
 
       try {
         const result = await request.fn();

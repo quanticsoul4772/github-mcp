@@ -76,7 +76,9 @@ export async function batchExecute<TInput, TResult>(
 
     // Start new operations up to concurrency limit
     while (queue.length > 0 && inProgress.size < concurrency && !shouldStop) {
-      const { item, index } = queue.shift()!;
+      const shifted = queue.shift();
+      if (!shifted) break;
+      const { item, index } = shifted;
       const promise = executeItem(item, index).then(() => {
         inProgress.delete(promise);
       });

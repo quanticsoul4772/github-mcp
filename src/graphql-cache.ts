@@ -348,7 +348,8 @@ export class GraphQLCache {
    */
   private evictLRU(): void {
     if (this.accessOrder.length > 0) {
-      const keyToEvict = this.accessOrder.shift()!;
+      const keyToEvict = this.accessOrder.shift();
+      if (keyToEvict === undefined) return;
       this.cache.delete(keyToEvict);
       if (this.enableMetrics) {
         this.metrics.evictions++;

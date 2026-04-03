@@ -104,7 +104,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
   tools.push({
     tool: {
       name: 'get_pull_request',
-      description: 'Fetch PR metadata: number, title, state, head/base refs, merge status, commit/diff counts, comment counts, and timestamps. Returns current mergeable status and CI state as of query time. Does NOT return review thread comments (use list_pull_request_comments), required checks results (use get_pull_request_status), or full PR body text when truncated.',
+      description: 'Fetch PR metadata: number, title, state, body, head/base refs, merge status, commit/diff counts, comment counts, and timestamps. Returns current mergeable status and CI state as of query time. Does NOT return review thread comments (use list_pull_request_comments) or required checks results (use get_pull_request_status).',
       inputSchema: {
         type: 'object',
         properties: {
