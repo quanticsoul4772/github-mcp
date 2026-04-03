@@ -78,49 +78,46 @@ export class IssueService implements IIssueService {
     return this.issueRepository.update(owner, repo, issueNumber, processedData);
   }
 
+  private static isValidEnum(value: unknown, allowed: readonly string[]): boolean {
+    return typeof value === 'string' && allowed.includes(value);
+  }
+
+  private static isValidPageSize(value: unknown): boolean {
+    return Number.isInteger(value) && (value as number) > 0 && (value as number) <= 100;
+  }
+
+  private static isValidMilestone(value: unknown): boolean {
+    return value != null && (typeof value === 'string' || typeof value === 'number');
+  }
+
   /**
    * Process and validate list options
    */
   private processListOptions(options: any): any {
     const processed: any = {};
 
-    if (options.state && ['open', 'closed', 'all'].includes(options.state)) {
+    if (IssueService.isValidEnum(options.state, ['open', 'closed', 'all'])) {
       processed.state = options.state;
     }
-
-    if (options.labels && Array.isArray(options.labels)) {
+    if (Array.isArray(options.labels)) {
       processed.labels = options.labels.join(',');
     }
-
-    if (options.assignee && typeof options.assignee === 'string') {
+    if (typeof options.assignee === 'string') {
       processed.assignee = options.assignee;
     }
-
-    if (
-      options.milestone &&
-      (typeof options.milestone === 'string' || typeof options.milestone === 'number')
-    ) {
+    if (IssueService.isValidMilestone(options.milestone)) {
       processed.milestone = options.milestone;
     }
-
-    if (options.sort && ['created', 'updated', 'comments'].includes(options.sort)) {
+    if (IssueService.isValidEnum(options.sort, ['created', 'updated', 'comments'])) {
       processed.sort = options.sort;
     }
-
-    if (options.direction && ['asc', 'desc'].includes(options.direction)) {
+    if (IssueService.isValidEnum(options.direction, ['asc', 'desc'])) {
       processed.direction = options.direction;
     }
-
-    if (
-      options.per_page &&
-      Number.isInteger(options.per_page) &&
-      options.per_page > 0 &&
-      options.per_page <= 100
-    ) {
+    if (IssueService.isValidPageSize(options.per_page)) {
       processed.per_page = options.per_page;
     }
-
-    if (options.page && Number.isInteger(options.page) && options.page > 0) {
+    if (Number.isInteger(options.page) && options.page > 0) {
       processed.page = options.page;
     }
 
