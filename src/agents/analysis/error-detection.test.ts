@@ -355,6 +355,21 @@ try {
       expect(report.findings.every(f => f.rule !== 'silent-error-handling')).toBe(true);
     });
 
+    it('should recognize catch keyword on its own line (hasCatchBlock)', async () => {
+      // Pattern where catch appears before closing brace count hits 0 —
+      // exercises hasCatchBlock line 841 (return true for "catch (" prefix)
+      const code = `
+try {
+  riskyOp();
+catch (e) {
+  console.error(e);
+}
+`;
+      // The agent treats text as-is; catch( found before braceCount hits 0
+      const report = await analyzeFile('catchownline.ts', code);
+      expect(report.findings.every(f => f.rule !== 'try-no-catch')).toBe(true);
+    });
+
     it('should NOT flag catch that re-throws', async () => {
       const code = `
 try {
@@ -451,6 +466,16 @@ try {
 
       const report = await agent.analyze({ type: 'project', path: tempDir });
 
+      expect(report.findings.some(f => f.rule === 'eval-usage')).toBe(true);
+    });
+
+    it('should analyze files in subdirectories', async () => {
+      // covers lines 875-877 in findSourceFiles (recursive subdirectory walk)
+      const subDir = path.join(tempDir, 'src');
+      await fs.mkdir(subDir);
+      await fs.writeFile(path.join(subDir, 'nested.ts'), EVAL_USAGE_TS);
+
+      const report = await agent.analyze({ type: 'directory', path: tempDir });
       expect(report.findings.some(f => f.rule === 'eval-usage')).toBe(true);
     });
   });
