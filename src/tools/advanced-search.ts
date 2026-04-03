@@ -97,7 +97,7 @@ export function createAdvancedSearchTools(
   tools.push({
     tool: {
       name: 'search_across_repos',
-      description: 'Search across multiple repositories with advanced GraphQL queries',
+      description: 'Search GitHub using GraphQL-powered advanced search. Supports types: REPOSITORY, ISSUE, USER, DISCUSSION. Returns different fields per type: REPOSITORY (stars, language, topics, owner), ISSUE (state, labels, comments count, repo), USER (login, bio, followers count), DISCUSSION (category, repo). Does NOT return file contents, full user profiles, or PR mergeable status. autoPage=true auto-fetches all result pages — use with caution, can exhaust GitHub API rate limits on large result sets. Use maxPages/maxItems to bound fetching. For simpler issue/repo searches, prefer search_issues or search_repositories (REST-based, more predictable).',
       inputSchema: {
         type: 'object',
         properties: {

@@ -59,7 +59,7 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
   tools.push({
     tool: {
       name: 'list_repositories',
-      description: 'List repositories for the authenticated user',
+      description: 'List repositories owned by, contributed to, or visible to the authenticated user. This is NOT a search across all GitHub — it returns repos scoped to the authenticated user\'s affiliations. Returns [{id, name, full_name, owner, description, private, language, stargazers_count, forks_count, updated_at, html_url}]. Does NOT return license, topics, or security settings. Default sort: by last update, descending. Use search_repositories to find repos across all of GitHub by keyword or topic.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -159,7 +159,7 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
       const params = args as GetRepositoryParams;
       
       // Ensure we have the required parameters
-      if (!params || !params.owner) {
+      if (!params?.owner) {
         throw new ValidationError('owner', 'Repository owner is required');
       }
       if (!params.repo) {
@@ -223,7 +223,7 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
   tools.push({
     tool: {
       name: 'get_file_contents',
-      description: 'Get file or directory contents from a GitHub repository',
+      description: 'Get file or directory contents from a GitHub repository at a given ref (branch, tag, or commit SHA). Returns DIFFERENT structures for files vs directories: file → {name, path, size, sha, content (text)}; directory → [{name, path, type, size, sha}] (entry list, no content). Does NOT return file blame, commit history, or line-level annotations — use list_commits for history. Binary files have base64-encoded content. Files larger than ~1MB may fail. ref defaults to the repository\'s default branch if omitted.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -557,7 +557,7 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
       const params = args as SearchRepositoriesParams;
       
       // Ensure query is provided
-      if (!params || !params.query) {
+      if (!params?.query) {
         throw new Error(`Search query is required. Received: ${JSON.stringify(params)}`);
       }
       

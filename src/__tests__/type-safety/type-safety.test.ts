@@ -183,6 +183,34 @@ describe('Type Safety Utilities', () => {
       expect(zodSchema.parse(123)).toBe(123);
       expect(zodSchema.parse({})).toEqual({});
     });
+
+    it('should apply pattern constraint to string schema', () => {
+      const jsonSchema = { type: 'string', pattern: '^[a-z]+$' };
+      const zodSchema = jsonSchemaToZod(jsonSchema);
+
+      expect(zodSchema.parse('hello')).toBe('hello');
+      expect(() => zodSchema.parse('HELLO')).toThrow();
+    });
+
+    it('should return z.record for object schema without properties', () => {
+      const jsonSchema = { type: 'object' };
+      const zodSchema = jsonSchemaToZod(jsonSchema);
+
+      expect(zodSchema.parse({ any: 'value', x: 123 })).toEqual({ any: 'value', x: 123 });
+    });
+
+    it('should return z.unknown for null/non-object input', () => {
+      expect(jsonSchemaToZod(null).parse('anything')).toBe('anything');
+      expect(jsonSchemaToZod(undefined).parse(42)).toBe(42);
+      expect(jsonSchemaToZod('string').parse({})).toEqual({});
+    });
+
+    it('should apply minLength and maxLength to string schema', () => {
+      const zodSchema = jsonSchemaToZod({ type: 'string', minLength: 3, maxLength: 10 });
+      expect(zodSchema.parse('hello')).toBe('hello');
+      expect(() => zodSchema.parse('hi')).toThrow(); // too short
+      expect(() => zodSchema.parse('toolongstring')).toThrow(); // too long
+    });
   });
 
   describe('CommonSchemas', () => {
@@ -372,6 +400,77 @@ describe('Type Safety Utilities', () => {
       expect(() => validateParameters(schema, invalidParams, 'test_tool')).toThrow(
         ParameterValidationError
       );
+    });
+
+    it('should rethrow non-Zod errors', () => {
+      const schema = z.object({ name: z.string() });
+      vi.spyOn(schema, 'parse').mockImplementationOnce(() => { throw new TypeError('custom error'); });
+      expect(() => validateParameters(schema, { name: 'x' }, 'tool')).toThrow(TypeError);
+    });
+  });
+
+  describe('TypeSafeHandlerFactory - additional methods', () => {
+    it('createListIssuesHandler should call handler with valid params', async () => {
+      const handler = vi.fn().mockResolvedValue([]);
+      const typeSafeHandler = TypeSafeHandlerFactory.createListIssuesHandler(handler);
+      await typeSafeHandler({ owner: 'o', repo: 'r' });
+      expect(handler).toHaveBeenCalledWith({ owner: 'o', repo: 'r' });
+    });
+
+    it('createUpdateIssueHandler should call handler with valid params', async () => {
+      const handler = vi.fn().mockResolvedValue({ number: 1 });
+      const typeSafeHandler = TypeSafeHandlerFactory.createUpdateIssueHandler(handler);
+      await typeSafeHandler({ owner: 'o', repo: 'r', issue_number: 1 });
+      expect(handler).toHaveBeenCalled();
+    });
+
+    it('createGetPullRequestHandler should call handler with valid params', async () => {
+      const handler = vi.fn().mockResolvedValue({ number: 5 });
+      const typeSafeHandler = TypeSafeHandlerFactory.createGetPullRequestHandler(handler);
+      await typeSafeHandler({ owner: 'o', repo: 'r', pull_number: 5 });
+      expect(handler).toHaveBeenCalled();
+    });
+
+    it('createListPullRequestsHandler should call handler with valid params', async () => {
+      const handler = vi.fn().mockResolvedValue([]);
+      const typeSafeHandler = TypeSafeHandlerFactory.createListPullRequestsHandler(handler);
+      await typeSafeHandler({ owner: 'o', repo: 'r' });
+      expect(handler).toHaveBeenCalled();
+    });
+
+    it('createCreatePullRequestHandler should call handler with valid params', async () => {
+      const handler = vi.fn().mockResolvedValue({ number: 10 });
+      const typeSafeHandler = TypeSafeHandlerFactory.createCreatePullRequestHandler(handler);
+      await typeSafeHandler({ owner: 'o', repo: 'r', title: 'PR', head: 'feat', base: 'main' });
+      expect(handler).toHaveBeenCalled();
+    });
+
+    it('createGetUserHandler should call handler with valid params', async () => {
+      const handler = vi.fn().mockResolvedValue({ login: 'octocat' });
+      const typeSafeHandler = TypeSafeHandlerFactory.createGetUserHandler(handler);
+      await typeSafeHandler({ username: 'octocat' });
+      expect(handler).toHaveBeenCalled();
+    });
+
+    it('createSearchRepositoriesHandler should call handler with valid params', async () => {
+      const handler = vi.fn().mockResolvedValue({ total_count: 1 });
+      const typeSafeHandler = TypeSafeHandlerFactory.createSearchRepositoriesHandler(handler);
+      await typeSafeHandler({ q: 'topic:typescript' });
+      expect(handler).toHaveBeenCalled();
+    });
+
+    it('createGetRepositoryHandler should call handler with valid params', async () => {
+      const handler = vi.fn().mockResolvedValue({ full_name: 'owner/repo' });
+      const typeSafeHandler = TypeSafeHandlerFactory.createGetRepositoryHandler(handler);
+      await typeSafeHandler({ owner: 'owner', repo: 'repo' });
+      expect(handler).toHaveBeenCalled();
+    });
+
+    it('createListUserRepositoriesHandler should call handler with valid params', async () => {
+      const handler = vi.fn().mockResolvedValue([]);
+      const typeSafeHandler = TypeSafeHandlerFactory.createListUserRepositoriesHandler(handler);
+      await typeSafeHandler({ username: 'octocat' });
+      expect(handler).toHaveBeenCalled();
     });
   });
 

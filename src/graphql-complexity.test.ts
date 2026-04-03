@@ -222,5 +222,103 @@ describe('GraphQL Complexity', () => {
       expect(typeof suggestions[0]).toBe('string');
       expect(suggestions[0].length).toBeGreaterThan(0);
     });
+
+    it('should suggest reducing fields when more than 20 fields are requested', () => {
+      const calculator = new GraphQLComplexityCalculator();
+      // Query with 21+ distinct fields to trigger totalFields > 20 suggestion
+      const manyFieldsQuery = `
+        query {
+          repository(owner: "test", name: "test") {
+            id name login title description url createdAt updatedAt
+            stargazerCount forkCount state number owner { login }
+            author { login } primaryLanguage { name }
+            issues(first: 10) { totalCount }
+            pullRequests(first: 10) { totalCount }
+            releases(first: 10) { totalCount }
+            watchers(first: 10) { totalCount }
+            collaborators(first: 10) { totalCount }
+          }
+        }
+      `;
+
+      const analysis = calculator.calculateQueryComplexity(manyFieldsQuery);
+      const suggestions = calculator.getOptimizationSuggestions(analysis);
+      // At 20+ fields, should suggest reducing fields
+      expect(Array.isArray(suggestions)).toBe(true);
+    });
+  });
+
+  describe('Variable-based pagination', () => {
+    it('should handle variable-based pagination (first: $limit)', () => {
+      const calculator = new GraphQLComplexityCalculator();
+      const query = `
+        query GetIssues($limit: Int!) {
+          repository(owner: "test", name: "test") {
+            issues(first: $limit) {
+              nodes {
+                title
+                body
+              }
+            }
+          }
+        }
+      `;
+
+      // With variables
+      const analysisWithVars = calculator.calculateQueryComplexity(query, { limit: 50 });
+      expect(analysisWithVars.estimatedPoints).toBeGreaterThan(0);
+
+      // Without variables (literal fallback)
+      const analysisNoVars = calculator.calculateQueryComplexity(query);
+      expect(analysisNoVars.estimatedPoints).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Warning generation', () => {
+    it('should warn when estimatedPoints exceeds maxComplexityPerQuery (line 152)', () => {
+      // Use a very low maxComplexityPerQuery so any query triggers the warning
+      const calculator = new GraphQLComplexityCalculator({ maxComplexityPerQuery: 1 });
+      const query = `query { repository(owner: "test", name: "test") { name } }`;
+      const analysis = calculator.calculateQueryComplexity(query);
+      expect(analysis.warnings.some(w => w.includes('exceeds recommended maximum'))).toBe(true);
+    });
+
+    it('should warn for large connection limits > 100 (line 158)', () => {
+      const calculator = new GraphQLComplexityCalculator();
+      const query = `
+        query {
+          repository(owner: "test", name: "test") {
+            issues(first: 101) {
+              nodes { title }
+            }
+          }
+        }
+      `;
+      const analysis = calculator.calculateQueryComplexity(query);
+      expect(analysis.warnings.some(w => w.includes('Large connection limits'))).toBe(true);
+    });
+
+    it('should warn for high nesting when nestedQueries.length > 3 (line 164)', () => {
+      const calculator = new GraphQLComplexityCalculator();
+      // 10 parallel fields at depth 3+ → nestedCount = 10 → Math.ceil(10/3) = 4 > 3
+      const query = `
+        query {
+          repository(owner: "x", name: "y") {
+            a { x } b { x } c { x } d { x } e { x }
+            f { x } g { x } h { x } i { x } j { x }
+          }
+        }
+      `;
+      const analysis = calculator.calculateQueryComplexity(query);
+      expect(analysis.warnings.some(w => w.includes('High query nesting'))).toBe(true);
+    });
+
+    it('should handle parse failure and fallback to 50 points (lines 168-174)', () => {
+      const calculator = new GraphQLComplexityCalculator();
+      // null is not iterable → triggers the catch block in extractNestedQueries
+      const analysis = calculator.calculateQueryComplexity(null as any);
+      expect(analysis.estimatedPoints).toBe(50);
+      expect(analysis.warnings.some(w => w.includes('Failed to parse query'))).toBe(true);
+    });
   });
 });

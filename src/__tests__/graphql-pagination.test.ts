@@ -286,6 +286,52 @@ describe('GraphQLPaginationHandler', () => {
         type: 'REPOSITORY',
       });
     });
+
+    it('extractData: should extract project items from result', () => {
+      const queryBuilder = handler.createProjectItemsQuery('proj_1');
+      const mockResult = { node: { items: [{ id: '1' }, { id: '2' }] } };
+      const data = queryBuilder.extractData(mockResult);
+      expect(data).toEqual([{ id: '1' }, { id: '2' }]);
+    });
+
+    it('extractData: should extract collaborators from result', () => {
+      const queryBuilder = handler.createCollaboratorsQuery('owner', 'repo');
+      const mockResult = { repository: { collaborators: [{ login: 'user1' }] } };
+      const data = queryBuilder.extractData(mockResult);
+      expect(data).toEqual([{ login: 'user1' }]);
+    });
+
+    it('extractData: should extract commit history via ref.target.history', () => {
+      const queryBuilder = handler.createCommitHistoryQuery('owner', 'repo', 'main');
+      const history = { nodes: [{ oid: 'abc' }], pageInfo: { hasNextPage: false }, totalCount: 1 };
+      const mockResult = { repository: { ref: { target: { history } } } };
+      const data = queryBuilder.extractData(mockResult);
+      expect(data).toEqual(history);
+    });
+
+    it('extractData: should fallback to defaultBranchRef when ref is null', () => {
+      const queryBuilder = handler.createCommitHistoryQuery('owner', 'repo', 'main');
+      const history = { nodes: [{ oid: 'def' }], pageInfo: { hasNextPage: false }, totalCount: 1 };
+      const mockResult = { repository: { ref: null, defaultBranchRef: { target: { history } } } };
+      const data = queryBuilder.extractData(mockResult);
+      expect(data).toEqual(history);
+    });
+
+    it('extractData: should extract search results with repositoryCount', () => {
+      const queryBuilder = handler.createSearchQuery('test', 'REPOSITORY');
+      const mockResult = {
+        search: {
+          nodes: [{ name: 'repo1' }],
+          pageInfo: { hasNextPage: false, endCursor: null },
+          repositoryCount: 1,
+          issueCount: 0,
+          userCount: 0,
+        },
+      };
+      const data = queryBuilder.extractData(mockResult);
+      expect(data.nodes).toEqual([{ name: 'repo1' }]);
+      expect(data.totalCount).toBe(1);
+    });
   });
 
   describe('createCachedHandler', () => {

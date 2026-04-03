@@ -9,8 +9,12 @@ import { createMockOctokit } from '../mocks/octokit.js';
 import { mockEnvVars, mockProcessExit, restoreProcessExit } from '../helpers/test-helpers.js';
 
 // Mock external dependencies
-vi.mock('@modelcontextprotocol/sdk/server/mcp.js');
-vi.mock('@modelcontextprotocol/sdk/server/stdio.js');
+vi.mock('@modelcontextprotocol/sdk/server/mcp.js', () => ({
+  McpServer: vi.fn(),
+}));
+vi.mock('@modelcontextprotocol/sdk/server/stdio.js', () => ({
+  StdioServerTransport: vi.fn(),
+}));
 vi.mock('@octokit/rest', () => ({
   Octokit: vi.fn(),
 }));
@@ -28,12 +32,12 @@ vi.mock('../../rate-limiter.js', () => ({
 
 // Mock other dependencies to prevent import errors
 vi.mock('../../optimized-api-client.js', () => ({
-  OptimizedAPIClient: vi.fn().mockImplementation(() => ({
-    getOctokit: vi.fn(() => ({
-        graphql: vi.fn()
-    })),
-    clearCache: vi.fn(),
-  })),
+  OptimizedAPIClient: vi.fn().mockImplementation(function() {
+    return {
+      getOctokit: vi.fn(() => ({ graphql: vi.fn() })),
+      clearCache: vi.fn(),
+    };
+  }),
 }));
 
 vi.mock('../../performance-monitor.js', () => ({
@@ -45,16 +49,17 @@ vi.mock('../../performance-monitor.js', () => ({
 }));
 
 vi.mock('../../reliability.js', () => ({
-  ReliabilityManager: vi.fn().mockImplementation(() => ({
-    executeWithReliability: vi.fn(async (name, fn) => {
-      // Execute the function directly and return the result
-      const result = await fn();
-      return result;
-    }),
-  })),
-  RetryManager: vi.fn().mockImplementation(() => ({})),
-  ConsoleTelemetry: vi.fn().mockImplementation(() => ({})),
-  NoOpTelemetry: vi.fn().mockImplementation(() => ({})),
+  ReliabilityManager: vi.fn().mockImplementation(function() {
+    return {
+      executeWithReliability: vi.fn(async (_name: string, fn: () => Promise<unknown>) => {
+        const result = await fn();
+        return result;
+      }),
+    };
+  }),
+  RetryManager: vi.fn().mockImplementation(function() { return {}; }),
+  ConsoleTelemetry: vi.fn().mockImplementation(function() { return {}; }),
+  NoOpTelemetry: vi.fn().mockImplementation(function() { return {}; }),
   DEFAULT_RETRY_CONFIG: {},
 }));
 
@@ -239,9 +244,6 @@ describe('GitHub MCP Server Integration', () => {
   let registeredTools: Map<string, any>;
 
   beforeEach(async () => {
-    // Reset modules to ensure clean imports
-    vi.resetModules();
-
     // Mock MCP server with tool registration tracking
     registeredTools = new Map();
     mockServer = {
@@ -254,12 +256,12 @@ describe('GitHub MCP Server Integration', () => {
       }),
       connect: vi.fn(),
     };
-    (McpServer as any).mockImplementation(() => mockServer);
+    (McpServer as any).mockImplementation(function() { return mockServer; });
 
     // Mock Octokit
     mockOctokit = createMockOctokit();
     const { Octokit } = await import('@octokit/rest');
-    (Octokit as any).mockImplementation(() => mockOctokit);
+    (Octokit as any).mockImplementation(function() { return mockOctokit; });
 
     // Configure the rate limiter mock to return the mock Octokit
     const { createRateLimitedOctokit } = await import('../../rate-limiter.js');
@@ -278,7 +280,7 @@ describe('GitHub MCP Server Integration', () => {
 
     // Mock transport
     mockTransport = { connect: vi.fn() };
-    (StdioServerTransport as any).mockImplementation(() => mockTransport);
+    (StdioServerTransport as any).mockImplementation(function() { return mockTransport; });
 
     // Mock process.exit
     exitSpy = mockProcessExit();

@@ -68,7 +68,7 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
   tools.push({
     tool: {
       name: 'list_code_scanning_alerts',
-      description: 'List code scanning alerts for a repository',
+      description: 'List code scanning (SAST) alerts for a repository, filterable by state (open/closed/dismissed/fixed), severity, tool name, or Git ref. Returns alert metadata: rule ID, severity, tags, tool version, most recent instance location, and timestamps. Does NOT return fix suggestions, full code context, or alert history. Requires code scanning to be enabled on the repository.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -528,7 +528,7 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
     tools.push({
       tool: {
         name: 'enable_vulnerability_alerts',
-        description: 'Enable vulnerability alerts for a repository',
+        description: '[WRITE] Enable Dependabot vulnerability alerts for the repository — GitHub will notify on vulnerable dependencies. Does NOT enable code scanning or secret scanning. Modifies repository settings. Returns success only. Requires admin access.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -562,7 +562,7 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
     tools.push({
       tool: {
         name: 'disable_vulnerability_alerts',
-        description: 'Disable vulnerability alerts for a repository',
+        description: '[WRITE] Disable Dependabot vulnerability alerts — repository will no longer receive vulnerability notifications. Does NOT affect code scanning or secret scanning. Modifies repository settings permanently (can be re-enabled). Returns success only. Requires admin access.',
         inputSchema: {
           type: 'object',
           properties: {

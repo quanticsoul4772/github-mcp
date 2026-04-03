@@ -306,6 +306,13 @@ describe('Advanced Search Tools', () => {
         })
       ).rejects.toThrow('GraphQL Error: Invalid search query');
     });
+
+    it('should throw when result.search is null', async () => {
+      mockOctokit.graphql.mockResolvedValue({ search: null });
+      await expect(
+        searchAcrossRepos.handler({ query: 'test', type: 'REPOSITORY' })
+      ).rejects.toThrow('Search query returned no results');
+    });
   });
 
   describe('search_repositories_advanced', () => {
@@ -828,6 +835,13 @@ describe('Advanced Search Tools', () => {
           query: 'very complex query with many filters',
         })
       ).rejects.toThrow('GraphQL Error: Search query too complex');
+    });
+
+    it('should throw when result.search is null', async () => {
+      mockOctokit.graphql.mockResolvedValue({ search: null });
+      await expect(
+        searchWithRelationships.handler({ entityType: 'USER', query: 'test' })
+      ).rejects.toThrow('Entity search with relationships returned no results');
     });
   });
 });

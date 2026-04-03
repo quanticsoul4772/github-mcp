@@ -75,7 +75,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boole
   tools.push({
     tool: {
       name: 'get_repository_insights',
-      description: 'Get comprehensive repository statistics and insights',
+      description: 'Fetch repository metadata, statistics (stars, forks, open issues/PRs, commit count), language breakdown by percentage, top 25 collaborators with contribution counts, and up to 10 recent commits. Does NOT return commit trends over time, issue/PR age distributions, contributor timelines, or file-level code statistics. For contributor details use get_contribution_stats.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -290,7 +290,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boole
   tools.push({
     tool: {
       name: 'get_contribution_stats',
-      description: 'Get detailed contribution statistics for repository contributors',
+      description: 'Analyze contributions (commits, issues, PRs, reviews) for up to 100 repository collaborators. Returns total contributions per contributor plus per-commit addition/deletion counts from up to 100 commits on the default branch. Does NOT return contribution timing, review quality metrics, or issue resolution patterns. Commit stats may differ from GraphQL totals on large repos.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -426,7 +426,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boole
   tools.push({
     tool: {
       name: 'get_commit_activity',
-      description: 'Get commit activity patterns and trends for a repository',
+      description: 'Analyze commit patterns for a branch within an optional date range. Returns summary totals (commits, additions, deletions, files changed) and patterns grouped by day/hour/weekday/author from up to 100 commits. Does NOT distinguish merge commits from direct commits, track reverts, or adjust for time zones. Results are truncated at 100 commits on large repos.',
       inputSchema: {
         type: 'object',
         properties: {

@@ -11,6 +11,13 @@ import {
   getQueryOperation,
   createGraphQLWrapper,
   GraphQLQueries,
+  safeAccess,
+  validateResponseFields,
+  formatGraphQLError,
+  createTypedHandler,
+  paginatedGraphQL,
+  typedGraphQL,
+  validatedGraphQL,
 } from './graphql-utils.js';
 import { OptimizedAPIClient } from './optimized-api-client.js';
 import { createMockOctokit } from './__tests__/mocks/octokit.js';
@@ -235,6 +242,21 @@ describe('GraphQL Utils', () => {
       expect(result).toEqual(mockResponse);
       expect(invalidateSpy).toHaveBeenCalled();
     });
+
+    it('should call mutate without variables (|| {} branch on line 213)', async () => {
+      const wrapper = createGraphQLWrapper(mockOptimizedClient);
+      vi.spyOn(mockOptimizedClient, 'graphql').mockResolvedValue({ done: true });
+      vi.spyOn(mockOptimizedClient, 'invalidateGraphQLCacheForMutation').mockReturnValue(0);
+      const result = await wrapper.mutate('mutation DoSomething { doSomething { ok } }');
+      expect(result).toEqual({ done: true });
+    });
+
+    it('should call execute without variables (|| {} branch on line 231)', async () => {
+      const wrapper = createGraphQLWrapper(mockOptimizedClient);
+      vi.spyOn(mockOptimizedClient, 'graphql').mockResolvedValue({ data: 'ok' });
+      const result = await wrapper.execute('query { viewer { login } }');
+      expect(result).toEqual({ data: 'ok' });
+    });
   });
 
   describe('GraphQLQueries helpers', () => {
@@ -302,6 +324,234 @@ describe('GraphQL Utils', () => {
       vi.spyOn(mockOptimizedClient, 'graphql').mockRejectedValue(new Error('GraphQL Error'));
 
       await expect(wrapper.query('query { test }')).rejects.toThrow('GraphQL Error');
+    });
+  });
+
+  // ============================================================================
+  // safeAccess
+  // ============================================================================
+
+  describe('safeAccess', () => {
+    it('should access a nested field', () => {
+      const obj = { a: { b: { c: 42 } } };
+      expect(safeAccess(obj, ['a', 'b', 'c'], 0)).toBe(42);
+    });
+
+    it('should return defaultValue when path does not exist', () => {
+      expect(safeAccess({ a: {} }, ['a', 'b', 'c'], 'default')).toBe('default');
+    });
+
+    it('should return defaultValue for null object', () => {
+      expect(safeAccess(null, ['a'], 'fallback')).toBe('fallback');
+    });
+
+    it('should return defaultValue for null intermediate', () => {
+      expect(safeAccess({ x: null }, ['x', 'y'], -1)).toBe(-1);
+    });
+
+    it('should return defaultValue when final value is null', () => {
+      expect(safeAccess({ a: null }, ['a'], 'default')).toBe('default');
+    });
+
+    it('should handle non-object intermediary', () => {
+      expect(safeAccess({ a: 'string' }, ['a', 'b'], 'default')).toBe('default');
+    });
+  });
+
+  // ============================================================================
+  // validateResponseFields
+  // ============================================================================
+
+  describe('validateResponseFields', () => {
+    it('should return true when all required paths exist', () => {
+      const response = { data: { viewer: { login: 'octocat' } } };
+      expect(validateResponseFields(response, [['data', 'viewer', 'login']])).toBe(true);
+    });
+
+    it('should return false when a required path is missing', () => {
+      expect(validateResponseFields({ data: { viewer: {} } }, [['data', 'viewer', 'login']])).toBe(false);
+    });
+
+    it('should return true for empty required fields list', () => {
+      expect(validateResponseFields({}, [])).toBe(true);
+    });
+
+    it('should return false when response is null', () => {
+      expect(validateResponseFields(null, [['a']])).toBe(false);
+    });
+
+    it('should return false when one of multiple paths is missing', () => {
+      expect(validateResponseFields({ data: { a: 1 } }, [['data', 'a'], ['data', 'b']])).toBe(false);
+    });
+  });
+
+  // ============================================================================
+  // formatGraphQLError
+  // ============================================================================
+
+  describe('formatGraphQLError', () => {
+    it('should format error from response.data.errors array', () => {
+      const error = {
+        response: { data: { errors: [{ message: 'Field not found' }, { message: 'Access denied' }] } },
+      };
+      expect(formatGraphQLError(error)).toBe('Field not found; Access denied');
+    });
+
+    it('should return error.message when no response errors', () => {
+      expect(formatGraphQLError({ message: 'GraphQL error' })).toBe('GraphQL error');
+    });
+
+    it('should return default message for unknown errors', () => {
+      expect(formatGraphQLError({})).toBe('An unknown error occurred while executing GraphQL query');
+    });
+
+    it('should return default message for null', () => {
+      expect(formatGraphQLError(null)).toBe('An unknown error occurred while executing GraphQL query');
+    });
+
+    it('should handle errors array item with missing message', () => {
+      const error = { response: { data: { errors: [{}] } } };
+      expect(formatGraphQLError(error)).toBe('Unknown GraphQL error');
+    });
+
+    it('should fall through to message when errors array is empty', () => {
+      const error = { response: { data: { errors: [] } }, message: 'fallback' };
+      expect(formatGraphQLError(error)).toBe('fallback');
+    });
+  });
+
+  // ============================================================================
+  // createTypedHandler
+  // ============================================================================
+
+  describe('createTypedHandler', () => {
+    it('should wrap a handler to accept unknown args', async () => {
+      const handler = vi.fn().mockResolvedValue({ result: 'ok' });
+      const typed = createTypedHandler(handler);
+      const result = await typed({ param: 'value' });
+      expect(result).toEqual({ result: 'ok' });
+      expect(handler).toHaveBeenCalledWith({ param: 'value' });
+    });
+  });
+
+  describe('paginatedGraphQL', () => {
+    it('should fetch all pages when hasNextPage is true then false', async () => {
+      const page1 = { data: [1], pageInfo: { hasNextPage: true, endCursor: 'cursor1' } };
+      const page2 = { data: [2], pageInfo: { hasNextPage: false, endCursor: null } };
+      mockOctokit.graphql = vi.fn()
+        .mockResolvedValueOnce(page1)
+        .mockResolvedValueOnce(page2);
+
+      const results = await paginatedGraphQL(
+        mockOctokit,
+        '{ items(first: $first, after: $after) { pageInfo { hasNextPage endCursor } } }',
+        {},
+        25,
+        10
+      );
+      expect(results).toHaveLength(2);
+      expect(mockOctokit.graphql).toHaveBeenCalledTimes(2);
+    });
+
+    it('should stop after maxPages', async () => {
+      const page = { data: [1], pageInfo: { hasNextPage: true, endCursor: 'c' } };
+      mockOctokit.graphql = vi.fn().mockResolvedValue(page);
+
+      const results = await paginatedGraphQL(mockOctokit, '{ query }', {}, 25, 3);
+      expect(results).toHaveLength(3);
+      expect(mockOctokit.graphql).toHaveBeenCalledTimes(3);
+    });
+
+    it('should return single page when hasNextPage is false', async () => {
+      const page = { data: [1, 2], pageInfo: { hasNextPage: false, endCursor: null } };
+      mockOctokit.graphql = vi.fn().mockResolvedValue(page);
+      const results = await paginatedGraphQL(mockOctokit, '{ query }');
+      expect(results).toHaveLength(1);
+    });
+  });
+
+  // ============================================================================
+  // typedGraphQL
+  // ============================================================================
+
+  describe('typedGraphQL', () => {
+    it('should return response on success', async () => {
+      const mockResponse = { repository: { name: 'test' } };
+      mockOctokit.graphql = vi.fn().mockResolvedValue(mockResponse);
+      const result = await typedGraphQL(mockOctokit, '{ repository { name } }');
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should re-throw non-GraphQL errors', async () => {
+      mockOctokit.graphql = vi.fn().mockRejectedValue(new Error('network error'));
+      await expect(typedGraphQL(mockOctokit, '{ repo }')).rejects.toThrow('network error');
+    });
+
+    it('should format GraphQL response errors', async () => {
+      const graphqlError = {
+        response: { data: { errors: [{ message: 'Field not found' }, { message: 'Syntax error' }] } },
+      };
+      mockOctokit.graphql = vi.fn().mockRejectedValue(graphqlError);
+      await expect(typedGraphQL(mockOctokit, '{ repo }')).rejects.toThrow(
+        'GraphQL errors: Field not found, Syntax error'
+      );
+    });
+
+    it('should re-throw error objects without response field', async () => {
+      const err = { code: 'SOME_ERROR', message: 'some error' };
+      mockOctokit.graphql = vi.fn().mockRejectedValue(err);
+      await expect(typedGraphQL(mockOctokit, '{ repo }')).rejects.toEqual(err);
+    });
+  });
+
+  // ============================================================================
+  // validatedGraphQL
+  // ============================================================================
+
+  describe('validatedGraphQL', () => {
+    it('should return result when validator passes', async () => {
+      const mockResponse = { data: { name: 'hello' } };
+      mockOctokit.graphql = vi.fn().mockResolvedValue(mockResponse);
+      const result = await validatedGraphQL(
+        mockOctokit,
+        '{ data { name } }',
+        {},
+        (d): d is typeof mockResponse => d !== null
+      );
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should throw when validator fails', async () => {
+      mockOctokit.graphql = vi.fn().mockResolvedValue({ data: null });
+      await expect(
+        validatedGraphQL(mockOctokit, '{ data }', {}, (d): d is never => false)
+      ).rejects.toThrow('GraphQL response failed validation');
+    });
+
+    it('should return result when no validator provided', async () => {
+      const mockResponse = { name: 'test' };
+      mockOctokit.graphql = vi.fn().mockResolvedValue(mockResponse);
+      const result = await validatedGraphQL(mockOctokit, '{ name }');
+      expect(result).toEqual(mockResponse);
+    });
+  });
+
+  // ============================================================================
+  // createGraphQLWrapper getClient
+  // ============================================================================
+
+  describe('createGraphQLWrapper getClient', () => {
+    it('should return the underlying client', () => {
+      const wrapper = createGraphQLWrapper(mockOptimizedClient);
+      expect(wrapper.getClient()).toBe(mockOptimizedClient);
+    });
+
+    it('execute should call smartGraphQL with options', async () => {
+      const mockResponse = { data: 'result' };
+      vi.spyOn(mockOptimizedClient, 'graphql').mockResolvedValue(mockResponse);
+      const wrapper = createGraphQLWrapper(mockOptimizedClient);
+      const result = await wrapper.execute('{ data }', { id: 1 }, { ttl: 500 });
+      expect(result).toEqual(mockResponse);
     });
   });
 });

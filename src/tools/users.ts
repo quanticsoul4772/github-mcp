@@ -129,7 +129,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
       const params = args as GetUserParams;
       
       // Ensure username is provided
-      if (!params || !params.username) {
+      if (!params?.username) {
         throw new Error(`Username is required. Received: ${JSON.stringify(params)}`);
       }
       

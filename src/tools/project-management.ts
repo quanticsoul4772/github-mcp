@@ -88,7 +88,7 @@ export function createProjectManagementTools(octokit: Octokit, _readOnly: boolea
   tools.push({
     tool: {
       name: 'get_project_boards',
-      description: 'Get GitHub Projects V2 boards for a repository or organization',
+      description: 'Fetch GitHub Projects V2 boards (max 50) for a repository or owner (user/org). Returns project metadata with first 20 items and field definitions per board. Items can be Issues, PRs, or DraftIssues. Does NOT return all items beyond 20 or field values per item — use dedicated project item queries for full data. Read-only.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -366,7 +366,7 @@ export function createProjectManagementTools(octokit: Octokit, _readOnly: boolea
   tools.push({
     tool: {
       name: 'get_milestones_with_issues',
-      description: 'Get repository milestones with their associated issues and pull requests',
+      description: 'Fetch repository milestones (max 25) with up to 50 associated issues and PRs per milestone. Returns milestone metadata, item titles/states/assignees/labels, and calculated progress percentage. Does NOT return issue body text, milestone custom fields, or linked discussions. Limited to 50 items per milestone — large milestones are truncated.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -549,7 +549,7 @@ export function createProjectManagementTools(octokit: Octokit, _readOnly: boolea
     tool: {
       name: 'get_cross_repo_project_view',
       description:
-        'Get a unified view of issues and PRs across multiple repositories for project management',
+        'Fetch open issues and PRs across 1-5 repositories (max 50 items per repo), filterable by labels, assignee, or milestone. Returns items sorted by update date with repo context and summary stats. Does NOT return issue body text (titles only), draft PRs, or closed items. Use for cross-repo dashboards; not suited for historical trend analysis.',
       inputSchema: {
         type: 'object',
         properties: {

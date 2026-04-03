@@ -85,7 +85,7 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
     tool: {
       name: 'batch_query_repositories',
       description:
-        'Query multiple repositories in a single GraphQL request for improved performance',
+        'Fetch stars, forks, languages, contributors, and commits for 1-10 repositories in a single GraphQL request. Returns aggregated results keyed by repository alias. Does NOT return file contents, workflow runs, or real-time commit metadata. Use when you need basic stats across multiple repos without making individual API calls per repo.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -386,7 +386,7 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
   tools.push({
     tool: {
       name: 'batch_query_users',
-      description: 'Query multiple users or organizations in a single request',
+      description: 'Fetch public profiles for up to 10 users or organizations in one request, optionally including top repositories by stars. Returns entity type, bio, follower counts, and up to 5 repos per user. Does NOT return private org data, membership status, or email. Use get_org for full organization details.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -596,7 +596,7 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
   tools.push({
     tool: {
       name: 'batch_graphql_query',
-      description: 'Execute a custom batch GraphQL query with multiple operations',
+      description: 'Execute up to 10 custom GraphQL query fragments with automatic variable namespacing to prevent conflicts. Each query requires alias, query string, and optional variables. Returns raw GraphQL results keyed by alias. Does NOT validate query complexity or handle pagination — caller is responsible for query optimization. Deeply nested queries can hit GitHub GraphQL complexity limits.',
       inputSchema: {
         type: 'object',
         properties: {

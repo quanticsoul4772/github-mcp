@@ -1,7 +1,7 @@
 /**
  * Tests for issue tools
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createIssueTools } from './issues.js';
 import { createMockOctokit } from '../__tests__/mocks/octokit.js';
 import { testFixtures } from '../__tests__/fixtures/test-data.js';
@@ -671,6 +671,83 @@ describe('Issue Tools', () => {
 
       expect(result.success).toBe(true);
       expect(result.message).toContain('unlocked');
+    });
+  });
+
+  describe('search_issues', () => {
+    let searchIssues: any;
+
+    beforeEach(() => {
+      mockOctokit.search = {
+        issuesAndPullRequests: vi.fn().mockResolvedValue({
+          data: {
+            total_count: 2,
+            incomplete_results: false,
+            items: [
+              {
+                number: 1,
+                title: 'Bug report',
+                state: 'open',
+                user: { login: 'alice' },
+                labels: [{ name: 'bug' }],
+                assignees: [{ login: 'bob' }],
+                comments: 3,
+                created_at: '2024-01-01T00:00:00Z',
+                updated_at: '2024-01-02T00:00:00Z',
+                closed_at: null,
+                html_url: 'https://github.com/owner/repo/issues/1',
+                body: 'Some body',
+                repository_url: 'https://api.github.com/repos/owner/repo',
+              },
+              {
+                number: 2,
+                title: 'Feature request',
+                state: 'closed',
+                user: null,
+                labels: [],
+                assignees: [],
+                comments: 0,
+                created_at: '2024-01-03T00:00:00Z',
+                updated_at: '2024-01-04T00:00:00Z',
+                closed_at: '2024-01-05T00:00:00Z',
+                html_url: 'https://github.com/owner/repo/issues/2',
+                body: null,
+                repository_url: 'https://api.github.com/repos/owner/repo',
+              },
+            ],
+          },
+        }),
+      };
+      searchIssues = tools.find((t: any) => t.tool.name === 'search_issues');
+    });
+
+    it('should be registered', () => {
+      expect(searchIssues).toBeDefined();
+    });
+
+    it('should search issues and return results', async () => {
+      const result = await searchIssues.handler({
+        query: 'is:issue is:open',
+      });
+      expect(result.total_count).toBe(2);
+      expect(result.items.length).toBe(2);
+      expect(result.items[0].title).toBe('Bug report');
+    });
+
+    it('should add repo filter when owner and repo provided', async () => {
+      await searchIssues.handler({
+        query: 'is:open',
+        owner: 'myowner',
+        repo: 'myrepo',
+      });
+      expect(mockOctokit.search.issuesAndPullRequests).toHaveBeenCalledWith(
+        expect.objectContaining({ q: 'repo:myowner/myrepo is:open' })
+      );
+    });
+
+    it('should handle null user in results', async () => {
+      const result = await searchIssues.handler({ query: 'test' });
+      expect(result.items[1].user?.login).toBeUndefined();
     });
   });
 });

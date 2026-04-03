@@ -89,7 +89,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
   tools.push({
     tool: {
       name: 'list_discussions',
-      description: 'List discussions in a repository (requires GraphQL)',
+      description: 'List discussions in a repository (GraphQL). Returns discussion previews — does NOT include full body text or comment threads; use get_discussion for full details. Supports cursor-based pagination; pass page_info.endCursor as the after parameter for next page. autoPage=true auto-fetches all pages (bounded by maxPages/maxItems). For keyword search across discussions, use search_discussions instead.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -644,7 +644,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
     tools.push({
       tool: {
         name: 'update_discussion',
-        description: 'Update a discussion',
+        description: 'Update a discussion\'s title, body, or category (all fields optional — only discussionId required). Only the discussion author or repo admins can update. Returns updated discussion metadata; does NOT return the full comment thread. Category changes may be restricted if the discussion has answers (answered discussions cannot change category).',
         inputSchema: {
           type: 'object',
           properties: {

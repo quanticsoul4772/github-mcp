@@ -13,7 +13,7 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
   tools.push({
     tool: {
       name: 'get_cache_metrics',
-      description: 'Get comprehensive cache performance metrics and statistics',
+      description: 'Retrieve cache hit rates, eviction counts, memory usage, and deduplication metrics for both REST and GraphQL APIs. Optionally includes per-query statistics. Does NOT return historical trends or cost estimates. Read-only — does not modify cache state.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -53,7 +53,7 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
   tools.push({
     tool: {
       name: 'get_graphql_cache_stats',
-      description: 'Get detailed GraphQL cache statistics and performance analysis',
+      description: 'Retrieve GraphQL-specific cache hit rates, memory usage, and per-query efficiency metrics. Does NOT return REST API cache data — use get_cache_metrics for combined REST + GraphQL statistics. Read-only.',
       inputSchema: {
         type: 'object',
         properties: {},
@@ -155,7 +155,7 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
   tools.push({
     tool: {
       name: 'cache_health_check',
-      description: 'Perform cache health check and return recommendations',
+      description: 'Analyze cache performance and return health status (healthy/warning/critical) with optimization recommendations. Checks hit rates, eviction ratios, and identifies low-performing queries. Does NOT modify cache state — read-only diagnostic.',
       inputSchema: {
         type: 'object',
         properties: {},
@@ -246,7 +246,7 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
   tools.push({
     tool: {
       name: 'warmup_cache',
-      description: 'Warm up cache with common queries for better performance',
+      description: 'Pre-populate cache by executing common queries (insights, contributors, discussions, categories) across specified repositories. Side effect: Makes real GraphQL requests that count toward rate limits. Does NOT return cached data — returns warmup results only. Use before high-traffic operations to improve subsequent response times.',
       inputSchema: {
         type: 'object',
         properties: {

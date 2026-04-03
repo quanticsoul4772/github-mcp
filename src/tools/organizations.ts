@@ -66,7 +66,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
   tools.push({
     tool: {
       name: 'search_orgs',
-      description: 'Search for GitHub organizations',
+      description: 'Search GitHub organizations by name, description, or search qualifiers. Supports sort by "followers", "repositories", or "joined". Returns basic org metadata; does NOT return member list, team list, or billing info. Results may have incomplete_results=true if query matches >1000 orgs. Supports qualifiers like location:NY. Use get_org to fetch full details for a known org name.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -132,7 +132,7 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
   tools.push({
     tool: {
       name: 'get_org',
-      description: 'Get details of a GitHub organization',
+      description: 'Get full metadata for a GitHub organization. Returns all visible fields including plan, member/repo counts, and permissions — some fields (billing_email, plan details) only appear with admin access. Does NOT return team list or member list; use list_org_teams or list_org_members separately. Use search_orgs to find orgs by keyword when you don\'t know the exact name.',
       inputSchema: {
         type: 'object',
         properties: {

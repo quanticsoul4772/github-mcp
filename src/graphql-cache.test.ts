@@ -146,6 +146,49 @@ describe('GraphQLCache', () => {
       const metrics = cache.getMetrics();
       expect(metrics.size).toBe(0);
     });
+
+    it('should invalidate via repoPattern when keyOp not in affectedOps', async () => {
+      // Key format: gql:${queryName}:${hash}:${vars}
+      // To trigger repoPattern branch, set owner='gql' and repo=queryName so the
+      // pattern /gql\W+queryName/i matches the start of the key ('gql:queryName')
+      const query = 'query GetLabels { labels { nodes { name } } }';
+      await cache.get(query, {}, vi.fn().mockResolvedValue({ data: 'labels' }));
+      expect(cache.size()).toBe(1);
+
+      // Unknown mutation (not in opMap → affectedOps empty), but repoPattern matches the key prefix
+      const invalidated = cache.invalidateForMutation('mutation UnknownOp { doSomething }', { owner: 'gql', repo: 'GetLabels' });
+      expect(invalidated).toBe(1);
+      expect(cache.size()).toBe(0);
+    });
+
+    it('should enter entry.query branch without invalidating when affectedOps is empty', async () => {
+      // Cache a query — will have an entry.query stored
+      const query = 'query GetStuff { stuff { id } }';
+      await cache.get(query, {}, vi.fn().mockResolvedValue({ data: 'stuff' }));
+      expect(cache.size()).toBe(1);
+
+      // Unknown mutation with no owner/repo: affectedOps empty, repoPattern null
+      // else if (entry?.query) branch is entered but for loop doesn't iterate → line 420
+      const invalidated = cache.invalidateForMutation('mutation UnknownOp { doSomething }');
+      expect(invalidated).toBe(0);
+      expect(cache.size()).toBe(1);
+    });
+
+    it('should delete a specific cache entry', async () => {
+      const query = 'query GetRepo { repository { name } }';
+      const variables = { owner: 'test', repo: 'testrepo' };
+      await cache.get(query, variables, vi.fn().mockResolvedValue({ data: 'repo' }));
+      expect(cache.size()).toBe(1);
+
+      const deleted = cache.delete(query, variables);
+      expect(deleted).toBe(true);
+      expect(cache.size()).toBe(0);
+    });
+
+    it('should return false when deleting a non-existent cache entry', async () => {
+      const deleted = cache.delete('query NonExistent { nope }', {});
+      expect(deleted).toBe(false);
+    });
   });
 
   describe('LRU eviction', () => {
@@ -302,6 +345,26 @@ describe('GraphQLCache', () => {
       const metrics = cache.getMetrics();
       expect(Object.keys(metrics.queryTypes)).toContain('GetRepository');
       expect(Object.keys(metrics.queryTypes)).toContain('CreateDiscussion');
+    });
+
+    it('should use exact GRAPHQL_CACHE_CONFIG match for query name TTL', async () => {
+      // A query named 'get_repository_insights' should match the config exactly (line 175)
+      const fetcher = vi.fn().mockResolvedValue({ data: 'insights' });
+      await cache.get(
+        'query get_repository_insights { repository { name } }',
+        { owner: 'test', repo: 'repo' },
+        fetcher
+      );
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    });
+
+    it('should bypass cache when skipCache option is true (line 220)', async () => {
+      const fetcher = vi.fn().mockResolvedValue({ data: 'fresh' });
+      // First call — populates cache
+      await cache.get('query FetchSomething { viewer { login } }', {}, fetcher);
+      // Second call with skipCache — should re-fetch despite cached result
+      await cache.get('query FetchSomething { viewer { login } }', {}, fetcher, { skipCache: true });
+      expect(fetcher).toHaveBeenCalledTimes(2);
     });
   });
 });

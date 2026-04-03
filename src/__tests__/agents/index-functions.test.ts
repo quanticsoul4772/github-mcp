@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import { createAgentSystem, quickAnalyze } from '../../agents/index.js';
+import { createAgentSystem, quickAnalyze, shouldSkipDirectory, shouldIncludeFile } from '../../agents/index.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
@@ -255,4 +255,36 @@ describe('Agent Index Functions', () => {
       )
     );
   }
+});
+
+describe('shouldSkipDirectory', () => {
+  test('should return true for node_modules', () => {
+    expect(shouldSkipDirectory('node_modules')).toBe(true);
+  });
+
+  test('should return true for .git', () => {
+    expect(shouldSkipDirectory('.git')).toBe(true);
+  });
+
+  test('should return false for src', () => {
+    expect(shouldSkipDirectory('src')).toBe(false);
+  });
+});
+
+describe('shouldIncludeFile', () => {
+  test('should exclude file matching exclude pattern', () => {
+    expect(shouldIncludeFile('src/test.ts', undefined, ['test\\.ts$'])).toBe(false);
+  });
+
+  test('should include file matching include pattern', () => {
+    expect(shouldIncludeFile('src/index.ts', ['\\.ts$'])).toBe(true);
+  });
+
+  test('should include .ts file with no patterns', () => {
+    expect(shouldIncludeFile('src/utils.ts')).toBe(true);
+  });
+
+  test('should exclude .md file with no patterns', () => {
+    expect(shouldIncludeFile('README.md')).toBe(false);
+  });
 });

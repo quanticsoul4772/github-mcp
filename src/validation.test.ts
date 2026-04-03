@@ -8,6 +8,7 @@ import {
   ValidationWarning,
   validateOwnerName,
   validateRepoName,
+  validateRepoNameWithResult,
   validateBranchName,
   validateFilePath,
   validateRef,
@@ -17,6 +18,7 @@ import {
   validateIssueNumber,
   validatePerPage,
   validateSearchQuery,
+  validateWorkflowFileName,
   validateGitOperation,
   validateCommandOptions,
   sanitizeText,
@@ -91,6 +93,11 @@ describe('Validation Module', () => {
   });
 
   describe('validateFilePath', () => {
+    it('should return null for empty or non-string input', () => {
+      expect(validateFilePath('')).toBe(null);
+      expect(validateFilePath(null as any)).toBe(null);
+    });
+
     it('should accept valid file paths', () => {
       expect(validateFilePath('README.md')).toBe('README.md');
       expect(validateFilePath('src/index.ts')).toBe('src/index.ts');
@@ -494,6 +501,7 @@ describe('Validation Module', () => {
         expect(validateOwnerName('a')).toBe(false); // Too short
         expect(validateOwnerName('-invalid')).toBe(false); // Starts with dash
         expect(validateOwnerName('invalid-')).toBe(false); // Ends with dash
+        expect(validateOwnerName('user--name')).toBe(false); // Consecutive hyphens
         expect(validateOwnerName('in valid')).toBe(false); // Contains space
         expect(validateOwnerName('in/valid')).toBe(false); // Contains slash
       });
@@ -514,6 +522,7 @@ describe('Validation Module', () => {
         expect(validateRepoName('invalid.')).toBe(false); // Ends with dot
         expect(validateRepoName('in valid')).toBe(false); // Contains space
         expect(validateRepoName('in/valid')).toBe(false); // Contains slash
+        expect(validateRepoName('bad..name')).toBe(false); // Consecutive dots
       });
     });
 
@@ -645,6 +654,11 @@ describe('Validation Module', () => {
         expect(validateGitOperation('clean -fdx')).toBe(false);
         expect(validateGitOperation('rm -rf')).toBe(false);
       });
+
+      it('should return false for empty or non-string input', () => {
+        expect(validateGitOperation('')).toBe(false);
+        expect(validateGitOperation(null as any)).toBe(false);
+      });
     });
 
     describe('validateCommandOptions', () => {
@@ -656,6 +670,11 @@ describe('Validation Module', () => {
       it('should reject disallowed options', () => {
         expect(validateCommandOptions('--force')).toBe(false);
         expect(validateCommandOptions('--exec=rm -rf /')).toBe(false);
+      });
+
+      it('should return true for empty or null options', () => {
+        expect(validateCommandOptions('')).toBe(true);
+        expect(validateCommandOptions(null as any)).toBe(true);
       });
     });
   });
@@ -705,6 +724,124 @@ describe('Validation Module', () => {
       // Cache should be cleared (we can't directly test this without exposing internals)
       // But we can verify the function exists and doesn't throw
       expect(cleanupValidation).toBeDefined();
+    });
+  });
+
+  describe('validateRepoNameWithResult', () => {
+    beforeEach(() => {
+      cleanupValidation();
+    });
+
+    it('should return valid for a good repo name', () => {
+      const result = validateRepoNameWithResult('my-repo');
+      expect(result.isValid).toBe(true);
+      expect(result.data).toBe('my-repo');
+    });
+
+    it('should return invalid for empty string', () => {
+      const result = validateRepoNameWithResult('');
+      expect(result.isValid).toBe(false);
+    });
+
+    it('should return invalid for non-string input', () => {
+      const result = validateRepoNameWithResult(null as any);
+      expect(result.isValid).toBe(false);
+    });
+
+    it('should return invalid for name over 100 characters', () => {
+      const result = validateRepoNameWithResult('a'.repeat(101));
+      expect(result.isValid).toBe(false);
+    });
+
+    it('should return invalid for name starting with dot', () => {
+      const result = validateRepoNameWithResult('.badname');
+      expect(result.isValid).toBe(false);
+    });
+
+    it('should return invalid for name ending with dot', () => {
+      const result = validateRepoNameWithResult('badname.');
+      expect(result.isValid).toBe(false);
+    });
+
+    it('should return invalid for name with consecutive dots', () => {
+      const result = validateRepoNameWithResult('bad..name');
+      expect(result.isValid).toBe(false);
+    });
+
+    it('should return invalid for name with invalid characters', () => {
+      const result = validateRepoNameWithResult('bad name!');
+      expect(result.isValid).toBe(false);
+    });
+
+    it('should add warning for long names (>50 chars)', () => {
+      const result = validateRepoNameWithResult('a'.repeat(51));
+      expect(result.isValid).toBe(true);
+      expect(result.warnings.length).toBeGreaterThan(0);
+    });
+
+    it('should cache results for the same input', () => {
+      const result1 = validateRepoNameWithResult('cached-repo');
+      const result2 = validateRepoNameWithResult('cached-repo');
+      expect(result1).toEqual(result2);
+    });
+
+    it('should evict expired cache entry and recompute', () => {
+      vi.useFakeTimers();
+      try {
+        cleanupValidation();
+        // Cache a valid result (TTL = 300000ms)
+        const r1 = validateRepoNameWithResult('expiry-repo');
+        expect(r1.isValid).toBe(true);
+        // Advance time past the TTL so the cache entry expires
+        vi.advanceTimersByTime(300001);
+        // Second call should find the entry expired, delete it, and recompute
+        const r2 = validateRepoNameWithResult('expiry-repo');
+        expect(r2.isValid).toBe(true);
+      } finally {
+        vi.useRealTimers();
+        cleanupValidation();
+      }
+    });
+
+    it('should bypass validation in development mode when SKIP_VALIDATION=true', () => {
+      process.env.NODE_ENV = 'development';
+      process.env.SKIP_VALIDATION = 'true';
+      cleanupValidation();
+      try {
+        const result = validateRepoNameWithResult('!!invalid!!');
+        expect(result.isValid).toBe(true);
+      } finally {
+        delete process.env.SKIP_VALIDATION;
+        process.env.NODE_ENV = 'test';
+      }
+    });
+  });
+
+  describe('validateWorkflowFileName', () => {
+    it('should accept .yml extension', () => {
+      expect(validateWorkflowFileName('ci.yml')).toBe(true);
+    });
+
+    it('should accept .yaml extension', () => {
+      expect(validateWorkflowFileName('deploy.yaml')).toBe(true);
+    });
+
+    it('should reject files without .yml or .yaml extension', () => {
+      expect(validateWorkflowFileName('ci.sh')).toBe(false);
+      expect(validateWorkflowFileName('ci')).toBe(false);
+    });
+
+    it('should reject null/undefined/non-string', () => {
+      expect(validateWorkflowFileName(null as any)).toBe(false);
+      expect(validateWorkflowFileName(undefined as any)).toBe(false);
+    });
+
+    it('should reject directory traversal in workflow filename', () => {
+      expect(validateWorkflowFileName('../etc/passwd.yml')).toBe(false);
+    });
+
+    it('should accept a path with subdirectory', () => {
+      expect(validateWorkflowFileName('.github/workflows/ci.yml')).toBe(true);
     });
   });
 });
