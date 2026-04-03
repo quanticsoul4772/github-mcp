@@ -9,7 +9,7 @@ function makeContext(extra: Record<string, any> = {}): any {
   return { projectPath: '/test', ...extra };
 }
 
-function makeMockAgent(name: string, findings: any[] = [], fail = false): any {
+function makeMockAgent(name: string, findings: any[] = [], fail: boolean | 'non-error' = false): any {
   return {
     name,
     getDependencies: vi.fn().mockReturnValue([]),
@@ -17,15 +17,17 @@ function makeMockAgent(name: string, findings: any[] = [], fail = false): any {
     canHandle: vi.fn().mockReturnValue(true),
     getDefaultConfiguration: vi.fn().mockReturnValue({}),
     validateConfiguration: vi.fn().mockReturnValue(true),
-    analyze: fail
-      ? vi.fn().mockRejectedValue(new Error(`${name} failed`))
-      : vi.fn().mockResolvedValue({
-          agentName: name,
-          timestamp: new Date(),
-          status: 'success',
-          findings,
-          recommendations: [`rec-${name}`],
-        }),
+    analyze: fail === 'non-error'
+      ? vi.fn().mockRejectedValue(`${name} failed as string`)
+      : fail
+        ? vi.fn().mockRejectedValue(new Error(`${name} failed`))
+        : vi.fn().mockResolvedValue({
+            agentName: name,
+            timestamp: new Date(),
+            status: 'success',
+            findings,
+            recommendations: [`rec-${name}`],
+          }),
   };
 }
 
@@ -51,6 +53,11 @@ describe('DefaultAgentCoordinator', () => {
       expect(events).toContain('analysis-complete');
     });
 
+    it('should create coordinator without registry argument', () => {
+      const c = new DefaultAgentCoordinator();
+      expect(c.getRegistry()).toBeDefined();
+    });
+
     it('should remove event listeners', () => {
       const listener = vi.fn();
       coordinator.addEventListener(listener);
@@ -58,6 +65,12 @@ describe('DefaultAgentCoordinator', () => {
       // After removal, the listener array should not contain it
       // Just verify no error thrown
       expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('should handle removing listener that was never added', () => {
+      const listener = vi.fn();
+      // Remove listener that was never added — should not throw
+      expect(() => coordinator.removeEventListener(listener)).not.toThrow();
     });
   });
 
@@ -79,6 +92,14 @@ describe('DefaultAgentCoordinator', () => {
       registry.register(agent);
       const report = await coordinator.runFullAnalysis(makeContext());
       expect(report.agentResults[0].status).toBe('error');
+    });
+
+    it('should handle non-Error thrown by agent (string exception)', async () => {
+      const agent = makeMockAgent('string-fail-agent', [], 'non-error');
+      registry.register(agent);
+      const report = await coordinator.runFullAnalysis(makeContext());
+      expect(report.agentResults[0].status).toBe('error');
+      expect(report.agentResults[0].findings[0].message).toContain('string-fail-agent failed as string');
     });
 
     it('should accumulate findings from multiple agents', async () => {
@@ -148,6 +169,29 @@ describe('DefaultAgentCoordinator', () => {
       });
       expect(result.summary.findingsByCategory['security']).toBe(2);
       expect(result.summary.findingsByCategory['style']).toBe(1);
+    });
+
+    it('should skip findings without category in findingsByCategory', async () => {
+      const agent = makeMockAgent('code-analysis', [
+        { id: 'f1', severity: 'high', category: undefined, file: 'a.ts', message: 'X' },
+        { id: 'f2', severity: 'low', category: 'style', file: 'b.ts', message: 'Y' },
+      ]);
+      registry.register(agent);
+      const result = await coordinator.coordinate({
+        target: { type: 'project', path: '/test' },
+      });
+      expect(result.summary.totalFindings).toBe(2);
+      expect(result.summary.findingsByCategory['style']).toBe(1);
+    });
+
+    it('should handle non-Error thrown during coordinate', async () => {
+      const agent = makeMockAgent('bad-agent', [], 'non-error');
+      registry.register(agent);
+      // coordinate() calls runAgentSafely which throws non-Error — should be caught
+      const result = await coordinator.coordinate({
+        target: { type: 'project', path: '/test' },
+      });
+      expect(result.summary.totalFindings).toBeGreaterThanOrEqual(0);
     });
   });
 
