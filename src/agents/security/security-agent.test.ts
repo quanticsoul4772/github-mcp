@@ -116,7 +116,7 @@ describe('SecurityAgent', () => {
   // ============================================================================
 
   it('should detect hardcoded password', async () => {
-    const result = await analyzeFile('creds.ts', 'const password = "supersecret123";');
+    const result = await analyzeFile('creds.ts', 'const password = "fake-value-for-testing";');
     const hasSecret = result.findings.some(
       f => f.category === 'security-pattern' && f.message.toLowerCase().includes('secret')
     );
@@ -124,7 +124,7 @@ describe('SecurityAgent', () => {
   });
 
   it('should detect hardcoded token', async () => {
-    const result = await analyzeFile('tok.ts', 'const token = "ghp_abc123";');
+    const result = await analyzeFile('tok.ts', 'const token = "fake-token-for-testing";');
     const hasSecret = result.findings.some(f => f.category === 'security-pattern');
     expect(hasSecret).toBe(true);
   });

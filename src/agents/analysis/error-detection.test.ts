@@ -115,8 +115,8 @@ element.innerHTML = '<div>' + userInput + '</div>';
 
 // security: hardcoded password
 const HARDCODED_CREDS_TS = `
-const password = "supersecret123";
-const apiKey = "sk-abc123xyz";
+const password = "fake-value-for-testing";
+const apiKey = "fake-api-key-for-testing";
 `;
 
 // clean code — no issues
@@ -421,7 +421,7 @@ try {
     });
 
     it('should detect hardcoded token', async () => {
-      const code = `const token = "ghp_abc123";\n`;
+      const code = `const token = "fake-token-for-testing";\n`;
       const report = await analyzeFile('token.ts', code);
       expect(report.findings.some(f => f.rule === 'hardcoded-credentials')).toBe(true);
     });
