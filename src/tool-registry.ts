@@ -6,6 +6,15 @@ import { JSONSchema, JSONSchemaProperty, ToolConfig } from './types.js';
 
 const TOOL_CALL_LOG = process.env.GITHUB_MCP_TOOL_LOG ?? '/home/agent/workspace/metrics/github-mcp-tool-calls.jsonl';
 
+function appendToolCallLog(tool: string, duration_ms: number, success: boolean, error?: string): void {
+    const entry = { ts: new Date().toISOString(), tool, duration_ms, success, ...(error !== undefined && { error }) };
+    try {
+        appendFileSync(TOOL_CALL_LOG, JSON.stringify(entry) + '\n');
+    } catch (err) {
+        logger.debug('Failed to write tool call log', { error: err instanceof Error ? err.message : String(err) });
+    }
+}
+
 function jsonSchemaPropertyToZod(prop: JSONSchemaProperty): ZodTypeAny {
     switch (prop.type) {
         case 'string': return z.string().optional();
@@ -113,7 +122,7 @@ export class ToolRegistry {
 
                     const duration = Date.now() - startTime;
                     logger.info(`Tool completed: ${toolName}`, { duration, success: true });
-                    try { appendFileSync(TOOL_CALL_LOG, JSON.stringify({ ts: new Date().toISOString(), tool: toolName, duration_ms: duration, success: true }) + '\n'); } catch { /* non-critical */ }
+                    appendToolCallLog(toolName, duration, true);
 
                     const { data: limitedResult, truncated, originalSize } = ResponseSizeLimiter.limitResponseSize(result);
 
@@ -132,7 +141,7 @@ export class ToolRegistry {
                     const duration = Date.now() - startTime;
                     metrics.recordError({ name: 'TOOL_ERROR', message: error.message } as any);
                     logger.error(`Tool error: ${toolName}`, { error: error.message, duration });
-                    try { appendFileSync(TOOL_CALL_LOG, JSON.stringify({ ts: new Date().toISOString(), tool: toolName, duration_ms: duration, success: false, error: error.message }) + '\n'); } catch { /* non-critical */ }
+                    appendToolCallLog(toolName, duration, false, error.message);
 
                     const errorResponse = formatErrorResponse(error);
                     const errorMessage = errorResponse.error.message;
