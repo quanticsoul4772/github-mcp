@@ -1,7 +1,10 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Octokit } from '@octokit/rest';
 import { z, ZodTypeAny } from 'zod';
+import { appendFileSync } from 'fs';
 import { JSONSchema, JSONSchemaProperty, ToolConfig } from './types.js';
+
+const TOOL_CALL_LOG = process.env.GITHUB_MCP_TOOL_LOG ?? '/home/agent/workspace/metrics/github-mcp-tool-calls.jsonl';
 
 function jsonSchemaPropertyToZod(prop: JSONSchemaProperty): ZodTypeAny {
     switch (prop.type) {
@@ -110,6 +113,7 @@ export class ToolRegistry {
 
                     const duration = Date.now() - startTime;
                     logger.info(`Tool completed: ${toolName}`, { duration, success: true });
+                    try { appendFileSync(TOOL_CALL_LOG, JSON.stringify({ ts: new Date().toISOString(), tool: toolName, duration_ms: duration, success: true }) + '\n'); } catch { /* non-critical */ }
 
                     const { data: limitedResult, truncated, originalSize } = ResponseSizeLimiter.limitResponseSize(result);
 
@@ -128,6 +132,7 @@ export class ToolRegistry {
                     const duration = Date.now() - startTime;
                     metrics.recordError({ name: 'TOOL_ERROR', message: error.message } as any);
                     logger.error(`Tool error: ${toolName}`, { error: error.message, duration });
+                    try { appendFileSync(TOOL_CALL_LOG, JSON.stringify({ ts: new Date().toISOString(), tool: toolName, duration_ms: duration, success: false, error: error.message }) + '\n'); } catch { /* non-critical */ }
 
                     const errorResponse = formatErrorResponse(error);
                     const errorMessage = errorResponse.error.message;
