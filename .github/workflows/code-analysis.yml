@@ -272,26 +272,15 @@ jobs:
             console.log(`Total findings: ${result.summary.totalFindings}`);
             
             // Generate reports
-            const reports = await Promise.all([
-              reportGenerator.generateReport(result, {
-                format: 'json',
-                outputPath: 'analysis-report.json',
-                includeDetails: true
-              }),
-              reportGenerator.generateReport(result, {
-                format: 'markdown',
-                outputPath: 'analysis-report.md',
-                includeDetails: true,
-                groupBy: 'severity',
-                includeRecommendations: true
-              }),
-              reportGenerator.generateReport(result, {
-                format: 'html',
-                outputPath: 'analysis-report.html',
-                includeDetails: true,
-                groupBy: 'severity',
-                includeRecommendations: true
-              })
+            const htmlReport = reportGenerator.generateReportSafe({
+              title: 'Comprehensive Code Analysis',
+              summary: `Analysis completed: ${result.summary.totalFindings} total findings across ${result.summary.agentsUsed?.join(', ') || 'all agents'}`,
+              metadata: { generatedAt: new Date(), generatedBy: 'comprehensive-analysis', version: '1.0.0' },
+            });
+            await Promise.all([
+              fs.writeFile('analysis-report.json', JSON.stringify({ summary: result.summary, findings: result.consolidatedFindings }, null, 2)),
+              fs.writeFile('analysis-report.md', `# Comprehensive Code Analysis\n\n**Total findings:** ${result.summary.totalFindings}\n**Agents used:** ${result.summary.agentsUsed?.join(', ') || 'none'}\n`),
+              fs.writeFile('analysis-report.html', htmlReport),
             ]);
             
             // Create summary for GitHub
@@ -649,14 +638,12 @@ jobs:
             await fs.writeFile('security-analysis.json', JSON.stringify(securityReport, null, 2));
             
             // Generate security report
-            await reportGenerator.generateReport(result, {
-              format: 'markdown',
-              outputPath: 'security-report.md',
-              includeDetails: true,
-              filterCategory: ['security_vulnerability', 'runtime_error'],
-              groupBy: 'severity',
-              includeRecommendations: true
+            const securityHtml = reportGenerator.generateReportSafe({
+              title: 'Security Analysis Report',
+              summary: `${securityFindings.length} security vulnerabilities, ${runtimeErrorFindings.length} runtime error risks`,
+              metadata: { generatedAt: new Date(), generatedBy: 'security-analysis', version: '1.0.0' },
             });
+            await fs.writeFile('security-report.html', securityHtml);
             
             if (securityFindings.length > 0) {
               console.log('\n❌ Security vulnerabilities found!');
@@ -819,15 +806,13 @@ jobs:
             await fs.writeFile('performance-analysis.json', JSON.stringify(performanceReport, null, 2));
             
             // Generate performance report
-            await reportGenerator.generateReport(result, {
-              format: 'html',
-              outputPath: 'performance-report.html',
-              includeDetails: true,
-              filterCategory: ['performance_issue', 'maintainability'],
-              groupBy: 'category',
-              includeRecommendations: true
+            const performanceHtml = reportGenerator.generateReportSafe({
+              title: 'Performance Analysis Report',
+              summary: `${performanceFindings.length} performance issues out of ${result.summary.totalFindings} total findings`,
+              metadata: { generatedAt: new Date(), generatedBy: 'performance-analysis', version: '1.0.0' },
             });
-            
+            await fs.writeFile('performance-report.html', performanceHtml);
+
             console.log('\n✅ Performance analysis completed');
             console.log(`Report saved to performance-report.html`);
             
