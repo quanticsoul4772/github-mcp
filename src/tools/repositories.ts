@@ -139,7 +139,7 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
   tools.push({
     tool: {
       name: 'get_repository',
-      description: 'Get details of a specific repository',
+      description: 'Get full details of a specific repository by owner/name (description, topics, stats, visibility, default branch). Does NOT search across repos — use search_repositories for keyword discovery or list_repositories to list a user\'s repos. Does NOT return file tree or commit history — use get_file_contents or list_commits for those.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -359,7 +359,7 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
   tools.push({
     tool: {
       name: 'list_commits',
-      description: 'List commits in a GitHub repository',
+      description: 'List commits in a GitHub repository, filterable by path, author, or date range. Returns summary metadata per commit (sha, message, author, date). Does NOT return the commit diff or changed file list — use get_commit for a specific commit\'s full details including file-level changes.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -427,7 +427,7 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
   tools.push({
     tool: {
       name: 'get_commit',
-      description: 'Get detailed information about a specific commit',
+      description: 'Get detailed information about a specific commit: message, author, committer, stats, and per-file changes with patches. Does NOT list commits in a range or by author — use list_commits for that. Does NOT return the full repository tree — use get_file_contents for directory listing.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -530,7 +530,7 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
   tools.push({
     tool: {
       name: 'search_repositories',
-      description: 'Search for GitHub repositories',
+      description: 'Search for GitHub repositories by keyword using GitHub search syntax (supports language:, stars:, topic:, org: qualifiers). Returns basic metadata per repo (name, description, stars, language, topics). Does NOT return a specific repo\'s full details — use get_repository for that. For star/fork/size/license filtering with nested data, use search_repositories_advanced.',
       inputSchema: {
         type: 'object',
         properties: {

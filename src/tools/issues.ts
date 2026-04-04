@@ -103,7 +103,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
   tools.push({
     tool: {
       name: 'list_issues',
-      description: 'List issues in a GitHub repository',
+      description: 'List issues in a GitHub repository with filters (state, labels, assignee, sort). Returns up to 100 per page. Does NOT support keyword search or cross-repo queries — use search_issues for keyword/label/cross-repo search. Does NOT return issue body by default — use get_issue for full details. To filter by pull request state, use list_pull_requests instead.',
       inputSchema: {
         type: 'object',
         properties: {

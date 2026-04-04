@@ -331,7 +331,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
   tools.push({
     tool: {
       name: 'get_pull_request_diff',
-      description: 'Get the diff of a pull request',
+      description: 'Get the unified diff of a pull request as raw text. Does NOT return per-file stats, patch objects, or change counts — use list_pull_request_files for structured per-file diffs. Does NOT return PR metadata (title, state, body) — use get_pull_request for that.',
       inputSchema: {
         type: 'object',
         properties: {

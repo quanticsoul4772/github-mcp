@@ -11,7 +11,7 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
   tools.push({
     tool: {
       name: 'search_code',
-      description: 'Search for code across GitHub repositories',
+      description: 'Search for code across GitHub repositories using search syntax (supports path:, language:, repo:, org:, filename: qualifiers). Returns file snippets with repo context. Does NOT return full file contents — use get_file_contents to fetch the complete file after finding it. Results are limited to top matches; not all occurrences are returned.',
       inputSchema: {
         type: 'object',
         properties: {
