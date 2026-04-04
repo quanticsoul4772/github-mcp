@@ -15,40 +15,39 @@ export class ErrorHandler {
 
     const messageFrom = (msg: string) => new Error(`${context}: ${msg}`, { cause: error });
 
-    if (error?.status === 404) {
-      throw messageFrom('Resource not found');
-    }
+    const statusHandlers: Record<number, () => never> = {
+      404: () => { throw messageFrom('Resource not found'); },
+      403: () => { throw messageFrom('Access forbidden - check token permissions'); },
+      401: () => { throw messageFrom('Authentication failed - check token'); },
+      422: () => { throw messageFrom(ErrorHandler.format422Message(error)); },
+    };
 
-    if (error?.status === 403) {
-      throw messageFrom('Access forbidden - check token permissions');
-    }
-
-    if (error?.status === 401) {
-      throw messageFrom('Authentication failed - check token');
-    }
-
-    if (error?.status === 422) {
-      const message = error?.response?.data?.message || 'Validation failed';
-      const errors = Array.isArray(error?.response?.data?.errors) ? error.response.data.errors : [];
-      const errorDetails =
-        errors.length > 0
-          ? `: ${errors
-              .map((e: any) => e?.message)
-              .filter(Boolean)
-              .join(', ')}`
-          : '';
-      throw messageFrom(`${message}${errorDetails}`);
+    const statusHandler = error?.status ? statusHandlers[error.status] : undefined;
+    if (statusHandler) {
+      return statusHandler();
     }
 
     if (error?.status && error?.message) {
       throw messageFrom(`GitHub API error (${error.status}): ${error.message}`);
     }
 
-    const fallbackMsg =
-      typeof error?.message === 'string' && error.message.length > 0
-        ? error.message
-        : 'Unknown error';
-    throw messageFrom(fallbackMsg);
+    throw messageFrom(ErrorHandler.getFallbackMessage(error));
+  }
+
+  private static format422Message(error: any): string {
+    const message = error?.response?.data?.message ?? 'Validation failed';
+    const rawErrors = error?.response?.data?.errors;
+    const errors: any[] = Array.isArray(rawErrors) ? rawErrors : [];
+    if (errors.length === 0) {
+      return message;
+    }
+    const details = errors.map((e: any) => e?.message).filter(Boolean).join(', ');
+    return `${message}: ${details}`;
+  }
+
+  private static getFallbackMessage(error: any): string {
+    const msg = error?.message;
+    return typeof msg === 'string' && msg.length > 0 ? msg : 'Unknown error';
   }
 
   /**
