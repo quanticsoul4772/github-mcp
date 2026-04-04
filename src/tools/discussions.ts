@@ -174,7 +174,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
       const result: any = await octokit.graphql(query, {
         owner: params.owner,
         repo: params.repo,
-        first: params.perPage || 25,
+        first: params.perPage ?? 25,
         after: params.after,
         categoryId: params.category,
       });
@@ -351,7 +351,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
         owner: params.owner,
         repo: params.repo,
         number: params.discussionNumber,
-        first: params.perPage || 25,
+        first: params.perPage ?? 25,
         after: params.after,
       });
 
@@ -486,7 +486,7 @@ export function createDiscussionTools(octokit: Octokit, readOnly: boolean): Tool
 
       const result: any = await octokit.graphql(query, {
         searchQuery,
-        first: params.first || 25,
+        first: params.first ?? 25,
       });
 
       return {

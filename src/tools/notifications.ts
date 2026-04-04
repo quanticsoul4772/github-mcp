@@ -327,7 +327,7 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
 
         return {
           success: true,
-          message: `Notification ${params.threadID} marked as ${params.state || 'read'}`,
+          message: `Notification ${params.threadID} marked as ${params.state ?? 'read'}`,
         };
       },
     });

@@ -52,7 +52,7 @@ export class PerformanceMonitor {
   constructor(options: { maxMetrics?: number; thresholds?: PerformanceThresholds } = {}) {
     this.metrics = [];
     this.aggregatedMetrics = new Map();
-    this.maxMetrics = options.maxMetrics || 1000;
+    this.maxMetrics = options.maxMetrics ?? 1000;
     this.thresholds = {
       slowQueryThreshold: 2000, // 2 seconds
       highMemoryThreshold: 100 * 1024 * 1024, // 100MB
@@ -156,13 +156,13 @@ export class PerformanceMonitor {
    */
   private checkThresholds(metric: PerformanceMetric): void {
     // Check slow query threshold
-    if (metric.duration > (this.thresholds.slowQueryThreshold || 2000)) {
+    if (metric.duration > (this.thresholds.slowQueryThreshold ?? 2000)) {
       console.warn(`⚠️  Slow query detected: ${metric.operation} took ${metric.duration}ms`);
     }
 
     // Check memory usage threshold
     const currentMemory = process.memoryUsage();
-    if (currentMemory.heapUsed > (this.thresholds.highMemoryThreshold || 100 * 1024 * 1024)) {
+    if (currentMemory.heapUsed > (this.thresholds.highMemoryThreshold ?? 100 * 1024 * 1024)) {
       console.warn(`⚠️  High memory usage: ${(currentMemory.heapUsed / 1024 / 1024).toFixed(2)}MB`);
     }
 
@@ -171,7 +171,7 @@ export class PerformanceMonitor {
     if (aggregated && aggregated.count >= 10) {
       // Only check after sufficient samples
       const errorRate = (aggregated.errorCount / aggregated.count) * 100;
-      if (errorRate > (this.thresholds.errorRateThreshold || 10)) {
+      if (errorRate > (this.thresholds.errorRateThreshold ?? 10)) {
         console.warn(`⚠️  High error rate for ${metric.operation}: ${errorRate.toFixed(1)}%`);
       }
     }
@@ -221,7 +221,7 @@ export class PerformanceMonitor {
    * Get slow queries (above threshold)
    */
   getSlowQueries(threshold?: number): PerformanceMetric[] {
-    const slowThreshold = threshold || this.thresholds.slowQueryThreshold || 2000;
+    const slowThreshold = threshold ?? this.thresholds.slowQueryThreshold ?? 2000;
     return this.metrics.filter(m => m.duration > slowThreshold);
   }
 

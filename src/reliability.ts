@@ -44,7 +44,7 @@ export class ConsoleTelemetry implements Telemetry {
   }
 
   trackError(error: Error, context?: Record<string, any>): void {
-    logger.error(`[TELEMETRY] Error: ${error.message}`, context || {}, error);
+    logger.error(`[TELEMETRY] Error: ${error.message}`, context ?? {}, error);
   }
 
   trackMetric(name: string, value: number, tags?: Record<string, string>): void {
@@ -271,7 +271,7 @@ export class RetryManager {
     // Handle GitHub API errors (from Octokit)
     if (error.status) {
       return new GitHubMCPError(
-        error.message || 'GitHub API error',
+        error.message ?? 'GitHub API error',
         'GITHUB_API_ERROR',
         error.status,
         { operation, originalError: error.message },
@@ -292,7 +292,7 @@ export class RetryManager {
 
     // Generic error
     return new GitHubMCPError(
-      error.message || 'Unknown error occurred',
+      error.message ?? 'Unknown error occurred',
       'UNKNOWN_ERROR',
       undefined,
       { operation },
@@ -307,7 +307,7 @@ export class RetryManager {
     }
 
     // Check against configured retryable errors
-    return config.retryableErrors?.includes(error.code) || false;
+    return config.retryableErrors?.includes(error.code) ?? false;
   }
 
   private calculateDelay(attempt: number, config: RetryConfig): number {
@@ -351,9 +351,7 @@ export class CorrelationManager {
   private currentId?: string;
 
   static getInstance(): CorrelationManager {
-    if (!this.instance) {
-      this.instance = new CorrelationManager();
-    }
+    this.instance ??= new CorrelationManager();
     return this.instance;
   }
 
@@ -424,7 +422,7 @@ export class ReliabilityManager {
       metadata?: Record<string, any>;
     }
   ): Promise<T> {
-    const correlationId = options?.correlationId || this.correlationManager.generateId();
+    const correlationId = options?.correlationId ?? this.correlationManager.generateId();
     const startTime = Date.now();
     const context: RequestContext = {
       operation,

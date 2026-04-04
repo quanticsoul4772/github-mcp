@@ -32,9 +32,9 @@ export class GitHubAPICache {
 
   constructor(options: CacheOptions = {}) {
     this.cache = new Map();
-    this.defaultTTL = options.defaultTTL || 5 * 60 * 1000; // 5 minutes default
-    this.maxSize = options.maxSize || 1000;
-    this.enableMetrics = options.enableMetrics || false;
+    this.defaultTTL = options.defaultTTL ?? 5 * 60 * 1000; // 5 minutes default
+    this.maxSize = options.maxSize ?? 1000;
+    this.enableMetrics = options.enableMetrics ?? false;
     this.accessOrder = [];
     this.metrics = {
       hits: 0,
@@ -91,7 +91,7 @@ export class GitHubAPICache {
 
     try {
       const data = await fetcher();
-      this.set(key, data, ttl || this.defaultTTL);
+      this.set(key, data, ttl ?? this.defaultTTL);
       return data;
     } catch (error) {
       // On error, return stale data if available

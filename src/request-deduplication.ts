@@ -28,8 +28,8 @@ export class RequestDeduplicator {
 
   constructor(options: RequestOptions = {}) {
     this.pendingRequests = new Map();
-    this.maxPendingTime = options.maxPendingTime || 5 * 1000; // 5 seconds default
-    this.enableMetrics = options.enableMetrics || false;
+    this.maxPendingTime = options.maxPendingTime ?? 5 * 1000; // 5 seconds default
+    this.enableMetrics = options.enableMetrics ?? false;
     this.metrics = {
       totalRequests: 0,
       deduplicatedRequests: 0,

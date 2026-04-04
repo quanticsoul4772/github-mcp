@@ -411,7 +411,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
         owner: params.owner,
         repo: params.repo,
         run_id: params.run_id,
-        filter: (params.filter || 'all') as any,
+        filter: (params.filter ?? 'all') as any,
         page: params.page,
         per_page: params.perPage,
       });
@@ -584,7 +584,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
 
       return {
         logs_url:
-          response.url ||
+          response.url ??
           `https://api.github.com/repos/${params.owner}/${params.repo}/actions/runs/${params.run_id}/logs`,
       };
     },

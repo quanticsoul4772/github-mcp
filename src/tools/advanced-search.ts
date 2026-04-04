@@ -687,8 +687,8 @@ export function createAdvancedSearchTools(
         const variables = {
           searchQuery: params.query,
           entityType: params.entityType,
-          first: params.first || 20,
-          repoLimit: params.repositoryLimit || 10,
+          first: params.first ?? 20,
+          repoLimit: params.repositoryLimit ?? 10,
         };
 
         return withErrorHandling('search_with_relationships', async () => {
@@ -707,17 +707,17 @@ export function createAdvancedSearchTools(
               return {
                 ...node,
                 type: 'organization',
-                totalMembers: node.membersWithRole?.totalCount || 0,
-                totalRepositories: node.repositories?.totalCount || 0,
+                totalMembers: node.membersWithRole?.totalCount ?? 0,
+                totalRepositories: node.repositories?.totalCount ?? 0,
               };
             } else {
               return {
                 ...node,
                 type: 'user',
-                totalFollowers: node.followers?.totalCount || 0,
-                totalFollowing: node.following?.totalCount || 0,
-                totalRepositories: node.repositories?.totalCount || 0,
-                totalGists: node.gists?.totalCount || 0,
+                totalFollowers: node.followers?.totalCount ?? 0,
+                totalFollowing: node.following?.totalCount ?? 0,
+                totalRepositories: node.repositories?.totalCount ?? 0,
+                totalGists: node.gists?.totalCount ?? 0,
               };
             }
           });

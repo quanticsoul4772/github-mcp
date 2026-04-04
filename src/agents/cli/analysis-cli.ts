@@ -250,7 +250,7 @@ export class AnalysisCLI {
    * Output analysis report
    */
   private async outputReport(report: AnalysisReport, options: CliOptions): Promise<void> {
-    const format = options.format || 'text';
+    const format = options.format ?? 'text';
 
     let output: string;
     switch (format) {
@@ -401,9 +401,7 @@ export class AnalysisCLI {
   private groupFindingsBySeverity(findings: any[]): Record<string, any[]> {
     return findings.reduce((groups, finding) => {
       const severity = finding.severity;
-      if (!groups[severity]) {
-        groups[severity] = [];
-      }
+      groups[severity] ??= [];
       groups[severity].push(finding);
       return groups;
     }, {});

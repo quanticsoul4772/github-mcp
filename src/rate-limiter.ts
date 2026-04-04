@@ -70,9 +70,9 @@ export class GitHubRateLimiter {
    * Update rate limit information from response headers
    */
   private updateRateLimit(headers: any, resource: string = 'core') {
-    const limit = parseInt(headers['x-ratelimit-limit'] || '5000');
-    const remaining = parseInt(headers['x-ratelimit-remaining'] || '5000');
-    const reset = new Date(parseInt(headers['x-ratelimit-reset'] || '0') * 1000);
+    const limit = parseInt(headers['x-ratelimit-limit'] ?? '5000');
+    const remaining = parseInt(headers['x-ratelimit-remaining'] ?? '5000');
+    const reset = new Date(parseInt(headers['x-ratelimit-reset'] ?? '0') * 1000);
 
     switch (resource) {
       case 'search':
@@ -207,7 +207,7 @@ export class GitHubRateLimiter {
           return b.priority - a.priority;
         }
         // Among equal priority, prefer lower point cost queries
-        return (a.estimatedPoints || 1) - (b.estimatedPoints || 1);
+        return (a.estimatedPoints ?? 1) - (b.estimatedPoints ?? 1);
       });
 
       const request = this.requestQueue.shift();
@@ -643,8 +643,8 @@ export function createRateLimitedOctokit(token: string): {
 
           try {
             const body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
-            query = body?.query || '';
-            variables = body?.variables || {};
+            query = body?.query ?? '';
+            variables = body?.variables ?? {};
           } catch (e) {
             logger.warn('Could not parse GraphQL request body for complexity analysis', {
               error: e instanceof Error ? e.message : String(e),

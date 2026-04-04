@@ -201,7 +201,7 @@ export function createGraphQLWrapper(client: OptimizedAPIClient | Octokit): {
      * Execute a GraphQL query with automatic caching
      */
     query: <T>(query: string, variables?: Record<string, any>, ttl?: number) =>
-      cachedGraphQL<T>(client, query, variables || {}, {
+      cachedGraphQL<T>(client, query, variables ?? {}, {
         ttl,
         operation: getQueryOperation(query),
       }),
@@ -210,7 +210,7 @@ export function createGraphQLWrapper(client: OptimizedAPIClient | Octokit): {
      * Execute a GraphQL mutation with cache invalidation
      */
     mutate: <T>(mutation: string, variables?: Record<string, any>) =>
-      smartGraphQL<T>(client, mutation, variables || {}, {
+      smartGraphQL<T>(client, mutation, variables ?? {}, {
         isMutation: true,
         skipCache: true, // Don't cache mutations
         operation: getQueryOperation(mutation),
@@ -228,7 +228,7 @@ export function createGraphQLWrapper(client: OptimizedAPIClient | Octokit): {
         operation?: string;
         isMutation?: boolean;
       }
-    ) => smartGraphQL<T>(client, query, variables || {}, options || {}),
+    ) => smartGraphQL<T>(client, query, variables ?? {}, options ?? {}),
 
     /**
      * Get the underlying client (for direct access when needed)
@@ -454,7 +454,7 @@ export function formatGraphQLError(error: any): string {
   if (error?.response?.data?.errors) {
     const errors = error.response.data.errors;
     if (Array.isArray(errors) && errors.length > 0) {
-      return errors.map(err => err.message || 'Unknown GraphQL error').join('; ');
+      return errors.map(err => err.message ?? 'Unknown GraphQL error').join('; ');
     }
   }
 

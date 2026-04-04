@@ -98,16 +98,16 @@ export class TestGenerationAgent extends BaseAgent {
         request
       );
 
-      const testFilePath = this.generateTestFilePath(request.target, request.framework || 'vitest');
+      const testFilePath = this.generateTestFilePath(request.target, request.framework ?? 'vitest');
 
       return {
         filePath: testFilePath,
         content: testContent,
         metadata: {
-          framework: request.framework || 'vitest',
+          framework: request.framework ?? 'vitest',
           testCases: functions.length + classes.reduce((sum, cls) => sum + cls.methods.length, 0),
-          coverage: request.coverage || { lines: 80, functions: 80, branches: 80 },
-          dependencies: this.extractTestDependencies(request.framework || 'vitest'),
+          coverage: request.coverage ?? { lines: 80, functions: 80, branches: 80 },
+          dependencies: this.extractTestDependencies(request.framework ?? 'vitest'),
         },
       };
     } catch (error) {
@@ -317,7 +317,7 @@ export class TestGenerationAgent extends BaseAgent {
     classes: ClassInfo[],
     request: TestGenerationRequest
   ): Promise<string> {
-    const framework = request.framework || 'vitest';
+    const framework = request.framework ?? 'vitest';
     const testType = request.testType;
 
     let content = this.generateTestHeader(targetFile, framework);
@@ -622,8 +622,8 @@ export class TestGenerationAgent extends BaseAgent {
       const line = lines[i];
       body += line + '\n';
 
-      braceCount += (line.match(/{/g) || []).length;
-      braceCount -= (line.match(/}/g) || []).length;
+      braceCount += (line.match(/{/g) ?? []).length;
+      braceCount -= (line.match(/}/g) ?? []).length;
 
       if (braceCount === 0 && i > startIndex) {
         break;

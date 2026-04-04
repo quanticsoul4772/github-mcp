@@ -244,7 +244,7 @@ const configSchema = z
   .refine(
     data => {
       // Ensure at least one GitHub token is provided
-      return data.GITHUB_PERSONAL_ACCESS_TOKEN || data.GITHUB_TOKEN;
+      return data.GITHUB_PERSONAL_ACCESS_TOKEN ?? data.GITHUB_TOKEN;
     },
     {
       message: 'Either GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_TOKEN must be provided',
@@ -252,7 +252,7 @@ const configSchema = z
     }
   ).refine(
     data => {
-        const token = data.GITHUB_PERSONAL_ACCESS_TOKEN || data.GITHUB_TOKEN;
+        const token = data.GITHUB_PERSONAL_ACCESS_TOKEN ?? data.GITHUB_TOKEN;
         if (!token) return false; // Previous refine should handle this
         return validateGitHubTokenFormat(token).isValid;
     },
@@ -299,7 +299,7 @@ export type Config = z.infer<typeof configSchema>;
  * Prioritizes GITHUB_PERSONAL_ACCESS_TOKEN over GITHUB_TOKEN
  */
 export function getGitHubToken(): string {
-  const token = config.GITHUB_PERSONAL_ACCESS_TOKEN || config.GITHUB_TOKEN;
+  const token = config.GITHUB_PERSONAL_ACCESS_TOKEN ?? config.GITHUB_TOKEN;
   if (!token) {
     throw new Error('No GitHub authentication token available');
   }
@@ -498,7 +498,7 @@ export function validateGitHubTokenWithResult(
     errors.push(
       createValidationError(
         'githubToken',
-        formatResult.error || 'Invalid token format',
+        formatResult.error ?? 'Invalid token format',
         'INVALID_TOKEN_FORMAT'
       )
     );
@@ -785,7 +785,7 @@ export function validateEnvironmentConfiguration(): {
   return {
     isValid: result.isValid,
     errors: result.errors.map(e => e.message),
-    sanitizedValues: result.data || {},
+    sanitizedValues: result.data ?? {},
   };
 }
 
@@ -829,7 +829,7 @@ export function validateEnvironmentConfigurationWithResult(): ValidationResult<
   };
 
   // Required variables - GitHub token
-  const token = getEnvVar('GITHUB_PERSONAL_ACCESS_TOKEN') || getEnvVar('GITHUB_TOKEN');
+  const token = getEnvVar('GITHUB_PERSONAL_ACCESS_TOKEN') ?? getEnvVar('GITHUB_TOKEN');
   if (!token) {
     errors.push(
       createValidationError(
@@ -978,7 +978,7 @@ export function validateEnvironmentConfigurationGraceful(): ValidationResult<{
   };
 
   // For recoverable errors, provide degraded functionality
-  const token = getEnvVar('GITHUB_PERSONAL_ACCESS_TOKEN') || getEnvVar('GITHUB_TOKEN');
+  const token = getEnvVar('GITHUB_PERSONAL_ACCESS_TOKEN') ?? getEnvVar('GITHUB_TOKEN');
   if (token) {
     // Even if token validation failed, try to proceed with warnings
     sanitizedValues.GITHUB_TOKEN = token;

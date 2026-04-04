@@ -154,9 +154,9 @@ export class GraphQLPaginationHandler {
 
     return {
       data: allData,
-      pageInfo: lastPageInfo || { hasNextPage: false },
+      pageInfo: lastPageInfo ?? { hasNextPage: false },
       totalCount,
-      hasMore: lastPageInfo?.hasNextPage || false,
+      hasMore: lastPageInfo?.hasNextPage ?? false,
       nextCursor: lastPageInfo?.endCursor,
     };
   }
@@ -502,7 +502,7 @@ export class GraphQLPaginationHandler {
       variables: { owner, repo, branch, since, until },
       extractData: (result: any) => {
         return (
-          result.repository.ref?.target?.history ||
+          result.repository.ref?.target?.history ??
           result.repository.defaultBranchRef?.target?.history
         );
       },
@@ -640,9 +640,9 @@ export class GraphQLPaginationHandler {
         nodes: result.search.nodes,
         pageInfo: result.search.pageInfo,
         totalCount:
-          result.search.repositoryCount ||
-          result.search.issueCount ||
-          result.search.userCount ||
+          result.search.repositoryCount ??
+          result.search.issueCount ??
+          result.search.userCount ??
           result.search.discussionCount,
       }),
     };
@@ -737,7 +737,7 @@ export const GraphQLPaginationUtils = {
 
     return {
       data: allData,
-      pageInfo: lastPageInfo || { hasNextPage: false },
+      pageInfo: lastPageInfo ?? { hasNextPage: false },
       totalCount: results.length > 0 ? totalCount : 0,
       hasMore,
       nextCursor: lastPageInfo?.endCursor,

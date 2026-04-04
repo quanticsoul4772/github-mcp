@@ -113,7 +113,7 @@ class CloseIssueHandler extends BaseToolHandler<CloseIssueParams, CloseIssueResu
           data.assignees?.map((user: any) => ({
             login: user.login,
             type: user.type,
-          })) || [],
+          })) ?? [],
         milestone: data.milestone
           ? {
               title: data.milestone.title,

@@ -132,7 +132,7 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
             // Build dynamic GraphQL query for multiple repositories
             const repositoryQueries = params.repositories
               .map((repo: RepositoryRef, index: number) => {
-                const alias = repo.alias || `repo${index}`;
+                const alias = repo.alias ?? `repo${index}`;
                 return `
                 ${alias}: repository(owner: \"${repo.owner}\", name: \"${repo.repo}\") {
                   id
@@ -316,16 +316,16 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
 
                 if (params.includeIssuesSummary) {
                   processed.issues = {
-                    total: repo.issues?.totalCount || 0,
-                    open: repo.openIssues?.totalCount || 0,
-                    closed: (repo.issues?.totalCount || 0) - (repo.openIssues?.totalCount || 0),
+                    total: repo.issues?.totalCount ?? 0,
+                    open: repo.openIssues?.totalCount ?? 0,
+                    closed: (repo.issues?.totalCount ?? 0) - (repo.openIssues?.totalCount ?? 0),
                   };
                   processed.pullRequests = {
-                    total: repo.pullRequests?.totalCount || 0,
-                    open: repo.openPullRequests?.totalCount || 0,
+                    total: repo.pullRequests?.totalCount ?? 0,
+                    open: repo.openPullRequests?.totalCount ?? 0,
                     closed:
-                      (repo.pullRequests?.totalCount || 0) -
-                      (repo.openPullRequests?.totalCount || 0),
+                      (repo.pullRequests?.totalCount ?? 0) -
+                      (repo.openPullRequests?.totalCount ?? 0),
                   };
                 }
 
@@ -353,18 +353,18 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
               repositories,
               summary: {
                 totalStars: repositories.reduce(
-                  (sum: number, repo: any) => sum + (repo.statistics?.stars || 0),
+                  (sum: number, repo: any) => sum + (repo.statistics?.stars ?? 0),
                   0
                 ),
                 totalForks: repositories.reduce(
-                  (sum: number, repo: any) => sum + (repo.statistics?.forks || 0),
+                  (sum: number, repo: any) => sum + (repo.statistics?.forks ?? 0),
                   0
                 ),
                 languages: [
                   ...new Set(
                     repositories.flatMap(
                       (repo: any) =>
-                        repo.languages?.breakdown?.map((lang: any) => lang.name) ||
+                        repo.languages?.breakdown?.map((lang: any) => lang.name) ??
                         (repo.primaryLanguage ? [repo.primaryLanguage.name] : [])
                     )
                   ),
@@ -451,7 +451,7 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
                 ${
                   params.includeRepositories
                     ? `
-                repositories(first: ${params.repositoryLimit || 5}, orderBy: {field: STARGAZERS, direction: DESC}) {
+                repositories(first: ${params.repositoryLimit ?? 5}, orderBy: {field: STARGAZERS, direction: DESC}) {
                   totalCount
                   nodes {
                     name
@@ -489,7 +489,7 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
                 ${
                   params.includeRepositories
                     ? `
-                repositories(first: ${params.repositoryLimit || 5}, orderBy: {field: STARGAZERS, direction: DESC}) {
+                repositories(first: ${params.repositoryLimit ?? 5}, orderBy: {field: STARGAZERS, direction: DESC}) {
                   totalCount
                   nodes {
                     name
@@ -569,7 +569,7 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
                 totalUsers: entities.filter(e => e.type === 'user').length,
                 totalOrganizations: entities.filter(e => e.type === 'organization').length,
                 totalRepositories: entities.reduce(
-                  (sum: number, entity: any) => sum + (entity.totalRepositories || 0),
+                  (sum: number, entity: any) => sum + (entity.totalRepositories ?? 0),
                   0
                 ),
                 topLanguages: [
@@ -578,7 +578,7 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
                       (entity: any) =>
                         entity.repositories
                           ?.map((repo: any) => repo.primaryLanguage?.name)
-                          .filter(Boolean) || []
+                          .filter(Boolean) ?? []
                     )
                   ),
                 ],

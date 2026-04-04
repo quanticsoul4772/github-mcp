@@ -91,8 +91,8 @@ export class GraphQLCache {
 
   constructor(options: GraphQLCacheOptions = {}) {
     this.cache = new Map();
-    this.defaultTTL = options.defaultTTL || 5 * 60 * 1000; // 5 minutes default
-    this.maxSize = options.maxSize || 1000;
+    this.defaultTTL = options.defaultTTL ?? 5 * 60 * 1000; // 5 minutes default
+    this.maxSize = options.maxSize ?? 1000;
     this.enableMetrics = options.enableMetrics ?? true;
     this.accessOrder = [];
     this.metrics = {
@@ -110,7 +110,7 @@ export class GraphQLCache {
    */
   private generateKey(query: string, variables: Record<string, any> = {}): string {
     // Extract query name/operation for better key identification
-    const queryName = this.extractQueryName(query) || 'unknown';
+    const queryName = this.extractQueryName(query) ?? 'unknown';
 
     // Create a deterministic hash of the query
     const queryHash = this.hashQuery(query);
@@ -203,7 +203,7 @@ export class GraphQLCache {
     } = {}
   ): Promise<T> {
     const key = this.generateKey(query, variables);
-    const queryName = this.extractQueryName(query) || options.operation || 'unknown';
+    const queryName = this.extractQueryName(query) ?? options.operation ?? 'unknown';
     const startTime = Date.now();
 
     // Initialize metrics for this query type
@@ -256,7 +256,7 @@ export class GraphQLCache {
     queryName?: string,
     startTime?: number
   ): Promise<T> {
-    const actualStartTime = startTime || Date.now();
+    const actualStartTime = startTime ?? Date.now();
 
     if (this.enableMetrics) {
       this.metrics.misses++;
@@ -364,7 +364,7 @@ export class GraphQLCache {
    */
   invalidateForMutation(mutation: string, variables: Record<string, any> = {}): number {
     let count = 0;
-    const op = this.extractQueryName(mutation)?.toLowerCase() || '';
+    const op = this.extractQueryName(mutation)?.toLowerCase() ?? '';
     const affectedOps: Record<string, true> = {};
 
     // Map common mutations to affected query operation prefixes

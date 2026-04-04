@@ -186,8 +186,8 @@ export class CodeAnalysisAgent extends AbstractBaseAgent {
       }
 
       // Track nesting level
-      const openBraces = (line.match(/{/g) || []).length;
-      const closeBraces = (line.match(/}/g) || []).length;
+      const openBraces = (line.match(/{/g) ?? []).length;
+      const closeBraces = (line.match(/}/g) ?? []).length;
       nestingLevel += openBraces - closeBraces;
 
       // Check for high complexity

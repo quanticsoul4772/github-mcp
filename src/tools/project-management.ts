@@ -331,7 +331,7 @@ export function createProjectManagementTools(octokit: Octokit, _readOnly: boolea
             const variables = {
               owner: validateGraphQLVariableValue(params.owner, 'owner'),
               ...(params.repo && { repo: validateGraphQLVariableValue(params.repo, 'repo') }),
-              first: validateGraphQLVariableValue(params.first || 25, 'first'),
+              first: validateGraphQLVariableValue(params.first ?? 25, 'first'),
             };
 
             const result: any = (await (octokit as any).graphqlWithComplexity)
@@ -343,7 +343,7 @@ export function createProjectManagementTools(octokit: Octokit, _readOnly: boolea
               projects = result.repository?.projectsV2;
             } else {
               // Try user first, then organization
-              projects = result.user?.projectsV2 || result.organization?.projectsV2;
+              projects = result.user?.projectsV2 ?? result.organization?.projectsV2;
             }
 
             if (!projects) {
@@ -481,7 +481,7 @@ export function createProjectManagementTools(octokit: Octokit, _readOnly: boolea
             const variables = {
               owner: validateGraphQLVariableValue(params.owner, 'owner'),
               repo: validateGraphQLVariableValue(params.repo, 'repo'),
-              first: validateGraphQLVariableValue(params.first || 10, 'first'),
+              first: validateGraphQLVariableValue(params.first ?? 10, 'first'),
               state: params.state ? validateGraphQLVariableValue(params.state, 'state') : undefined,
             };
 
@@ -816,7 +816,7 @@ export function createProjectManagementTools(octokit: Octokit, _readOnly: boolea
               byAssignee: Object.entries(
                 allItems.reduce((acc: any, item) => {
                   for (const assignee of item.assignees.nodes) {
-                    acc[assignee.login] = (acc[assignee.login] || 0) + 1;
+                    acc[assignee.login] = (acc[assignee.login] ?? 0) + 1;
                   }
                   return acc;
                 }, {})

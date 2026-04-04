@@ -103,7 +103,7 @@ export class TypeSafetyAgent extends AbstractBaseAgent {
       if (!content) return findings;
 
       const config = JSON.parse(content);
-      const compilerOptions = config.compilerOptions || {};
+      const compilerOptions = config.compilerOptions ?? {};
 
       // Check for strict mode
       if (!compilerOptions.strict) {

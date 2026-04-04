@@ -126,7 +126,7 @@ export class MetricsCollector {
    * Increment a counter metric
    */
   public incrementCounter(name: string, value: number = 1): void {
-    const current = this.counters.get(name) || 0;
+    const current = this.counters.get(name) ?? 0;
     this.counters.set(name, current + value);
   }
 
@@ -141,7 +141,7 @@ export class MetricsCollector {
    * Record a histogram value
    */
   public recordHistogram(name: string, value: number): void {
-    const values = this.histograms.get(name) || [];
+    const values = this.histograms.get(name) ?? [];
     values.push(value);
     this.histograms.set(name, values);
   }
@@ -207,8 +207,8 @@ export class MetricsCollector {
     resetTimestamp: number;
     resetTimeRemaining: number;
   } {
-    const remaining = this.gauges.get('github_rate_limit_remaining') || 0;
-    const resetTimestamp = this.gauges.get('github_rate_limit_reset_timestamp') || 0;
+    const remaining = this.gauges.get('github_rate_limit_remaining') ?? 0;
+    const resetTimestamp = this.gauges.get('github_rate_limit_reset_timestamp') ?? 0;
     const resetTimeRemaining =
       resetTimestamp > 0 ? Math.max(0, resetTimestamp - Math.floor(Date.now() / 1000)) : 0;
 

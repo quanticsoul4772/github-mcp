@@ -140,9 +140,9 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
               date: item.commit.author?.date || '',
             },
             committer: {
-              name: item.commit.committer?.name || '',
-              email: item.commit.committer?.email || '',
-              date: item.commit.committer?.date || '',
+              name: item.commit.committer?.name ?? '',
+              email: item.commit.committer?.email ?? '',
+              date: item.commit.committer?.date ?? '',
             },
             comment_count: item.commit.comment_count,
           },

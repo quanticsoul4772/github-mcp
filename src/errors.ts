@@ -33,7 +33,7 @@ export class GitHubMCPError extends Error {
     this.context = context;
     this.originalError = originalError;
     // Generate a correlation ID if not provided
-    this.correlationId = correlationId || logger.generateCorrelationId();
+    this.correlationId = correlationId ?? logger.generateCorrelationId();
     this.timestamp = new Date();
     this.isRetryable = this.determineRetryability();
 
@@ -194,7 +194,7 @@ export async function withErrorHandling<T>(
 
     // Record error metrics
     metrics.recordError({
-      tool: context?.tool || 'unknown',
+      tool: context?.tool ?? 'unknown',
       operation,
       errorType: normalizedError.name,
       message: normalizedError.message,
@@ -233,7 +233,7 @@ export function normalizeError(
 
   // GitHub API error (from Octokit)
   if (error.status) {
-    const message = error.message || 'GitHub API error';
+    const message = error.message ?? 'GitHub API error';
     const statusCode = error.status;
 
     // Check for specific error types
@@ -255,7 +255,7 @@ export function normalizeError(
       return new AuthorizationError(message, { ...context, operation });
     }
     if (statusCode === 404) {
-      return new NotFoundError(operation || 'Unknown resource', context);
+      return new NotFoundError(operation ?? 'Unknown resource', context);
     }
     if (statusCode === 429) {
       const reset = parseInt(error.response?.headers?.['x-ratelimit-reset'] ?? '', 10);
@@ -285,12 +285,12 @@ export function normalizeError(
 
   // Timeout errors
   if (error.name === 'TimeoutError' || error.code === 'ETIMEDOUT') {
-    return new TimeoutError(operation || 'Unknown operation', 30000);
+    return new TimeoutError(operation ?? 'Unknown operation', 30000);
   }
 
   // Generic error
   return new GitHubMCPError(
-    error.message || 'An unknown error occurred',
+    error.message ?? 'An unknown error occurred',
     'UNKNOWN_ERROR',
     undefined,
     { ...context, operation },

@@ -128,8 +128,8 @@ export class StaticAnalysisAgent extends BaseAgent {
       const trimmedLine = line.trim();
 
       // Unclosed brackets/parentheses (basic check)
-      const openBrackets = (line.match(/[{[(]/g) || []).length;
-      const closeBrackets = (line.match(/[}\])]/g) || []).length;
+      const openBrackets = (line.match(/[{[(]/g) ?? []).length;
+      const closeBrackets = (line.match(/[}\])]/g) ?? []).length;
       if (openBrackets > closeBrackets + 1) {
         findings.push(
           this.createFinding(
@@ -679,8 +679,8 @@ export class StaticAnalysisAgent extends BaseAgent {
 
         for (let j = i; j < lines.length; j++) {
           const currentLine = lines[j];
-          braceCount += (currentLine.match(/{/g) || []).length;
-          braceCount -= (currentLine.match(/}/g) || []).length;
+          braceCount += (currentLine.match(/{/g) ?? []).length;
+          braceCount -= (currentLine.match(/}/g) ?? []).length;
 
           if (braceCount === 0 && j > i) {
             bodyEnd = j;

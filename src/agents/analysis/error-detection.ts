@@ -759,8 +759,8 @@ export class ErrorDetectionAgent extends BaseAgent {
       const line = lines[i];
       body += line + '\n';
 
-      braceCount += (line.match(/{/g) || []).length;
-      braceCount -= (line.match(/}/g) || []).length;
+      braceCount += (line.match(/{/g) ?? []).length;
+      braceCount -= (line.match(/}/g) ?? []).length;
 
       if (braceCount === 0 && i > startIndex) {
         break;
@@ -834,8 +834,8 @@ export class ErrorDetectionAgent extends BaseAgent {
 
     for (let i = tryIndex; i < lines.length; i++) {
       const line = lines[i];
-      braceCount += (line.match(/{/g) || []).length;
-      braceCount -= (line.match(/}/g) || []).length;
+      braceCount += (line.match(/{/g) ?? []).length;
+      braceCount -= (line.match(/}/g) ?? []).length;
 
       if (line.trim().startsWith('catch (') || line.trim().startsWith('finally')) {
         return true;

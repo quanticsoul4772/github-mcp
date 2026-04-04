@@ -99,7 +99,7 @@ export const generateMockToken = (type: 'pat' | 'fine-grained' | 'server' | 'ref
     case 'pat':
       return 'ghp_' + 'A'.repeat(36);
     case 'fine-grained':
-      return 'github_pat_' + 'A'.repeat(length || 71);
+      return 'github_pat_' + 'A'.repeat(length ?? 71);
     case 'server':
       return 'ghs_' + 'A'.repeat(36);
     case 'refresh':

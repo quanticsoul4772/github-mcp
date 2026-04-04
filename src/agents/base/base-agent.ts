@@ -181,13 +181,13 @@ export abstract class AbstractBaseAgent implements BaseAgent {
 
     switch (level) {
       case 'info':
-        console.log(logMessage, data || '');
+        console.log(logMessage, data ?? '');
         break;
       case 'warn':
-        console.warn(logMessage, data || '');
+        console.warn(logMessage, data ?? '');
         break;
       case 'error':
-        console.error(logMessage, data || '');
+        console.error(logMessage, data ?? '');
         break;
     }
   }

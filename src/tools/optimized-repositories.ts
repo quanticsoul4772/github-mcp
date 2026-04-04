@@ -284,7 +284,7 @@ export function createOptimizedRepositoryTools(
           throw new ValidationError('repo', 'Invalid repository name');
         }
 
-        const maxPages = params.maxPages || 3;
+        const maxPages = params.maxPages ?? 3;
         return optimizedClient.listBranches(params.owner, params.repo, maxPages);
       },
       'list_branches_optimized'
@@ -348,12 +348,12 @@ export function createOptimizedRepositoryTools(
         }
 
         const options = {
-          state: params.state || 'open',
+          state: params.state ?? 'open',
           labels: params.labels,
           assignee: params.assignee,
           since: params.since,
-          maxPages: params.maxPages || 5,
-          perPage: params.perPage || 100,
+          maxPages: params.maxPages ?? 5,
+          perPage: params.perPage ?? 100,
         };
 
         return optimizedClient.listIssues(params.owner, params.repo, options);
@@ -417,11 +417,11 @@ export function createOptimizedRepositoryTools(
         }
 
         const options = {
-          state: params.state || 'open',
+          state: params.state ?? 'open',
           sort: params.sort,
           direction: params.direction,
-          maxPages: params.maxPages || 5,
-          perPage: params.perPage || 100,
+          maxPages: params.maxPages ?? 5,
+          perPage: params.perPage ?? 100,
         };
 
         return optimizedClient.listPullRequests(params.owner, params.repo, options);

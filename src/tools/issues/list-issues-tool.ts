@@ -134,7 +134,7 @@ class ListIssuesHandler extends BaseToolHandler<ListIssuesParams, IssueListItem[
           issue.assignees?.map((user: any) => ({
             login: user.login,
             type: user.type,
-          })) || [],
+          })) ?? [],
         milestone: issue.milestone
           ? {
               title: issue.milestone.title,

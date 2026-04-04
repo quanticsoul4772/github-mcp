@@ -48,7 +48,7 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
   private eventListeners: AgentEventListener[] = [];
 
   constructor(registry?: DefaultAgentRegistry) {
-    this.registry = registry || new DefaultAgentRegistry();
+    this.registry = registry ?? new DefaultAgentRegistry();
   }
 
   /**
@@ -103,9 +103,7 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
         results.push(result);
 
         // Add result to context for dependent agents
-        if (!context.previousResults) {
-          context.previousResults = new Map();
-        }
+        context.previousResults ??= new Map();
         context.previousResults.set(agent.name, result);
       } catch (error) {
         console.error(`Agent ${agent.name} failed:`, error);
@@ -165,9 +163,7 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
       const result = await this.runSingleAgentInternal(agent, context);
       results.push(result);
 
-      if (!context.previousResults) {
-        context.previousResults = new Map();
-      }
+      context.previousResults ??= new Map();
       context.previousResults.set(agent.name, result);
     }
 
@@ -235,7 +231,7 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
    */
   public generateReport(results: AnalysisResult[], context: AnalysisContext): AnalysisReport {
     const allFindings = results.flatMap(result => result.findings);
-    const recommendations = results.flatMap(result => result.recommendations || []);
+    const recommendations = results.flatMap(result => result.recommendations ?? []);
 
     const summary = {
       totalFindings: allFindings.length,
@@ -245,7 +241,7 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
       lowFindings: allFindings.filter(f => f.severity === 'low').length,
       infoFindings: allFindings.filter(f => f.severity === 'info').length,
       agentsRun: results.length,
-      totalExecutionTime: results.reduce((sum, r) => sum + (r.executionTime || 0), 0),
+      totalExecutionTime: results.reduce((sum, r) => sum + (r.executionTime ?? 0), 0),
       filesAnalyzed: new Set(allFindings.map(f => f.file).filter(Boolean)).size,
     };
 
@@ -323,10 +319,10 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
         summary: {
           filesAnalyzed: new Set(r.findings.map(f => f.file).filter(Boolean)).size,
           totalFindings: r.findings.length,
-          duration: r.executionTime || 0,
+          duration: r.executionTime ?? 0,
         },
         findings: r.findings,
-        duration: r.executionTime || 0,
+        duration: r.executionTime ?? 0,
       })),
       consolidatedFindings: report.findings,
     };
@@ -350,7 +346,7 @@ export class DefaultAgentCoordinator implements AgentCoordinator {
     const agents = this.registry.getAllAgents();
 
     for (const agent of agents) {
-      const config = context.configuration?.get(agent.name) || agent.getDefaultConfiguration();
+      const config = context.configuration?.get(agent.name) ?? agent.getDefaultConfiguration();
       if (!agent.validateConfiguration(config)) {
         errors.push(`Invalid configuration for agent '${agent.name}'`);
       }

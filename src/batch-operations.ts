@@ -139,7 +139,7 @@ export async function batchGetFiles(
   const fetchOperations = Array.from(pathToSha.entries()).map(([path, sha]) => ({
     path,
     sha,
-    size: pathToSize.get(path) || 0,
+    size: pathToSize.get(path) ?? 0,
   }));
 
   // Filter out large files (>1MB) to avoid memory issues
@@ -217,7 +217,7 @@ export async function batchUpdateFiles(
       return {
         path: file.path,
         sha: data.sha,
-        mode: file.mode || '100644', // Default to regular file
+        mode: file.mode ?? '100644', // Default to regular file
       };
     },
     { concurrency: 10 }

@@ -143,9 +143,9 @@ export class ToolRegistry {
             };
 
             if (hasParams) {
-                this.server.tool(toolName, config.tool.description || 'GitHub API operation', zodShape, handler);
+                this.server.tool(toolName, config.tool.description ?? 'GitHub API operation', zodShape, handler);
             } else {
-                this.server.tool(toolName, config.tool.description || 'GitHub API operation', handler);
+                this.server.tool(toolName, config.tool.description ?? 'GitHub API operation', handler);
             }
 
             this.registeredTools.add(config.tool.name);

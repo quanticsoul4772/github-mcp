@@ -100,7 +100,7 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
     },
     handler: async (args: unknown) => {
       const params = args as { cacheType?: string; pattern?: string };
-      const cacheType = params.cacheType || 'all';
+      const cacheType = params.cacheType ?? 'all';
       let clearedEntries = 0;
 
       if (params.pattern) {
@@ -286,7 +286,7 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
         };
       }
 
-      const queryTypes = params.queryTypes || ['insights', 'contributors'];
+      const queryTypes = params.queryTypes ?? ['insights', 'contributors'];
       let warmedQueries = 0;
       const results: Array<{ repo: string; queryType: string; success: boolean; error?: string }> =
         [];

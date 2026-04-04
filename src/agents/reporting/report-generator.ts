@@ -138,9 +138,9 @@ export class ReportGenerator {
    */
   public generateReportSafe(data: Partial<ReportData>): string {
     const safeData: ReportData = {
-      title: data.title || 'Security Analysis Report',
-      summary: data.summary || 'Analysis completed',
-      sections: data.sections || [],
+      title: data.title ?? 'Security Analysis Report',
+      summary: data.summary ?? 'Analysis completed',
+      sections: data.sections ?? [],
       metadata: {
         generatedAt: (() => {
           const v = data.metadata?.generatedAt;
@@ -532,7 +532,7 @@ export class ReportGenerator {
           return a.file.localeCompare(b.file);
         case 'line':
           if (a.file !== b.file) return a.file.localeCompare(b.file);
-          return (a.line || 0) - (b.line || 0);
+          return (a.line ?? 0) - (b.line ?? 0);
         default:
           return 0;
       }
@@ -1043,10 +1043,10 @@ export class ReportGenerator {
         this.escapeCsv(finding.title),
         this.escapeCsv(finding.description),
         this.escapeCsv(finding.file),
-        finding.line?.toString() || '',
-        finding.column?.toString() || '',
-        this.escapeCsv(finding.rule || ''),
-        this.escapeCsv(finding.suggestion || ''),
+        finding.line?.toString() ?? '',
+        finding.column?.toString() ?? '',
+        this.escapeCsv(finding.rule ?? ''),
+        this.escapeCsv(finding.suggestion ?? ''),
       ];
       csv +=
         row.join(',') +

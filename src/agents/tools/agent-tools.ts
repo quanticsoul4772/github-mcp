@@ -139,7 +139,7 @@ export function createAgentTools(): ToolConfig<unknown, unknown>[] {
           const target: AnalysisTarget = {
             type: args.type,
             path: args.target,
-            depth: args.depth || 'deep',
+            depth: args.depth ?? 'deep',
           };
 
           const request: CoordinationRequest = {
@@ -148,7 +148,7 @@ export function createAgentTools(): ToolConfig<unknown, unknown>[] {
             parallel: args.parallel !== false,
             config: {
               enabled: true,
-              depth: args.depth || 'deep',
+              depth: args.depth ?? 'deep',
               minSeverity: args.minSeverity as Severity,
               includeCategories: args.includeCategories as FindingCategory[],
               excludeCategories: args.excludeCategories as FindingCategory[],
@@ -300,7 +300,7 @@ export function createAgentTools(): ToolConfig<unknown, unknown>[] {
           const request: TestGenerationRequest = {
             target: args.target,
             testType: args.testType,
-            framework: args.framework || 'vitest',
+            framework: args.framework ?? 'vitest',
             coverage: args.coverage,
           };
 

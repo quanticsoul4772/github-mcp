@@ -217,10 +217,10 @@ export class PaginationHandler {
 
       const response = await apiCall(params);
       const data = response.data;
-      const headers = response.headers || {};
+      const headers = response.headers ?? {};
 
       // Parse GitHub pagination headers
-      const linkHeader = headers.link || '';
+      const linkHeader = headers.link ?? '';
       const hasNext = linkHeader.includes('rel="next"');
 
       // Try to extract total count from headers if available

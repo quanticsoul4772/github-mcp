@@ -368,10 +368,10 @@ export abstract class BaseAgent implements CodeAnalysisAgent {
     const parts = [
       this.name,
       file,
-      line?.toString() || '0',
-      column?.toString() || '0',
-      rule || 'unknown',
-      title || 'finding',
+      line?.toString() ?? '0',
+      column?.toString() ?? '0',
+      rule ?? 'unknown',
+      title ?? 'finding',
     ];
 
     // Create a simple hash of the parts

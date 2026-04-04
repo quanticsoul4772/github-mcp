@@ -38,7 +38,7 @@ export abstract class BaseToolHandler<TParams, TResult> {
         throw new Error(`${context}: GitHub API error (${error.status}): ${error.message}`);
       }
 
-      throw new Error(`${context}: ${error.message || 'Unknown error'}`);
+      throw new Error(`${context}: ${error.message ?? 'Unknown error'}`);
     }
   }
 

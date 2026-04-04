@@ -105,13 +105,13 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
     handler: async (args: unknown) => {
       const params = args as ListUserRepositoriesParams;
       const { data } = await octokit.rest.repos.listForAuthenticatedUser({
-        visibility: (params.visibility as any) || 'all',
+        visibility: (params.visibility as any) ?? 'all',
         affiliation: params.affiliation as any,
         type: params.type as any,
-        sort: (params.sort as any) || 'updated',
-        direction: (params.direction as any) || 'desc',
-        page: params.page || 1,
-        per_page: params.perPage || 30,
+        sort: (params.sort as any) ?? 'updated',
+        direction: (params.direction as any) ?? 'desc',
+        page: params.page ?? 1,
+        per_page: params.perPage ?? 30,
       });
 
       return data.map(repo => ({
@@ -340,8 +340,8 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
       const { data } = await octokit.rest.repos.listBranches({
         owner: params.owner,
         repo: params.repo,
-        page: params.page || 1,
-        per_page: params.perPage || 30,
+        page: params.page ?? 1,
+        per_page: params.perPage ?? 30,
       });
 
       return data.map(branch => ({
@@ -563,8 +563,8 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
       
       const { data } = await octokit.rest.search.repos({
         q: params.query,
-        page: params.page || 1,
-        per_page: params.perPage || 30,
+        page: params.page ?? 1,
+        per_page: params.perPage ?? 30,
       });
 
       return {
@@ -574,8 +574,8 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
           name: repo.name,
           full_name: repo.full_name,
           owner: {
-            login: repo.owner?.login || '',
-            type: repo.owner?.type || '',
+            login: repo.owner?.login ?? '',
+            type: repo.owner?.type ?? '',
           },
           description: repo.description,
           private: repo.private,

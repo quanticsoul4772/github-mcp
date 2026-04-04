@@ -319,7 +319,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
       }
 
       const { data } = await octokit.search.issuesAndPullRequests({
-        q: query || '',
+        q: query ?? '',
         sort: params.sort as any,
         order: params.order as any,
         page: params.page,

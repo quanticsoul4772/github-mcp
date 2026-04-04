@@ -320,8 +320,8 @@ export class OptimizedAPIClient {
       exclude_pull_requests: params.exclude_pull_requests,
       check_suite_id: params.check_suite_id,
       head_sha: params.head_sha,
-      per_page: params.per_page || 30,
-      page: params.page || 1,
+      per_page: params.per_page ?? 30,
+      page: params.page ?? 1,
     };
 
     const response = await this.octokit.actions.listWorkflowRuns(fetchParams);
@@ -401,7 +401,7 @@ export class OptimizedAPIClient {
 
       // Apply performance monitoring if enabled
       if (this.enablePerformanceMonitoring && this.performanceMonitor) {
-        const operationName = options.operation || 'graphql';
+        const operationName = options.operation ?? 'graphql';
         return this.performanceMonitor.measure(operationName, cachedExecutor);
       }
 
@@ -410,7 +410,7 @@ export class OptimizedAPIClient {
 
     // Apply performance monitoring if enabled (fallback)
     if (this.enablePerformanceMonitoring && this.performanceMonitor) {
-      const operationName = options.operation || 'graphql';
+      const operationName = options.operation ?? 'graphql';
       return this.performanceMonitor.measure(operationName, fetcher);
     }
 
@@ -474,7 +474,7 @@ export class OptimizedAPIClient {
    * Get comprehensive GraphQL cache statistics
    */
   getGraphQLCacheStats(): GraphQLDetailedStats | null {
-    return this.graphqlCache?.getDetailedStats() || null;
+    return this.graphqlCache?.getDetailedStats() ?? null;
   }
 
   /**

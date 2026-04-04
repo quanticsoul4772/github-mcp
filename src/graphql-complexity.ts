@@ -130,7 +130,7 @@ export class GraphQLComplexityCalculator {
       for (const connection of connections) {
         const multiplier = this.config.connectionMultiplier;
         const connectionBaseCost = this.config.fieldCosts[connection.field] || 2;
-        const itemCount = connection.first || 10; // Default 'first' value
+        const itemCount = connection.first ?? 10; // Default 'first' value
         connectionCost += Math.ceil(connectionBaseCost * multiplier * Math.log(itemCount + 1));
       }
       analysis.breakdown.connections = connectionCost;
@@ -154,7 +154,7 @@ export class GraphQLComplexityCalculator {
         );
       }
 
-      if (connections.some(c => (c.first || 10) > 100)) {
+      if (connections.some(c => (c.first ?? 10) > 100)) {
         analysis.warnings.push(
           'Large connection limits detected - consider pagination for better performance'
         );

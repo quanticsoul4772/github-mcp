@@ -383,7 +383,7 @@ function generateCsvReport(report: AnalysisReport): string {
   const rows = report.findings
     .map(
       finding =>
-        `"${finding.severity}","${finding.category}","${finding.message}","${finding.file || ''}","${finding.line || ''}","${finding.fix || ''}"`
+        `"${finding.severity}","${finding.category}","${finding.message}","${finding.file ?? ''}","${finding.line ?? ''}","${finding.fix ?? ''}"`
     )
     .join('\n');
 

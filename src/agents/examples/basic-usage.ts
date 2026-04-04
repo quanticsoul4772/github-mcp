@@ -233,9 +233,9 @@ export async function quickSecurityScan(targetPath: string) {
       console.log('\\n⚠️ Security Issues:');
       securityFindings.forEach((finding: any, index: number) => {
         console.log(
-          `${index + 1}. [${finding.severity?.toUpperCase() || 'UNKNOWN'}] ${finding.message || 'Unknown issue'}`
+          `${index + 1}. [${finding.severity?.toUpperCase() ?? 'UNKNOWN'}] ${finding.message ?? 'Unknown issue'}`
         );
-        console.log(`   📍 ${finding.file || 'unknown'}:${finding.line || 0}`);
+        console.log(`   📍 ${finding.file ?? 'unknown'}:${finding.line ?? 0}`);
         console.log(`   💡 Review and fix this security issue`);
         console.log('');
       });

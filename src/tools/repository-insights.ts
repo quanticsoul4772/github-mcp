@@ -244,7 +244,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boole
                     repository.pullRequests.totalCount - repository.openPullRequests.totalCount,
                 },
                 releases: repository.releases.totalCount,
-                commits: repository.defaultBranchRef?.target?.history?.totalCount || 0,
+                commits: repository.defaultBranchRef?.target?.history?.totalCount ?? 0,
               },
               languages: {
                 totalSize: repository.languages.totalSize,
@@ -264,7 +264,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boole
                     author: commit.author?.user?.login,
                     additions: commit.additions,
                     deletions: commit.deletions,
-                  })) || [],
+                  })) ?? [],
               },
               metadata: {
                 createdAt: repository.createdAt,
@@ -361,7 +361,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boole
             const variables = {
               owner: validateGraphQLVariableValue(params.owner, 'owner'),
               repo: validateGraphQLVariableValue(params.repo, 'repo'),
-              first: validateGraphQLVariableValue(params.first || 25, 'first'),
+              first: validateGraphQLVariableValue(params.first ?? 25, 'first'),
             };
 
             const result: any = (await (octokit as any).graphqlWithComplexity)
@@ -373,7 +373,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boole
             }
 
             const repository = result.repository;
-            const commitHistory = repository.defaultBranchRef?.target?.history?.nodes || [];
+            const commitHistory = repository.defaultBranchRef?.target?.history?.nodes ?? [];
 
             // Calculate commit statistics per contributor
             const commitStats: Record<
@@ -388,8 +388,8 @@ export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boole
                   commitStats[author] = { commits: 0, additions: 0, deletions: 0 };
                 }
                 commitStats[author].commits++;
-                commitStats[author].additions += commit.additions || 0;
-                commitStats[author].deletions += commit.deletions || 0;
+                commitStats[author].additions += commit.additions ?? 0;
+                commitStats[author].deletions += commit.deletions ?? 0;
               }
             });
 
@@ -555,7 +555,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boole
               const dayKey = date.toISOString().split('T')[0];
               const hour = date.getUTCHours();
               const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
-              const author = commit.author?.user?.login || 'unknown';
+              const author = commit.author?.user?.login ?? 'unknown';
 
               // Count by day
               activityByDay[dayKey] = (activityByDay[dayKey] || 0) + 1;
@@ -570,9 +570,9 @@ export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boole
               activityByWeekday[weekday] = (activityByWeekday[weekday] || 0) + 1;
 
               // Accumulate stats
-              totalAdditions += commit.additions || 0;
-              totalDeletions += commit.deletions || 0;
-              totalFilesChanged += commit.changedFiles || 0;
+              totalAdditions += commit.additions ?? 0;
+              totalDeletions += commit.deletions ?? 0;
+              totalFilesChanged += commit.changedFiles ?? 0;
             });
 
             return {
