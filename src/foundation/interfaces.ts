@@ -3,8 +3,8 @@
  */
 export interface IGitHubClient {
   // Repository operations
-  getRepository(owner: string, repo: string): Promise<any>;
-  getFileContents(owner: string, repo: string, path: string, ref?: string): Promise<any>;
+  getRepository(owner: string, repo: string): Promise<unknown>;
+  getFileContents(owner: string, repo: string, path: string, ref?: string): Promise<unknown>;
   createFile(
     owner: string,
     repo: string,
@@ -12,7 +12,7 @@ export interface IGitHubClient {
     content: string,
     message: string,
     branch?: string
-  ): Promise<any>;
+  ): Promise<unknown>;
   updateFile(
     owner: string,
     repo: string,
@@ -21,7 +21,7 @@ export interface IGitHubClient {
     message: string,
     sha: string,
     branch?: string
-  ): Promise<any>;
+  ): Promise<unknown>;
   deleteFile(
     owner: string,
     repo: string,
@@ -29,27 +29,27 @@ export interface IGitHubClient {
     message: string,
     sha: string,
     branch?: string
-  ): Promise<any>;
+  ): Promise<unknown>;
 
   // Issue operations
-  listIssues(owner: string, repo: string, options?: any): Promise<any>;
-  getIssue(owner: string, repo: string, issueNumber: number): Promise<any>;
-  createIssue(owner: string, repo: string, data: any): Promise<any>;
-  updateIssue(owner: string, repo: string, issueNumber: number, data: any): Promise<any>;
+  listIssues(owner: string, repo: string, options?: Record<string, unknown>): Promise<unknown>;
+  getIssue(owner: string, repo: string, issueNumber: number): Promise<unknown>;
+  createIssue(owner: string, repo: string, data: Record<string, unknown>): Promise<unknown>;
+  updateIssue(owner: string, repo: string, issueNumber: number, data: Record<string, unknown>): Promise<unknown>;
 
   // Pull request operations
-  listPullRequests(owner: string, repo: string, options?: any): Promise<any>;
-  getPullRequest(owner: string, repo: string, pullNumber: number): Promise<any>;
-  createPullRequest(owner: string, repo: string, data: any): Promise<any>;
-  updatePullRequest(owner: string, repo: string, pullNumber: number, data: any): Promise<any>;
+  listPullRequests(owner: string, repo: string, options?: Record<string, unknown>): Promise<unknown>;
+  getPullRequest(owner: string, repo: string, pullNumber: number): Promise<unknown>;
+  createPullRequest(owner: string, repo: string, data: Record<string, unknown>): Promise<unknown>;
+  updatePullRequest(owner: string, repo: string, pullNumber: number, data: Record<string, unknown>): Promise<unknown>;
 }
 
 /**
  * Repository pattern interfaces
  */
 export interface IRepositoryRepository {
-  get(owner: string, repo: string): Promise<any>;
-  getFileContents(owner: string, repo: string, path: string, ref?: string): Promise<any>;
+  get(owner: string, repo: string): Promise<unknown>;
+  getFileContents(owner: string, repo: string, path: string, ref?: string): Promise<unknown>;
   createFile(
     owner: string,
     repo: string,
@@ -57,7 +57,7 @@ export interface IRepositoryRepository {
     content: string,
     message: string,
     branch?: string
-  ): Promise<any>;
+  ): Promise<unknown>;
   updateFile(
     owner: string,
     repo: string,
@@ -66,7 +66,7 @@ export interface IRepositoryRepository {
     message: string,
     sha: string,
     branch?: string
-  ): Promise<any>;
+  ): Promise<unknown>;
   deleteFile(
     owner: string,
     repo: string,
@@ -74,28 +74,30 @@ export interface IRepositoryRepository {
     message: string,
     sha: string,
     branch?: string
-  ): Promise<any>;
+  ): Promise<unknown>;
 }
 
 export interface IIssueRepository {
-  list(owner: string, repo: string, options?: any): Promise<any>;
-  get(owner: string, repo: string, issueNumber: number): Promise<any>;
-  create(owner: string, repo: string, data: any): Promise<any>;
-  update(owner: string, repo: string, issueNumber: number, data: any): Promise<any>;
+  list(owner: string, repo: string, options?: Record<string, unknown>): Promise<unknown>;
+  get(owner: string, repo: string, issueNumber: number): Promise<unknown>;
+  create(owner: string, repo: string, data: Record<string, unknown>): Promise<unknown>;
+  update(owner: string, repo: string, issueNumber: number, data: Record<string, unknown>): Promise<unknown>;
 }
 
 export interface IPullRequestRepository {
-  list(owner: string, repo: string, options?: any): Promise<any>;
-  get(owner: string, repo: string, pullNumber: number): Promise<any>;
-  create(owner: string, repo: string, data: any): Promise<any>;
-  update(owner: string, repo: string, pullNumber: number, data: any): Promise<any>;
+  list(owner: string, repo: string, options?: Record<string, unknown>): Promise<unknown>;
+  get(owner: string, repo: string, pullNumber: number): Promise<unknown>;
+  create(owner: string, repo: string, data: Record<string, unknown>): Promise<unknown>;
+  update(owner: string, repo: string, pullNumber: number, data: Record<string, unknown>): Promise<unknown>;
 }
 
 /**
- * Service layer interfaces
+ * Service layer interfaces — return any since GitHub API response shapes are not yet fully typed
  */
 export interface IRepositoryService {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getRepository(owner: string, repo: string): Promise<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getFileContents(owner: string, repo: string, path: string, ref?: string): Promise<any>;
   createFile(
     owner: string,
@@ -104,6 +106,7 @@ export interface IRepositoryService {
     content: string,
     message: string,
     branch?: string
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<any>;
   updateFile(
     owner: string,
@@ -113,6 +116,7 @@ export interface IRepositoryService {
     message: string,
     sha: string,
     branch?: string
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<any>;
   deleteFile(
     owner: string,
@@ -121,21 +125,30 @@ export interface IRepositoryService {
     message: string,
     sha: string,
     branch?: string
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<any>;
 }
 
 export interface IIssueService {
-  listIssues(owner: string, repo: string, options?: any): Promise<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  listIssues(owner: string, repo: string, options?: Record<string, unknown>): Promise<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getIssue(owner: string, repo: string, issueNumber: number): Promise<any>;
-  createIssue(owner: string, repo: string, data: any): Promise<any>;
-  updateIssue(owner: string, repo: string, issueNumber: number, data: any): Promise<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  createIssue(owner: string, repo: string, data: Record<string, unknown>): Promise<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  updateIssue(owner: string, repo: string, issueNumber: number, data: Record<string, unknown>): Promise<any>;
 }
 
 export interface IPullRequestService {
-  listPullRequests(owner: string, repo: string, options?: any): Promise<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  listPullRequests(owner: string, repo: string, options?: Record<string, unknown>): Promise<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getPullRequest(owner: string, repo: string, pullNumber: number): Promise<any>;
-  createPullRequest(owner: string, repo: string, data: any): Promise<any>;
-  updatePullRequest(owner: string, repo: string, pullNumber: number, data: any): Promise<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  createPullRequest(owner: string, repo: string, data: Record<string, unknown>): Promise<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  updatePullRequest(owner: string, repo: string, pullNumber: number, data: Record<string, unknown>): Promise<any>;
 }
 
 /**
