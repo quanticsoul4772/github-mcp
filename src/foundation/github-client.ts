@@ -13,15 +13,13 @@ export class GitHubClient implements IGitHubClient {
   constructor(private readonly octokit: Octokit) {}
 
   // Repository operations
-  async getRepository(owner: string, repo: string): Promise<any> {
+  async getRepository(owner: string, repo: string): Promise<unknown> {
     const { data } = await this.octokit.repos.get({ owner, repo });
     return data;
   }
 
-  async getFileContents(owner: string, repo: string, path: string, ref?: string): Promise<any> {
-    const params: any = { owner, repo, path };
-    if (ref) params.ref = ref;
-
+  async getFileContents(owner: string, repo: string, path: string, ref?: string): Promise<unknown> {
+    const params = ref ? { owner, repo, path, ref } : { owner, repo, path };
     const { data } = await this.octokit.repos.getContent(params);
     return data;
   }
@@ -33,16 +31,15 @@ export class GitHubClient implements IGitHubClient {
     content: string,
     message: string,
     branch?: string
-  ): Promise<any> {
-    const params: any = {
+  ): Promise<unknown> {
+    const params = {
       owner,
       repo,
       path,
       message,
       content: Buffer.from(content).toString('base64'),
+      ...(branch ? { branch } : {}),
     };
-    if (branch) params.branch = branch;
-
     const { data } = await this.octokit.repos.createOrUpdateFileContents(params);
     return data;
   }
@@ -55,17 +52,16 @@ export class GitHubClient implements IGitHubClient {
     message: string,
     sha: string,
     branch?: string
-  ): Promise<any> {
-    const params: any = {
+  ): Promise<unknown> {
+    const params = {
       owner,
       repo,
       path,
       message,
       content: Buffer.from(content).toString('base64'),
       sha,
+      ...(branch ? { branch } : {}),
     };
-    if (branch) params.branch = branch;
-
     const { data } = await this.octokit.repos.createOrUpdateFileContents(params);
     return data;
   }
@@ -77,22 +73,21 @@ export class GitHubClient implements IGitHubClient {
     message: string,
     sha: string,
     branch?: string
-  ): Promise<any> {
-    const params: any = {
+  ): Promise<unknown> {
+    const params = {
       owner,
       repo,
       path,
       message,
       sha,
+      ...(branch ? { branch } : {}),
     };
-    if (branch) params.branch = branch;
-
     const { data } = await this.octokit.repos.deleteFile(params);
     return data;
   }
 
   // Issue operations
-  async listIssues(owner: string, repo: string, options: any = {}): Promise<any> {
+  async listIssues(owner: string, repo: string, options: Record<string, unknown> = {}): Promise<unknown> {
     const { data } = await this.octokit.issues.listForRepo({
       owner,
       repo,
@@ -101,7 +96,7 @@ export class GitHubClient implements IGitHubClient {
     return data;
   }
 
-  async getIssue(owner: string, repo: string, issueNumber: number): Promise<any> {
+  async getIssue(owner: string, repo: string, issueNumber: number): Promise<unknown> {
     const { data } = await this.octokit.issues.get({
       owner,
       repo,
@@ -110,27 +105,20 @@ export class GitHubClient implements IGitHubClient {
     return data;
   }
 
-  async createIssue(owner: string, repo: string, data: any): Promise<any> {
-    const { data: result } = await this.octokit.issues.create({
-      owner,
-      repo,
-      ...data,
-    });
+  async createIssue(owner: string, repo: string, issueData: Record<string, unknown>): Promise<unknown> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: result } = await this.octokit.issues.create({ owner, repo, ...issueData } as any);
     return result;
   }
 
-  async updateIssue(owner: string, repo: string, issueNumber: number, data: any): Promise<any> {
-    const { data: result } = await this.octokit.issues.update({
-      owner,
-      repo,
-      issue_number: issueNumber,
-      ...data,
-    });
+  async updateIssue(owner: string, repo: string, issueNumber: number, issueData: Record<string, unknown>): Promise<unknown> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: result } = await this.octokit.issues.update({ owner, repo, issue_number: issueNumber, ...issueData } as any);
     return result;
   }
 
   // Pull request operations
-  async listPullRequests(owner: string, repo: string, options: any = {}): Promise<any> {
+  async listPullRequests(owner: string, repo: string, options: Record<string, unknown> = {}): Promise<unknown> {
     const { data } = await this.octokit.pulls.list({
       owner,
       repo,
@@ -139,7 +127,7 @@ export class GitHubClient implements IGitHubClient {
     return data;
   }
 
-  async getPullRequest(owner: string, repo: string, pullNumber: number): Promise<any> {
+  async getPullRequest(owner: string, repo: string, pullNumber: number): Promise<unknown> {
     const { data } = await this.octokit.pulls.get({
       owner,
       repo,
@@ -148,12 +136,9 @@ export class GitHubClient implements IGitHubClient {
     return data;
   }
 
-  async createPullRequest(owner: string, repo: string, data: any): Promise<any> {
-    const { data: result } = await this.octokit.pulls.create({
-      owner,
-      repo,
-      ...data,
-    });
+  async createPullRequest(owner: string, repo: string, prData: Record<string, unknown>): Promise<unknown> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: result } = await this.octokit.pulls.create({ owner, repo, ...prData } as any);
     return result;
   }
 
@@ -161,14 +146,10 @@ export class GitHubClient implements IGitHubClient {
     owner: string,
     repo: string,
     pullNumber: number,
-    data: any
-  ): Promise<any> {
-    const { data: result } = await this.octokit.pulls.update({
-      owner,
-      repo,
-      pull_number: pullNumber,
-      ...data,
-    });
+    prData: Record<string, unknown>
+  ): Promise<unknown> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: result } = await this.octokit.pulls.update({ owner, repo, pull_number: pullNumber, ...prData } as any);
     return result;
   }
 }

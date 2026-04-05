@@ -39,7 +39,7 @@ describe('GitHubClient', () => {
       mockOctokit.repos.get.mockResolvedValue({ data: { name: 'my-repo' } });
       const result = await client.getRepository('owner', 'my-repo');
       expect(mockOctokit.repos.get).toHaveBeenCalledWith({ owner: 'owner', repo: 'my-repo' });
-      expect(result.name).toBe('my-repo');
+      expect((result as Record<string, unknown>).name).toBe('my-repo');
     });
   });
 
@@ -48,7 +48,7 @@ describe('GitHubClient', () => {
       mockOctokit.repos.getContent.mockResolvedValue({ data: { content: 'base64==' } });
       const result = await client.getFileContents('owner', 'repo', 'src/index.ts');
       expect(mockOctokit.repos.getContent).toHaveBeenCalledWith({ owner: 'owner', repo: 'repo', path: 'src/index.ts' });
-      expect(result.content).toBe('base64==');
+      expect((result as Record<string, unknown>).content).toBe('base64==');
     });
 
     it('should pass ref when provided', async () => {
@@ -70,7 +70,7 @@ describe('GitHubClient', () => {
           message: 'Add file',
         })
       );
-      expect(result.commit.sha).toBe('abc');
+      expect(((result as Record<string, unknown>).commit as Record<string, unknown>).sha).toBe('abc');
     });
 
     it('should pass branch when provided', async () => {
@@ -92,7 +92,7 @@ describe('GitHubClient', () => {
           content: Buffer.from('content').toString('base64'),
         })
       );
-      expect(result.commit.sha).toBe('new-sha');
+      expect(((result as Record<string, unknown>).commit as Record<string, unknown>).sha).toBe('new-sha');
     });
 
     it('should pass branch when provided', async () => {
@@ -111,7 +111,7 @@ describe('GitHubClient', () => {
       expect(mockOctokit.repos.deleteFile).toHaveBeenCalledWith(
         expect.objectContaining({ sha: 'file-sha', message: 'Remove file' })
       );
-      expect(result.commit.sha).toBe('del-sha');
+      expect(((result as Record<string, unknown>).commit as Record<string, unknown>).sha).toBe('del-sha');
     });
 
     it('should pass branch when provided', async () => {
@@ -137,7 +137,7 @@ describe('GitHubClient', () => {
       mockOctokit.issues.get.mockResolvedValue({ data: { number: 5 } });
       const result = await client.getIssue('owner', 'repo', 5);
       expect(mockOctokit.issues.get).toHaveBeenCalledWith({ owner: 'owner', repo: 'repo', issue_number: 5 });
-      expect(result.number).toBe(5);
+      expect((result as Record<string, unknown>).number).toBe(5);
     });
   });
 
@@ -145,7 +145,7 @@ describe('GitHubClient', () => {
     it('should create an issue', async () => {
       mockOctokit.issues.create.mockResolvedValue({ data: { number: 10, title: 'New' } });
       const result = await client.createIssue('owner', 'repo', { title: 'New' });
-      expect(result.number).toBe(10);
+      expect((result as Record<string, unknown>).number).toBe(10);
     });
   });
 
@@ -156,7 +156,7 @@ describe('GitHubClient', () => {
       expect(mockOctokit.issues.update).toHaveBeenCalledWith(
         expect.objectContaining({ issue_number: 3, state: 'closed' })
       );
-      expect(result.state).toBe('closed');
+      expect((result as Record<string, unknown>).state).toBe('closed');
     });
   });
 
@@ -173,7 +173,7 @@ describe('GitHubClient', () => {
       mockOctokit.pulls.get.mockResolvedValue({ data: { number: 7 } });
       const result = await client.getPullRequest('owner', 'repo', 7);
       expect(mockOctokit.pulls.get).toHaveBeenCalledWith({ owner: 'owner', repo: 'repo', pull_number: 7 });
-      expect(result.number).toBe(7);
+      expect((result as Record<string, unknown>).number).toBe(7);
     });
   });
 
@@ -181,7 +181,7 @@ describe('GitHubClient', () => {
     it('should create a pull request', async () => {
       mockOctokit.pulls.create.mockResolvedValue({ data: { number: 20 } });
       const result = await client.createPullRequest('owner', 'repo', { title: 'PR' });
-      expect(result.number).toBe(20);
+      expect((result as Record<string, unknown>).number).toBe(20);
     });
   });
 
@@ -192,7 +192,7 @@ describe('GitHubClient', () => {
       expect(mockOctokit.pulls.update).toHaveBeenCalledWith(
         expect.objectContaining({ pull_number: 5, state: 'closed' })
       );
-      expect(result.state).toBe('closed');
+      expect((result as Record<string, unknown>).state).toBe('closed');
     });
   });
 });
