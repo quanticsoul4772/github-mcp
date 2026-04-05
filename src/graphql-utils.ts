@@ -13,7 +13,7 @@ import { Octokit } from '@octokit/rest';
 export async function cachedGraphQL<T>(
   client: OptimizedAPIClient | Octokit,
   query: string,
-  variables: Record<string, any> = {},
+  variables: Record<string, unknown> = {},
   options: {
     ttl?: number;
     skipCache?: boolean;
@@ -21,7 +21,7 @@ export async function cachedGraphQL<T>(
   } = {}
 ): Promise<T> {
   // If client is OptimizedAPIClient, use cached GraphQL
-  if (client && typeof (client as any).graphql === 'function' && 'getMetrics' in client) {
+  if (client && typeof (client as { graphql?: unknown }).graphql === 'function' && 'getMetrics' in client) {
     return (client as OptimizedAPIClient).graphql<T>(query, variables, options);
   }
 
@@ -35,7 +35,7 @@ export async function cachedGraphQL<T>(
 export async function smartGraphQL<T>(
   client: OptimizedAPIClient | Octokit,
   query: string,
-  variables: Record<string, any> = {},
+  variables: Record<string, unknown> = {},
   options: {
     ttl?: number;
     skipCache?: boolean;
@@ -64,7 +64,7 @@ export async function smartGraphQL<T>(
 export async function typedGraphQL<T>(
   octokit: Octokit,
   query: string,
-  variables?: Record<string, any>
+  variables?: Record<string, unknown>
 ): Promise<T> {
   try {
     // Cast the octokit.graphql response to our typed structure
@@ -73,10 +73,10 @@ export async function typedGraphQL<T>(
   } catch (error) {
     // Handle GraphQL-specific errors
     if (error && typeof error === 'object' && 'response' in error) {
-      const graphqlError = error as any;
+      const graphqlError = error as { response?: { data?: { errors?: Array<{ message: string }> } } };
       if (graphqlError.response?.data?.errors) {
         const errorMessages = graphqlError.response.data.errors
-          .map((err: any) => err.message)
+          .map((err) => err.message)
           .join(', ');
         throw new Error(`GraphQL errors: ${errorMessages}`);
       }
@@ -99,8 +99,8 @@ export async function typedGraphQL<T>(
 export async function validatedGraphQL<T>(
   octokit: Octokit,
   query: string,
-  variables?: Record<string, any>,
-  validator?: (data: any) => data is T
+  variables?: Record<string, unknown>,
+  validator?: (data: unknown) => data is T
 ): Promise<T> {
   const result = await typedGraphQL<T>(octokit, query, variables);
 
@@ -118,7 +118,7 @@ export async function batchCachedGraphQL<T>(
   client: OptimizedAPIClient | Octokit,
   queries: Array<{
     query: string;
-    variables?: Record<string, any>;
+    variables?: Record<string, unknown>;
     options?: { ttl?: number; skipCache?: boolean; operation?: string };
   }>
 ): Promise<T[]> {
@@ -181,26 +181,24 @@ export function getQueryOperation(query: string): string {
  * Migration helper for existing GraphQL tools
  * Provides a drop-in replacement for octokit.graphql calls
  */
-export function createGraphQLWrapper(client: OptimizedAPIClient | Octokit): {
-  query: <T>(query: string, variables?: Record<string, any>, ttl?: number) => Promise<T>;
-  mutate: <T>(mutation: string, variables?: Record<string, any>) => Promise<T>;
-  execute: <T>(
-    query: string,
-    variables?: Record<string, any>,
-    options?: {
-      ttl?: number;
-      skipCache?: boolean;
-      operation?: string;
-      isMutation?: boolean;
-    }
-  ) => Promise<T>;
+interface GraphQLWrapperOptions {
+  ttl?: number;
+  skipCache?: boolean;
+  operation?: string;
+  isMutation?: boolean;
+}
+interface GraphQLWrapper {
+  query: <T>(query: string, variables?: Record<string, unknown>, ttl?: number) => Promise<T>;
+  mutate: <T>(mutation: string, variables?: Record<string, unknown>) => Promise<T>;
+  execute: <T>(query: string, variables?: Record<string, unknown>, options?: GraphQLWrapperOptions) => Promise<T>;
   getClient: () => OptimizedAPIClient | Octokit;
-} {
+}
+export function createGraphQLWrapper(client: OptimizedAPIClient | Octokit): GraphQLWrapper {
   return {
     /**
      * Execute a GraphQL query with automatic caching
      */
-    query: <T>(query: string, variables?: Record<string, any>, ttl?: number) =>
+    query: <T>(query: string, variables?: Record<string, unknown>, ttl?: number) =>
       cachedGraphQL<T>(client, query, variables ?? {}, {
         ttl,
         operation: getQueryOperation(query),
@@ -209,7 +207,7 @@ export function createGraphQLWrapper(client: OptimizedAPIClient | Octokit): {
     /**
      * Execute a GraphQL mutation with cache invalidation
      */
-    mutate: <T>(mutation: string, variables?: Record<string, any>) =>
+    mutate: <T>(mutation: string, variables?: Record<string, unknown>) =>
       smartGraphQL<T>(client, mutation, variables ?? {}, {
         isMutation: true,
         skipCache: true, // Don't cache mutations
@@ -219,16 +217,8 @@ export function createGraphQLWrapper(client: OptimizedAPIClient | Octokit): {
     /**
      * Execute a GraphQL query with custom options
      */
-    execute: <T>(
-      query: string,
-      variables?: Record<string, any>,
-      options?: {
-        ttl?: number;
-        skipCache?: boolean;
-        operation?: string;
-        isMutation?: boolean;
-      }
-    ) => smartGraphQL<T>(client, query, variables ?? {}, options ?? {}),
+    execute: <T>(query: string, variables?: Record<string, unknown>, options?: GraphQLWrapperOptions) =>
+      smartGraphQL<T>(client, query, variables ?? {}, options ?? {}),
 
     /**
      * Get the underlying client (for direct access when needed)
@@ -378,7 +368,7 @@ export async function paginatedGraphQL<
 >(
   octokit: Octokit,
   baseQuery: string,
-  variables: Record<string, any> = {},
+  variables: Record<string, unknown> = {},
   pageSize: number = 25,
   maxPages: number = 10
 ): Promise<T[]> {
@@ -388,7 +378,7 @@ export async function paginatedGraphQL<
   let pageCount = 0;
 
   while (hasNextPage && pageCount < maxPages) {
-    const queryVariables: Record<string, any> = {
+    const queryVariables: Record<string, unknown> = {
       ...variables,
       first: pageSize,
       after: cursor,
@@ -413,15 +403,15 @@ export async function paginatedGraphQL<
  * @param defaultValue - Default value if path doesn't exist
  * @returns The value at the path or default value
  */
-export function safeAccess<T>(obj: any, path: string[], defaultValue: T): T {
-  let current = obj;
+export function safeAccess<T>(obj: unknown, path: string[], defaultValue: T): T {
+  let current: unknown = obj;
   for (const key of path) {
     if (current == null || typeof current !== 'object') {
       return defaultValue;
     }
-    current = current[key];
+    current = (current as Record<string, unknown>)[key];
   }
-  return current ?? defaultValue;
+  return (current ?? defaultValue) as T;
 }
 
 /**
@@ -431,14 +421,14 @@ export function safeAccess<T>(obj: any, path: string[], defaultValue: T): T {
  * @param requiredFields - Array of required field paths
  * @returns True if all fields are present
  */
-export function validateResponseFields(response: any, requiredFields: string[][]): boolean {
+export function validateResponseFields(response: unknown, requiredFields: string[][]): boolean {
   return requiredFields.every(path => {
-    let current = response;
+    let current: unknown = response;
     for (const key of path) {
       if (current == null || typeof current !== 'object') {
         return false;
       }
-      current = current[key];
+      current = (current as Record<string, unknown>)[key];
     }
     return current !== undefined;
   });
@@ -450,16 +440,18 @@ export function validateResponseFields(response: any, requiredFields: string[][]
  * @param error - The error from GraphQL operation
  * @returns User-friendly error message
  */
-export function formatGraphQLError(error: any): string {
-  if (error?.response?.data?.errors) {
-    const errors = error.response.data.errors;
-    if (Array.isArray(errors) && errors.length > 0) {
-      return errors.map(err => err.message ?? 'Unknown GraphQL error').join('; ');
+export function formatGraphQLError(error: unknown): string {
+  if (error && typeof error === 'object') {
+    const e = error as { response?: { data?: { errors?: Array<{ message?: string }> } }; message?: string };
+    if (e.response?.data?.errors) {
+      const errors = e.response.data.errors;
+      if (Array.isArray(errors) && errors.length > 0) {
+        return errors.map(err => err.message ?? 'Unknown GraphQL error').join('; ');
+      }
     }
-  }
-
-  if (error?.message) {
-    return error.message;
+    if (e.message) {
+      return e.message;
+    }
   }
 
   return 'An unknown error occurred while executing GraphQL query';
