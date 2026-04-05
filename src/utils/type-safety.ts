@@ -8,6 +8,24 @@
 import { z } from 'zod';
 
 /**
+ * Typed representation of a JSON Schema node (subset used by jsonSchemaToZod)
+ */
+interface JsonSchemaNode {
+  type?: string;
+  enum?: string[];
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  minimum?: number;
+  maximum?: number;
+  items?: JsonSchemaNode;
+  minItems?: number;
+  maxItems?: number;
+  properties?: Record<string, JsonSchemaNode>;
+  required?: string[];
+}
+
+/**
  * Error thrown when parameter validation fails
  */
 export class ParameterValidationError extends Error {
@@ -30,10 +48,10 @@ export class ParameterValidationError extends Error {
  */
 export function createTypeSafeHandler<T>(
   schema: z.ZodSchema<T>,
-  handler: (params: T) => Promise<any>,
+  handler: (params: T) => Promise<unknown>,
   toolName: string
 ) {
-  return async (args: unknown): Promise<any> => {
+  return async (args: unknown): Promise<unknown> => {
     try {
       // Validate and parse the parameters
       const validatedParams = schema.parse(args);
@@ -53,88 +71,60 @@ export function createTypeSafeHandler<T>(
  * Converts a JSON Schema object to a Zod schema
  * This provides a bridge between existing JSON schemas and Zod validation
  */
-export function jsonSchemaToZod(jsonSchema: any): z.ZodSchema<any> {
-  if (!jsonSchema || typeof jsonSchema !== 'object') {
-    return z.unknown();
+function jsonSchemaToZodString(s: JsonSchemaNode): z.ZodTypeAny {
+  if (s.enum && s.enum.length > 0) {
+    return z.enum(s.enum as [string, ...string[]]);
+  }
+  let schema = z.string();
+  if (s.minLength !== undefined) schema = schema.min(s.minLength);
+  if (s.maxLength !== undefined) schema = schema.max(s.maxLength);
+  if (s.pattern) schema = schema.regex(new RegExp(s.pattern));
+  return schema;
+}
+
+function jsonSchemaToZodNumber(s: JsonSchemaNode): z.ZodTypeAny {
+  let schema = s.type === 'integer' ? z.number().int() : z.number();
+  if (s.minimum !== undefined) schema = schema.min(s.minimum);
+  if (s.maximum !== undefined) schema = schema.max(s.maximum);
+  return schema;
+}
+
+function jsonSchemaToZodArray(s: JsonSchemaNode): z.ZodTypeAny {
+  let schema = z.array(s.items ? jsonSchemaToZod(s.items) : z.unknown());
+  if (s.minItems !== undefined) schema = schema.min(s.minItems);
+  if (s.maxItems !== undefined) schema = schema.max(s.maxItems);
+  return schema;
+}
+
+function jsonSchemaToZodObject(s: JsonSchemaNode): z.ZodTypeAny {
+  if (!s.properties) return z.record(z.string(), z.unknown());
+
+  const shape: Record<string, z.ZodTypeAny> = {};
+  for (const [key, propSchema] of Object.entries(s.properties)) {
+    shape[key] = jsonSchemaToZod(propSchema);
   }
 
-  switch (jsonSchema.type) {
-    case 'string':
-      let stringSchema = z.string();
-      if (jsonSchema.enum) {
-        return z.enum(jsonSchema.enum);
-      }
-      if (jsonSchema.minLength !== undefined) {
-        stringSchema = stringSchema.min(jsonSchema.minLength);
-      }
-      if (jsonSchema.maxLength !== undefined) {
-        stringSchema = stringSchema.max(jsonSchema.maxLength);
-      }
-      if (jsonSchema.pattern) {
-        stringSchema = stringSchema.regex(new RegExp(jsonSchema.pattern));
-      }
-      return stringSchema;
+  const requiredFields = new Set(s.required ?? []);
+  const newShape: Record<string, z.ZodTypeAny> = {};
+  for (const [key, fieldSchema] of Object.entries(shape)) {
+    newShape[key] =
+      requiredFields.size > 0 && requiredFields.has(key) ? fieldSchema : fieldSchema.optional();
+  }
+  return z.object(newShape);
+}
 
+export function jsonSchemaToZod(jsonSchema: unknown): z.ZodTypeAny {
+  if (!jsonSchema || typeof jsonSchema !== 'object') return z.unknown();
+  const s = jsonSchema as JsonSchemaNode;
+
+  switch (s.type) {
+    case 'string':  return jsonSchemaToZodString(s);
     case 'number':
-    case 'integer':
-      let numberSchema = jsonSchema.type === 'integer' ? z.number().int() : z.number();
-      if (jsonSchema.minimum !== undefined) {
-        numberSchema = numberSchema.min(jsonSchema.minimum);
-      }
-      if (jsonSchema.maximum !== undefined) {
-        numberSchema = numberSchema.max(jsonSchema.maximum);
-      }
-      return numberSchema;
-
-    case 'boolean':
-      return z.boolean();
-
-    case 'array':
-      let arraySchema = z.array(jsonSchema.items ? jsonSchemaToZod(jsonSchema.items) : z.unknown());
-      if (jsonSchema.minItems !== undefined) {
-        arraySchema = arraySchema.min(jsonSchema.minItems);
-      }
-      if (jsonSchema.maxItems !== undefined) {
-        arraySchema = arraySchema.max(jsonSchema.maxItems);
-      }
-      return arraySchema;
-
-    case 'object':
-      if (!jsonSchema.properties) {
-        return z.record(z.string(), z.unknown());
-      }
-
-      const shape: Record<string, z.ZodSchema<any>> = {};
-      for (const [key, propSchema] of Object.entries(jsonSchema.properties)) {
-        shape[key] = jsonSchemaToZod(propSchema);
-      }
-
-      let objectSchema = z.object(shape);
-
-      // Handle required fields
-      if (jsonSchema.required && Array.isArray(jsonSchema.required)) {
-        // Zod objects are strict by default, so we need to make optional fields optional
-        const requiredFields = new Set(jsonSchema.required);
-        const newShape: Record<string, z.ZodSchema<any>> = {};
-
-        for (const [key, schema] of Object.entries(shape)) {
-          newShape[key] = requiredFields.has(key) ? schema : schema.optional();
-        }
-
-        objectSchema = z.object(newShape);
-      } else {
-        // If no required fields specified, make all optional
-        const newShape: Record<string, z.ZodSchema<any>> = {};
-        for (const [key, schema] of Object.entries(shape)) {
-          newShape[key] = schema.optional();
-        }
-        objectSchema = z.object(newShape);
-      }
-
-      return objectSchema;
-
-    default:
-      return z.unknown();
+    case 'integer': return jsonSchemaToZodNumber(s);
+    case 'boolean': return z.boolean();
+    case 'array':   return jsonSchemaToZodArray(s);
+    case 'object':  return jsonSchemaToZodObject(s);
+    default:        return z.unknown();
   }
 }
 
@@ -214,16 +204,15 @@ export const CommonSchemas = {
 /**
  * Utility to combine multiple schemas into a single flat schema
  */
-export function combineSchemas<T extends Record<string, z.ZodSchema<any>>>(
+export function combineSchemas<T extends Record<string, z.ZodTypeAny>>(
   schemas: T
-): z.ZodSchema<any> {
+): z.ZodTypeAny {
   // Extract all properties from the schemas and combine them into a single object schema
-  const combinedShape: Record<string, z.ZodSchema<any>> = {};
+  const combinedShape: Record<string, z.ZodTypeAny> = {};
 
   for (const schema of Object.values(schemas)) {
     if (schema instanceof z.ZodObject) {
-      // Access the shape property correctly
-      const shape = (schema as any).shape;
+      const shape = (schema as z.ZodObject<z.ZodRawShape>).shape;
       Object.assign(combinedShape, shape);
     }
   }
@@ -347,7 +336,7 @@ export class TypeSafeHandlerFactory {
    * Creates a type-safe handler for getting an issue
    */
   static createGetIssueHandler(
-    handler: (params: z.infer<typeof GitHubSchemas.getIssue>) => Promise<any>
+    handler: (params: z.infer<typeof GitHubSchemas.getIssue>) => Promise<unknown>
   ) {
     return createTypeSafeHandler(GitHubSchemas.getIssue, handler, 'get_issue');
   }
@@ -356,7 +345,7 @@ export class TypeSafeHandlerFactory {
    * Creates a type-safe handler for listing issues
    */
   static createListIssuesHandler(
-    handler: (params: z.infer<typeof GitHubSchemas.listIssues>) => Promise<any>
+    handler: (params: z.infer<typeof GitHubSchemas.listIssues>) => Promise<unknown>
   ) {
     return createTypeSafeHandler(GitHubSchemas.listIssues, handler, 'list_issues');
   }
@@ -365,7 +354,7 @@ export class TypeSafeHandlerFactory {
    * Creates a type-safe handler for creating an issue
    */
   static createCreateIssueHandler(
-    handler: (params: z.infer<typeof GitHubSchemas.createIssue>) => Promise<any>
+    handler: (params: z.infer<typeof GitHubSchemas.createIssue>) => Promise<unknown>
   ) {
     return createTypeSafeHandler(GitHubSchemas.createIssue, handler, 'create_issue');
   }
@@ -374,7 +363,7 @@ export class TypeSafeHandlerFactory {
    * Creates a type-safe handler for updating an issue
    */
   static createUpdateIssueHandler(
-    handler: (params: z.infer<typeof GitHubSchemas.updateIssue>) => Promise<any>
+    handler: (params: z.infer<typeof GitHubSchemas.updateIssue>) => Promise<unknown>
   ) {
     return createTypeSafeHandler(GitHubSchemas.updateIssue, handler, 'update_issue');
   }
@@ -383,7 +372,7 @@ export class TypeSafeHandlerFactory {
    * Creates a type-safe handler for getting a pull request
    */
   static createGetPullRequestHandler(
-    handler: (params: z.infer<typeof GitHubSchemas.getPullRequest>) => Promise<any>
+    handler: (params: z.infer<typeof GitHubSchemas.getPullRequest>) => Promise<unknown>
   ) {
     return createTypeSafeHandler(GitHubSchemas.getPullRequest, handler, 'get_pull_request');
   }
@@ -392,7 +381,7 @@ export class TypeSafeHandlerFactory {
    * Creates a type-safe handler for listing pull requests
    */
   static createListPullRequestsHandler(
-    handler: (params: z.infer<typeof GitHubSchemas.listPullRequests>) => Promise<any>
+    handler: (params: z.infer<typeof GitHubSchemas.listPullRequests>) => Promise<unknown>
   ) {
     return createTypeSafeHandler(GitHubSchemas.listPullRequests, handler, 'list_pull_requests');
   }
@@ -401,7 +390,7 @@ export class TypeSafeHandlerFactory {
    * Creates a type-safe handler for creating a pull request
    */
   static createCreatePullRequestHandler(
-    handler: (params: z.infer<typeof GitHubSchemas.createPullRequest>) => Promise<any>
+    handler: (params: z.infer<typeof GitHubSchemas.createPullRequest>) => Promise<unknown>
   ) {
     return createTypeSafeHandler(GitHubSchemas.createPullRequest, handler, 'create_pull_request');
   }
@@ -410,7 +399,7 @@ export class TypeSafeHandlerFactory {
    * Creates a type-safe handler for getting a user
    */
   static createGetUserHandler(
-    handler: (params: z.infer<typeof GitHubSchemas.getUser>) => Promise<any>
+    handler: (params: z.infer<typeof GitHubSchemas.getUser>) => Promise<unknown>
   ) {
     return createTypeSafeHandler(GitHubSchemas.getUser, handler, 'get_user');
   }
@@ -419,7 +408,7 @@ export class TypeSafeHandlerFactory {
    * Creates a type-safe handler for searching repositories
    */
   static createSearchRepositoriesHandler(
-    handler: (params: z.infer<typeof GitHubSchemas.searchRepositories>) => Promise<any>
+    handler: (params: z.infer<typeof GitHubSchemas.searchRepositories>) => Promise<unknown>
   ) {
     return createTypeSafeHandler(GitHubSchemas.searchRepositories, handler, 'search_repositories');
   }
@@ -428,7 +417,7 @@ export class TypeSafeHandlerFactory {
    * Creates a type-safe handler for getting a repository
    */
   static createGetRepositoryHandler(
-    handler: (params: z.infer<typeof GitHubSchemas.getRepository>) => Promise<any>
+    handler: (params: z.infer<typeof GitHubSchemas.getRepository>) => Promise<unknown>
   ) {
     return createTypeSafeHandler(GitHubSchemas.getRepository, handler, 'get_repository');
   }
@@ -437,7 +426,7 @@ export class TypeSafeHandlerFactory {
    * Creates a type-safe handler for listing user repositories
    */
   static createListUserRepositoriesHandler(
-    handler: (params: z.infer<typeof GitHubSchemas.listUserRepositories>) => Promise<any>
+    handler: (params: z.infer<typeof GitHubSchemas.listUserRepositories>) => Promise<unknown>
   ) {
     return createTypeSafeHandler(
       GitHubSchemas.listUserRepositories,
@@ -451,7 +440,7 @@ export class TypeSafeHandlerFactory {
    */
   static createCustomHandler<T>(
     schema: z.ZodSchema<T>,
-    handler: (params: T) => Promise<any>,
+    handler: (params: T) => Promise<unknown>,
     toolName: string
   ) {
     return createTypeSafeHandler(schema, handler, toolName);
