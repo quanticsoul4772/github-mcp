@@ -20,6 +20,7 @@ interface RateLimitInfo {
 interface GraphQLRateLimitInfo extends RateLimitInfo {
   pointsUsed: number;
   estimatedPointsPerHour: number;
+  estimatedRemaining?: number;
   queryHistory: Array<{
     timestamp: Date;
     points: number;
@@ -27,15 +28,17 @@ interface GraphQLRateLimitInfo extends RateLimitInfo {
   }>;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyResolver = (value: any) => void;
 interface RequestQueue {
-  resolve: (value: any) => void;
+  resolve: AnyResolver;
   reject: (error: Error) => void;
-  fn: () => Promise<any>;
+  fn: () => Promise<unknown>;
   priority: number;
   resource?: string;
   estimatedPoints?: number;
   query?: string;
-  variables?: Record<string, any>;
+  variables?: Record<string, unknown>;
 }
 
 export class GitHubRateLimiter {
@@ -69,10 +72,10 @@ export class GitHubRateLimiter {
   /**
    * Update rate limit information from response headers
    */
-  private updateRateLimit(headers: any, resource: string = 'core') {
-    const limit = parseInt(headers['x-ratelimit-limit'] ?? '5000');
-    const remaining = parseInt(headers['x-ratelimit-remaining'] ?? '5000');
-    const reset = new Date(parseInt(headers['x-ratelimit-reset'] ?? '0') * 1000);
+  private updateRateLimit(headers: Record<string, string | string[] | undefined>, resource: string = 'core') {
+    const limit = parseInt(String(headers['x-ratelimit-limit'] ?? '5000'));
+    const remaining = parseInt(String(headers['x-ratelimit-remaining'] ?? '5000'));
+    const reset = new Date(parseInt(String(headers['x-ratelimit-reset'] ?? '0')) * 1000);
 
     switch (resource) {
       case 'search':
@@ -131,7 +134,7 @@ export class GitHubRateLimiter {
     const estimatedRemaining = Math.max(0, graphql.limit - graphql.estimatedPointsPerHour);
     // Optionally store as a derived property for status reporting without mutating `remaining`
     // (cast to any to avoid changing interface footprint)
-    (graphql as any).estimatedRemaining = estimatedRemaining;
+    graphql.estimatedRemaining = estimatedRemaining;
   }
 
   /**
@@ -238,7 +241,7 @@ export class GitHubRateLimiter {
   async wrapGraphQLRequest<T>(
     request: () => Promise<T>,
     query: string,
-    variables: Record<string, any> = {},
+    variables: Record<string, unknown> = {},
     priority: number = 1
   ): Promise<T> {
     // Calculate query complexity
@@ -276,8 +279,9 @@ export class GitHubRateLimiter {
           });
 
           // Extract rate limit headers if available (GraphQL often lacks headers in response objects)
-          if (result && typeof result === 'object' && (result as any).headers) {
-            this.updateRateLimit((result as any).headers, 'graphql');
+          const graphqlHeaders = result && typeof result === 'object' ? (result as { headers?: Record<string, string | string[] | undefined> }).headers : undefined;
+          if (graphqlHeaders) {
+            this.updateRateLimit(graphqlHeaders, 'graphql');
           } else {
             // Fallback: do not alter server-derived remaining here; rely on periodic status fetch or errors to update.
             // Optionally, consider scheduling a lightweight rate_limit REST query elsewhere to refresh headers.
@@ -349,7 +353,8 @@ export class GitHubRateLimiter {
 
           // Extract rate limit headers if available
           if (result && typeof result === 'object' && 'headers' in result) {
-            this.updateRateLimit((result as any).headers, resource);
+            const resultHeaders = (result as { headers?: Record<string, string | string[] | undefined> }).headers;
+            if (resultHeaders) this.updateRateLimit(resultHeaders, resource);
           }
 
           return result;
@@ -459,7 +464,7 @@ export class GitHubRateLimiter {
    */
   canExecuteGraphQLQuery(
     query: string,
-    variables: Record<string, any> = {}
+    variables: Record<string, unknown> = {}
   ): {
     canExecute: boolean;
     estimatedPoints: number;
@@ -520,7 +525,7 @@ export class ResponseSizeLimiter {
 
         // Limit number of items
         if (data.length > maxItems) {
-          limitedData = data.slice(0, maxItems) as T & any[];
+          limitedData = data.slice(0, maxItems) as T & unknown[];
           truncated = true;
         }
 
@@ -593,13 +598,13 @@ export class ResponseSizeLimiter {
   private static truncateObjectStrings<T>(obj: T, _maxSize: number): T {
     const MAX_STRING_LENGTH = 1000; // Maximum length for individual string fields
 
-    function truncateRecursive(value: any): any {
+    function truncateRecursive(value: unknown): unknown {
       if (typeof value === 'string' && value.length > MAX_STRING_LENGTH) {
         return value.substring(0, MAX_STRING_LENGTH) + '... [truncated]';
       } else if (Array.isArray(value)) {
         return value.map(truncateRecursive);
       } else if (typeof value === 'object' && value !== null) {
-        const result: any = {};
+        const result: Record<string, unknown> = {};
         for (const [key, val] of Object.entries(value)) {
           result[key] = truncateRecursive(val);
         }
@@ -608,7 +613,7 @@ export class ResponseSizeLimiter {
       return value;
     }
 
-    return truncateRecursive(obj);
+    return truncateRecursive(obj) as T;
   }
 }
 
@@ -617,7 +622,7 @@ export class ResponseSizeLimiter {
  */
 export function createRateLimitedOctokit(token: string): {
   octokit: Octokit & {
-    graphqlWithComplexity: (query: string, variables?: Record<string, any>) => Promise<any>;
+    graphqlWithComplexity: (query: string, variables?: Record<string, unknown>) => Promise<unknown>;
   };
   rateLimiter: GitHubRateLimiter;
 } {
@@ -627,7 +632,7 @@ export function createRateLimitedOctokit(token: string): {
     auth: token,
     request: {
       // Add custom request hook to apply rate limiting
-      hook: async (request: any, options: any) => {
+      hook: async (request: (opts: unknown) => Promise<unknown>, options: { url?: string; body?: unknown }) => {
         // Determine resource type from URL
         let resource = 'core';
         if (options.url?.includes('/search/')) {
@@ -639,7 +644,7 @@ export function createRateLimitedOctokit(token: string): {
         // For GraphQL requests, extract query from body for complexity analysis
         if (resource === 'graphql' && options.body) {
           let query = '';
-          let variables: Record<string, any> = {};
+          let variables: Record<string, unknown> = {};
 
           try {
             const body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
@@ -678,11 +683,11 @@ export function createRateLimitedOctokit(token: string): {
       },
     },
   }) as Octokit & {
-    graphqlWithComplexity: (query: string, variables?: Record<string, any>) => Promise<any>;
+    graphqlWithComplexity: (query: string, variables?: Record<string, unknown>) => Promise<unknown>;
   };
 
   // Add enhanced GraphQL method with complexity checking
-  octokit.graphqlWithComplexity = async (query: string, variables: Record<string, any> = {}) => {
+  octokit.graphqlWithComplexity = async (query: string, variables: Record<string, unknown> = {}) => {
     // Check query safety first
     const safetyCheck = rateLimiter.canExecuteGraphQLQuery(query, variables);
 
