@@ -86,11 +86,8 @@ jobs:
           fail-on-severity: high
           # Check for vulnerable dependencies
           vulnerability-check: true
-          # Check licenses
+          # Check licenses (allowlist — anything not listed is denied)
           license-check: true
-          # Deny specific licenses
-          deny-licenses: GPL-3.0, AGPL-3.0
-          # Allow specific licenses
           allow-licenses: MIT, Apache-2.0, BSD-3-Clause, ISC
   
   # OpenSSF Scorecard
