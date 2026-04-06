@@ -28,7 +28,7 @@ jobs:
           fetch-depth: 0  # Fetch all history for scanning
       
       - name: TruffleHog OSS
-        uses: trufflesecurity/trufflehog@v3.92.0
+        uses: trufflesecurity/trufflehog@v3.94.2
         with:
           path: ./
           base: ${{ github.event.before || '' }}
