@@ -11,7 +11,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
   actions: read
   checks: write
   pull-requests: write
