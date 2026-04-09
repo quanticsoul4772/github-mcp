@@ -108,7 +108,7 @@
     "depcheck": "^1.4.7",
     "eslint": "^10.2.0",
     "license-checker": "^25.0.1",
-    "nyc": "^17.1.0",
+    "nyc": "^18.0.0",
     "prettier": "^3.8.1",
     "tsx": "^4.20.5",
     "typescript": "^6.0.2",
