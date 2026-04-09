@@ -164,11 +164,11 @@ export function createOptimizedRepositoryTools(
           params.repo,
           safePath,
           params.ref
-        );
+        ) as Record<string, unknown> | Array<Record<string, unknown>>;
 
         if (Array.isArray(data)) {
           // Directory listing
-          return data.map((item: any) => ({
+          return data.map((item: Record<string, unknown>) => ({
             name: item.name,
             path: item.path,
             type: item.type,

@@ -4,6 +4,11 @@ import { ToolConfig } from '../types.js';
 import { createTypeSafeHandler } from '../utils/type-safety.js';
 import { withErrorHandling } from '../errors.js';
 
+// Extended Octokit type that may have graphqlWithComplexity from rate-limiter
+type OctokitWithComplexity = Octokit & {
+  graphqlWithComplexity?: (query: string, variables?: Record<string, unknown>) => Promise<unknown>;
+};
+
 // Type definitions for batch operations
 interface RepositoryRef {
   owner: string;
@@ -29,11 +34,146 @@ interface BatchQueryUsersParams {
 interface GraphQLQueryDef {
   alias: string;
   query: string;
-  variables?: Record<string, any>;
+  variables?: Record<string, unknown>;
 }
 
 interface BatchGraphQLQueryParams {
   queries: GraphQLQueryDef[];
+}
+
+// GraphQL response types for batch repository queries
+interface BatchRepoNode {
+  id: string;
+  name: string;
+  nameWithOwner: string;
+  description: string | null;
+  url: string;
+  stargazerCount: number;
+  forkCount: number;
+  watchers: { totalCount: number };
+  createdAt: string;
+  updatedAt: string;
+  pushedAt: string;
+  primaryLanguage: { name: string; color: string } | null;
+  licenseInfo: { name: string; spdxId: string } | null;
+  languages?: {
+    totalSize: number;
+    edges: Array<{ size: number; node: { name: string; color: string } }>;
+  };
+  collaborators?: {
+    totalCount: number;
+    nodes: Array<{
+      login: string;
+      name: string | null;
+      avatarUrl: string;
+      contributionsCollection: { totalCommitContributions: number };
+    }>;
+  };
+  issues?: { totalCount: number };
+  openIssues?: { totalCount: number };
+  pullRequests?: { totalCount: number };
+  openPullRequests?: { totalCount: number };
+  defaultBranchRef?: {
+    name: string;
+    target: {
+      history: {
+        nodes: Array<{
+          committedDate: string;
+          messageHeadline: string;
+          author: { user: { login: string } | null };
+          additions: number;
+          deletions: number;
+        }>;
+      };
+    };
+  };
+  repositoryTopics: { nodes: Array<{ topic: { name: string } }> };
+}
+
+interface ProcessedRepo {
+  id: string;
+  name: string;
+  fullName: string;
+  description: string | null;
+  url: string;
+  statistics: { stars: number; forks: number; watchers: number };
+  primaryLanguage: { name: string; color: string } | null;
+  license: { name: string; spdxId: string } | null;
+  topics: string[];
+  dates: { created: string; updated: string; pushed: string };
+  languages?: { totalSize: number; breakdown: Array<{ name: string; color: string; size: number; percentage: number }> };
+  contributors?: { totalCount: number; top: Array<{ login: string; name: string | null; avatarUrl: string; commits: number }> };
+  issues?: { total: number; open: number; closed: number };
+  pullRequests?: { total: number; open: number; closed: number };
+  recentCommits?: { branch: string; commits: Array<{ date: string; message: string; author: string | undefined; additions: number; deletions: number }> };
+}
+
+// GraphQL response types for batch user queries
+interface BatchUserNode {
+  id: string;
+  login: string;
+  name: string | null;
+  email: string | null;
+  bio: string | null;
+  company: string | null;
+  location: string | null;
+  url: string;
+  avatarUrl: string;
+  createdAt: string;
+  updatedAt: string;
+  followers?: { totalCount: number };
+  following?: { totalCount: number };
+  repositories?: {
+    totalCount: number;
+    nodes: Array<{
+      name: string;
+      nameWithOwner: string;
+      description: string | null;
+      url: string;
+      stargazerCount: number;
+      forkCount: number;
+      primaryLanguage: { name: string; color: string } | null;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  };
+}
+
+interface BatchOrgNode {
+  id: string;
+  login: string;
+  name: string | null;
+  email: string | null;
+  description: string | null;
+  location: string | null;
+  url: string;
+  avatarUrl: string;
+  createdAt: string;
+  updatedAt: string;
+  membersWithRole?: { totalCount: number };
+  repositories?: BatchUserNode['repositories'];
+}
+
+interface BatchEntityRepo {
+  name: string;
+  nameWithOwner: string;
+  description: string | null;
+  url: string;
+  stargazerCount: number;
+  forkCount: number;
+  primaryLanguage: { name: string; color: string } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface BatchEntity {
+  type?: 'user' | 'organization';
+  login: string;
+  error?: string;
+  totalRepositories?: number;
+  totalMembers?: number;
+  repositories?: BatchEntityRepo[];
+  [key: string]: unknown;
 }
 
 // Zod schemas for validation
@@ -67,7 +207,7 @@ const BatchQueryUsersSchema = z.object({
 const GraphQLQueryDefSchema = z.object({
   alias: z.string().min(1, 'Alias is required'),
   query: z.string().min(1, 'Query is required'),
-  variables: z.record(z.string(), z.any()).optional(),
+  variables: z.record(z.string(), z.unknown()).optional(),
 });
 
 const BatchGraphQLQuerySchema = z.object({
@@ -254,21 +394,22 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
               }
             `;
 
-            const result: any = (await (octokit as any).graphqlWithComplexity)
-              ? await (octokit as any).graphqlWithComplexity(query)
-              : await octokit.graphql(query);
+            const extOctokit = octokit as OctokitWithComplexity;
+            const result = (extOctokit.graphqlWithComplexity
+              ? await extOctokit.graphqlWithComplexity(query)
+              : await octokit.graphql(query)) as Record<string, BatchRepoNode | null>;
 
             if (!result) {
               throw new Error('Batch repository query returned no results');
             }
 
             // Process results
-            const repositories = Object.keys(result)
+            const repositories: ProcessedRepo[] = Object.keys(result)
               .map(key => {
                 const repo = result[key];
                 if (!repo) return null;
 
-                const processed: any = {
+                const processed: ProcessedRepo = {
                   id: repo.id,
                   name: repo.name,
                   fullName: repo.nameWithOwner,
@@ -281,7 +422,7 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
                   },
                   primaryLanguage: repo.primaryLanguage,
                   license: repo.licenseInfo,
-                  topics: repo.repositoryTopics.nodes.map((node: any) => node.topic.name),
+                  topics: repo.repositoryTopics.nodes.map((node) => node.topic.name),
                   dates: {
                     created: repo.createdAt,
                     updated: repo.updatedAt,
@@ -292,12 +433,12 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
                 if (params.includeLanguages && repo.languages) {
                   processed.languages = {
                     totalSize: repo.languages.totalSize,
-                    breakdown: repo.languages.edges.map((edge: any) => ({
+                    breakdown: repo.languages.edges.map((edge) => ({
                       name: edge.node.name,
                       color: edge.node.color,
                       size: edge.size,
                       percentage:
-                        Math.round((edge.size / repo.languages.totalSize) * 100 * 100) / 100,
+                        Math.round((edge.size / repo.languages!.totalSize) * 100 * 100) / 100,
                     })),
                   };
                 }
@@ -305,7 +446,7 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
                 if (params.includeContributors && repo.collaborators) {
                   processed.contributors = {
                     totalCount: repo.collaborators.totalCount,
-                    top: repo.collaborators.nodes.map((contributor: any) => ({
+                    top: repo.collaborators.nodes.map((contributor) => ({
                       login: contributor.login,
                       name: contributor.name,
                       avatarUrl: contributor.avatarUrl,
@@ -332,7 +473,7 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
                 if (params.includeRecentCommits && repo.defaultBranchRef?.target?.history) {
                   processed.recentCommits = {
                     branch: repo.defaultBranchRef.name,
-                    commits: repo.defaultBranchRef.target.history.nodes.map((commit: any) => ({
+                    commits: repo.defaultBranchRef.target.history.nodes.map((commit) => ({
                       date: commit.committedDate,
                       message: commit.messageHeadline,
                       author: commit.author?.user?.login,
@@ -344,7 +485,7 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
 
                 return processed;
               })
-              .filter(Boolean);
+              .filter((r): r is ProcessedRepo => r !== null);
 
             return {
               totalQueried: params.repositories.length,
@@ -353,24 +494,24 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
               repositories,
               summary: {
                 totalStars: repositories.reduce(
-                  (sum: number, repo: any) => sum + (repo.statistics?.stars ?? 0),
+                  (sum: number, repo: ProcessedRepo) => sum + (repo.statistics?.stars ?? 0),
                   0
                 ),
                 totalForks: repositories.reduce(
-                  (sum: number, repo: any) => sum + (repo.statistics?.forks ?? 0),
+                  (sum: number, repo: ProcessedRepo) => sum + (repo.statistics?.forks ?? 0),
                   0
                 ),
                 languages: [
                   ...new Set(
                     repositories.flatMap(
-                      (repo: any) =>
-                        repo.languages?.breakdown?.map((lang: any) => lang.name) ??
+                      (repo: ProcessedRepo) =>
+                        repo.languages?.breakdown?.map((lang) => lang.name) ??
                         (repo.primaryLanguage ? [repo.primaryLanguage.name] : [])
                     )
                   ),
                 ],
                 licenses: [
-                  ...new Set(repositories.map((repo: any) => repo.license?.name).filter(Boolean)),
+                  ...new Set(repositories.map((repo: ProcessedRepo) => repo.license?.name).filter(Boolean)),
                 ],
               },
             };
@@ -523,19 +664,20 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
               }
             `;
 
-            const result: any = (await (octokit as any).graphqlWithComplexity)
-              ? await (octokit as any).graphqlWithComplexity(query)
-              : await octokit.graphql(query);
+            const extOctokit = octokit as OctokitWithComplexity;
+            const result = (extOctokit.graphqlWithComplexity
+              ? await extOctokit.graphqlWithComplexity(query)
+              : await octokit.graphql(query)) as Record<string, BatchUserNode | BatchOrgNode | null>;
 
             if (!result) {
               throw new Error('Batch user query returned no results');
             }
 
             // Process results - combine user and organization results
-            const entities = [];
+            const entities: BatchEntity[] = [];
             for (let i = 0; i < params.usernames.length; i++) {
-              const user = result[`user${i}`];
-              const org = result[`org${i}`];
+              const user = result[`user${i}`] as BatchUserNode | null;
+              const org = result[`org${i}`] as BatchOrgNode | null;
 
               if (user) {
                 entities.push({
@@ -548,7 +690,7 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
                 entities.push({
                   ...org,
                   type: 'organization',
-                  totalMembers: org.membersWithRole?.totalCount,
+                  totalMembers: (org as BatchOrgNode).membersWithRole?.totalCount,
                   totalRepositories: org.repositories?.totalCount,
                   repositories: org.repositories?.nodes,
                 });
@@ -569,15 +711,15 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
                 totalUsers: entities.filter(e => e.type === 'user').length,
                 totalOrganizations: entities.filter(e => e.type === 'organization').length,
                 totalRepositories: entities.reduce(
-                  (sum: number, entity: any) => sum + (entity.totalRepositories ?? 0),
+                  (sum: number, entity: BatchEntity) => sum + (entity.totalRepositories ?? 0),
                   0
                 ),
                 topLanguages: [
                   ...new Set(
                     entities.flatMap(
-                      (entity: any) =>
+                      (entity: BatchEntity) =>
                         entity.repositories
-                          ?.map((repo: any) => repo.primaryLanguage?.name)
+                          ?.map((repo) => repo.primaryLanguage?.name)
                           .filter(Boolean) ?? []
                     )
                   ),
@@ -634,7 +776,7 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
           'batch_graphql_query',
           async () => {
             // Build the combined query with all variables
-            const allVariables: any = {};
+            const allVariables: Record<string, unknown> = {};
             const queryFragments = [];
 
             for (let i = 0; i < params.queries.length; i++) {
@@ -670,9 +812,10 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
             `;
 
             try {
-              const result: any = (await (octokit as any).graphqlWithComplexity)
-                ? await (octokit as any).graphqlWithComplexity(fullQuery, allVariables)
-                : await octokit.graphql(fullQuery, allVariables);
+              const extOctokit = octokit as OctokitWithComplexity;
+              const result = (extOctokit.graphqlWithComplexity
+                ? await extOctokit.graphqlWithComplexity(fullQuery, allVariables)
+                : await octokit.graphql(fullQuery, allVariables)) as Record<string, unknown>;
 
               if (!result) {
                 throw new Error('Batch GraphQL query returned no results');
@@ -685,7 +828,7 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
                 executedQuery: fullQuery,
                 variables: allVariables,
               };
-            } catch (error: any) {
+            } catch (error: unknown) {
               console.error('Batch GraphQL operation failed:', error); // Log for debugging
               return {
                 successful: false,

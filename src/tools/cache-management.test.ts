@@ -57,7 +57,7 @@ describe('Cache Management Tools', () => {
         graphqlCache: { hits: 8, misses: 2 },
         deduplication: { deduplicated: 3 },
         performance: { avgResponseTime: 150 },
-      };
+      } as unknown as ReturnType<typeof mockOptimizedClient.getMetrics>;
 
       vi.spyOn(mockOptimizedClient, 'getMetrics').mockReturnValue(mockMetrics);
 
@@ -74,7 +74,7 @@ describe('Cache Management Tools', () => {
       const mockMetrics = {
         cache: { hits: 10, misses: 5 },
         graphqlCache: { hits: 8, misses: 2 },
-      };
+      } as unknown as ReturnType<typeof mockOptimizedClient.getMetrics>;
 
       const mockDetailedStats = {
         general: { hits: 8, misses: 2, size: 5, evictions: 0, queryTypes: {} },

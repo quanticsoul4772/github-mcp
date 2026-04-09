@@ -5,6 +5,11 @@ import { createTypeSafeHandler } from '../utils/type-safety.js';
 import { withErrorHandling } from '../errors.js';
 import { validateGraphQLVariableValue } from '../graphql-validation.js';
 
+// Extended Octokit type that may have graphqlWithComplexity from rate-limiter
+type OctokitWithComplexity = Octokit & {
+  graphqlWithComplexity?: (query: string, variables?: Record<string, unknown>) => Promise<unknown>;
+};
+
 // Type definitions for project management tools
 interface GetProjectBoardsParams {
   owner: string;
@@ -30,6 +35,124 @@ interface GetCrossRepoProjectViewParams {
   assignee?: string;
   state?: 'OPEN' | 'CLOSED';
   milestone?: string;
+}
+
+// GraphQL response types for project boards
+interface ProjectV2Node {
+  id: string;
+  number: number;
+  title: string;
+  shortDescription: string;
+  readme: string;
+  url: string;
+  createdAt: string;
+  updatedAt: string;
+  closed: boolean;
+  public: boolean;
+  owner: { login: string };
+  creator: { login: string };
+  items: {
+    totalCount: number;
+    nodes: Array<{
+      id: string;
+      type: string;
+      content: Record<string, unknown>;
+    }>;
+  };
+  fields: {
+    totalCount: number;
+    nodes: Array<{
+      id: string;
+      name: string;
+      dataType: string;
+      options?: Array<{ id: string; name: string; color: string }>;
+    }>;
+  };
+}
+
+interface ProjectsV2Connection {
+  totalCount: number;
+  nodes: ProjectV2Node[];
+}
+
+interface ProjectBoardsResult {
+  repository?: { projectsV2: ProjectsV2Connection };
+  user?: { projectsV2: ProjectsV2Connection };
+  organization?: { projectsV2: ProjectsV2Connection };
+}
+
+// GraphQL response types for milestones
+interface MilestoneIssue {
+  id: string;
+  number: number;
+  title: string;
+  state: string;
+  url: string;
+  createdAt: string;
+  author: { login: string };
+  labels: { nodes: Array<{ name: string; color: string }> };
+  assignees: { nodes: Array<{ login: string; avatarUrl: string }> };
+}
+
+interface MilestoneNode {
+  id: string;
+  number: number;
+  title: string;
+  description: string;
+  state: string;
+  url: string;
+  createdAt: string;
+  updatedAt: string;
+  dueOn: string | null;
+  closedAt: string | null;
+  creator: { login: string; avatarUrl: string };
+  issues: { totalCount: number; nodes: MilestoneIssue[] };
+  pullRequests: { totalCount: number; nodes: MilestoneIssue[] };
+}
+
+interface MilestonesResult {
+  repository?: {
+    milestones: {
+      totalCount: number;
+      nodes: MilestoneNode[];
+    };
+  };
+}
+
+// GraphQL response types for cross-repo view
+interface CrossRepoItem {
+  id: string;
+  number: number;
+  title: string;
+  body: string;
+  state: string;
+  url: string;
+  createdAt: string;
+  updatedAt: string;
+  author: { login: string; avatarUrl: string };
+  assignees: { nodes: Array<{ login: string; avatarUrl: string }> };
+  labels: { nodes: Array<{ name: string; color: string }> };
+  milestone: { title: string; dueOn: string | null; state: string } | null;
+  comments?: { totalCount: number };
+  reactions?: { totalCount: number };
+  reviews?: { totalCount: number; nodes: Array<{ state: string; author: { login: string } }> };
+  mergeable?: string;
+  isDraft?: boolean;
+}
+
+interface CrossRepoResult {
+  repository?: {
+    name: string;
+    nameWithOwner: string;
+    url: string;
+    issues: { totalCount: number; nodes: CrossRepoItem[] };
+    pullRequests: { totalCount: number; nodes: CrossRepoItem[] };
+  };
+}
+
+interface CrossRepoItemWithContext extends CrossRepoItem {
+  repository: { name: string; nameWithOwner: string; url: string };
+  type: 'issue' | 'pullRequest';
 }
 
 // Zod schemas for validation
@@ -334,11 +457,12 @@ export function createProjectManagementTools(octokit: Octokit, _readOnly: boolea
               first: validateGraphQLVariableValue(params.first ?? 25, 'first'),
             };
 
-            const result: any = (await (octokit as any).graphqlWithComplexity)
-              ? await (octokit as any).graphqlWithComplexity(query, variables)
-              : await octokit.graphql(query, variables);
+            const extOctokit = octokit as OctokitWithComplexity;
+            const result = (extOctokit.graphqlWithComplexity
+              ? await extOctokit.graphqlWithComplexity(query, variables)
+              : await octokit.graphql(query, variables)) as ProjectBoardsResult;
 
-            let projects;
+            let projects: ProjectsV2Connection | undefined;
             if (params.repo) {
               projects = result.repository?.projectsV2;
             } else {
@@ -485,25 +609,26 @@ export function createProjectManagementTools(octokit: Octokit, _readOnly: boolea
               state: params.state ? validateGraphQLVariableValue(params.state, 'state') : undefined,
             };
 
-            const result: any = (await (octokit as any).graphqlWithComplexity)
-              ? await (octokit as any).graphqlWithComplexity(query, variables)
-              : await octokit.graphql(query, variables);
+            const extOctokit = octokit as OctokitWithComplexity;
+            const result = (extOctokit.graphqlWithComplexity
+              ? await extOctokit.graphqlWithComplexity(query, variables)
+              : await octokit.graphql(query, variables)) as MilestonesResult;
 
             if (!result.repository) {
               throw new Error('Repository not found or milestones query failed');
             }
 
-            const milestones = result.repository.milestones.nodes.map((milestone: any) => {
+            const milestones = result.repository.milestones.nodes.map((milestone: MilestoneNode) => {
               const allIssues = milestone.issues.nodes;
               const allPullRequests = milestone.pullRequests.nodes;
 
               // Calculate progress
-              const openIssues = allIssues.filter((issue: any) => issue.state === 'OPEN').length;
+              const openIssues = allIssues.filter((issue: MilestoneIssue) => issue.state === 'OPEN').length;
               const closedIssues = allIssues.filter(
-                (issue: any) => issue.state === 'CLOSED'
+                (issue: MilestoneIssue) => issue.state === 'CLOSED'
               ).length;
-              const openPRs = allPullRequests.filter((pr: any) => pr.state === 'OPEN').length;
-              const closedPRs = allPullRequests.filter((pr: any) =>
+              const openPRs = allPullRequests.filter((pr: MilestoneIssue) => pr.state === 'OPEN').length;
+              const closedPRs = allPullRequests.filter((pr: MilestoneIssue) =>
                 ['CLOSED', 'MERGED'].includes(pr.state)
               ).length;
 
@@ -703,9 +828,10 @@ export function createProjectManagementTools(octokit: Octokit, _readOnly: boolea
                   : ['OPEN'],
               };
 
-              const result: any = (await (octokit as any).graphqlWithComplexity)
-                ? await (octokit as any).graphqlWithComplexity(query, variables)
-                : await octokit.graphql(query, variables);
+              const extOctokit = octokit as OctokitWithComplexity;
+              const result = (extOctokit.graphqlWithComplexity
+                ? await extOctokit.graphqlWithComplexity(query, variables)
+                : await octokit.graphql(query, variables)) as CrossRepoResult;
 
               if (!result.repository) {
                 console.warn(
@@ -722,8 +848,8 @@ export function createProjectManagementTools(octokit: Octokit, _readOnly: boolea
             }
 
             // Apply filters
-            let allIssues: any[] = [];
-            let allPullRequests: any[] = [];
+            let allIssues: CrossRepoItemWithContext[] = [];
+            let allPullRequests: CrossRepoItemWithContext[] = [];
 
             for (const repoResult of results) {
               let filteredIssues = repoResult.issues;
@@ -732,60 +858,60 @@ export function createProjectManagementTools(octokit: Octokit, _readOnly: boolea
               // Filter by labels
               if (params.labels && params.labels.length > 0) {
                 const filterLabels = params.labels;
-                filteredIssues = filteredIssues.filter((issue: any) =>
+                filteredIssues = filteredIssues.filter((issue: CrossRepoItem) =>
                   filterLabels.some((label: string) =>
-                    issue.labels.nodes.some((issueLabel: any) => issueLabel.name === label)
+                    issue.labels.nodes.some((issueLabel) => issueLabel.name === label)
                   )
                 );
-                filteredPRs = filteredPRs.filter((pr: any) =>
+                filteredPRs = filteredPRs.filter((pr: CrossRepoItem) =>
                   filterLabels.some((label: string) =>
-                    pr.labels.nodes.some((prLabel: any) => prLabel.name === label)
+                    pr.labels.nodes.some((prLabel) => prLabel.name === label)
                   )
                 );
               }
 
               // Filter by assignee
               if (params.assignee) {
-                filteredIssues = filteredIssues.filter((issue: any) =>
-                  issue.assignees.nodes.some((assignee: any) => assignee.login === params.assignee)
+                filteredIssues = filteredIssues.filter((issue: CrossRepoItem) =>
+                  issue.assignees.nodes.some((assignee) => assignee.login === params.assignee)
                 );
-                filteredPRs = filteredPRs.filter((pr: any) =>
-                  pr.assignees.nodes.some((assignee: any) => assignee.login === params.assignee)
+                filteredPRs = filteredPRs.filter((pr: CrossRepoItem) =>
+                  pr.assignees.nodes.some((assignee) => assignee.login === params.assignee)
                 );
               }
 
               // Filter by milestone
               if (params.milestone) {
                 filteredIssues = filteredIssues.filter(
-                  (issue: any) => issue.milestone?.title === params.milestone
+                  (issue: CrossRepoItem) => issue.milestone?.title === params.milestone
                 );
                 filteredPRs = filteredPRs.filter(
-                  (pr: any) => pr.milestone?.title === params.milestone
+                  (pr: CrossRepoItem) => pr.milestone?.title === params.milestone
                 );
               }
 
               // Add repository context to each item
               allIssues.push(
-                ...filteredIssues.map((issue: any) => ({
+                ...filteredIssues.map((issue: CrossRepoItem) => ({
                   ...issue,
                   repository: {
                     name: repoResult.repository.name,
                     nameWithOwner: repoResult.repository.nameWithOwner,
                     url: repoResult.repository.url,
                   },
-                  type: 'issue',
+                  type: 'issue' as const,
                 }))
               );
 
               allPullRequests.push(
-                ...filteredPRs.map((pr: any) => ({
+                ...filteredPRs.map((pr: CrossRepoItem) => ({
                   ...pr,
                   repository: {
                     name: repoResult.repository.name,
                     nameWithOwner: repoResult.repository.nameWithOwner,
                     url: repoResult.repository.url,
                   },
-                  type: 'pullRequest',
+                  type: 'pullRequest' as const,
                 }))
               );
             }
@@ -814,15 +940,15 @@ export function createProjectManagementTools(octokit: Octokit, _readOnly: boolea
                 closed: allItems.filter(item => ['CLOSED', 'MERGED'].includes(item.state)).length,
               },
               byAssignee: Object.entries(
-                allItems.reduce((acc: any, item) => {
+                allItems.reduce((acc: Record<string, number>, item) => {
                   for (const assignee of item.assignees.nodes) {
                     acc[assignee.login] = (acc[assignee.login] ?? 0) + 1;
                   }
                   return acc;
                 }, {})
               )
-                .map(([login, count]) => ({ login, count }))
-                .sort((a: any, b: any) => b.count - a.count),
+                .map(([login, count]) => ({ login, count: count as number }))
+                .sort((a, b) => b.count - a.count),
             };
 
             return {

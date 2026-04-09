@@ -124,7 +124,7 @@ export class OptimizedAPIClient {
    */
   async call<T>(
     operation: string,
-    params: Record<string, any>,
+    params: Record<string, unknown>,
     apiCall: () => Promise<T>,
     options: {
       cacheTTL?: number;
@@ -174,7 +174,7 @@ export class OptimizedAPIClient {
     repo: string,
     path: string = '',
     ref?: string
-  ): Promise<any> {
+  ): Promise<unknown> {
     return this.call('repos.getContent', { owner, repo, path, ref }, async () => {
       const { data } = await this.octokit.repos.getContent({
         owner,
@@ -189,7 +189,7 @@ export class OptimizedAPIClient {
   /**
    * Optimized repository information retrieval
    */
-  async getRepository(owner: string, repo: string): Promise<any> {
+  async getRepository(owner: string, repo: string): Promise<unknown> {
     return this.call('repos.get', { owner, repo }, async () => {
       const { data } = await this.octokit.repos.get({ owner, repo });
       return data;
@@ -199,7 +199,7 @@ export class OptimizedAPIClient {
   /**
    * Optimized user information retrieval
    */
-  async getUser(username?: string): Promise<any> {
+  async getUser(username?: string): Promise<unknown> {
     const operation = username ? 'users.get' : 'users.getAuthenticated';
     const params = username ? { username } : {};
 
@@ -228,7 +228,7 @@ export class OptimizedAPIClient {
       assignee?: string;
       since?: string;
     } = {}
-  ): Promise<any[]> {
+  ): Promise<unknown[]> {
     const { state = 'open', maxPages = 5, perPage = 100, ...otherOptions } = options;
     const params = { owner, repo, state, per_page: perPage, ...otherOptions };
 
@@ -262,7 +262,7 @@ export class OptimizedAPIClient {
       sort?: 'created' | 'updated' | 'popularity';
       direction?: 'asc' | 'desc';
     } = {}
-  ): Promise<any[]> {
+  ): Promise<unknown[]> {
     const { state = 'open', maxPages = 5, perPage = 100, ...otherOptions } = options;
 
     // For single page requests, use optimized call
@@ -286,7 +286,7 @@ export class OptimizedAPIClient {
   /**
    * Optimized branch listing
    */
-  async listBranches(owner: string, repo: string, maxPages: number = 3): Promise<any[]> {
+  async listBranches(owner: string, repo: string, maxPages: number = 3): Promise<unknown[]> {
     const params = { owner, repo, per_page: 100 };
 
     if (maxPages === 1) {
@@ -307,7 +307,21 @@ export class OptimizedAPIClient {
   /**
    * Optimized workflow runs listing
    */
-  async listWorkflowRuns(params: any): Promise<{ data: unknown[]; headers?: any }> {
+  async listWorkflowRuns(params: {
+    owner: string;
+    repo: string;
+    workflow_id?: number | string;
+    actor?: string;
+    branch?: string;
+    event?: string;
+    status?: string;
+    created?: string;
+    exclude_pull_requests?: boolean;
+    check_suite_id?: number;
+    head_sha?: string;
+    per_page?: number;
+    page?: number;
+  }): Promise<{ data: unknown[]; headers?: Record<string, string | undefined> }> {
     const fetchParams = {
       owner: params.owner,
       repo: params.repo,
@@ -315,7 +329,7 @@ export class OptimizedAPIClient {
       actor: params.actor,
       branch: params.branch,
       event: params.event,
-      status: params.status as any,
+      status: params.status as 'completed' | 'action_required' | 'cancelled' | 'failure' | 'neutral' | 'skipped' | 'stale' | 'success' | 'timed_out' | 'in_progress' | 'queued' | 'requested' | 'waiting' | 'pending' | undefined,
       created: params.created,
       exclude_pull_requests: params.exclude_pull_requests,
       check_suite_id: params.check_suite_id,
@@ -324,8 +338,9 @@ export class OptimizedAPIClient {
       page: params.page ?? 1,
     };
 
-    const response = await this.octokit.actions.listWorkflowRuns(fetchParams);
-    return { data: response.data.workflow_runs, headers: response.headers };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Octokit requires workflow_id but this method supports listing without it
+    const response = await this.octokit.actions.listWorkflowRuns(fetchParams as Parameters<Octokit['actions']['listWorkflowRuns']>[0]);
+    return { data: response.data.workflow_runs, headers: response.headers as Record<string, string | undefined> };
   }
 
   /**
@@ -334,7 +349,7 @@ export class OptimizedAPIClient {
   async batchCall<T>(
     calls: Array<{
       operation: string;
-      params: Record<string, any>;
+      params: Record<string, unknown>;
       apiCall: () => Promise<T>;
       options?: { cacheTTL?: number; skipCache?: boolean };
     }>,
@@ -361,7 +376,7 @@ export class OptimizedAPIClient {
    */
   async graphql<T>(
     query: string,
-    variables: Record<string, any> = {},
+    variables: Record<string, unknown> = {},
     options: {
       ttl?: number;
       skipCache?: boolean;
@@ -374,10 +389,10 @@ export class OptimizedAPIClient {
         .sort()
         .reduce(
           (acc, k) => {
-            acc[k] = (variables as any)[k];
+            acc[k] = variables[k];
             return acc;
           },
-          {} as Record<string, any>
+          {} as Record<string, unknown>
         );
       const dedupeKey = `graphql:${this.hashQuery(query)}:${JSON.stringify(sortedVars)}`;
       if (this.enableDeduplication && !options.skipDeduplication && this.deduplicator) {
@@ -420,7 +435,7 @@ export class OptimizedAPIClient {
   /**
    * Invalidate GraphQL cache after mutations
    */
-  invalidateGraphQLCacheForMutation(mutation: string, variables: Record<string, any> = {}): number {
+  invalidateGraphQLCacheForMutation(mutation: string, variables: Record<string, unknown> = {}): number {
     if (!this.graphqlCache) return 0;
     return this.graphqlCache.invalidateForMutation(mutation, variables);
   }
@@ -460,7 +475,13 @@ export class OptimizedAPIClient {
   /**
    * Get performance metrics
    */
-  getMetrics(): any {
+  getMetrics(): {
+    cache?: CacheMetrics;
+    graphqlCache?: GraphQLCacheMetrics;
+    deduplication?: DeduplicationMetrics;
+    performance?: SystemMetrics;
+    aggregatedPerformance?: AggregatedMetrics[];
+  } {
     return {
       cache: this.cache?.getMetrics(),
       graphqlCache: this.graphqlCache?.getMetrics(),
