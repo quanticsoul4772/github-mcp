@@ -346,8 +346,7 @@ jobs:
           publish_dir: .
           destination_dir: analysis-reports
           keep_files: true
-          include_files: |
-            analysis-report.html
+          force_orphan: true
 
       - name: Create issue for critical findings
         if: failure() && github.event_name == 'push'
