@@ -16,29 +16,31 @@ export abstract class BaseToolHandler<TParams, TResult> {
   ): Promise<TResult> {
     try {
       return await operation();
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Standardized error handling
       if (error instanceof ValidationError) {
         throw error;
       }
 
-      if (error.status === 404) {
+      const err = error as { status?: number; message?: string };
+
+      if (err.status === 404) {
         throw new Error(`${context}: Resource not found`);
       }
 
-      if (error.status === 403) {
+      if (err.status === 403) {
         throw new Error(`${context}: Access forbidden - check token permissions`);
       }
 
-      if (error.status === 401) {
+      if (err.status === 401) {
         throw new Error(`${context}: Authentication failed - check token`);
       }
 
-      if (error.status && error.message) {
-        throw new Error(`${context}: GitHub API error (${error.status}): ${error.message}`);
+      if (err.status && err.message) {
+        throw new Error(`${context}: GitHub API error (${err.status}): ${err.message}`);
       }
 
-      throw new Error(`${context}: ${error.message ?? 'Unknown error'}`);
+      throw new Error(`${context}: ${err.message ?? 'Unknown error'}`);
     }
   }
 

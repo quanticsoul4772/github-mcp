@@ -368,12 +368,13 @@ export function createCacheManagementTools(optimizedClient: OptimizedAPIClient):
 
             results.push({ repo: `${owner}/${repo}`, queryType, success: true });
             warmedQueries++;
-          } catch (error: any) {
+          } catch (error: unknown) {
+              const err = error as { status?: number; message?: string };
             results.push({
               repo: `${owner}/${repo}`,
               queryType,
               success: false,
-              error: error.message,
+              error: err.message,
             });
           }
         }

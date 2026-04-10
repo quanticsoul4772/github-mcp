@@ -17,7 +17,7 @@ export interface ComponentHealth {
   name: string;
   status: HealthStatus;
   message?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   lastChecked: string;
   responseTime?: number;
 }
@@ -30,8 +30,8 @@ export interface SystemHealth {
   timestamp: string;
   uptime: number;
   components: ComponentHealth[];
-  reliability?: Record<string, any>;
-  metadata?: Record<string, any>;
+  reliability?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -139,7 +139,7 @@ export class HealthManager {
       let message = 'GitHub API is not accessible';
 
       if (error instanceof Error) {
-        const githubError = error as any;
+        const githubError = error as { status?: number };
         const statusCode = typeof githubError?.status === 'number' ? githubError.status : undefined;
         if (statusCode === 401) {
           message = 'GitHub API authentication failed';
@@ -161,7 +161,7 @@ export class HealthManager {
         responseTime,
         metadata: {
           error: error instanceof Error ? error.message : String(error),
-          statusCode: (error as any)?.status,
+          statusCode: (error as { status?: number })?.status,
         },
       };
 

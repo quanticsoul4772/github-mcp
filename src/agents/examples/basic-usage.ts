@@ -70,8 +70,8 @@ export async function analyzeProject(projectPath: string) {
   // Create coordinator and register agents
   const registry = new DefaultAgentRegistry();
   const coordinator = new DefaultAgentCoordinator(registry);
-  registry.register(new StaticAnalysisAgent() as any);
-  registry.register(new ErrorDetectionAgent() as any);
+  registry.register(new StaticAnalysisAgent() as never);
+  registry.register(new ErrorDetectionAgent() as never);
 
   // Define analysis context
   const context: AnalysisContext = {
@@ -211,8 +211,8 @@ export async function quickSecurityScan(targetPath: string) {
 
   const securityRegistry = new DefaultAgentRegistry();
   const coordinator = new DefaultAgentCoordinator(securityRegistry);
-  securityRegistry.register(new StaticAnalysisAgent() as any);
-  securityRegistry.register(new ErrorDetectionAgent() as any);
+  securityRegistry.register(new StaticAnalysisAgent() as never);
+  securityRegistry.register(new ErrorDetectionAgent() as never);
 
   const context: AnalysisContext = {
     projectPath: targetPath,
@@ -263,13 +263,13 @@ export async function monitorAgentHealth() {
 
   const healthRegistry = new DefaultAgentRegistry();
   const _coordinator = new DefaultAgentCoordinator(healthRegistry);
-  healthRegistry.register(new StaticAnalysisAgent() as any);
-  healthRegistry.register(new ErrorDetectionAgent() as any);
-  healthRegistry.register(new TestGenerationAgent() as any);
+  healthRegistry.register(new StaticAnalysisAgent() as never);
+  healthRegistry.register(new ErrorDetectionAgent() as never);
+  healthRegistry.register(new TestGenerationAgent() as never);
 
   try {
     // Mock health check since coordinator doesn't have these methods
-    const health: Record<string, any> = {
+    const health: Record<string, { healthy: boolean; status: string; metrics?: { avgAnalysisTime: number; successRate: number; memoryUsage: number } }> = {
       'static-analysis': {
         healthy: true,
         status: 'Healthy',

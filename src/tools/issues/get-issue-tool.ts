@@ -85,11 +85,11 @@ class GetIssueHandler extends BaseToolHandler<GetIssueParams, GetIssueResult> {
               type: data.user.type,
             }
           : null,
-        labels: (data.labels ?? []).map((label: any) =>
+        labels: (data.labels ?? []).map((label: string | { name?: string }) =>
           typeof label === 'string' ? label : label?.name
         ),
         assignees:
-          data.assignees?.map((user: any) => ({
+          data.assignees?.map((user: { login: string; type: string }) => ({
             login: user.login,
             type: user.type,
           })) ?? [],

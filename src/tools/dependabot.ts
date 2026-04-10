@@ -83,7 +83,7 @@ export function createDependabotTools(octokit: Octokit, readOnly: boolean): Tool
         const { data } = await octokit.dependabot.listAlertsForRepo({
           owner: params.owner,
           repo: params.repo,
-          state: params.state as any as any,
+          state: params.state as never,
           severity: params.severity,
         });
 
@@ -126,8 +126,9 @@ export function createDependabotTools(octokit: Octokit, readOnly: boolean): Tool
           fixed_at: alert.fixed_at,
           auto_dismissed_at: alert.auto_dismissed_at,
         }));
-      } catch (error: any) {
-        if (error.status === 404 || error.status === 403) {
+      } catch (error: unknown) {
+          const err = error as { status?: number; message?: string };
+        if (err.status === 404 || err.status === 403) {
           return {
             error:
               'Dependabot alerts not available for this repository or you do not have permission',
@@ -215,8 +216,9 @@ export function createDependabotTools(octokit: Octokit, readOnly: boolean): Tool
           fixed_at: data.fixed_at,
           auto_dismissed_at: data.auto_dismissed_at,
         };
-      } catch (error: any) {
-        if (error.status === 404) {
+      } catch (error: unknown) {
+          const err = error as { status?: number; message?: string };
+        if (err.status === 404) {
           return {
             error: 'Alert not found or you do not have permission to view it',
           };
@@ -275,8 +277,9 @@ export function createDependabotTools(octokit: Octokit, readOnly: boolean): Tool
             updated_at: secret.updated_at,
           })),
         };
-      } catch (error: any) {
-        if (error.status === 404 || error.status === 403) {
+      } catch (error: unknown) {
+          const err = error as { status?: number; message?: string };
+        if (err.status === 404 || err.status === 403) {
           return {
             error: 'Unable to access Dependabot secrets for this repository',
           };
@@ -332,8 +335,8 @@ export function createDependabotTools(octokit: Octokit, readOnly: boolean): Tool
           owner: params.owner,
           repo: params.repo,
           alert_number: params.alertNumber,
-          state: params.state as any as any,
-          dismissed_reason: params.dismissed_reason as any,
+          state: params.state as never,
+          dismissed_reason: params.dismissed_reason as never,
           dismissed_comment: params.dismissed_comment,
         });
 

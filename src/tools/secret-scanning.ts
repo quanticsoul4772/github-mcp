@@ -91,9 +91,9 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
         const { data } = await octokit.secretScanning.listAlertsForRepo({
           owner: params.owner,
           repo: params.repo,
-          state: params.state as any as any,
-          secret_type: params.secret_type as any,
-          resolution: params.resolution as any,
+          state: params.state as never,
+          secret_type: params.secret_type as never,
+          resolution: params.resolution as never,
         });
 
         return data.map(alert => ({
@@ -126,8 +126,9 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
           push_protection_bypassed_at: alert.push_protection_bypassed_at,
           validity: alert.validity,
         }));
-      } catch (error: any) {
-        if (error.status === 404 || error.status === 403) {
+      } catch (error: unknown) {
+          const err = error as { status?: number; message?: string };
+        if (err.status === 404 || err.status === 403) {
           return {
             error:
               'Secret scanning is not enabled for this repository or you do not have permission',
@@ -203,8 +204,9 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
           push_protection_bypassed_at: data.push_protection_bypassed_at,
           validity: data.validity,
         };
-      } catch (error: any) {
-        if (error.status === 404) {
+      } catch (error: unknown) {
+          const err = error as { status?: number; message?: string };
+        if (err.status === 404) {
           return {
             error: 'Alert not found or you do not have permission to view it',
           };
@@ -264,8 +266,9 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
           type: location.type,
           details: location.details,
         }));
-      } catch (error: any) {
-        if (error.status === 404) {
+      } catch (error: unknown) {
+          const err = error as { status?: number; message?: string };
+        if (err.status === 404) {
           return {
             error: 'Alert not found or you do not have permission to view locations',
           };
@@ -328,9 +331,9 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
       try {
         const { data } = await octokit.secretScanning.listAlertsForOrg({
           org: params.org,
-          state: params.state as any as any,
-          secret_type: params.secret_type as any,
-          resolution: params.resolution as any,
+          state: params.state as never,
+          secret_type: params.secret_type as never,
+          resolution: params.resolution as never,
           page: params.page,
           per_page: params.perPage,
         });
@@ -368,8 +371,9 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
             : null,
           validity: alert.validity,
         }));
-      } catch (error: any) {
-        if (error.status === 404 || error.status === 403) {
+      } catch (error: unknown) {
+          const err = error as { status?: number; message?: string };
+        if (err.status === 404 || err.status === 403) {
           return {
             error: 'Unable to access organization secret scanning alerts',
           };
@@ -425,8 +429,8 @@ export function createSecretScanningTools(octokit: Octokit, readOnly: boolean): 
           owner: params.owner,
           repo: params.repo,
           alert_number: params.alertNumber,
-          state: params.state as any as any,
-          resolution: params.resolution as any,
+          state: params.state as never,
+          resolution: params.resolution as never,
           resolution_comment: params.resolution_comment,
         });
 

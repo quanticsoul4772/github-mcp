@@ -177,8 +177,9 @@ export function createOptimizedRepositoryTools(
           }));
         } else if (data.type === 'file') {
           // File content: only decode when content and encoding are provided and content is not excessively large
-          const encoding = (data as any).encoding;
-          const rawContent = (data as any).content;
+          const fileData = data as unknown as { encoding?: string; content?: string; name: string; path: string; size: number; sha: string; type: string };
+          const encoding = fileData.encoding;
+          const rawContent = fileData.content;
           let decoded: string | undefined;
           if (typeof rawContent === 'string' && encoding === 'base64') {
             // Avoid decoding extremely large contents into memory
@@ -189,16 +190,16 @@ export function createOptimizedRepositoryTools(
             }
           }
           return {
-            name: (data as any).name,
-            path: (data as any).path,
-            size: (data as any).size,
-            sha: (data as any).sha,
+            name: fileData.name,
+            path: fileData.path,
+            size: fileData.size,
+            sha: fileData.sha,
             encoding,
             // If decoding failed or was skipped, return raw content and a flag
             content: decoded,
             content_raw: decoded ? undefined : rawContent,
             is_decoded: !!decoded,
-            media_type: (data as any).type,
+            media_type: fileData.type,
           };
         } else {
           return data;

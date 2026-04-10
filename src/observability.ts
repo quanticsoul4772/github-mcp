@@ -11,12 +11,12 @@ import { metrics, ApiCallMetric, ErrorMetric } from './metrics.js';
 /**
  * Wrap a tool handler with observability features
  */
-export function withObservability<T extends (...args: any[]) => Promise<any>>(
+export function withObservability<T extends (...args: unknown[]) => Promise<unknown>>(
   toolName: string,
   operation: string,
   handler: T
 ): T {
-  return (async (...args: any[]) => {
+  return (async (...args: unknown[]) => {
     const startTime = Date.now();
     const correlationId = logger.generateCorrelationId();
     const toolLogger = logger.child({
@@ -89,17 +89,17 @@ export function withObservability<T extends (...args: any[]) => Promise<any>>(
 /**
  * Wrap GitHub API calls with rate limit tracking
  */
-export function withRateLimitTracking<T extends (...args: any[]) => Promise<any>>(
+export function withRateLimitTracking<T extends (...args: unknown[]) => Promise<unknown>>(
   apiCall: T,
   apiName: string
 ): T {
-  return (async (...args: any[]) => {
+  return (async (...args: unknown[]) => {
     try {
       const result = await apiCall(...args);
 
       // Extract rate limit headers if available
       if (result && typeof result === 'object' && 'headers' in result) {
-        const headers = (result as any).headers;
+        const headers = (result as { headers: Record<string, string> }).headers;
         const rateLimit = headers['x-ratelimit-remaining'];
         const rateLimitReset = headers['x-ratelimit-reset'];
 

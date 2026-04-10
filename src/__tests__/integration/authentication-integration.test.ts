@@ -102,7 +102,7 @@ describe('Authentication Integration Tests', () => {
         await expiredOctokit.rest.users.getAuthenticated();
         // If this succeeds, the token wasn't actually expired
         console.warn('Test token may not be expired - this is expected in some cases');
-      } catch (error: any) {
+      } catch (error: unknown) {
         const normalizedError = normalizeError(error, 'authenticate');
         expect(normalizedError).toBeInstanceOf(AuthenticationError);
         expect(normalizedError.statusCode).toBe(401);
@@ -137,8 +137,9 @@ describe('Authentication Integration Tests', () => {
         try {
           // Try to access organization data - may fail with insufficient permissions
           await octokit.rest.orgs.list();
-        } catch (error: any) {
-          if (error.status === 403) {
+        } catch (error: unknown) {
+            const err = error as { status?: number; message?: string };
+          if (err.status === 403) {
             const normalizedError = normalizeError(error, 'list_organizations');
             expect(normalizedError).toBeInstanceOf(AuthorizationError);
             expect(normalizedError.statusCode).toBe(403);
@@ -189,7 +190,7 @@ describe('Authentication Integration Tests', () => {
             owner: 'definitely-does-not-exist-12345',
             repo: 'also-does-not-exist-67890',
           });
-        } catch (error: any) {
+        } catch (error: unknown) {
           const normalizedError = normalizeError(error, 'get_repository');
 
           // Should be normalized to a proper error type
@@ -216,9 +217,10 @@ describe('Authentication Integration Tests', () => {
       try {
         await timeoutOctokit.rest.users.getAuthenticated();
         // May not always timeout, so we don't force this to fail
-      } catch (error: any) {
-        if (error.code === 'ETIMEDOUT' || error.name === 'TimeoutError') {
-          const normalizedError = normalizeError(error, 'authenticate');
+      } catch (error: unknown) {
+        const err = error as { code?: string; name?: string };
+        if (err.code === 'ETIMEDOUT' || err.name === 'TimeoutError') {
+          const normalizedError = normalizeError(error as Error, 'authenticate');
           expect(normalizedError.isRetryable).toBe(true);
         }
       }
@@ -289,10 +291,11 @@ describe('Authentication Integration Tests', () => {
             expect(repoResponse.status).toBe(200);
             expect(repoResponse.data.name).toBe(repo.name);
           }
-        } catch (error: any) {
-          if (error.status === 403) {
+        } catch (error: unknown) {
+            const err = error as { status?: number; message?: string };
+          if (err.status === 403) {
             console.warn('Token does not have repository access permissions');
-            expect(error.status).toBe(403);
+            expect(err.status).toBe(403);
           } else {
             throw error;
           }
@@ -319,7 +322,7 @@ describe('Authentication Integration Tests', () => {
             owner: 'invalid-owner-123',
             repo: 'invalid-repo-456',
           });
-        } catch (error: any) {
+        } catch (error: unknown) {
           const normalizedError = normalizeError(error, 'test_operation');
 
           // Check error message and logs don't contain tokens

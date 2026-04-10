@@ -338,7 +338,7 @@ export class OptimizedAPIClient {
       page: params.page ?? 1,
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Octokit requires workflow_id but this method supports listing without it
+     
     const response = await this.octokit.actions.listWorkflowRuns(fetchParams as Parameters<Octokit['actions']['listWorkflowRuns']>[0]);
     return { data: response.data.workflow_runs, headers: response.headers as Record<string, string | undefined> };
   }
@@ -366,7 +366,7 @@ export class OptimizedAPIClient {
     ).then(results =>
       results.map(result => ({
         ...result,
-        operation: result.input.operation,
+        operation: (result.input as { operation: string }).operation,
       }))
     );
   }

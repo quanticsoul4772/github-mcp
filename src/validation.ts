@@ -118,7 +118,7 @@ if (typeof process !== 'undefined' && typeof setInterval !== 'undefined') {
       process.exit(0);
     });
     process.on('uncaughtException', error => {
-      logger.error('Uncaught exception:', error);
+      logger.error('Uncaught exception:', { error: error.message });
       cleanupValidation();
       process.exit(1);
     });

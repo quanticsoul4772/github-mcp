@@ -103,8 +103,8 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
       const params = args as SearchOrgsParams;
       const { data } = await octokit.search.users({
         q: `${params.query} type:org`,
-        sort: params.sort as any as any,
-        order: params.order as any as any,
+        sort: params.sort as never,
+        order: params.order as never,
         page: params.page,
         per_page: params.perPage,
       });
@@ -231,8 +231,8 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
       const params = args as ListOrgMembersParams;
       const { data } = await octokit.orgs.listMembers({
         org: params.org,
-        filter: params.filter as any as any,
-        role: params.role as any,
+        filter: params.filter as never,
+        role: params.role as never,
         page: params.page,
         per_page: params.perPage,
       });
@@ -297,9 +297,9 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
       const params = args as ListOrgReposParams;
       const { data } = await octokit.repos.listForOrg({
         org: params.org,
-        type: params.type as any,
-        sort: params.sort as any as any,
-        direction: params.direction as any as any,
+        type: params.type as never,
+        sort: params.sort as never,
+        direction: params.direction as never,
         page: params.page,
         per_page: params.perPage,
       });
@@ -416,8 +416,9 @@ export function createOrganizationTools(octokit: Octokit, readOnly: boolean): To
           is_member: true,
           message: `${params.username} is a member of ${params.org}`,
         };
-      } catch (error: any) {
-        if (error.status === 404) {
+      } catch (error: unknown) {
+          const err = error as { status?: number; message?: string };
+        if (err.status === 404) {
           return {
             is_member: false,
             message: `${params.username} is not a member of ${params.org}`,

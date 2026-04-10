@@ -229,8 +229,9 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
           url: data.url,
           thread_url: data.thread_url,
         };
-      } catch (error: any) {
-        if (error.status === 404) {
+      } catch (error: unknown) {
+          const err = error as { status?: number; message?: string };
+        if (err.status === 404) {
           return {
             subscribed: false,
             message: 'Not subscribed to this thread',
@@ -277,8 +278,9 @@ export function createNotificationTools(octokit: Octokit, readOnly: boolean): To
           url: data.url,
           repository_url: data.repository_url,
         };
-      } catch (error: any) {
-        if (error.status === 404) {
+      } catch (error: unknown) {
+          const err = error as { status?: number; message?: string };
+        if (err.status === 404) {
           return {
             subscribed: false,
             message: 'Not watching this repository',

@@ -177,8 +177,8 @@ export function mapPullRequest(pr: PullRequest): any {
  */
 export async function handleToolError(
   operation: string,
-  error: any,
-  context?: Record<string, any>
+  error: unknown,
+  context?: Record<string, unknown>
 ): Promise<never> {
   const normalizedError = normalizeError(error, operation, context);
   throw normalizedError;
@@ -237,29 +237,32 @@ export function formatFileSize(bytes: number): string {
 /**
  * Extract error message from various error types
  */
-export function extractErrorMessage(error: any): string {
+export function extractErrorMessage(error: unknown): string {
   if (typeof error === 'string') return error;
-  if (error?.message) return error.message;
-  if (error?.response?.data?.message) return error.response.data.message;
-  if (error?.response?.data) return JSON.stringify(error.response.data);
+  const err = error as { message?: string; response?: { data?: { message?: string } } };
+  if (err?.message) return err.message;
+  if (err?.response?.data?.message) return err.response.data.message;
+  if (err?.response?.data) return JSON.stringify(err.response.data);
   return 'An unknown error occurred';
 }
 
 /**
  * Check if error is a 404 Not Found
  */
-export function isNotFoundError(error: any): boolean {
-  return error?.status === 404 || error?.response?.status === 404;
+export function isNotFoundError(error: unknown): boolean {
+  const err = error as { status?: number; response?: { status?: number } };
+  return err?.status === 404 || err?.response?.status === 404;
 }
 
 /**
  * Check if error is a rate limit error
  */
-export function isRateLimitError(error: any): boolean {
+export function isRateLimitError(error: unknown): boolean {
+  const err = error as { status?: number; response?: { status?: number; headers?: Record<string, string> } };
   return (
-    error?.status === 429 ||
-    error?.response?.status === 429 ||
-    error?.response?.headers?.['x-ratelimit-remaining'] === '0'
+    err?.status === 429 ||
+    err?.response?.status === 429 ||
+    err?.response?.headers?.['x-ratelimit-remaining'] === '0'
   );
 }
 
@@ -281,7 +284,7 @@ export function parseLinkHeader(linkHeader: string | undefined): {
 } {
   if (!linkHeader) return {};
 
-  const links: any = {};
+  const links: Record<string, number> = {};
   const parts = linkHeader.split(',');
 
   for (const part of parts) {

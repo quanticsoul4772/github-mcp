@@ -159,14 +159,14 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
       const { data } = await octokit.issues.listForRepo({
         owner: params.owner,
         repo: params.repo,
-        state: params.state as any,
+        state: params.state as never,
         labels: Array.isArray(params.labels)
           ? params.labels.join(',')
           : params.labels
             ? [params.labels].join(',')
             : undefined,
-        sort: params.sort as any,
-        direction: params.direction as any,
+        sort: params.sort as never,
+        direction: params.direction as never,
         since: params.since,
         page: params.page,
         per_page: params.perPage,
@@ -320,8 +320,8 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
 
       const { data } = await octokit.search.issuesAndPullRequests({
         q: query ?? '',
-        sort: params.sort as any,
-        order: params.order as any,
+        sort: params.sort as never,
+        order: params.order as never,
         page: params.page,
         per_page: params.perPage,
       });
@@ -485,7 +485,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           issue_number: params.issue_number,
           title: params.title,
           body: params.body,
-          state: params.state as any,
+          state: params.state as never,
           state_reason: params.state_reason,
           labels: params.labels,
           assignees: params.assignees,
@@ -496,7 +496,7 @@ export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfi
           number: data.number,
           title: data.title,
           state: data.state,
-          state_reason: (data as any).state_reason ?? null,
+          state_reason: (data as unknown as { state_reason?: string }).state_reason ?? null,
           body: data.body,
           html_url: data.html_url,
           updated_at: data.updated_at,

@@ -48,7 +48,7 @@ export class RequestDeduplicator {
   /**
    * Generate a unique key for the request
    */
-  private generateKey(operation: string, params: Record<string, any>): string {
+  private generateKey(operation: string, params: Record<string, unknown>): string {
     const sortedParams = Object.keys(params)
       .sort()
       .reduce(
@@ -58,7 +58,7 @@ export class RequestDeduplicator {
           }
           return acc;
         },
-        {} as Record<string, any>
+        {} as Record<string, unknown>
       );
 
     return `${operation}:${JSON.stringify(sortedParams)}`;
@@ -69,7 +69,7 @@ export class RequestDeduplicator {
    */
   async deduplicate<T>(
     operation: string,
-    params: Record<string, any>,
+    params: Record<string, unknown>,
     executor: () => Promise<T>
   ): Promise<T> {
     const key = this.generateKey(operation, params);

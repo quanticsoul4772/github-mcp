@@ -108,7 +108,7 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
         const { data } = await octokit.codeScanning.listAlertsForRepo({
           owner: params.owner,
           repo: params.repo,
-          state: params.state as any as any,
+          state: params.state as never,
           ref: params.ref,
           tool_name: params.tool_name,
           severity: params.severity,
@@ -140,8 +140,9 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
           updated_at: alert.updated_at,
           html_url: alert.html_url,
         }));
-      } catch (error: any) {
-        if (error.status === 404) {
+      } catch (error: unknown) {
+          const err = error as { status?: number; message?: string };
+        if (err.status === 404) {
           return {
             error:
               'Code scanning is not enabled for this repository or you do not have permission to view alerts',
@@ -225,8 +226,9 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
           instances_url: data.instances_url,
           html_url: data.html_url,
         };
-      } catch (error: any) {
-        if (error.status === 404) {
+      } catch (error: unknown) {
+          const err = error as { status?: number; message?: string };
+        if (err.status === 404) {
           return {
             error: 'Alert not found or you do not have permission to view it',
           };
@@ -267,7 +269,7 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
         const { data } = await octokit.securityAdvisories.listRepositoryAdvisories({
           owner: params.owner,
           repo: params.repo,
-          state: params.state as any as any,
+          state: params.state as never,
         });
 
         return data.map(advisory => ({
@@ -287,8 +289,9 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
           cwes: advisory.cwes,
           html_url: advisory.html_url,
         }));
-      } catch (error: any) {
-        if (error.status === 404 || error.status === 403) {
+      } catch (error: unknown) {
+          const err = error as { status?: number; message?: string };
+        if (err.status === 404 || err.status === 403) {
           return {
             error:
               'Security advisories not available for this repository or you do not have permission',
@@ -331,8 +334,9 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
           enabled: true,
           message: 'Vulnerability alerts are enabled for this repository',
         };
-      } catch (error: any) {
-        if (error.status === 404) {
+      } catch (error: unknown) {
+          const err = error as { status?: number; message?: string };
+        if (err.status === 404) {
           return {
             enabled: false,
             message: 'Vulnerability alerts are not enabled for this repository',
@@ -381,8 +385,9 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
           analyses_url: data.analyses_url,
           errors: data.errors,
         };
-      } catch (error: any) {
-        if (error.status === 404) {
+      } catch (error: unknown) {
+          const err = error as { status?: number; message?: string };
+        if (err.status === 404) {
           return {
             error: 'SARIF upload not found',
           };
@@ -438,8 +443,8 @@ export function createCodeSecurityTools(octokit: Octokit, readOnly: boolean): To
           owner: params.owner,
           repo: params.repo,
           alert_number: params.alertNumber,
-          state: params.state as any as any,
-          dismissed_reason: params.dismissed_reason as any,
+          state: params.state as never,
+          dismissed_reason: params.dismissed_reason as never,
           dismissed_comment: params.dismissed_comment,
         });
 

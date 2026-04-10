@@ -325,7 +325,7 @@ async function runDemo() {
     });
     
     logger.info('Quick analysis completed', {
-      totalFindings: (quickResult as any).analysis.summary.totalFindings,
+      totalFindings: (quickResult as unknown as { analysis: { summary: { totalFindings: number } } }).analysis.summary.totalFindings,
     });
     
     logger.info('Running Detailed Single File Analysis');

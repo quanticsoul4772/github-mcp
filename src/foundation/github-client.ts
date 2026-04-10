@@ -106,14 +106,14 @@ export class GitHubClient implements IGitHubClient {
   }
 
   async createIssue(owner: string, repo: string, issueData: Record<string, unknown>): Promise<unknown> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: result } = await this.octokit.issues.create({ owner, repo, ...issueData } as any);
+     
+    const { data: result } = await this.octokit.issues.create({ owner, repo, ...issueData } as never);
     return result;
   }
 
   async updateIssue(owner: string, repo: string, issueNumber: number, issueData: Record<string, unknown>): Promise<unknown> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: result } = await this.octokit.issues.update({ owner, repo, issue_number: issueNumber, ...issueData } as any);
+     
+    const { data: result } = await this.octokit.issues.update({ owner, repo, issue_number: issueNumber, ...issueData } as never);
     return result;
   }
 
@@ -137,8 +137,8 @@ export class GitHubClient implements IGitHubClient {
   }
 
   async createPullRequest(owner: string, repo: string, prData: Record<string, unknown>): Promise<unknown> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: result } = await this.octokit.pulls.create({ owner, repo, ...prData } as any);
+     
+    const { data: result } = await this.octokit.pulls.create({ owner, repo, ...prData } as never);
     return result;
   }
 
@@ -148,8 +148,8 @@ export class GitHubClient implements IGitHubClient {
     pullNumber: number,
     prData: Record<string, unknown>
   ): Promise<unknown> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: result } = await this.octokit.pulls.update({ owner, repo, pull_number: pullNumber, ...prData } as any);
+     
+    const { data: result } = await this.octokit.pulls.update({ owner, repo, pull_number: pullNumber, ...prData } as never);
     return result;
   }
 }

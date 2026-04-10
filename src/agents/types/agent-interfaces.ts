@@ -39,7 +39,7 @@ export interface AgentConfiguration {
   enabled: boolean;
   priority: number;
   timeout: number;
-  options: Record<string, any>;
+  options: Record<string, unknown>;
 }
 
 export interface AnalysisContext {

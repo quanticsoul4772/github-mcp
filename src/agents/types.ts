@@ -72,7 +72,7 @@ export interface Finding {
   /** Rule or check that generated this finding */
   rule?: string;
   /** Additional metadata */
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -106,7 +106,7 @@ export interface AnalysisReport {
   /** Any errors encountered during analysis */
   errors?: string[];
   /** Additional metadata */
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -126,13 +126,13 @@ export interface AgentConfig {
   /** Categories to exclude */
   excludeCategories?: FindingCategory[];
   /** Custom rules or patterns */
-  customRules?: Record<string, any>;
+  customRules?: Record<string, unknown>;
   /** Timeout in milliseconds */
   timeout?: number;
   /** Enable caching */
   enableCache?: boolean;
   /** Additional agent-specific configuration */
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -276,7 +276,7 @@ export interface TestGenerationRequest {
     branches?: number;
   };
   /** Additional test configuration */
-  config?: Record<string, any>;
+  config?: Record<string, unknown>;
 }
 
 /**

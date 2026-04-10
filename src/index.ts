@@ -179,7 +179,7 @@ export class GitHubMCPServer {
   private setupRequestInterception() {
     // Hook into Octokit's request lifecycle
     this.octokit.hook.before('request', async options => {
-      metrics.recordApiCall({ method: options.method, url: options.url } as any);
+      metrics.recordApiCall({ tool: 'octokit', operation: `${options.method} ${options.url}`, success: true, duration: 0, timestamp: Date.now() });
       logger.debug('API request', {
         method: options.method,
         url: options.url,
@@ -195,7 +195,7 @@ export class GitHubMCPServer {
     });
 
     this.octokit.hook.error('request', async (error, options) => {
-      metrics.recordError({ name: error.name, message: error.message } as any);
+      metrics.recordError({ tool: 'octokit', operation: `${options.method} ${options.url}`, errorType: error.name, message: error.message, timestamp: Date.now() });
       logger.error('API error', {
         method: options.method,
         url: options.url,

@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DefaultAgentCoordinator } from './coordinator.js';
 import { DefaultAgentRegistry } from './agent-registry.js';
 
-function makeContext(extra: Record<string, any> = {}): any {
+function makeContext(extra: Record<string, unknown> = {}): any {
   return { projectPath: '/test', ...extra };
 }
 

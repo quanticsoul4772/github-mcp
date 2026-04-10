@@ -334,7 +334,7 @@ export abstract class BaseAgent implements CodeAnalysisAgent {
     snippet?: string,
     suggestion?: string,
     rule?: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): Finding {
     // Generate consistent ID based on content
     const id = this.generateFindingId(file, line, column, rule, title);

@@ -521,11 +521,11 @@ export async function validateGitHubTokenWithAPI(
     timeout?: number;
     retries?: number;
   } = {}
-): Promise<ValidationResult<{ token: string; user: any }>> {
+): Promise<ValidationResult<{ token: string; user: unknown }>> {
   // First check format using the comprehensive validation
   const formatResult = validateGitHubTokenWithResult(token);
   if (!formatResult.isValid) {
-    return createErrorResult<{ token: string; user: any }>(
+    return createErrorResult<{ token: string; user: unknown }>(
       formatResult.errors,
       formatResult.warnings,
       formatResult.suggestions
@@ -549,7 +549,7 @@ export async function validateGitHubTokenWithAPI(
 
   // Check for fetch API availability
   if (typeof fetch === 'undefined' && typeof global !== 'undefined' && !global.fetch) {
-    return createErrorResult<{ token: string; user: any }>([
+    return createErrorResult<{ token: string; user: unknown }>([
       createValidationError(
         'githubToken',
         'Fetch API not available in this environment',
@@ -572,7 +572,7 @@ export async function validateGitHubTokenWithAPI(
         });
 
         if (response.status === 401) {
-          return createErrorResult<{ token: string; user: any }>([
+          return createErrorResult<{ token: string; user: unknown }>([
             createValidationError(
               'githubToken',
               'Token is invalid or expired',
@@ -582,7 +582,7 @@ export async function validateGitHubTokenWithAPI(
         }
 
         if (response.status === 403) {
-          return createErrorResult<{ token: string; user: any }>([
+          return createErrorResult<{ token: string; user: unknown }>([
             createValidationError(
               'githubToken',
               'API rate limit exceeded',
@@ -592,7 +592,7 @@ export async function validateGitHubTokenWithAPI(
         }
 
         if (!response.ok) {
-          return createErrorResult<{ token: string; user: any }>([
+          return createErrorResult<{ token: string; user: unknown }>([
             createValidationError(
               'githubToken',
               `GitHub API returned ${response.status}: ${response.statusText}`,
@@ -605,7 +605,7 @@ export async function validateGitHubTokenWithAPI(
 
         return createSuccessResult({ token, user }, [], ['Token validation successful']);
       } catch (error) {
-        return createErrorResult<{ token: string; user: any }>([
+        return createErrorResult<{ token: string; user: unknown }>([
           createValidationError(
             'githubToken',
             `Network error during validation: ${error instanceof Error ? error.message : String(error)}`,

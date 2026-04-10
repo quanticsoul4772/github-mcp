@@ -81,7 +81,7 @@ class CloseIssueHandler extends BaseToolHandler<CloseIssueParams, CloseIssueResu
 
   protected async executeOperation(params: CloseIssueParams): Promise<CloseIssueResult> {
     return ErrorHandler.withErrorHandling(async () => {
-      const updateData: Record<string, any> = {
+      const updateData: Record<string, unknown> = {
         state: 'closed',
       };
       if (params.state_reason !== undefined) {
@@ -106,11 +106,11 @@ class CloseIssueHandler extends BaseToolHandler<CloseIssueParams, CloseIssueResu
               type: data.user.type,
             }
           : null,
-        labels: (data.labels ?? []).map((label: any) =>
+        labels: (data.labels ?? []).map((label: string | { name?: string }) =>
           typeof label === 'string' ? label : label?.name
         ),
         assignees:
-          data.assignees?.map((user: any) => ({
+          data.assignees?.map((user: { login: string; type: string }) => ({
             login: user.login,
             type: user.type,
           })) ?? [],

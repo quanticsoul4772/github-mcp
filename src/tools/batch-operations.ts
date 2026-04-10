@@ -438,7 +438,7 @@ export function createBatchOperationsTools(octokit: Octokit, _readOnly: boolean)
                       color: edge.node.color,
                       size: edge.size,
                       percentage:
-                        Math.round((edge.size / repo.languages!.totalSize) * 100 * 100) / 100,
+                        Math.round((edge.size / (repo.languages?.totalSize ?? 1)) * 100 * 100) / 100,
                     })),
                   };
                 }

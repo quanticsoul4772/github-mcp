@@ -144,7 +144,7 @@ export class ReportGenerator {
       metadata: {
         generatedAt: (() => {
           const v = data.metadata?.generatedAt;
-          const d = v instanceof Date ? v : v ? new Date(v as any) : undefined;
+          const d = v instanceof Date ? v : v ? new Date(v as string | number) : undefined;
           return d && !isNaN(d.getTime()) ? d : new Date();
         })(),
         generatedBy: data.metadata?.generatedBy ?? 'Security Analysis Agent (Safe Mode)',

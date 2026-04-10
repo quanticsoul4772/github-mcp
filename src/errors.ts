@@ -12,7 +12,7 @@ import { metrics } from './metrics.js';
 export class GitHubMCPError extends Error {
   public readonly code: string;
   public readonly statusCode?: number | undefined;
-  public readonly context?: Record<string, any> | undefined;
+  public readonly context?: Record<string, unknown> | undefined;
   public readonly isRetryable: boolean;
   public readonly originalError?: Error | undefined;
   public readonly correlationId?: string | undefined;
@@ -22,7 +22,7 @@ export class GitHubMCPError extends Error {
     message: string,
     code: string,
     statusCode?: number,
-    context?: Record<string, any>,
+    context?: Record<string, unknown>,
     originalError?: Error,
     correlationId?: string
   ) {
@@ -73,7 +73,7 @@ export class GitHubMCPError extends Error {
  * Authentication error
  */
 export class AuthenticationError extends GitHubMCPError {
-  constructor(message: string, context?: Record<string, any>) {
+  constructor(message: string, context?: Record<string, unknown>) {
     super(message, 'AUTHENTICATION_ERROR', 401, context);
     this.name = 'AuthenticationError';
   }
@@ -83,7 +83,7 @@ export class AuthenticationError extends GitHubMCPError {
  * Authorization error
  */
 export class AuthorizationError extends GitHubMCPError {
-  constructor(message: string, context?: Record<string, any>) {
+  constructor(message: string, context?: Record<string, unknown>) {
     super(message, 'AUTHORIZATION_ERROR', 403, context);
     this.name = 'AuthorizationError';
   }
@@ -93,7 +93,7 @@ export class AuthorizationError extends GitHubMCPError {
  * Resource not found error
  */
 export class NotFoundError extends GitHubMCPError {
-  constructor(resource: string, context?: Record<string, any>) {
+  constructor(resource: string, context?: Record<string, unknown>) {
     super(`Resource not found: ${resource}`, 'NOT_FOUND', 404, context);
     this.name = 'NotFoundError';
   }
@@ -154,7 +154,7 @@ export class ConfigurationError extends GitHubMCPError {
  * Generic API error for user-facing responses
  */
 export class APIError extends GitHubMCPError {
-  constructor(message: string, statusCode: number = 500, context?: Record<string, any>) {
+  constructor(message: string, statusCode: number = 500, context?: Record<string, unknown>) {
     super(message, 'API_ERROR', statusCode, context);
     this.name = 'APIError';
   }
@@ -166,7 +166,7 @@ export class APIError extends GitHubMCPError {
 export async function withErrorHandling<T>(
   operation: string,
   fn: () => Promise<T>,
-  context?: Record<string, any>
+  context?: Record<string, unknown>
 ): Promise<T> {
   const startTime = Date.now();
   const correlationId = logger.generateCorrelationId();
@@ -194,7 +194,7 @@ export async function withErrorHandling<T>(
 
     // Record error metrics
     metrics.recordError({
-      tool: context?.tool ?? 'unknown',
+      tool: (context?.tool as string) ?? 'unknown',
       operation,
       errorType: normalizedError.name,
       message: normalizedError.message,
@@ -222,19 +222,21 @@ export async function withErrorHandling<T>(
  * Normalize various error types into GitHubMCPError
  */
 export function normalizeError(
-  error: any,
+  error: unknown,
   operation?: string,
-  context?: Record<string, any>
+  context?: Record<string, unknown>
 ): GitHubMCPError {
   // Already a GitHubMCPError
   if (error instanceof GitHubMCPError) {
     return error;
   }
 
+  const err = error as { status?: number; message?: string; code?: string; name?: string; response?: { headers?: Record<string, string> } };
+
   // GitHub API error (from Octokit)
-  if (error.status) {
-    const message = error.message ?? 'GitHub API error';
-    const statusCode = error.status;
+  if (err.status) {
+    const message = err.message ?? 'GitHub API error';
+    const statusCode = err.status;
 
     // Check for specific error types
     if (statusCode === 401) {
@@ -242,9 +244,9 @@ export function normalizeError(
     }
     if (statusCode === 403) {
       // Check if it's a rate limit error
-      if (error.response?.headers?.['x-ratelimit-remaining'] === '0') {
-        const reset = parseInt(error.response?.headers?.['x-ratelimit-reset'] ?? '', 10);
-        const limit = parseInt(error.response?.headers?.['x-ratelimit-limit'] ?? '', 10);
+      if (err.response?.headers?.['x-ratelimit-remaining'] === '0') {
+        const reset = parseInt(err.response?.headers?.['x-ratelimit-reset'] ?? '', 10);
+        const limit = parseInt(err.response?.headers?.['x-ratelimit-limit'] ?? '', 10);
         return new RateLimitError(
           'GitHub API rate limit exceeded',
           Number.isFinite(reset) ? reset : undefined,
@@ -258,9 +260,9 @@ export function normalizeError(
       return new NotFoundError(operation ?? 'Unknown resource', context);
     }
     if (statusCode === 429) {
-      const reset = parseInt(error.response?.headers?.['x-ratelimit-reset'] ?? '', 10);
-      const limit = parseInt(error.response?.headers?.['x-ratelimit-limit'] ?? '', 10);
-      const remaining = parseInt(error.response?.headers?.['x-ratelimit-remaining'] ?? '', 10);
+      const reset = parseInt(err.response?.headers?.['x-ratelimit-reset'] ?? '', 10);
+      const limit = parseInt(err.response?.headers?.['x-ratelimit-limit'] ?? '', 10);
+      const remaining = parseInt(err.response?.headers?.['x-ratelimit-remaining'] ?? '', 10);
       return new RateLimitError(
         message,
         Number.isFinite(reset) ? reset : undefined,
@@ -274,27 +276,27 @@ export function normalizeError(
       'GITHUB_API_ERROR',
       statusCode,
       { ...context, operation },
-      error
+      error instanceof Error ? error : new Error(String(error))
     );
   }
 
   // Network errors
-  if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
-    return new NetworkError(`Network error during ${operation}: ${error.message}`, error);
+  if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND' || err.code === 'ETIMEDOUT') {
+    return new NetworkError(`Network error during ${operation}: ${err.message}`, error instanceof Error ? error : new Error(String(error)));
   }
 
   // Timeout errors
-  if (error.name === 'TimeoutError' || error.code === 'ETIMEDOUT') {
+  if (err.name === 'TimeoutError' || err.code === 'ETIMEDOUT') {
     return new TimeoutError(operation ?? 'Unknown operation', 30000);
   }
 
   // Generic error
   return new GitHubMCPError(
-    error.message ?? 'An unknown error occurred',
+    err.message ?? 'An unknown error occurred',
     'UNKNOWN_ERROR',
     undefined,
     { ...context, operation },
-    error
+    error instanceof Error ? error : new Error(String(error))
   );
 }
 
@@ -398,7 +400,7 @@ export function formatErrorResponse(error: Error): {
   error: {
     code: string;
     message: string;
-    details?: Record<string, any>;
+    details?: Record<string, unknown>;
   };
 } {
   if (error instanceof GitHubMCPError) {

@@ -14,7 +14,7 @@ export interface ToolSchema {
     }
   >;
   required: string[];
-  examples: Array<Record<string, any>>;
+  examples: Array<Record<string, unknown>>;
 }
 
 /**

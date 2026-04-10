@@ -30,9 +30,9 @@ export function createAgentTools(): ToolConfig<unknown, unknown>[] {
   const reportGenerator = new ReportGenerator();
 
   // Register agents
-  registry.register(new StaticAnalysisAgent() as any);
-  registry.register(new ErrorDetectionAgent() as any);
-  registry.register(new TestGenerationAgent() as any);
+  registry.register(new StaticAnalysisAgent() as never);
+  registry.register(new ErrorDetectionAgent() as never);
+  registry.register(new TestGenerationAgent() as never);
 
   const tools: ToolConfig<unknown, unknown>[] = [
     // Agent management tools
@@ -156,7 +156,7 @@ export function createAgentTools(): ToolConfig<unknown, unknown>[] {
           };
 
           logger.info('Starting coordinated analysis', { target: args.target });
-          const result = await coordinator.runFullAnalysis(request as any);
+          const result = await coordinator.runFullAnalysis(request as never);
 
           const MAX_FINDINGS = 200;
           const totalFindings = result.findings.length;
@@ -292,7 +292,7 @@ export function createAgentTools(): ToolConfig<unknown, unknown>[] {
       },
       handler: async (args: any) => {
         try {
-          const testAgent = registry.getAgent('test-generation') as any;
+          const testAgent = registry.getAgent('test-generation') as unknown as TestGenerationAgent;
           if (!testAgent) {
             throw new Error('Test generation agent not available');
           }
@@ -401,7 +401,7 @@ export function createAgentTools(): ToolConfig<unknown, unknown>[] {
           };
 
           logger.info('Running analysis for report', { target: args.target });
-          const analysisResult = await coordinator.runFullAnalysis(request as any);
+          const analysisResult = await coordinator.runFullAnalysis(request as never);
 
           // Generate report
           const _reportOptions: ReportOptions = {

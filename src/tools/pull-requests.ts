@@ -235,11 +235,11 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
       const { data } = await octokit.pulls.list({
         owner: params.owner,
         repo: params.repo,
-        state: params.state as any,
+        state: params.state as never,
         head: params.head,
         base: params.base,
-        sort: params.sort as any,
-        direction: params.direction as any,
+        sort: params.sort as never,
+        direction: params.direction as never,
         page: params.page,
         per_page: params.perPage,
       });
@@ -588,8 +588,8 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
 
         const { data } = await octokit.search.issuesAndPullRequests({
           q: query,
-          sort: params.sort as any,
-          order: params.order as any,
+          sort: params.sort as never,
+          order: params.order as never,
           page: params.page,
           per_page: params.perPage,
         });
@@ -745,7 +745,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
           pull_number: params.pull_number,
           title: params.title,
           body: params.body,
-          state: params.state as any,
+          state: params.state as never,
           base: params.base,
           maintainer_can_modify: params.maintainer_can_modify,
         });
@@ -861,7 +861,7 @@ export function createPullRequestTools(octokit: Octokit, readOnly: boolean): Too
           repo: params.repo,
           pull_number: params.pull_number,
           body: params.body,
-          event: params.event as any,
+          event: params.event as never,
           commit_id: params.commitID,
         });
 

@@ -11,7 +11,7 @@ interface BatchResult<T> {
   data?: T;
   error?: Error;
   index: number;
-  input: any;
+  input: unknown;
 }
 
 interface BatchOptions {
@@ -312,14 +312,14 @@ export async function batchGetIssuesWithComments(
       numbers: issueNumbers,
     });
 
-    const issues = new Map<number, any>();
-    for (const issue of (result as any).repository.issues.nodes) {
+    const issues = new Map<number, unknown>();
+    for (const issue of (result as { repository: { issues: { nodes: Array<{ number: number }> } } }).repository.issues.nodes) {
       issues.set(issue.number, issue);
     }
     return issues;
   } catch {
     // Fallback to REST API if GraphQL fails
-    const issues = new Map<number, any>();
+    const issues = new Map<number, unknown>();
     const results = await batchExecute(
       issueNumbers,
       async number => {

@@ -88,7 +88,7 @@ class UpdateIssueHandler extends BaseToolHandler<UpdateIssueParams, UpdateIssueR
 
   protected async executeOperation(params: UpdateIssueParams): Promise<UpdateIssueResult> {
     return ErrorHandler.withErrorHandling(async () => {
-      const updateData: Record<string, any> = {};
+      const updateData: Record<string, unknown> = {};
       if (params.title !== undefined) updateData.title = params.title;
       if (params.body !== undefined) updateData.body = params.body;
       if (params.state !== undefined) updateData.state = params.state;
@@ -114,11 +114,11 @@ class UpdateIssueHandler extends BaseToolHandler<UpdateIssueParams, UpdateIssueR
               type: data.user.type,
             }
           : null,
-        labels: (data.labels ?? []).map((label: any) =>
+        labels: (data.labels ?? []).map((label: string | { name?: string }) =>
           typeof label === 'string' ? label : label?.name
         ),
         assignees:
-          data.assignees?.map((user: any) => ({
+          data.assignees?.map((user: { login: string; type: string }) => ({
             login: user.login,
             type: user.type,
           })) ?? [],

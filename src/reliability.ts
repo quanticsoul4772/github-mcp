@@ -11,7 +11,7 @@ import { logger } from './logger.js';
  */
 export interface Telemetry {
   trackRequest(operation: string, duration: number, success: boolean): void;
-  trackError(error: Error, context?: Record<string, any>): void;
+  trackError(error: Error, context?: Record<string, unknown>): void;
   trackMetric(name: string, value: number, tags?: Record<string, string>): void;
   trackRetry(operation: string, attempt: number, error: Error): void;
   trackCircuitBreakerState(operation: string, state: CircuitBreakerState): void;
@@ -43,7 +43,7 @@ export class ConsoleTelemetry implements Telemetry {
     }
   }
 
-  trackError(error: Error, context?: Record<string, any>): void {
+  trackError(error: Error, context?: Record<string, unknown>): void {
     logger.error(`[TELEMETRY] Error: ${error.message}`, context ?? {}, error);
   }
 
@@ -389,7 +389,7 @@ export interface RequestContext {
   operation: string;
   correlationId: string;
   startTime: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -419,7 +419,7 @@ export class ReliabilityManager {
       retryConfig?: Partial<RetryConfig>;
       useCircuitBreaker?: boolean;
       correlationId?: string;
-      metadata?: Record<string, any>;
+      metadata?: Record<string, unknown>;
     }
   ): Promise<T> {
     const correlationId = options?.correlationId ?? this.correlationManager.generateId();
@@ -485,8 +485,8 @@ export class ReliabilityManager {
   /**
    * Get health status of all circuit breakers
    */
-  getHealthStatus(): Record<string, any> {
-    const circuitBreakers: Record<string, any> = {};
+  getHealthStatus(): Record<string, unknown> {
+    const circuitBreakers: Record<string, unknown> = {};
 
     for (const [operation, breaker] of this.circuitBreakers) {
       circuitBreakers[operation] = breaker.getStats();

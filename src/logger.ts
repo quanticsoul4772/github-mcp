@@ -19,7 +19,7 @@ export interface LogContext {
   operation?: string;
   duration?: number;
   statusCode?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface LogEntry {

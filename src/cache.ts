@@ -47,7 +47,7 @@ export class GitHubAPICache {
   /**
    * Generate cache key from operation and parameters
    */
-  private generateKey(operation: string, params: Record<string, any>): string {
+  private generateKey(operation: string, params: Record<string, unknown>): string {
     const sortedParams = Object.keys(params)
       .sort()
       .reduce(
@@ -57,7 +57,7 @@ export class GitHubAPICache {
           }
           return acc;
         },
-        {} as Record<string, any>
+        {} as Record<string, unknown>
       );
 
     return `${operation}:${JSON.stringify(sortedParams)}`;
@@ -68,7 +68,7 @@ export class GitHubAPICache {
    */
   async get<T>(
     operation: string,
-    params: Record<string, any>,
+    params: Record<string, unknown>,
     fetcher: () => Promise<T>,
     ttl?: number
   ): Promise<T> {
@@ -184,7 +184,7 @@ export class GitHubAPICache {
   /**
    * Clear specific cache entry
    */
-  delete(operation: string, params: Record<string, any>): boolean {
+  delete(operation: string, params: Record<string, unknown>): boolean {
     const key = this.generateKey(operation, params);
     const result = this.cache.delete(key);
 

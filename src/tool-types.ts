@@ -592,7 +592,7 @@ export interface BatchProcessRepositoriesParams {
     repo: string;
   }>;
   operation: 'sync' | 'analyze' | 'update';
-  options?: Record<string, any>;
+  options?: Record<string, unknown>;
 }
 
 export interface BulkUpdatePullRequestsParams {

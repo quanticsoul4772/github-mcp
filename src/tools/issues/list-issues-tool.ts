@@ -127,11 +127,11 @@ class ListIssuesHandler extends BaseToolHandler<ListIssuesParams, IssueListItem[
               type: issue.user.type,
             }
           : null,
-        labels: (issue.labels ?? []).map((label: any) =>
+        labels: (issue.labels ?? []).map((label: string | { name?: string }) =>
           typeof label === 'string' ? label : label?.name
         ),
         assignees:
-          issue.assignees?.map((user: any) => ({
+          issue.assignees?.map((user: { login: string; type: string }) => ({
             login: user.login,
             type: user.type,
           })) ?? [],

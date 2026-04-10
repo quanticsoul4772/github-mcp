@@ -116,7 +116,7 @@ export class ToolRegistry {
                 try {
                     const validatedParams = params ?? {};
                     logger.debug(`Tool invoked: ${toolName}`, { params: validatedParams });
-                    metrics.recordApiCall({ method: 'TOOL', url: toolName } as any);
+                    metrics.recordApiCall({ tool: toolName, operation: 'execute', success: true, duration: 0, timestamp: Date.now() });
 
                     const result = await config.handler(validatedParams);
 
@@ -137,13 +137,14 @@ export class ToolRegistry {
                     }
 
                     return { content: [{ type: 'text' as const, text: responseText }] };
-                } catch (error: any) {
+                } catch (error: unknown) {
                     const duration = Date.now() - startTime;
-                    metrics.recordError({ name: 'TOOL_ERROR', message: error.message } as any);
-                    logger.error(`Tool error: ${toolName}`, { error: error.message, duration });
-                    appendToolCallLog(toolName, duration, false, error.message);
+                    const errMsg = error instanceof Error ? error.message : String(error);
+                    metrics.recordError({ tool: toolName, operation: 'execute', errorType: 'TOOL_ERROR', message: errMsg, timestamp: Date.now() });
+                    logger.error(`Tool error: ${toolName}`, { error: errMsg, duration });
+                    appendToolCallLog(toolName, duration, false, errMsg);
 
-                    const errorResponse = formatErrorResponse(error);
+                    const errorResponse = formatErrorResponse(error instanceof Error ? error : new Error(errMsg));
                     const errorMessage = errorResponse.error.message;
                     const errorCode = errorResponse.error.code;
                     const errorDetails = errorResponse.error.details;
@@ -234,7 +235,7 @@ export class ToolRegistry {
             }, condition: this.enabledToolsets.has('graphql_insights') },
             { name: 'advanced_search', createTools: () => {
                 // Advanced search needs the optimized client, but can fall back to regular octokit
-                return createAdvancedSearchTools(this.optimizedClient || { getOctokit: () => this.octokit } as any, this.readOnly);
+                return createAdvancedSearchTools(this.optimizedClient || { getOctokit: () => this.octokit } as never, this.readOnly);
             }, condition: this.enabledToolsets.has('advanced_search') },
             { name: 'project_management', createTools: () => createProjectManagementTools(this.octokit, this.readOnly), condition: this.enabledToolsets.has('project_management') },
             { name: 'batch_operations', createTools: () => createBatchOperationsTools(this.octokit, this.readOnly), condition: this.enabledToolsets.has('batch_operations') },

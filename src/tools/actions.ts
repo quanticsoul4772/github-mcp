@@ -283,8 +283,8 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
         workflow_id: params.workflow_id,
         actor: params.actor,
         branch: params.branch,
-        event: params.event as any,
-        status: params.status as any,
+        event: params.event as never,
+        status: params.status as never,
         page: params.page,
         per_page: params.perPage,
       });
@@ -411,7 +411,7 @@ export function createActionTools(octokit: Octokit, readOnly: boolean): ToolConf
         owner: params.owner,
         repo: params.repo,
         run_id: params.run_id,
-        filter: (params.filter ?? 'all') as any,
+        filter: (params.filter ?? 'all') as never,
         page: params.page,
         per_page: params.perPage,
       });

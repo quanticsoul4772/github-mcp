@@ -105,11 +105,11 @@ export function createRepositoryTools(octokit: Octokit, readOnly: boolean): Tool
     handler: async (args: unknown) => {
       const params = args as ListUserRepositoriesParams;
       const { data } = await octokit.rest.repos.listForAuthenticatedUser({
-        visibility: (params.visibility as any) ?? 'all',
-        affiliation: params.affiliation as any,
-        type: params.type as any,
-        sort: (params.sort as any) ?? 'updated',
-        direction: (params.direction as any) ?? 'desc',
+        visibility: (params.visibility as never) ?? 'all',
+        affiliation: params.affiliation as never,
+        type: params.type as never,
+        sort: (params.sort as never) ?? 'updated',
+        direction: (params.direction as never) ?? 'desc',
         page: params.page ?? 1,
         per_page: params.perPage ?? 30,
       });
