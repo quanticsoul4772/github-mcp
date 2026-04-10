@@ -7,6 +7,97 @@ import {
 } from '../graphql-validation.js';
 import { withErrorHandling } from '../errors.js';
 
+// Extended Octokit type that may have graphqlWithComplexity from rate-limiter
+type OctokitWithComplexity = Octokit & {
+  graphqlWithComplexity?: (query: string, variables?: Record<string, unknown>) => Promise<unknown>;
+};
+
+// GraphQL response types
+interface InsightsCommitNode {
+  committedDate: string;
+  messageHeadline: string;
+  author: { user: { login: string } | null } | null;
+  additions: number;
+  deletions: number;
+  changedFiles?: number;
+}
+
+interface InsightsRepoResult {
+  repository?: {
+    id: string;
+    name: string;
+    nameWithOwner: string;
+    description: string | null;
+    url: string;
+    stargazerCount: number;
+    forkCount: number;
+    watchers: { totalCount: number };
+    createdAt: string;
+    updatedAt: string;
+    pushedAt: string;
+    primaryLanguage: { name: string; color: string } | null;
+    licenseInfo: { name: string; spdxId: string } | null;
+    languages: {
+      totalSize: number;
+      edges: Array<{ size: number; node: { name: string; color: string } }>;
+    };
+    collaborators: {
+      totalCount: number;
+      nodes: Array<{
+        login: string;
+        name: string | null;
+        avatarUrl: string;
+        contributionsCollection: { totalCommitContributions: number };
+      }>;
+    };
+    issues: { totalCount: number };
+    openIssues: { totalCount: number };
+    pullRequests: { totalCount: number };
+    openPullRequests: { totalCount: number };
+    releases: { totalCount: number };
+    defaultBranchRef?: {
+      name: string;
+      target: { history: { totalCount: number; nodes: InsightsCommitNode[] } };
+    };
+    repositoryTopics: { nodes: Array<{ topic: { name: string } }> };
+    diskUsage: number;
+    isPrivate: boolean;
+    isFork: boolean;
+    isArchived: boolean;
+    isTemplate: boolean;
+    visibility: string;
+  };
+}
+
+interface ContributionStatsResult {
+  repository?: {
+    collaborators: {
+      totalCount: number;
+      nodes: Array<{
+        login: string;
+        name: string | null;
+        avatarUrl: string;
+        contributionsCollection: {
+          totalCommitContributions: number;
+          totalIssueContributions: number;
+          totalPullRequestContributions: number;
+          totalPullRequestReviewContributions: number;
+        };
+      }>;
+    };
+    defaultBranchRef?: {
+      target: { history: { nodes: InsightsCommitNode[] } };
+    };
+  };
+}
+
+interface CommitActivityResult {
+  repository?: {
+    ref?: { target: { history: { totalCount: number; nodes: InsightsCommitNode[] } } };
+    defaultBranchRef?: { name: string; target: { history: { totalCount: number; nodes: InsightsCommitNode[] } } };
+  };
+}
+
 // Type definitions for repository insights
 interface RepositoryInsightsParams {
   owner: string;
@@ -205,9 +296,10 @@ export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boole
               repo: validateGraphQLVariableValue(params.repo, 'repo'),
             };
 
-            const result: any = (await (octokit as any).graphqlWithComplexity)
-              ? await (octokit as any).graphqlWithComplexity(query, variables)
-              : await octokit.graphql(query, variables);
+            const extOctokit = octokit as OctokitWithComplexity;
+            const result = (extOctokit.graphqlWithComplexity
+              ? await extOctokit.graphqlWithComplexity(query, variables)
+              : await octokit.graphql(query, variables)) as InsightsRepoResult;
 
             if (!result.repository) {
               throw new Error('Repository not found or insights query failed');
@@ -224,7 +316,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boole
                 url: repository.url,
                 primaryLanguage: repository.primaryLanguage,
                 license: repository.licenseInfo,
-                topics: repository.repositoryTopics.nodes.map((node: any) => node.topic.name),
+                topics: repository.repositoryTopics.nodes.map((node) => node.topic.name),
                 diskUsage: repository.diskUsage,
               },
               statistics: {
@@ -248,7 +340,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boole
               },
               languages: {
                 totalSize: repository.languages.totalSize,
-                breakdown: repository.languages.edges.map((edge: any) => ({
+                breakdown: repository.languages.edges.map((edge) => ({
                   name: edge.node.name,
                   color: edge.node.color,
                   size: edge.size,
@@ -258,7 +350,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boole
               },
               activity: {
                 recentCommits:
-                  repository.defaultBranchRef?.target?.history?.nodes.map((commit: any) => ({
+                  repository.defaultBranchRef?.target?.history?.nodes.map((commit: InsightsCommitNode) => ({
                     date: commit.committedDate,
                     message: commit.messageHeadline,
                     author: commit.author?.user?.login,
@@ -364,9 +456,10 @@ export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boole
               first: validateGraphQLVariableValue(params.first ?? 25, 'first'),
             };
 
-            const result: any = (await (octokit as any).graphqlWithComplexity)
-              ? await (octokit as any).graphqlWithComplexity(query, variables)
-              : await octokit.graphql(query, variables);
+            const extOctokit = octokit as OctokitWithComplexity;
+            const result = (extOctokit.graphqlWithComplexity
+              ? await extOctokit.graphqlWithComplexity(query, variables)
+              : await octokit.graphql(query, variables)) as ContributionStatsResult;
 
             if (!result.repository) {
               throw new Error('Repository not found or contribution stats query failed');
@@ -381,7 +474,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boole
               { commits: number; additions: number; deletions: number }
             > = {};
 
-            commitHistory.forEach((commit: any) => {
+            commitHistory.forEach((commit: InsightsCommitNode) => {
               const author = commit.author?.user?.login;
               if (author) {
                 if (!commitStats[author]) {
@@ -395,7 +488,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boole
 
             return {
               totalContributors: repository.collaborators.totalCount,
-              contributors: repository.collaborators.nodes.map((contributor: any) => ({
+              contributors: repository.collaborators.nodes.map((contributor) => ({
                 user: {
                   login: contributor.login,
                   name: contributor.name,
@@ -521,9 +614,10 @@ export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boole
               until: params.until ? validateGraphQLVariableValue(params.until, 'until') : undefined,
             };
 
-            const result: any = (await (octokit as any).graphqlWithComplexity)
-              ? await (octokit as any).graphqlWithComplexity(query, variables)
-              : await octokit.graphql(query, variables);
+            const extOctokit = octokit as OctokitWithComplexity;
+            const result: CommitActivityResult = extOctokit.graphqlWithComplexity
+              ? (await extOctokit.graphqlWithComplexity(query, variables)) as CommitActivityResult
+              : await octokit.graphql<CommitActivityResult>(query, variables);
 
             if (!result.repository) {
               throw new Error('Repository not found or commit activity query failed');
@@ -550,7 +644,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boole
             let totalDeletions = 0;
             let totalFilesChanged = 0;
 
-            commits.forEach((commit: any) => {
+            commits.forEach((commit: InsightsCommitNode) => {
               const date = new Date(commit.committedDate);
               const dayKey = date.toISOString().split('T')[0];
               const hour = date.getUTCHours();
@@ -603,7 +697,7 @@ export function createRepositoryInsightsTools(octokit: Octokit, _readOnly: boole
                   .sort(([, a], [, b]) => b - a)
                   .map(([author, count]) => ({ author, commits: count })),
               },
-              commits: commits.map((commit: any) => ({
+              commits: commits.map((commit: InsightsCommitNode) => ({
                 date: commit.committedDate,
                 message: commit.messageHeadline,
                 author: commit.author?.user?.login,

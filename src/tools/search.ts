@@ -48,8 +48,8 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
       const params = args as SearchCodeParams;
       const { data } = await octokit.search.code({
         q: params.q,
-        sort: params.sort as any as any,
-        order: params.order as any as any,
+        sort: params.sort as 'indexed' | undefined,
+        order: params.order,
         page: params.page,
         per_page: params.perPage,
       });
@@ -121,8 +121,8 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
       const params = args as SearchCodeParams;
       const { data } = await octokit.search.commits({
         q: params.q,
-        sort: params.sort as any as any,
-        order: params.order as any as any,
+        sort: params.sort as 'author-date' | 'committer-date' | undefined,
+        order: params.order,
         page: params.page,
         per_page: params.perPage,
       });
@@ -148,14 +148,14 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
           },
           author: item.author
             ? {
-                login: (item.author as any).login,
-                type: (item.author as any).type,
+                login: (item.author as { login?: string }).login,
+                type: (item.author as { type?: string }).type,
               }
             : null,
           committer: item.committer
             ? {
-                login: (item.committer as any).login,
-                type: (item.committer as any).type,
+                login: (item.committer as { login?: string }).login,
+                type: (item.committer as { type?: string }).type,
               }
             : null,
           repository: {
@@ -276,10 +276,10 @@ export function createSearchTools(octokit: Octokit): ToolConfig[] {
         throw new Error('repository_id is required for label search');
       }
       const { data } = await octokit.search.labels({
-        repository_id: params.repository_id,
+        repository_id: params.repository_id!,
         q: params.q,
-        sort: params.sort as any as any,
-        order: params.order as any as any,
+        sort: params.sort as 'created' | 'updated' | undefined,
+        order: params.order,
         page: params.page,
         per_page: params.perPage,
       });

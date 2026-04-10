@@ -7,17 +7,17 @@ interface GetUserParams {
 
 interface SearchUsersParams {
   query: string;
-  sort?: string;
-  order?: string;
+  sort?: 'followers' | 'repositories' | 'joined';
+  order?: 'asc' | 'desc';
   page?: number;
   perPage?: number;
 }
 
 interface ListUserReposParams {
   username?: string;
-  type?: string;
-  sort?: string;
-  direction?: string;
+  type?: 'all' | 'owner' | 'public' | 'private' | 'member';
+  sort?: 'created' | 'updated' | 'pushed' | 'full_name';
+  direction?: 'asc' | 'desc';
   page?: number;
   perPage?: number;
 }
@@ -103,7 +103,7 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
         disk_usage: data.disk_usage,
         collaborators: data.collaborators,
         two_factor_authentication:
-          'two_factor_authentication' in data ? (data as any).two_factor_authentication : undefined,
+          'two_factor_authentication' in data ? (data as Record<string, unknown>).two_factor_authentication : undefined,
         plan: data.plan,
       };
     },
@@ -205,8 +205,8 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
       const params = args as SearchUsersParams;
       const { data } = await octokit.search.users({
         q: params.query,
-        sort: params.sort as any as any,
-        order: params.order as any as any,
+        sort: params.sort,
+        order: params.order,
         page: params.page,
         per_page: params.perPage,
       });
@@ -278,18 +278,18 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
       if (params.username) {
         const response = await octokit.repos.listForUser({
           username: params.username,
-          type: params.type as any,
-          sort: params.sort as any as any,
-          direction: params.direction as any as any,
+          type: params.type as 'all' | 'owner' | 'member' | undefined,
+          sort: params.sort,
+          direction: params.direction,
           page: params.page,
           per_page: params.perPage,
         });
         data = response.data;
       } else {
         const response = await octokit.repos.listForAuthenticatedUser({
-          type: params.type as any,
-          sort: params.sort as any as any,
-          direction: params.direction as any as any,
+          type: params.type as 'all' | 'owner' | 'public' | 'private' | 'member' | undefined,
+          sort: params.sort,
+          direction: params.direction,
           page: params.page,
           per_page: params.perPage,
         });
@@ -482,8 +482,8 @@ export function createUserTools(octokit: Octokit, readOnly: boolean): ToolConfig
             ? `${params.username} is following ${params.target_user}`
             : `You are following ${params.target_user}`,
         };
-      } catch (error: any) {
-        if (error.status === 404) {
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'status' in error && (error as { status: number }).status === 404) {
           return {
             following: false,
             message: params.username
