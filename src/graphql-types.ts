@@ -332,57 +332,64 @@ export interface SimpleRepositoryResponse {
 }
 
 // Type guards for runtime validation
-export function isRepository(node: any): node is Repository {
+export function isRepository(node: unknown): node is Repository {
+  const obj = node as Record<string, unknown>;
   return (
-    node &&
-    typeof node.id === 'string' &&
-    typeof node.name === 'string' &&
-    node.stargazerCount !== undefined
+    obj != null &&
+    typeof obj.id === 'string' &&
+    typeof obj.name === 'string' &&
+    obj.stargazerCount !== undefined
   );
 }
 
-export function isIssue(node: any): node is Issue {
+export function isIssue(node: unknown): node is Issue {
+  const obj = node as Record<string, unknown>;
   return (
-    node &&
-    typeof node.id === 'string' &&
-    typeof node.number === 'number' &&
-    node.state !== undefined
+    obj != null &&
+    typeof obj.id === 'string' &&
+    typeof obj.number === 'number' &&
+    obj.state !== undefined
   );
 }
 
-export function isUser(node: any): node is User {
+export function isUser(node: unknown): node is User {
+  const obj = node as Record<string, unknown>;
   return (
-    node &&
-    typeof node.id === 'string' &&
-    typeof node.login === 'string' &&
-    node.followers !== undefined
+    obj != null &&
+    typeof obj.id === 'string' &&
+    typeof obj.login === 'string' &&
+    obj.followers !== undefined
   );
 }
 
-export function isDiscussion(node: any): node is Discussion {
+export function isDiscussion(node: unknown): node is Discussion {
+  const obj = node as Record<string, unknown>;
   return (
-    node &&
-    typeof node.id === 'string' &&
-    typeof node.number === 'number' &&
-    node.upvoteCount !== undefined
+    obj != null &&
+    typeof obj.id === 'string' &&
+    typeof obj.number === 'number' &&
+    obj.upvoteCount !== undefined
   );
 }
 
 // Validation utilities
-export function validatePageInfo(pageInfo: any): pageInfo is PageInfo {
-  return pageInfo && typeof pageInfo.hasNextPage === 'boolean';
+export function validatePageInfo(pageInfo: unknown): pageInfo is PageInfo {
+  const obj = pageInfo as Record<string, unknown>;
+  return obj != null && typeof obj.hasNextPage === 'boolean';
 }
 
-export function validateActor(actor: any): actor is Actor {
-  return actor && typeof actor.login === 'string';
+export function validateActor(actor: unknown): actor is Actor {
+  const obj = actor as Record<string, unknown>;
+  return obj != null && typeof obj.login === 'string';
 }
 
-export function validateRepository(repo: any): repo is Repository {
+export function validateRepository(repo: unknown): repo is Repository {
+  const obj = repo as Record<string, unknown>;
   return (
-    repo &&
-    typeof repo.id === 'string' &&
-    typeof repo.name === 'string' &&
-    typeof repo.stargazerCount === 'number'
+    obj != null &&
+    typeof obj.id === 'string' &&
+    typeof obj.name === 'string' &&
+    typeof obj.stargazerCount === 'number'
   );
 }
 

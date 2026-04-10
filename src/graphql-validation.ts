@@ -367,7 +367,7 @@ export const BatchGraphQLQuerySchema = z.object({
       z.object({
         alias: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Alias must be a valid identifier'),
         query: z.string().min(1, 'Query cannot be empty').max(5000, 'Query too long'),
-        variables: z.record(z.string(), z.any()).optional(),
+        variables: z.record(z.string(), z.unknown()).optional(),
       })
     )
     .min(1)
@@ -413,7 +413,7 @@ export function validateGraphQLInput<T>(
 /**
  * Validates that a string is safe for GraphQL variable substitution
  */
-export function validateGraphQLVariableValue(value: any, variableName: string): any {
+export function validateGraphQLVariableValue(value: unknown, variableName: string): unknown {
   if (typeof value === 'string') {
     // Check for potential GraphQL injection patterns
     if (value.includes('${') || value.includes('#{') || value.includes('{{')) {
@@ -463,7 +463,8 @@ export function validateGraphQLVariableValue(value: any, variableName: string): 
   }
 
   if (typeof value === 'object') {
-    const keys = Object.keys(value);
+    const obj = value as Record<string, unknown>;
+    const keys = Object.keys(obj);
     if (keys.length > 50) {
       throw new GraphQLValidationError(
         variableName,
@@ -472,7 +473,7 @@ export function validateGraphQLVariableValue(value: any, variableName: string): 
       );
     }
 
-    const result: any = {};
+    const result: Record<string, unknown> = {};
     for (const key of keys) {
       if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)) {
         throw new GraphQLValidationError(
@@ -481,7 +482,7 @@ export function validateGraphQLVariableValue(value: any, variableName: string): 
           'INVALID_PROPERTY_NAME'
         );
       }
-      result[key] = validateGraphQLVariableValue(value[key], `${variableName}.${key}`);
+      result[key] = validateGraphQLVariableValue(obj[key], `${variableName}.${key}`);
     }
     return result;
   }

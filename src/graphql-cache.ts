@@ -11,7 +11,7 @@ interface GraphQLCacheEntry<T> {
   timestamp: number;
   ttl: number;
   queryHash: string;
-  variables: Record<string, any>;
+  variables: Record<string, unknown>;
   query?: string; // Store original query for invalidation matching
 }
 
@@ -82,7 +82,7 @@ export const GRAPHQL_CACHE_CONFIG = {
 };
 
 export class GraphQLCache {
-  private cache: Map<string, GraphQLCacheEntry<any>>;
+  private cache: Map<string, GraphQLCacheEntry<unknown>>;
   private readonly defaultTTL: number;
   private readonly maxSize: number;
   private readonly enableMetrics: boolean;
@@ -108,7 +108,7 @@ export class GraphQLCache {
    * Generate cache key from GraphQL query and variables
    * Uses query hash and sorted variables for consistent keys
    */
-  private generateKey(query: string, variables: Record<string, any> = {}): string {
+  private generateKey(query: string, variables: Record<string, unknown> = {}): string {
     // Extract query name/operation for better key identification
     const queryName = this.extractQueryName(query) ?? 'unknown';
 
@@ -125,7 +125,7 @@ export class GraphQLCache {
           }
           return acc;
         },
-        {} as Record<string, any>
+        {} as Record<string, unknown>
       );
 
     return `gql:${queryName}:${queryHash}:${JSON.stringify(sortedVariables)}`;
@@ -194,7 +194,7 @@ export class GraphQLCache {
    */
   async get<T>(
     query: string,
-    variables: Record<string, any> = {},
+    variables: Record<string, unknown> = {},
     fetcher: () => Promise<T>,
     options: {
       ttl?: number;
@@ -250,7 +250,7 @@ export class GraphQLCache {
   private async executeAndCache<T>(
     key: string,
     query: string,
-    variables: Record<string, any>,
+    variables: Record<string, unknown>,
     fetcher: () => Promise<T>,
     customTTL?: number,
     queryName?: string,
@@ -301,7 +301,7 @@ export class GraphQLCache {
     data: T,
     ttl: number,
     query: string,
-    variables: Record<string, any>
+    variables: Record<string, unknown>
   ): void {
     // Check if we need to evict entries
     if (this.cache.size >= this.maxSize && !this.cache.has(key)) {
@@ -328,7 +328,7 @@ export class GraphQLCache {
   /**
    * Check if cache entry is still valid
    */
-  private isValid(entry: GraphQLCacheEntry<any>): boolean {
+  private isValid(entry: GraphQLCacheEntry<unknown>): boolean {
     return Date.now() - entry.timestamp < entry.ttl;
   }
 
@@ -362,7 +362,7 @@ export class GraphQLCache {
    * Invalidate cache entries based on write operations
    * Uses intelligent patterns to invalidate related cached data
    */
-  invalidateForMutation(mutation: string, variables: Record<string, any> = {}): number {
+  invalidateForMutation(mutation: string, variables: Record<string, unknown> = {}): number {
     let count = 0;
     const op = this.extractQueryName(mutation)?.toLowerCase() ?? '';
     const affectedOps: Record<string, true> = {};
@@ -438,7 +438,7 @@ export class GraphQLCache {
   /**
    * Clear specific cache entry
    */
-  delete(query: string, variables: Record<string, any> = {}): boolean {
+  delete(query: string, variables: Record<string, unknown> = {}): boolean {
     const key = this.generateKey(query, variables);
     const result = this.cache.delete(key);
 

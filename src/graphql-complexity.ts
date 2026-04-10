@@ -98,7 +98,7 @@ export class GraphQLComplexityCalculator {
   /**
    * Calculate complexity for a GraphQL query string
    */
-  calculateQueryComplexity(query: string, variables: Record<string, any> = {}): QueryAnalysis {
+  calculateQueryComplexity(query: string, variables: Record<string, unknown> = {}): QueryAnalysis {
     const analysis: QueryAnalysis = {
       estimatedPoints: 0,
       breakdown: {
@@ -207,7 +207,7 @@ export class GraphQLComplexityCalculator {
    */
   private extractConnections(
     query: string,
-    variables: Record<string, any>
+    variables: Record<string, unknown>
   ): Array<{ field: string; first?: number }> {
     const connections: Array<{ field: string; first?: number }> = [];
 
@@ -222,7 +222,7 @@ export class GraphQLComplexityCalculator {
 
       let firstValue: number | undefined;
       if (variableName && Object.prototype.hasOwnProperty.call(variables, variableName)) {
-        const raw = (variables as any)[variableName];
+        const raw = (variables as Record<string, unknown>)[variableName];
         const num = typeof raw === 'number' ? raw : parseInt(String(raw), 10);
         if (Number.isFinite(num)) firstValue = num;
       } else if (literalValue) {
@@ -326,7 +326,7 @@ export const githubComplexityCalculator = new GraphQLComplexityCalculator();
  */
 export function estimateGraphQLPoints(
   query: string,
-  variables: Record<string, any> = {},
+  variables: Record<string, unknown> = {},
   calculator: GraphQLComplexityCalculator = githubComplexityCalculator
 ): number {
   return calculator.calculateQueryComplexity(query, variables).estimatedPoints;
@@ -337,7 +337,7 @@ export function estimateGraphQLPoints(
  */
 export function isQueryComplexitySafe(
   query: string,
-  variables: Record<string, any> = {},
+  variables: Record<string, unknown> = {},
   maxPoints: number = 50
 ): { safe: boolean; points: number; warnings: string[] } {
   const analysis = githubComplexityCalculator.calculateQueryComplexity(query, variables);

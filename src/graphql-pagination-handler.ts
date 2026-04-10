@@ -39,8 +39,8 @@ export interface GraphQLPaginationResponse<T> {
 
 export interface GraphQLQueryBuilder {
   query: string;
-  variables: Record<string, any>;
-  extractData: (result: any) => GraphQLPaginatedResult<any>;
+  variables: Record<string, unknown>;
+  extractData: (result: Record<string, unknown>) => GraphQLPaginatedResult<unknown>;
 }
 
 /**
@@ -76,11 +76,11 @@ export class GraphQLPaginationHandler {
       after,
     };
 
-    const result = await this.octokit.graphql(queryBuilder.query, variables);
+    const result = await this.octokit.graphql(queryBuilder.query, variables) as Record<string, unknown>;
     const extracted = queryBuilder.extractData(result);
 
     return {
-      data: extracted.nodes || extracted.edges?.map(e => e.node) || [],
+      data: (extracted.nodes || extracted.edges?.map(e => e.node) || []) as T[],
       pageInfo: extracted.pageInfo,
       totalCount: extracted.totalCount,
       hasMore: extracted.pageInfo.hasNextPage,
@@ -120,10 +120,10 @@ export class GraphQLPaginationHandler {
       };
 
       try {
-        const result = await this.octokit.graphql(queryBuilder.query, variables);
+        const result = await this.octokit.graphql(queryBuilder.query, variables) as Record<string, unknown>;
         const extracted = queryBuilder.extractData(result);
 
-        const pageData = extracted.nodes || extracted.edges?.map(e => e.node) || [];
+        const pageData = (extracted.nodes || extracted.edges?.map(e => e.node) || []) as T[];
 
         // Respect maxItems limit
         if (maxItems) {
@@ -203,7 +203,7 @@ export class GraphQLPaginationHandler {
         }
       `,
       variables: { owner, repo, categoryId },
-      extractData: (result: any) => result.repository.discussions,
+      extractData: (result: Record<string, unknown>) => (result['repository'] as Record<string, unknown>)['discussions'] as GraphQLPaginatedResult<unknown>,
     };
   }
 
@@ -261,7 +261,7 @@ export class GraphQLPaginationHandler {
         }
       `,
       variables: { owner, repo, number: discussionNumber },
-      extractData: (result: any) => result.repository.discussion.comments,
+      extractData: (result: Record<string, unknown>) => ((result['repository'] as Record<string, unknown>)['discussion'] as Record<string, unknown>)['comments'] as GraphQLPaginatedResult<unknown>,
     };
   }
 
@@ -346,7 +346,7 @@ export class GraphQLPaginationHandler {
         }
       `,
       variables: { projectId },
-      extractData: (result: any) => result.node.items,
+      extractData: (result: Record<string, unknown>) => (result['node'] as Record<string, unknown>)['items'] as GraphQLPaginatedResult<unknown>,
     };
   }
 
@@ -392,7 +392,7 @@ export class GraphQLPaginationHandler {
         }
       `,
       variables: { owner, repo, affiliation },
-      extractData: (result: any) => result.repository.collaborators,
+      extractData: (result: Record<string, unknown>) => (result['repository'] as Record<string, unknown>)['collaborators'] as GraphQLPaginatedResult<unknown>,
     };
   }
 
@@ -500,11 +500,13 @@ export class GraphQLPaginationHandler {
         }
       `,
       variables: { owner, repo, branch, since, until },
-      extractData: (result: any) => {
-        return (
-          result.repository.ref?.target?.history ??
-          result.repository.defaultBranchRef?.target?.history
-        );
+      extractData: (result: Record<string, unknown>) => {
+        const repository = result['repository'] as Record<string, unknown>;
+        const ref = repository['ref'] as Record<string, unknown> | undefined;
+        const defaultBranchRef = repository['defaultBranchRef'] as Record<string, unknown> | undefined;
+        const refTarget = ref?.['target'] as Record<string, unknown> | undefined;
+        const defaultTarget = defaultBranchRef?.['target'] as Record<string, unknown> | undefined;
+        return (refTarget?.['history'] ?? defaultTarget?.['history']) as GraphQLPaginatedResult<unknown>;
       },
     };
   }
@@ -636,15 +638,18 @@ export class GraphQLPaginationHandler {
         }
       `,
       variables: { searchQuery: query, type },
-      extractData: (result: any) => ({
-        nodes: result.search.nodes,
-        pageInfo: result.search.pageInfo,
-        totalCount:
-          result.search.repositoryCount ??
-          result.search.issueCount ??
-          result.search.userCount ??
-          result.search.discussionCount,
-      }),
+      extractData: (result: Record<string, unknown>) => {
+        const search = result['search'] as Record<string, unknown>;
+        return {
+          nodes: search['nodes'] as unknown[],
+          pageInfo: search['pageInfo'] as GraphQLPageInfo,
+          totalCount:
+            (search['repositoryCount'] as number | undefined) ??
+            (search['issueCount'] as number | undefined) ??
+            (search['userCount'] as number | undefined) ??
+            (search['discussionCount'] as number | undefined),
+        };
+      },
     };
   }
 
@@ -652,7 +657,7 @@ export class GraphQLPaginationHandler {
    * Create a cached paginated fetcher to avoid duplicate requests
    */
   createCachedHandler(
-    cache: Map<string, { data: any; timestamp: number }>,
+    cache: Map<string, { data: unknown; timestamp: number }>,
     ttl: number = 5 * 60 * 1000 // 5 minutes
   ) {
     return async <T>(
@@ -668,7 +673,7 @@ export class GraphQLPaginationHandler {
       const cached = cache.get(cacheKey);
 
       if (cached && Date.now() - cached.timestamp < ttl) {
-        return cached.data;
+        return cached.data as GraphQLPaginationResponse<T>;
       }
 
       const result = await this.paginate<T>(queryBuilder, options);
