@@ -1,0 +1,56 @@
+{
+  "code-analysis": {
+    "enabled": true,
+    "priority": 10,
+    "timeout": 30000,
+    "options": {
+      "maxComplexity": 10,
+      "maxNestingLevel": 4,
+      "maxLineLength": 120,
+      "checkConsoleStatements": true,
+      "checkMagicNumbers": true,
+      "checkDuplicateCode": true
+    }
+  },
+  "type-safety": {
+    "enabled": true,
+    "priority": 20,
+    "timeout": 30000,
+    "options": {
+      "strictMode": true,
+      "checkAnyTypes": true,
+      "checkImplicitAny": true,
+      "checkNullSafety": true,
+      "checkTypeAssertions": true,
+      "requireReturnTypes": false
+    }
+  },
+  "testing": {
+    "enabled": true,
+    "priority": 30,
+    "timeout": 45000,
+    "options": {
+      "minCoverage": 80,
+      "checkTestNaming": true,
+      "checkTestStructure": true,
+      "checkAssertions": true,
+      "checkTestIsolation": true,
+      "maxTestsPerFile": 20
+    }
+  },
+  "security": {
+    "enabled": true,
+    "priority": 15,
+    "timeout": 30000,
+    "options": {
+      "checkHardcodedSecrets": true,
+      "checkCodeInjection": true,
+      "checkXSS": true,
+      "checkSQLInjection": true,
+      "checkInsecureHTTP": true,
+      "checkDependencies": true,
+      "checkCORS": true,
+      "checkAuthentication": true
+    }
+  }
+}

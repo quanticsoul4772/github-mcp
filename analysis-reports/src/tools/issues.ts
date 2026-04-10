@@ -1,0 +1,820 @@
+import { Octokit } from '@octokit/rest';
+import { ToolConfig } from '../types.js';
+import {
+  ListIssuesParams,
+  CreateIssueParams,
+  UpdateIssueParams,
+  CreateIssueCommentParams,
+  SearchIssuesParams,
+  UpdateIssueCommentParams,
+  DeleteIssueCommentParams,
+  AddLabelsToIssueParams,
+  RemoveLabelFromIssueParams,
+  LockIssueParams,
+  UnlockIssueParams,
+} from '../tool-types.js';
+
+interface GetIssueParams {
+  owner: string;
+  repo: string;
+  issue_number: number;
+}
+
+interface GetIssueCommentsParams {
+  owner: string;
+  repo: string;
+  issue_number: number;
+  page?: number;
+  perPage?: number;
+}
+
+interface SearchIssuesWithRepoParams extends SearchIssuesParams {
+  owner?: string;
+  repo?: string;
+  query?: string;
+}
+
+export function createIssueTools(octokit: Octokit, readOnly: boolean): ToolConfig[] {
+  const tools: ToolConfig[] = [];
+
+  // Get issue details tool
+  tools.push({
+    tool: {
+      name: 'get_issue',
+      description: 'Get details of a specific GitHub issue',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          owner: {
+            type: 'string',
+            description: 'The owner of the repository',
+          },
+          repo: {
+            type: 'string',
+            description: 'The name of the repository',
+          },
+          issue_number: {
+            type: 'number',
+            description: 'The number of the issue',
+          },
+        },
+        required: ['owner', 'repo', 'issue_number'],
+      },
+    },
+    handler: async (args: unknown) => {
+      const params = args as GetIssueParams;
+      const { data } = await octokit.issues.get({
+        owner: params.owner,
+        repo: params.repo,
+        issue_number: params.issue_number,
+      });
+
+      return {
+        number: data.number,
+        title: data.title,
+        state: data.state,
+        body: data.body,
+        user: {
+          login: data.user?.login,
+          type: data.user?.type,
+        },
+        labels: data.labels.map(label => (typeof label === 'string' ? label : label.name)),
+        assignees: data.assignees?.map(user => ({
+          login: user.login,
+          type: user.type,
+        })),
+        milestone: data.milestone
+          ? {
+              title: data.milestone.title,
+              number: data.milestone.number,
+              state: data.milestone.state,
+            }
+          : null,
+        comments: data.comments,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        closed_at: data.closed_at,
+        html_url: data.html_url,
+      };
+    },
+  });
+
+  // List issues tool
+  tools.push({
+    tool: {
+      name: 'list_issues',
+      description: 'List issues in a GitHub repository with filters (state, labels, assignee, sort). Returns up to 100 per page. Does NOT support keyword search or cross-repo queries — use search_issues for keyword/label/cross-repo search. Does NOT return issue body by default — use get_issue for full details. To filter by pull request state, use list_pull_requests instead.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          owner: {
+            type: 'string',
+            description: 'Repository owner',
+          },
+          repo: {
+            type: 'string',
+            description: 'Repository name',
+          },
+          state: {
+            type: 'string',
+            description: 'Filter by state',
+            enum: ['open', 'closed', 'all'],
+          },
+          labels: {
+            type: 'array',
+            description: 'Filter by labels',
+            items: { type: 'string' },
+          },
+          sort: {
+            type: 'string',
+            description: 'Sort order',
+            enum: ['created', 'updated', 'comments'],
+          },
+          direction: {
+            type: 'string',
+            description: 'Sort direction',
+            enum: ['asc', 'desc'],
+          },
+          since: {
+            type: 'string',
+            description: 'Filter by date (ISO 8601 timestamp)',
+          },
+          page: {
+            type: 'number',
+            description: 'Page number for pagination (min 1)',
+            minimum: 1,
+          },
+          perPage: {
+            type: 'number',
+            description: 'Results per page for pagination (min 1, max 100)',
+            minimum: 1,
+            maximum: 100,
+          },
+        },
+        required: ['owner', 'repo'],
+      },
+    },
+    handler: async (args: unknown) => {
+      const params = args as ListIssuesParams;
+      const { data } = await octokit.issues.listForRepo({
+        owner: params.owner,
+        repo: params.repo,
+        state: params.state as never,
+        labels: Array.isArray(params.labels)
+          ? params.labels.join(',')
+          : params.labels
+            ? [params.labels].join(',')
+            : undefined,
+        sort: params.sort as never,
+        direction: params.direction as never,
+        since: params.since,
+        page: params.page,
+        per_page: params.perPage,
+      });
+
+      return data.map(issue => ({
+        number: issue.number,
+        title: issue.title,
+        state: issue.state,
+        user: {
+          login: issue.user?.login,
+          type: issue.user?.type,
+        },
+        labels: issue.labels.map(label => (typeof label === 'string' ? label : label.name)),
+        assignees: issue.assignees?.map(user => ({
+          login: user.login,
+        })),
+        comments: issue.comments,
+        created_at: issue.created_at,
+        updated_at: issue.updated_at,
+        html_url: issue.html_url,
+        pull_request: issue.pull_request ? true : false,
+      }));
+    },
+  });
+
+  // List issue comments tool
+  tools.push({
+    tool: {
+      name: 'list_issue_comments',
+      description: 'Get comments on a GitHub issue',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          owner: {
+            type: 'string',
+            description: 'Repository owner',
+          },
+          repo: {
+            type: 'string',
+            description: 'Repository name',
+          },
+          issue_number: {
+            type: 'number',
+            description: 'Issue number',
+          },
+          page: {
+            type: 'number',
+            description: 'Page number for pagination (min 1)',
+            minimum: 1,
+          },
+          perPage: {
+            type: 'number',
+            description: 'Results per page for pagination (min 1, max 100)',
+            minimum: 1,
+            maximum: 100,
+          },
+        },
+        required: ['owner', 'repo', 'issue_number'],
+      },
+    },
+    handler: async (args: unknown) => {
+      const params = args as GetIssueCommentsParams;
+      const { data } = await octokit.issues.listComments({
+        owner: params.owner,
+        repo: params.repo,
+        issue_number: params.issue_number,
+        page: params.page,
+        per_page: params.perPage,
+      });
+
+      return data.map(comment => ({
+        id: comment.id,
+        body: comment.body,
+        user: {
+          login: comment.user?.login,
+          type: comment.user?.type,
+        },
+        created_at: comment.created_at,
+        updated_at: comment.updated_at,
+        html_url: comment.html_url,
+      }));
+    },
+  });
+
+  // Search issues tool
+  tools.push({
+    tool: {
+      name: 'search_issues',
+      description: 'Search for GitHub issues and pull requests using GitHub search syntax. Returns basic metadata (number, title, state, labels, url) — does NOT return issue body text or comment content; use get_issue for full details. Results may be truncated (incomplete_results=true) for queries matching >1000 items. Supports operators: is:open, is:pr, is:issue, label:bug, assignee:user, repo:owner/name, created:>2023-01-01. Use list_issues to list issues on a specific repo without search syntax. Auth: read access.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Search query using GitHub issues search syntax',
+          },
+          sort: {
+            type: 'string',
+            description: 'Sort field by number of matches',
+            enum: [
+              'comments',
+              'reactions',
+              'reactions-+1',
+              'reactions--1',
+              'reactions-smile',
+              'reactions-thinking_face',
+              'reactions-heart',
+              'reactions-tada',
+              'interactions',
+              'created',
+              'updated',
+            ],
+          },
+          order: {
+            type: 'string',
+            description: 'Sort order',
+            enum: ['asc', 'desc'],
+          },
+          owner: {
+            type: 'string',
+            description: 'Optional repository owner',
+          },
+          repo: {
+            type: 'string',
+            description: 'Optional repository name',
+          },
+          page: {
+            type: 'number',
+            description: 'Page number for pagination (min 1)',
+            minimum: 1,
+          },
+          perPage: {
+            type: 'number',
+            description: 'Results per page for pagination (min 1, max 100)',
+            minimum: 1,
+            maximum: 100,
+          },
+        },
+        required: ['query'],
+      },
+    },
+    handler: async (args: unknown) => {
+      const params = args as SearchIssuesWithRepoParams;
+      let query = params.query;
+
+      // Add repo filter if provided
+      if (params.owner && params.repo) {
+        query = `repo:${params.owner}/${params.repo} ${query}`;
+      }
+
+      const { data } = await octokit.search.issuesAndPullRequests({
+        q: query ?? '',
+        sort: params.sort as never,
+        order: params.order as never,
+        page: params.page,
+        per_page: params.perPage,
+      });
+
+      return {
+        total_count: data.total_count,
+        incomplete_results: data.incomplete_results,
+        items: data.items.map(item => ({
+          number: item.number,
+          title: item.title,
+          state: item.state,
+          user: {
+            login: item.user?.login,
+          },
+          labels: item.labels.map(label => label.name),
+          assignees: item.assignees?.map(user => ({
+            login: user.login,
+          })),
+          comments: item.comments,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          html_url: item.html_url,
+          pull_request: item.pull_request ? true : false,
+          repository_url: item.repository_url,
+        })),
+      };
+    },
+  });
+
+  // Add write operations if not in read-only mode
+  if (!readOnly) {
+    // Create issue tool
+    tools.push({
+      tool: {
+        name: 'create_issue',
+        description: 'Create a new GitHub issue',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            owner: {
+              type: 'string',
+              description: 'Repository owner',
+            },
+            repo: {
+              type: 'string',
+              description: 'Repository name',
+            },
+            title: {
+              type: 'string',
+              description: 'Issue title',
+            },
+            body: {
+              type: 'string',
+              description: 'Issue body content',
+            },
+            assignees: {
+              type: 'array',
+              description: 'Usernames to assign to this issue',
+              items: { type: 'string' },
+            },
+            milestone: {
+              type: 'number',
+              description: 'Milestone number',
+            },
+            labels: {
+              type: 'array',
+              description: 'Labels to apply to this issue',
+              items: { type: 'string' },
+            },
+          },
+          required: ['owner', 'repo', 'title'],
+        },
+      },
+      handler: async (args: unknown) => {
+        const params = args as CreateIssueParams;
+        const { data } = await octokit.issues.create({
+          owner: params.owner,
+          repo: params.repo,
+          title: params.title,
+          body: params.body,
+          assignees: params.assignees,
+          milestone: params.milestone,
+          labels: params.labels,
+        });
+
+        return {
+          number: data.number,
+          title: data.title,
+          state: data.state,
+          body: data.body,
+          html_url: data.html_url,
+          user: {
+            login: data.user?.login,
+          },
+          created_at: data.created_at,
+        };
+      },
+    });
+
+    // Update issue tool
+    tools.push({
+      tool: {
+        name: 'update_issue',
+        description: 'Update an existing GitHub issue',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            owner: {
+              type: 'string',
+              description: 'Repository owner',
+            },
+            repo: {
+              type: 'string',
+              description: 'Repository name',
+            },
+            issue_number: {
+              type: 'number',
+              description: 'Issue number to update',
+            },
+            title: {
+              type: 'string',
+              description: 'New title',
+            },
+            body: {
+              type: 'string',
+              description: 'New description',
+            },
+            state: {
+              type: 'string',
+              description: 'New state',
+              enum: ['open', 'closed'],
+            },
+            state_reason: {
+              type: 'string',
+              description: 'Reason for state change — use with state:"closed" to distinguish completed work from issues closed as not planned',
+              enum: ['completed', 'not_planned', 'reopened'],
+            },
+            labels: {
+              type: 'array',
+              description: 'New labels',
+              items: { type: 'string' },
+            },
+            assignees: {
+              type: 'array',
+              description: 'New assignees',
+              items: { type: 'string' },
+            },
+            milestone: {
+              type: 'number',
+              description: 'New milestone number',
+            },
+          },
+          required: ['owner', 'repo', 'issue_number'],
+        },
+      },
+      handler: async (args: unknown) => {
+        const params = args as UpdateIssueParams;
+        const { data } = await octokit.issues.update({
+          owner: params.owner,
+          repo: params.repo,
+          issue_number: params.issue_number,
+          title: params.title,
+          body: params.body,
+          state: params.state as never,
+          state_reason: params.state_reason,
+          labels: params.labels,
+          assignees: params.assignees,
+          milestone: params.milestone,
+        });
+
+        return {
+          number: data.number,
+          title: data.title,
+          state: data.state,
+          state_reason: (data as unknown as { state_reason?: string }).state_reason ?? null,
+          body: data.body,
+          html_url: data.html_url,
+          updated_at: data.updated_at,
+        };
+      },
+    });
+
+    // Create issue comment tool
+    tools.push({
+      tool: {
+        name: 'create_issue_comment',
+        description: 'Create a new comment on an issue or PR. Supports Markdown formatting. Returns comment ID, URL, and created_at. Does NOT support inline code suggestions (use PR review comments for that) or comment reactions — reactions must be added separately after creation. Requires write access.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            owner: {
+              type: 'string',
+              description: 'Repository owner',
+            },
+            repo: {
+              type: 'string',
+              description: 'Repository name',
+            },
+            issue_number: {
+              type: 'number',
+              description: 'Issue number to comment on',
+            },
+            body: {
+              type: 'string',
+              description: 'Comment content',
+            },
+          },
+          required: ['owner', 'repo', 'issue_number', 'body'],
+        },
+      },
+      handler: async (args: unknown) => {
+        const params = args as CreateIssueCommentParams;
+        const { data } = await octokit.issues.createComment({
+          owner: params.owner,
+          repo: params.repo,
+          issue_number: params.issue_number,
+          body: params.body,
+        });
+
+        return {
+          id: data.id,
+          body: data.body,
+          user: {
+            login: data.user?.login,
+          },
+          created_at: data.created_at,
+          html_url: data.html_url,
+        };
+      },
+    });
+
+    // Update issue comment tool
+    tools.push({
+      tool: {
+        name: 'update_issue_comment',
+        description: 'Update an existing issue comment',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            owner: {
+              type: 'string',
+              description: 'Repository owner',
+            },
+            repo: {
+              type: 'string',
+              description: 'Repository name',
+            },
+            comment_id: {
+              type: 'number',
+              description: 'Comment ID to update',
+            },
+            body: {
+              type: 'string',
+              description: 'New comment content',
+            },
+          },
+          required: ['owner', 'repo', 'comment_id', 'body'],
+        },
+      },
+      handler: async (args: unknown) => {
+        const params = args as UpdateIssueCommentParams;
+        const { data } = await octokit.issues.updateComment({
+          owner: params.owner,
+          repo: params.repo,
+          comment_id: params.comment_id,
+          body: params.body,
+        });
+
+        return {
+          id: data.id,
+          body: data.body,
+          user: {
+            login: data.user?.login,
+          },
+          updated_at: data.updated_at,
+          html_url: data.html_url,
+        };
+      },
+    });
+
+    // Delete issue comment tool
+    tools.push({
+      tool: {
+        name: 'delete_issue_comment',
+        description: '[DESTRUCTIVE] Permanently delete an issue comment — cannot be recovered. Does NOT return the deleted comment content. Requires write access to the repository. Side effect: decrements the issue\'s comment count.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            owner: {
+              type: 'string',
+              description: 'Repository owner',
+            },
+            repo: {
+              type: 'string',
+              description: 'Repository name',
+            },
+            comment_id: {
+              type: 'number',
+              description: 'Comment ID to delete',
+            },
+          },
+          required: ['owner', 'repo', 'comment_id'],
+        },
+      },
+      handler: async (args: unknown) => {
+        const params = args as DeleteIssueCommentParams;
+        await octokit.issues.deleteComment({
+          owner: params.owner,
+          repo: params.repo,
+          comment_id: params.comment_id,
+        });
+
+        return {
+          success: true,
+          message: `Comment ${params.comment_id} deleted successfully`,
+        };
+      },
+    });
+
+    // Add issue labels tool
+    tools.push({
+      tool: {
+        name: 'add_issue_labels',
+        description: 'Add one or more labels to an issue (appends — does NOT replace existing labels). Labels must already exist in the repository; this does NOT create new labels. Returns the complete updated label list. Side effect: updates issue\'s updated_at timestamp. To replace all labels use update_issue instead.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            owner: {
+              type: 'string',
+              description: 'Repository owner',
+            },
+            repo: {
+              type: 'string',
+              description: 'Repository name',
+            },
+            issue_number: {
+              type: 'number',
+              description: 'Issue number',
+            },
+            labels: {
+              type: 'array',
+              description: 'Labels to add',
+              items: { type: 'string' },
+            },
+          },
+          required: ['owner', 'repo', 'issue_number', 'labels'],
+        },
+      },
+      handler: async (args: unknown) => {
+        const params = args as AddLabelsToIssueParams;
+        const { data } = await octokit.issues.addLabels({
+          owner: params.owner,
+          repo: params.repo,
+          issue_number: params.issue_number,
+          labels: params.labels,
+        });
+
+        return data.map(label => ({
+          name: label.name,
+          color: label.color,
+          description: label.description,
+        }));
+      },
+    });
+
+    // Remove issue label tool
+    tools.push({
+      tool: {
+        name: 'remove_issue_label',
+        description: 'Remove a label from an issue',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            owner: {
+              type: 'string',
+              description: 'Repository owner',
+            },
+            repo: {
+              type: 'string',
+              description: 'Repository name',
+            },
+            issue_number: {
+              type: 'number',
+              description: 'Issue number',
+            },
+            name: {
+              type: 'string',
+              description: 'Label name to remove',
+            },
+          },
+          required: ['owner', 'repo', 'issue_number', 'name'],
+        },
+      },
+      handler: async (args: unknown) => {
+        const params = args as RemoveLabelFromIssueParams;
+        await octokit.issues.removeLabel({
+          owner: params.owner,
+          repo: params.repo,
+          issue_number: params.issue_number,
+          name: params.name,
+        });
+
+        return {
+          success: true,
+          message: `Label '${params.name}' removed from issue ${params.issue_number}`,
+        };
+      },
+    });
+
+    // Lock issue tool
+    tools.push({
+      tool: {
+        name: 'lock_issue',
+        description: '[DESTRUCTIVE] Lock an issue to prevent new comments. Locked issues cannot receive comments or reactions until unlocked. Optional lock_reason: off-topic, too heated, resolved, spam. Does NOT close the issue — use close_issue separately if needed. Requires: collaborator write access or triage role.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            owner: {
+              type: 'string',
+              description: 'Repository owner',
+            },
+            repo: {
+              type: 'string',
+              description: 'Repository name',
+            },
+            issue_number: {
+              type: 'number',
+              description: 'Issue number',
+            },
+            lock_reason: {
+              type: 'string',
+              description: 'Reason for locking',
+              enum: ['off-topic', 'too heated', 'resolved', 'spam'],
+            },
+          },
+          required: ['owner', 'repo', 'issue_number'],
+        },
+      },
+      handler: async (args: unknown) => {
+        const params = args as LockIssueParams;
+        await octokit.issues.lock({
+          owner: params.owner,
+          repo: params.repo,
+          issue_number: params.issue_number,
+          lock_reason: params.lock_reason,
+        });
+
+        return {
+          success: true,
+          message: `Issue ${params.issue_number} locked successfully`,
+        };
+      },
+    });
+
+    // Unlock issue tool
+    tools.push({
+      tool: {
+        name: 'unlock_issue',
+        description: 'Unlock an issue',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            owner: {
+              type: 'string',
+              description: 'Repository owner',
+            },
+            repo: {
+              type: 'string',
+              description: 'Repository name',
+            },
+            issue_number: {
+              type: 'number',
+              description: 'Issue number',
+            },
+          },
+          required: ['owner', 'repo', 'issue_number'],
+        },
+      },
+      handler: async (args: unknown) => {
+        const params = args as UnlockIssueParams;
+        await octokit.issues.unlock({
+          owner: params.owner,
+          repo: params.repo,
+          issue_number: params.issue_number,
+        });
+
+        return {
+          success: true,
+          message: `Issue ${params.issue_number} unlocked successfully`,
+        };
+      },
+    });
+  }
+
+  return tools;
+}

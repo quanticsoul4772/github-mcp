@@ -1,0 +1,24 @@
+{
+  "totalFindings": 2,
+  "criticalFindings": 0,
+  "highFindings": 1,
+  "mediumFindings": 1,
+  "lowFindings": 0,
+  "agentsUsed": [
+    "code-analysis",
+    "security",
+    "type-safety",
+    "testing"
+  ],
+  "analysisTime": 5,
+  "topIssues": [
+    {
+      "category": "configuration",
+      "count": 1
+    },
+    {
+      "category": "test-configuration",
+      "count": 1
+    }
+  ]
+}

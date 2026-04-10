@@ -1,0 +1,972 @@
+import { Octokit } from '@octokit/rest';
+import { z } from 'zod';
+import { ToolConfig } from '../types.js';
+import { createTypeSafeHandler } from '../utils/type-safety.js';
+import { withErrorHandling } from '../errors.js';
+import { validateGraphQLVariableValue } from '../graphql-validation.js';
+
+// Extended Octokit type that may have graphqlWithComplexity from rate-limiter
+type OctokitWithComplexity = Octokit & {
+  graphqlWithComplexity?: (query: string, variables?: Record<string, unknown>) => Promise<unknown>;
+};
+
+// Type definitions for project management tools
+interface GetProjectBoardsParams {
+  owner: string;
+  repo?: string;
+  first?: number;
+}
+
+interface GetMilestonesWithIssuesParams {
+  owner: string;
+  repo: string;
+  state?: 'OPEN' | 'CLOSED';
+  first?: number;
+}
+
+interface RepositoryRef {
+  owner: string;
+  repo: string;
+}
+
+interface GetCrossRepoProjectViewParams {
+  repositories: RepositoryRef[];
+  labels?: string[];
+  assignee?: string;
+  state?: 'OPEN' | 'CLOSED';
+  milestone?: string;
+}
+
+// GraphQL response types for project boards
+interface ProjectV2Node {
+  id: string;
+  number: number;
+  title: string;
+  shortDescription: string;
+  readme: string;
+  url: string;
+  createdAt: string;
+  updatedAt: string;
+  closed: boolean;
+  public: boolean;
+  owner: { login: string };
+  creator: { login: string };
+  items: {
+    totalCount: number;
+    nodes: Array<{
+      id: string;
+      type: string;
+      content: Record<string, unknown>;
+    }>;
+  };
+  fields: {
+    totalCount: number;
+    nodes: Array<{
+      id: string;
+      name: string;
+      dataType: string;
+      options?: Array<{ id: string; name: string; color: string }>;
+    }>;
+  };
+}
+
+interface ProjectsV2Connection {
+  totalCount: number;
+  nodes: ProjectV2Node[];
+}
+
+interface ProjectBoardsResult {
+  repository?: { projectsV2: ProjectsV2Connection };
+  user?: { projectsV2: ProjectsV2Connection };
+  organization?: { projectsV2: ProjectsV2Connection };
+}
+
+// GraphQL response types for milestones
+interface MilestoneIssue {
+  id: string;
+  number: number;
+  title: string;
+  state: string;
+  url: string;
+  createdAt: string;
+  author: { login: string };
+  labels: { nodes: Array<{ name: string; color: string }> };
+  assignees: { nodes: Array<{ login: string; avatarUrl: string }> };
+}
+
+interface MilestoneNode {
+  id: string;
+  number: number;
+  title: string;
+  description: string;
+  state: string;
+  url: string;
+  createdAt: string;
+  updatedAt: string;
+  dueOn: string | null;
+  closedAt: string | null;
+  creator: { login: string; avatarUrl: string };
+  issues: { totalCount: number; nodes: MilestoneIssue[] };
+  pullRequests: { totalCount: number; nodes: MilestoneIssue[] };
+}
+
+interface MilestonesResult {
+  repository?: {
+    milestones: {
+      totalCount: number;
+      nodes: MilestoneNode[];
+    };
+  };
+}
+
+// GraphQL response types for cross-repo view
+interface CrossRepoItem {
+  id: string;
+  number: number;
+  title: string;
+  body: string;
+  state: string;
+  url: string;
+  createdAt: string;
+  updatedAt: string;
+  author: { login: string; avatarUrl: string };
+  assignees: { nodes: Array<{ login: string; avatarUrl: string }> };
+  labels: { nodes: Array<{ name: string; color: string }> };
+  milestone: { title: string; dueOn: string | null; state: string } | null;
+  comments?: { totalCount: number };
+  reactions?: { totalCount: number };
+  reviews?: { totalCount: number; nodes: Array<{ state: string; author: { login: string } }> };
+  mergeable?: string;
+  isDraft?: boolean;
+}
+
+interface CrossRepoResult {
+  repository?: {
+    name: string;
+    nameWithOwner: string;
+    url: string;
+    issues: { totalCount: number; nodes: CrossRepoItem[] };
+    pullRequests: { totalCount: number; nodes: CrossRepoItem[] };
+  };
+}
+
+interface CrossRepoItemWithContext extends CrossRepoItem {
+  repository: { name: string; nameWithOwner: string; url: string };
+  type: 'issue' | 'pullRequest';
+}
+
+// Zod schemas for validation
+const GetProjectBoardsSchema = z.object({
+  owner: z.string().min(1, 'Owner is required'),
+  repo: z.string().optional(),
+  first: z.number().int().min(1).max(50).optional(),
+});
+
+const GetMilestonesWithIssuesSchema = z.object({
+  owner: z.string().min(1, 'Owner is required'),
+  repo: z.string().min(1, 'Repository name is required'),
+  state: z.enum(['OPEN', 'CLOSED']).optional(),
+  first: z.number().int().min(1).max(25).optional(),
+});
+
+const RepositoryRefSchema = z.object({
+  owner: z.string().min(1, 'Owner is required'),
+  repo: z.string().min(1, 'Repository name is required'),
+});
+
+const GetCrossRepoProjectViewSchema = z.object({
+  repositories: z
+    .array(RepositoryRefSchema)
+    .min(1, 'At least one repository is required')
+    .max(5, 'Maximum 5 repositories allowed'),
+  labels: z.array(z.string()).optional(),
+  assignee: z.string().optional(),
+  state: z.enum(['OPEN', 'CLOSED']).optional(),
+  milestone: z.string().optional(),
+});
+
+/**
+ * Creates project management tools using GraphQL API for enhanced project tracking capabilities.
+ *
+ * These tools provide sophisticated project management functionality that leverages GraphQL's
+ * ability to fetch nested relationships and contextual data in single queries,
+ * offering performance and feature advantages over REST-based project management.
+ *
+ * @param octokit - Configured Octokit instance with GraphQL support
+ * @param readOnly - Whether to exclude write operations (all project tools are read-only)
+ * @returns Array of project management tool configurations
+ *
+ * @example
+ * ```typescript
+ * const tools = createProjectManagementTools(octokit, true);
+ * // Returns tools: get_project_boards, get_milestones_with_issues, etc.
+ * ```
+ *
+ * @see https://docs.github.com/en/graphql/reference/objects#project
+ */
+export function createProjectManagementTools(octokit: Octokit, _readOnly: boolean): ToolConfig[] {
+  const tools: ToolConfig[] = [];
+
+  // Get project boards (GitHub Projects V2)
+  tools.push({
+    tool: {
+      name: 'get_project_boards',
+      description: 'Fetch GitHub Projects V2 boards (max 50) for a repository or owner (user/org). Returns project metadata with first 20 items and field definitions per board. Items can be Issues, PRs, or DraftIssues. Does NOT return all items beyond 20 or field values per item — use dedicated project item queries for full data. Read-only.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          owner: {
+            type: 'string',
+            description: 'Repository owner or organization',
+          },
+          repo: {
+            type: 'string',
+            description: 'Repository name (optional, for repository-specific projects)',
+          },
+          first: {
+            type: 'number',
+            description: 'Number of projects to return (max 50)',
+            minimum: 1,
+            maximum: 50,
+          },
+        },
+        required: ['owner'],
+      },
+    },
+    handler: createTypeSafeHandler(
+      GetProjectBoardsSchema,
+      async (params: GetProjectBoardsParams) => {
+        return withErrorHandling(
+          'get_project_boards',
+          async () => {
+            const query = params.repo
+              ? `
+              query($owner: String!, $repo: String!, $first: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  projectsV2(first: $first) {
+                    totalCount
+                    nodes {
+                      id
+                      number
+                      title
+                      shortDescription
+                      readme
+                      url
+                      createdAt
+                      updatedAt
+                      closed
+                      public
+                      owner {
+                        login
+                      }
+                      creator {
+                        login
+                      }
+                      items(first: 20) {
+                        totalCount
+                        nodes {
+                          id
+                          type
+                          content {
+                            ... on Issue {
+                              number
+                              title
+                              state
+                              url
+                            }
+                            ... on PullRequest {
+                              number
+                              title
+                              state
+                              url
+                            }
+                            ... on DraftIssue {
+                              title
+                              body
+                            }
+                          }
+                        }
+                      }
+                      fields(first: 20) {
+                        totalCount
+                        nodes {
+                          id
+                          name
+                          dataType
+                          ... on ProjectV2SingleSelectField {
+                            options {
+                              id
+                              name
+                              color
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `
+              : `
+              query($owner: String!, $first: Int!) {
+                user(login: $owner) {
+                  projectsV2(first: $first) {
+                    totalCount
+                    nodes {
+                      id
+                      number
+                      title
+                      shortDescription
+                      readme
+                      url
+                      createdAt
+                      updatedAt
+                      closed
+                      public
+                      owner {
+                        login
+                      }
+                      creator {
+                        login
+                      }
+                      items(first: 20) {
+                        totalCount
+                        nodes {
+                          id
+                          type
+                          content {
+                            ... on Issue {
+                              number
+                              title
+                              state
+                              url
+                              repository {
+                                nameWithOwner
+                              }
+                            }
+                            ... on PullRequest {
+                              number
+                              title
+                              state
+                              url
+                              repository {
+                                nameWithOwner
+                              }
+                            }
+                            ... on DraftIssue {
+                              title
+                              body
+                            }
+                          }
+                        }
+                      }
+                      fields(first: 20) {
+                        totalCount
+                        nodes {
+                          id
+                          name
+                          dataType
+                          ... on ProjectV2SingleSelectField {
+                            options {
+                              id
+                              name
+                              color
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                organization(login: $owner) {
+                  projectsV2(first: $first) {
+                    totalCount
+                    nodes {
+                      id
+                      number
+                      title
+                      shortDescription
+                      readme
+                      url
+                      createdAt
+                      updatedAt
+                      closed
+                      public
+                      owner {
+                        login
+                      }
+                      creator {
+                        login
+                      }
+                      items(first: 20) {
+                        totalCount
+                        nodes {
+                          id
+                          type
+                          content {
+                            ... on Issue {
+                              number
+                              title
+                              state
+                              url
+                              repository {
+                                nameWithOwner
+                              }
+                            }
+                            ... on PullRequest {
+                              number
+                              title
+                              state
+                              url
+                              repository {
+                                nameWithOwner
+                              }
+                            }
+                            ... on DraftIssue {
+                              title
+                              body
+                            }
+                          }
+                        }
+                      }
+                      fields(first: 20) {
+                        totalCount
+                        nodes {
+                          id
+                          name
+                          dataType
+                          ... on ProjectV2SingleSelectField {
+                            options {
+                              id
+                              name
+                              color
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            // Validate GraphQL variables before execution
+            const variables = {
+              owner: validateGraphQLVariableValue(params.owner, 'owner'),
+              ...(params.repo && { repo: validateGraphQLVariableValue(params.repo, 'repo') }),
+              first: validateGraphQLVariableValue(params.first ?? 25, 'first'),
+            };
+
+            const extOctokit = octokit as OctokitWithComplexity;
+            const result = (extOctokit.graphqlWithComplexity
+              ? await extOctokit.graphqlWithComplexity(query, variables)
+              : await octokit.graphql(query, variables)) as ProjectBoardsResult;
+
+            let projects: ProjectsV2Connection | undefined;
+            if (params.repo) {
+              projects = result.repository?.projectsV2;
+            } else {
+              // Try user first, then organization
+              projects = result.user?.projectsV2 ?? result.organization?.projectsV2;
+            }
+
+            if (!projects) {
+              throw new Error(`No projects found for ${params.owner}`);
+            }
+
+            return {
+              totalCount: projects.totalCount,
+              projects: projects.nodes,
+            };
+          },
+          { tool: 'get_project_boards', owner: params.owner, repo: params.repo }
+        );
+      },
+      'get_project_boards'
+    ),
+  });
+
+  // Get milestones with associated issues
+  tools.push({
+    tool: {
+      name: 'get_milestones_with_issues',
+      description: 'Fetch repository milestones (max 25) with up to 50 associated issues and PRs per milestone. Returns milestone metadata, item titles/states/assignees/labels, and calculated progress percentage. Does NOT return issue body text, milestone custom fields, or linked discussions. Limited to 50 items per milestone — large milestones are truncated.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          owner: {
+            type: 'string',
+            description: 'Repository owner',
+          },
+          repo: {
+            type: 'string',
+            description: 'Repository name',
+          },
+          state: {
+            type: 'string',
+            description: 'Filter by milestone state',
+            enum: ['OPEN', 'CLOSED'],
+          },
+          first: {
+            type: 'number',
+            description: 'Number of milestones to return (max 25)',
+            minimum: 1,
+            maximum: 25,
+          },
+        },
+        required: ['owner', 'repo'],
+      },
+    },
+    handler: createTypeSafeHandler(
+      GetMilestonesWithIssuesSchema,
+      async (params: GetMilestonesWithIssuesParams) => {
+        return withErrorHandling(
+          'get_milestones_with_issues',
+          async () => {
+            const query = `
+              query($owner: String!, $repo: String!, $first: Int!, $state: MilestoneState) {
+                repository(owner: $owner, name: $repo) {
+                  milestones(first: $first, states: [$state], orderBy: {field: CREATED_AT, direction: DESC}) {
+                    totalCount
+                    nodes {
+                      id
+                      number
+                      title
+                      description
+                      state
+                      url
+                      createdAt
+                      updatedAt
+                      dueOn
+                      closedAt
+                      creator {
+                        login
+                        avatarUrl
+                      }
+                      issues(first: 50) {
+                        totalCount
+                        nodes {
+                          id
+                          number
+                          title
+                          state
+                          url
+                          createdAt
+                          author {
+                            login
+                          }
+                          labels(first: 10) {
+                            nodes {
+                              name
+                              color
+                            }
+                          }
+                          assignees(first: 5) {
+                            nodes {
+                              login
+                              avatarUrl
+                            }
+                          }
+                        }
+                      }
+                      pullRequests(first: 50) {
+                        totalCount
+                        nodes {
+                          id
+                          number
+                          title
+                          state
+                          url
+                          createdAt
+                          author {
+                            login
+                          }
+                          labels(first: 10) {
+                            nodes {
+                              name
+                              color
+                            }
+                          }
+                          assignees(first: 5) {
+                            nodes {
+                              login
+                              avatarUrl
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            // Validate GraphQL variables before execution
+            const variables = {
+              owner: validateGraphQLVariableValue(params.owner, 'owner'),
+              repo: validateGraphQLVariableValue(params.repo, 'repo'),
+              first: validateGraphQLVariableValue(params.first ?? 10, 'first'),
+              state: params.state ? validateGraphQLVariableValue(params.state, 'state') : undefined,
+            };
+
+            const extOctokit = octokit as OctokitWithComplexity;
+            const result = (extOctokit.graphqlWithComplexity
+              ? await extOctokit.graphqlWithComplexity(query, variables)
+              : await octokit.graphql(query, variables)) as MilestonesResult;
+
+            if (!result.repository) {
+              throw new Error('Repository not found or milestones query failed');
+            }
+
+            const milestones = result.repository.milestones.nodes.map((milestone: MilestoneNode) => {
+              const allIssues = milestone.issues.nodes;
+              const allPullRequests = milestone.pullRequests.nodes;
+
+              // Calculate progress
+              const openIssues = allIssues.filter((issue: MilestoneIssue) => issue.state === 'OPEN').length;
+              const closedIssues = allIssues.filter(
+                (issue: MilestoneIssue) => issue.state === 'CLOSED'
+              ).length;
+              const openPRs = allPullRequests.filter((pr: MilestoneIssue) => pr.state === 'OPEN').length;
+              const closedPRs = allPullRequests.filter((pr: MilestoneIssue) =>
+                ['CLOSED', 'MERGED'].includes(pr.state)
+              ).length;
+
+              const totalItems = allIssues.length + allPullRequests.length;
+              const completedItems = closedIssues + closedPRs;
+              const progressPercentage =
+                totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+              return {
+                ...milestone,
+                progress: {
+                  total: totalItems,
+                  completed: completedItems,
+                  percentage: progressPercentage,
+                  issues: {
+                    open: openIssues,
+                    closed: closedIssues,
+                    total: allIssues.length,
+                  },
+                  pullRequests: {
+                    open: openPRs,
+                    closed: closedPRs,
+                    total: allPullRequests.length,
+                  },
+                },
+              };
+            });
+
+            return {
+              totalCount: result.repository.milestones.totalCount,
+              milestones,
+            };
+          },
+          { tool: 'get_milestones_with_issues', owner: params.owner, repo: params.repo }
+        );
+      },
+      'get_milestones_with_issues'
+    ),
+  });
+
+  // Cross-repository project view
+  tools.push({
+    tool: {
+      name: 'get_cross_repo_project_view',
+      description:
+        'Fetch open issues and PRs across 1-5 repositories (max 50 items per repo), filterable by labels, assignee, or milestone. Returns items sorted by update date with repo context and summary stats. Does NOT return issue body text (titles only), draft PRs, or closed items. Use for cross-repo dashboards; not suited for historical trend analysis.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          repositories: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                owner: { type: 'string' },
+                repo: { type: 'string' },
+              },
+              required: ['owner', 'repo'],
+            },
+            description: 'List of repositories to include',
+            maxItems: 5,
+          },
+          labels: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Filter by labels (optional)',
+          },
+          assignee: {
+            type: 'string',
+            description: 'Filter by assignee (optional)',
+          },
+          state: {
+            type: 'string',
+            description: 'Filter by state',
+            enum: ['OPEN', 'CLOSED'],
+          },
+          milestone: {
+            type: 'string',
+            description: 'Filter by milestone title (optional)',
+          },
+        },
+        required: ['repositories'],
+      },
+    },
+    handler: createTypeSafeHandler(
+      GetCrossRepoProjectViewSchema,
+      async (params: GetCrossRepoProjectViewParams) => {
+        return withErrorHandling(
+          'get_cross_repo_project_view',
+          async () => {
+            const repositories = params.repositories;
+            const results = [];
+
+            // Query each repository
+            for (const repoInfo of repositories) {
+              const query = `
+                query($owner: String!, $repo: String!, $states: [IssueState!]) {
+                  repository(owner: $owner, name: $repo) {
+                    name
+                    nameWithOwner
+                    url
+                    issues(first: 50, states: $states, orderBy: {field: UPDATED_AT, direction: DESC}) {
+                      totalCount
+                      nodes {
+                        id
+                        number
+                        title
+                        body
+                        state
+                        url
+                        createdAt
+                        updatedAt
+                        author {
+                          login
+                          avatarUrl
+                        }
+                        assignees(first: 5) {
+                          nodes {
+                            login
+                            avatarUrl
+                          }
+                        }
+                        labels(first: 10) {
+                          nodes {
+                            name
+                            color
+                          }
+                        }
+                        milestone {
+                          title
+                          dueOn
+                          state
+                        }
+                        comments {
+                          totalCount
+                        }
+                        reactions {
+                          totalCount
+                        }
+                      }
+                    }
+                    pullRequests(first: 50, states: $states, orderBy: {field: UPDATED_AT, direction: DESC}) {
+                      totalCount
+                      nodes {
+                        id
+                        number
+                        title
+                        body
+                        state
+                        url
+                        createdAt
+                        updatedAt
+                        author {
+                          login
+                          avatarUrl
+                        }
+                        assignees(first: 5) {
+                          nodes {
+                            login
+                            avatarUrl
+                          }
+                        }
+                        labels(first: 10) {
+                          nodes {
+                            name
+                            color
+                          }
+                        }
+                        milestone {
+                          title
+                          dueOn
+                          state
+                        }
+                        reviews(first: 10) {
+                          totalCount
+                          nodes {
+                            state
+                            author {
+                              login
+                            }
+                          }
+                        }
+                        mergeable
+                        isDraft
+                      }
+                    }
+                  }
+                }
+              `;
+
+              // Validate GraphQL variables before execution
+              const variables = {
+                owner: validateGraphQLVariableValue(repoInfo.owner, 'owner'),
+                repo: validateGraphQLVariableValue(repoInfo.repo, 'repo'),
+                states: params.state
+                  ? [validateGraphQLVariableValue(params.state, 'state')]
+                  : ['OPEN'],
+              };
+
+              const extOctokit = octokit as OctokitWithComplexity;
+              const result = (extOctokit.graphqlWithComplexity
+                ? await extOctokit.graphqlWithComplexity(query, variables)
+                : await octokit.graphql(query, variables)) as CrossRepoResult;
+
+              if (!result.repository) {
+                console.warn(
+                  `Repository ${repoInfo.owner}/${repoInfo.repo} not found or inaccessible`
+                );
+                continue;
+              }
+
+              results.push({
+                repository: result.repository,
+                issues: result.repository.issues.nodes,
+                pullRequests: result.repository.pullRequests.nodes,
+              });
+            }
+
+            // Apply filters
+            let allIssues: CrossRepoItemWithContext[] = [];
+            let allPullRequests: CrossRepoItemWithContext[] = [];
+
+            for (const repoResult of results) {
+              let filteredIssues = repoResult.issues;
+              let filteredPRs = repoResult.pullRequests;
+
+              // Filter by labels
+              if (params.labels && params.labels.length > 0) {
+                const filterLabels = params.labels;
+                filteredIssues = filteredIssues.filter((issue: CrossRepoItem) =>
+                  filterLabels.some((label: string) =>
+                    issue.labels.nodes.some((issueLabel) => issueLabel.name === label)
+                  )
+                );
+                filteredPRs = filteredPRs.filter((pr: CrossRepoItem) =>
+                  filterLabels.some((label: string) =>
+                    pr.labels.nodes.some((prLabel) => prLabel.name === label)
+                  )
+                );
+              }
+
+              // Filter by assignee
+              if (params.assignee) {
+                filteredIssues = filteredIssues.filter((issue: CrossRepoItem) =>
+                  issue.assignees.nodes.some((assignee) => assignee.login === params.assignee)
+                );
+                filteredPRs = filteredPRs.filter((pr: CrossRepoItem) =>
+                  pr.assignees.nodes.some((assignee) => assignee.login === params.assignee)
+                );
+              }
+
+              // Filter by milestone
+              if (params.milestone) {
+                filteredIssues = filteredIssues.filter(
+                  (issue: CrossRepoItem) => issue.milestone?.title === params.milestone
+                );
+                filteredPRs = filteredPRs.filter(
+                  (pr: CrossRepoItem) => pr.milestone?.title === params.milestone
+                );
+              }
+
+              // Add repository context to each item
+              allIssues.push(
+                ...filteredIssues.map((issue: CrossRepoItem) => ({
+                  ...issue,
+                  repository: {
+                    name: repoResult.repository.name,
+                    nameWithOwner: repoResult.repository.nameWithOwner,
+                    url: repoResult.repository.url,
+                  },
+                  type: 'issue' as const,
+                }))
+              );
+
+              allPullRequests.push(
+                ...filteredPRs.map((pr: CrossRepoItem) => ({
+                  ...pr,
+                  repository: {
+                    name: repoResult.repository.name,
+                    nameWithOwner: repoResult.repository.nameWithOwner,
+                    url: repoResult.repository.url,
+                  },
+                  type: 'pullRequest' as const,
+                }))
+              );
+            }
+
+            // Combine and sort by updated date
+            const allItems = [...allIssues, ...allPullRequests].sort(
+              (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+            );
+
+            // Generate summary statistics
+            const summary = {
+              totalItems: allItems.length,
+              totalIssues: allIssues.length,
+              totalPullRequests: allPullRequests.length,
+              byRepository: results.map(r => ({
+                repository: r.repository.nameWithOwner,
+                issues: allIssues.filter(
+                  i => i.repository.nameWithOwner === r.repository.nameWithOwner
+                ).length,
+                pullRequests: allPullRequests.filter(
+                  pr => pr.repository.nameWithOwner === r.repository.nameWithOwner
+                ).length,
+              })),
+              byState: {
+                open: allItems.filter(item => item.state === 'OPEN').length,
+                closed: allItems.filter(item => ['CLOSED', 'MERGED'].includes(item.state)).length,
+              },
+              byAssignee: Object.entries(
+                allItems.reduce((acc: Record<string, number>, item) => {
+                  for (const assignee of item.assignees.nodes) {
+                    acc[assignee.login] = (acc[assignee.login] ?? 0) + 1;
+                  }
+                  return acc;
+                }, {})
+              )
+                .map(([login, count]) => ({ login, count: count as number }))
+                .sort((a, b) => b.count - a.count),
+            };
+
+            return {
+              summary,
+              items: allItems,
+              repositories: results.map(r => ({
+                name: r.repository.name,
+                nameWithOwner: r.repository.nameWithOwner,
+                url: r.repository.url,
+              })),
+            };
+          },
+          { tool: 'get_cross_repo_project_view', repositoryCount: params.repositories.length }
+        );
+      },
+      'get_cross_repo_project_view'
+    ),
+  });
+
+  return tools;
+}
