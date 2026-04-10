@@ -130,6 +130,7 @@ export interface IRepositoryService {
 }
 
 export interface IIssueService {
+  // Return types remain `any` — narrowing requires a GitHubIssue interface (future refactor)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   listIssues(owner: string, repo: string, options?: Record<string, unknown>): Promise<any>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

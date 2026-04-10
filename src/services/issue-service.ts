@@ -8,7 +8,8 @@ import { validateOwnerName, validateRepoName, ValidationError } from '../validat
 export class IssueService implements IIssueService {
   constructor(private readonly issueRepository: IIssueRepository) {}
 
-  async listIssues(owner: string, repo: string, options: any = {}): Promise<any> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async listIssues(owner: string, repo: string, options: Record<string, unknown> = {}): Promise<any> {
     // Validation
     if (!validateOwnerName(owner)) {
       throw new ValidationError('owner', 'Invalid repository owner name');
@@ -24,6 +25,7 @@ export class IssueService implements IIssueService {
     return this.issueRepository.list(owner, repo, processedOptions);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async getIssue(owner: string, repo: string, issueNumber: number): Promise<any> {
     // Validation
     if (!validateOwnerName(owner)) {
@@ -40,7 +42,8 @@ export class IssueService implements IIssueService {
     return this.issueRepository.get(owner, repo, issueNumber);
   }
 
-  async createIssue(owner: string, repo: string, data: any): Promise<any> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async createIssue(owner: string, repo: string, data: Record<string, unknown>): Promise<any> {
     // Validation
     if (!validateOwnerName(owner)) {
       throw new ValidationError('owner', 'Invalid repository owner name');
@@ -59,7 +62,8 @@ export class IssueService implements IIssueService {
     return this.issueRepository.create(owner, repo, processedData);
   }
 
-  async updateIssue(owner: string, repo: string, issueNumber: number, data: any): Promise<any> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async updateIssue(owner: string, repo: string, issueNumber: number, data: Record<string, unknown>): Promise<any> {
     // Validation
     if (!validateOwnerName(owner)) {
       throw new ValidationError('owner', 'Invalid repository owner name');
@@ -93,8 +97,8 @@ export class IssueService implements IIssueService {
   /**
    * Process and validate list options
    */
-  private processListOptions(options: any): any {
-    const processed: any = {};
+  private processListOptions(options: Record<string, unknown>): Record<string, unknown> {
+    const processed: Record<string, unknown> = {};
 
     if (IssueService.isValidEnum(options.state, ['open', 'closed', 'all'])) {
       processed.state = options.state;
@@ -117,7 +121,7 @@ export class IssueService implements IIssueService {
     if (IssueService.isValidPageSize(options.per_page)) {
       processed.per_page = options.per_page;
     }
-    if (Number.isInteger(options.page) && options.page > 0) {
+    if (Number.isInteger(options.page) && (options.page as number) > 0) {
       processed.page = options.page;
     }
 
@@ -127,8 +131,8 @@ export class IssueService implements IIssueService {
   /**
    * Process and sanitize issue data
    */
-  private processIssueData(data: any): any {
-    const processed: any = {};
+  private processIssueData(data: Record<string, unknown>): Record<string, unknown> {
+    const processed: Record<string, unknown> = {};
 
     if (data.title && typeof data.title === 'string') {
       processed.title = data.title.trim();
@@ -140,13 +144,13 @@ export class IssueService implements IIssueService {
 
     if (data.assignees && Array.isArray(data.assignees)) {
       processed.assignees = data.assignees.filter(
-        (assignee: any) => typeof assignee === 'string' && assignee.trim().length > 0
+        (assignee: unknown) => typeof assignee === 'string' && assignee.trim().length > 0
       );
     }
 
     if (data.labels && Array.isArray(data.labels)) {
       processed.labels = data.labels.filter(
-        (label: any) => typeof label === 'string' && label.trim().length > 0
+        (label: unknown) => typeof label === 'string' && label.trim().length > 0
       );
     }
 
@@ -157,7 +161,7 @@ export class IssueService implements IIssueService {
       processed.milestone = data.milestone;
     }
 
-    if (data.state && ['open', 'closed'].includes(data.state)) {
+    if (typeof data.state === 'string' && ['open', 'closed'].includes(data.state)) {
       processed.state = data.state;
     }
 
