@@ -105,7 +105,7 @@ describe('validateGraphQLVariableValue', () => {
 
   // Object branch
   it('should validate object recursively', () => {
-    const result = validateGraphQLVariableValue({ name: 'test', count: 5 }, 'obj');
+    const result = validateGraphQLVariableValue({ name: 'test', count: 5 }, 'obj') as Record<string, unknown>;
     expect(result.name).toBe('test');
     expect(result.count).toBe(5);
   });
