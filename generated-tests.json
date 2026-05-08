@@ -1,0 +1,12 @@
+[
+  {
+    "sourceFile": "src/agents/types/agent-interfaces.ts",
+    "testFile": "src/agents/types/agent-interfaces.test.ts",
+    "testCases": 0
+  },
+  {
+    "sourceFile": "src/agents/types.ts",
+    "testFile": "src/agents/types.test.ts",
+    "testCases": 0
+  }
+]
