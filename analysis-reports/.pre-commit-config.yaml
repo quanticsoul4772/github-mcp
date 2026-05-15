@@ -1,0 +1,89 @@
+repos:
+  # Security and secret scanning (single tool)
+  - repo: https://github.com/trufflesecurity/trufflehog
+    rev: v3.84.0
+    hooks:
+      - id: trufflehog
+        name: TruffleHog
+        description: Detect secrets in your data
+        entry: bash -c 'trufflehog git file://. --since-commit HEAD --only-verified --fail'
+        language: system
+        stages: [commit]
+
+  # Code quality and linting
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        exclude: \.github/workflows/.*\.ya?ml$
+      - id: check-json
+      - id: check-merge-conflict
+      - id: detect-private-key
+        exclude: tests/fixtures/
+
+  # TypeScript and Node.js specific
+  - repo: local
+    hooks:
+      - id: eslint
+        name: ESLint
+        description: Run ESLint on TypeScript/JavaScript files
+        entry: npm run lint
+        language: system
+        files: \.[jt]sx?$
+        pass_filenames: false
+
+      - id: typescript-check
+        name: TypeScript Check
+        description: Check TypeScript compilation
+        entry: npx tsc --noEmit --pretty false --project tsconfig.json
+        language: system
+        files: \.(ts|tsx)$
+        pass_filenames: false
+
+      - id: npm-audit
+        name: npm audit
+        description: Run npm audit to check for vulnerabilities
+        entry: bash -c 'npm audit --audit-level high'
+        language: system
+        files: package\.json$
+        pass_filenames: false
+
+      # Custom security validation
+      - id: security-check
+        name: Security Check
+        description: Run custom security validation
+        entry: bash -c 'node -e "
+          const { validateEnvironmentConfiguration } = require(\"./build/validation.js\");
+          const result = validateEnvironmentConfiguration();
+          if (!result.isValid) {
+            console.error(\"Environment validation failed:\", result.errors);
+            process.exit(1);
+          }
+          console.log(\"Environment validation passed\");
+        "'
+        language: system
+        files: \.(ts|js|json|ya?ml)$
+        pass_filenames: false
+
+# Global settings
+default_language_version:
+  node: system
+
+# Performance optimization
+default_stages: [commit]
+minimum_pre_commit_version: '2.9.0'
+
+# CI settings
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: []
+  submodules: false

@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  # GitHub MCP Server
+  github-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: github-mcp-server
+    restart: unless-stopped
+    
+    # Environment variables
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - LOG_LEVEL=info
+      # GitHub token should be provided via .env file or environment
+      - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_PERSONAL_ACCESS_TOKEN}
+      - GITHUB_READ_ONLY=${GITHUB_READ_ONLY:-false}
+      - GITHUB_TOOLSETS=${GITHUB_TOOLSETS:-all}
+      - GITHUB_HOST=${GITHUB_HOST:-}
+    
+    # Ports
+    ports:
+      - "3000:3000"
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Development service with hot reload
+  github-mcp-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    container_name: github-mcp-dev
+    restart: unless-stopped
+    profiles:
+      - dev
+    
+    # Override command for development
+    command: npm run dev
+    
+    # Mount source code for hot reload
+    volumes:
+      - .:/app
+      - /app/node_modules
+    
+    # Environment variables for development
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - LOG_LEVEL=debug
+      - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_PERSONAL_ACCESS_TOKEN}
+      - GITHUB_READ_ONLY=${GITHUB_READ_ONLY:-true}
+      - GITHUB_TOOLSETS=${GITHUB_TOOLSETS:-all}
+    
+    # Ports for development
+    ports:
+      - "3001:3001"
+    
+    # Logging for development
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "2"
+
+# Networks
+networks:
+  default:
+    name: github-mcp-network
+    driver: bridge
+
+# Volumes for development
+volumes:
+  node_modules:

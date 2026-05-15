@@ -1,0 +1,171 @@
+# Multi-stage Dockerfile for code analysis agents
+FROM node:20-alpine AS base
+
+# Install system dependencies
+RUN apk add --no-cache \
+    git \
+    bash \
+    curl \
+    jq
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY tsconfig.json ./
+
+# Install dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Development stage with all dependencies
+FROM base AS development
+
+# Install all dependencies including dev dependencies
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Build the project
+RUN npm run build
+
+# Production stage for running agents
+FROM base AS production
+
+# Copy built application
+COPY --from=development /app/build ./build
+COPY --from=development /app/src/agents ./src/agents
+
+# Create analysis scripts directory
+RUN mkdir -p /app/scripts
+
+# Create analysis runner script
+RUN cat > /app/scripts/run-analysis.sh << 'EOF'
+#!/bin/bash
+set -e
+
+ANALYSIS_TYPE=${1:-"comprehensive"}
+TARGET_PATH=${2:-"src/"}
+OUTPUT_FORMAT=${3:-"json"}
+OUTPUT_PATH=${4:-"/app/output"}
+
+echo "🔍 Running $ANALYSIS_TYPE analysis on $TARGET_PATH"
+echo "📊 Output format: $OUTPUT_FORMAT"
+echo "📁 Output path: $OUTPUT_PATH"
+
+mkdir -p "$OUTPUT_PATH"
+
+case "$ANALYSIS_TYPE" in
+    "quick")
+        node -e "
+        import('./build/agents/index.js').then(async (m) => {
+            const result = await m.quickAnalyze('$TARGET_PATH', {
+                type: 'directory',
+                format: '$OUTPUT_FORMAT'
+            });
+            
+            if ('$OUTPUT_FORMAT' === 'json') {
+                require('fs').writeFileSync('$OUTPUT_PATH/quick-analysis.json', JSON.stringify(result, null, 2));
+            } else {
+                require('fs').writeFileSync('$OUTPUT_PATH/quick-analysis.txt', result.report);
+            }
+            
+            console.log('✅ Quick analysis completed');
+            console.log('📊 Results saved to $OUTPUT_PATH/quick-analysis.*');
+        }).catch(console.error);
+        "
+        ;;
+    "security")
+        node -e "
+        import('./build/agents/examples/basic-usage.js').then(async (m) => {
+            const result = await m.quickSecurityScan('$TARGET_PATH');
+            require('fs').writeFileSync('$OUTPUT_PATH/security-analysis.json', JSON.stringify(result, null, 2));
+            console.log('🔒 Security analysis completed');
+            console.log('📊 Results saved to $OUTPUT_PATH/security-analysis.json');
+        }).catch(console.error);
+        "
+        ;;
+    "comprehensive")
+        node -e "
+        import('./build/agents/examples/basic-usage.js').then(async (m) => {
+            await m.generateAnalysisReport('$TARGET_PATH', '$OUTPUT_FORMAT', '$OUTPUT_PATH/comprehensive-report.$OUTPUT_FORMAT');
+            console.log('📋 Comprehensive analysis completed');
+            console.log('📊 Report saved to $OUTPUT_PATH/comprehensive-report.$OUTPUT_FORMAT');
+        }).catch(console.error);
+        "
+        ;;
+    "tests")
+        node -e "
+        import('./build/agents/examples/basic-usage.js').then(async (m) => {
+            const files = require('fs').readdirSync('$TARGET_PATH', { recursive: true })
+                .filter(f => f.endsWith('.ts') && !f.includes('.test.') && !f.includes('.spec.'))
+                .slice(0, 5);
+            
+            for (const file of files) {
+                try {
+                    await m.generateTestsForFile('$TARGET_PATH/' + file, '$OUTPUT_PATH/' + file.replace('.ts', '.test.ts'));
+                    console.log('🧪 Generated tests for ' + file);
+                } catch (error) {
+                    console.error('❌ Failed to generate tests for ' + file + ':', error.message);
+                }
+            }
+            console.log('✅ Test generation completed');
+        }).catch(console.error);
+        "
+        ;;
+    *)
+        echo "❌ Unknown analysis type: $ANALYSIS_TYPE"
+        echo "Available types: quick, security, comprehensive, tests"
+        exit 1
+        ;;
+esac
+EOF
+
+RUN chmod +x /app/scripts/run-analysis.sh
+
+# Create health check script
+RUN cat > /app/scripts/health-check.sh << 'EOF'
+#!/bin/bash
+set -e
+
+echo "🏥 Checking agent system health..."
+
+node -e "
+import('./build/agents/examples/basic-usage.js').then(async (m) => {
+    const health = await m.monitorAgentHealth();
+    
+    if (health.summary.healthy) {
+        console.log('✅ All agents are healthy');
+        process.exit(0);
+    } else {
+        console.log('❌ Some agents are unhealthy');
+        console.log('Unhealthy agents:', health.summary.unhealthyAgents);
+        process.exit(1);
+    }
+}).catch((error) => {
+    console.error('❌ Health check failed:', error);
+    process.exit(1);
+});
+"
+EOF
+
+RUN chmod +x /app/scripts/health-check.sh
+
+# Set default command
+CMD ["/app/scripts/run-analysis.sh"]
+
+# Add labels
+LABEL org.opencontainers.image.title="GitHub MCP Code Analysis Agents"
+LABEL org.opencontainers.image.description="Docker container for running code analysis agents"
+LABEL org.opencontainers.image.version="1.0.0"
+LABEL org.opencontainers.image.authors="quanticsoul4772"
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD /app/scripts/health-check.sh
+
+# Expose volume for output
+VOLUME ["/app/output"]
+
+# Set working directory for analysis
+WORKDIR /app

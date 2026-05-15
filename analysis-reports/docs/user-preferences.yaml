@@ -1,0 +1,271 @@
+# GitHub MCP Tools Reference
+# Generated on 2025-08-12T17:06:39.682Z
+
+github-mcp:
+  list_repositories:
+    description: "List repositories for the authenticated user"
+    required: []
+    optional: ["username","org","type","sort","per_page"]
+    example: |
+      {
+        "type": "all",
+        "sort": "updated",
+        "per_page": 30
+      }
+
+  get_repository:
+    description: "Get details of a specific repository"
+    required: ["owner","repo"]
+    example: |
+      {
+        "owner": "quanticsoul4772",
+        "repo": "github-mcp"
+      }
+
+  create_repository:
+    description: "Create a new GitHub repository"
+    required: ["name"]
+    optional: ["description","private","auto_init","gitignore_template","license_template"]
+    example: |
+      {
+        "name": "my-new-repo",
+        "description": "A new repository",
+        "private": false,
+        "auto_init": true
+      }
+
+  get_issue:
+    description: "Get details of a specific GitHub issue"
+    required: ["owner","repo","issue_number"]
+    example: |
+      {
+        "owner": "quanticsoul4772",
+        "repo": "github-mcp",
+        "issue_number": 42
+      }
+
+  list_issues:
+    description: "List issues in a GitHub repository"
+    required: ["owner","repo"]
+    optional: ["state","assignee","creator","labels","sort","direction","per_page"]
+    example: |
+      {
+        "owner": "quanticsoul4772",
+        "repo": "github-mcp",
+        "state": "open",
+        "sort": "created"
+      }
+
+  create_issue:
+    description: "Create a new GitHub issue"
+    required: ["owner","repo","title"]
+    optional: ["body","assignees","labels","milestone"]
+    example: |
+      {
+        "owner": "quanticsoul4772",
+        "repo": "github-mcp",
+        "title": "Bug: Something is broken",
+        "body": "Detailed description of the issue",
+        "labels": [
+          "bug"
+        ]
+      }
+
+  update_issue:
+    description: "Update an existing GitHub issue"
+    required: ["owner","repo","issue_number"]
+    optional: ["title","body","state","assignees","labels","milestone"]
+    example: |
+      {
+        "owner": "quanticsoul4772",
+        "repo": "github-mcp",
+        "issue_number": 42,
+        "state": "closed"
+      }
+
+  get_pull_request:
+    description: "Get details of a specific pull request"
+    required: ["owner","repo","pull_number"]
+    example: |
+      {
+        "owner": "quanticsoul4772",
+        "repo": "github-mcp",
+        "pull_number": 10
+      }
+
+  list_pull_requests:
+    description: "List pull requests in a repository"
+    required: ["owner","repo"]
+    optional: ["state","head","base","sort","direction","per_page"]
+    example: |
+      {
+        "owner": "quanticsoul4772",
+        "repo": "github-mcp",
+        "state": "open"
+      }
+
+  create_pull_request:
+    description: "Create a new pull request"
+    required: ["owner","repo","title","head","base"]
+    optional: ["body","maintainer_can_modify","draft"]
+    example: |
+      {
+        "owner": "quanticsoul4772",
+        "repo": "github-mcp",
+        "title": "Feature: Add new functionality",
+        "head": "feature-branch",
+        "base": "main",
+        "body": "Description of changes"
+      }
+
+  merge_pull_request:
+    description: "Merge a pull request"
+    required: ["owner","repo","pull_number"]
+    optional: ["commit_title","commit_message","merge_method"]
+    example: |
+      {
+        "owner": "quanticsoul4772",
+        "repo": "github-mcp",
+        "pull_number": 10,
+        "merge_method": "squash"
+      }
+
+  get_file_contents:
+    description: "Get contents of a file from a repository"
+    required: ["owner","repo","path"]
+    optional: ["ref"]
+    example: |
+      {
+        "owner": "quanticsoul4772",
+        "repo": "github-mcp",
+        "path": "README.md",
+        "ref": "main"
+      }
+
+  create_or_update_file:
+    description: "Create or update a file in a repository"
+    required: ["owner","repo","path","message","content"]
+    optional: ["branch","sha","committer","author"]
+    example: |
+      {
+        "owner": "quanticsoul4772",
+        "repo": "github-mcp",
+        "path": "docs/new-file.md",
+        "message": "Add new documentation",
+        "content": "SGVsbG8gV29ybGQh",
+        "branch": "main"
+      }
+
+  search_repositories:
+    description: "Search for GitHub repositories"
+    required: ["q"]
+    optional: ["sort","order","per_page"]
+    example: |
+      {
+        "q": "language:typescript mcp",
+        "sort": "stars",
+        "order": "desc"
+      }
+
+  search_issues:
+    description: "Search for GitHub issues and pull requests"
+    required: ["q"]
+    optional: ["sort","order","per_page"]
+    example: |
+      {
+        "q": "is:issue is:open label:bug",
+        "sort": "created",
+        "order": "desc"
+      }
+
+  search_code:
+    description: "Search for code across GitHub repositories"
+    required: ["q"]
+    optional: ["sort","order","per_page"]
+    example: |
+      {
+        "q": "console.log repo:quanticsoul4772/github-mcp",
+        "sort": "indexed"
+      }
+
+  get_me:
+    description: "Get my GitHub user profile"
+    required: []
+
+  get_user:
+    description: "Get a GitHub user by username"
+    required: ["username"]
+    example: |
+      {
+        "username": "quanticsoul4772"
+      }
+
+  list_workflows:
+    description: "List GitHub Actions workflows in a repository"
+    required: ["owner","repo"]
+    optional: ["per_page"]
+    example: |
+      {
+        "owner": "quanticsoul4772",
+        "repo": "github-mcp"
+      }
+
+  list_workflow_runs:
+    description: "List runs for a specific workflow"
+    required: ["owner","repo","workflow_id"]
+    optional: ["status","branch","per_page"]
+    example: |
+      {
+        "owner": "quanticsoul4772",
+        "repo": "github-mcp",
+        "workflow_id": "ci.yml",
+        "status": "completed"
+      }
+
+  list_branches:
+    description: "List branches in a repository"
+    required: ["owner","repo"]
+    optional: ["protected","per_page"]
+    example: |
+      {
+        "owner": "quanticsoul4772",
+        "repo": "github-mcp",
+        "protected": true
+      }
+
+  create_branch:
+    description: "Create a new branch in a repository"
+    required: ["owner","repo","ref","sha"]
+    example: |
+      {
+        "owner": "quanticsoul4772",
+        "repo": "github-mcp",
+        "ref": "refs/heads/new-feature",
+        "sha": "aa218f56b14c9653891f9e74264a383fa43fefbd"
+      }
+
+  list_commits:
+    description: "List commits in a repository"
+    required: ["owner","repo"]
+    optional: ["sha","path","author","since","until","per_page"]
+    example: |
+      {
+        "owner": "quanticsoul4772",
+        "repo": "github-mcp",
+        "since": "2025-08-01T00:00:00Z",
+        "author": "quanticsoul4772"
+      }
+
+  get_commit:
+    description: "Get detailed information about a specific commit"
+    required: ["owner","repo","sha"]
+    example: |
+      {
+        "owner": "quanticsoul4772",
+        "repo": "github-mcp",
+        "sha": "aa218f56b14c9653891f9e74264a383fa43fefbd"
+      }
+
+  get_rate_limit_status:
+    description: "Get current GitHub API rate limit status"
+    required: []

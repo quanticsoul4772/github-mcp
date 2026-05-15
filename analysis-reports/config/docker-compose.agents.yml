@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  # Code analysis agents service
+  code-analysis:
+    build:
+      context: .
+      dockerfile: Dockerfile.agents
+      target: production
+    container_name: github-mcp-agents
+    volumes:
+      - ./src:/app/src:ro
+      - ./analysis-output:/app/output
+      - ./package.json:/app/package.json:ro
+      - ./tsconfig.json:/app/tsconfig.json:ro
+    environment:
+      - NODE_ENV=production
+      - ANALYSIS_DEPTH=deep
+      - TARGET_PATH=src/
+      - OUTPUT_FORMAT=json
+    command: ["/app/scripts/run-analysis.sh", "comprehensive", "src/", "json", "/app/output"]
+    restart: "no"
+    networks:
+      - analysis-network
+
+  # Quick analysis service
+  quick-analysis:
+    build:
+      context: .
+      dockerfile: Dockerfile.agents
+      target: production
+    container_name: github-mcp-quick-analysis
+    volumes:
+      - ./src:/app/src:ro
+      - ./analysis-output:/app/output
+    environment:
+      - NODE_ENV=production
+    command: ["/app/scripts/run-analysis.sh", "quick", "src/", "console", "/app/output"]
+    restart: "no"
+    networks:
+      - analysis-network
+
+  # Security analysis service
+  security-analysis:
+    build:
+      context: .
+      dockerfile: Dockerfile.agents
+      target: production
+    container_name: github-mcp-security-analysis
+    volumes:
+      - ./src:/app/src:ro
+      - ./analysis-output:/app/output
+    environment:
+      - NODE_ENV=production
+    command: ["/app/scripts/run-analysis.sh", "security", "src/", "json", "/app/output"]
+    restart: "no"
+    networks:
+      - analysis-network
+
+  # Test generation service
+  test-generation:
+    build:
+      context: .
+      dockerfile: Dockerfile.agents
+      target: production
+    container_name: github-mcp-test-generation
+    volumes:
+      - ./src:/app/src:ro
+      - ./analysis-output:/app/output
+    environment:
+      - NODE_ENV=production
+    command: ["/app/scripts/run-analysis.sh", "tests", "src/", "typescript", "/app/output"]
+    restart: "no"
+    networks:
+      - analysis-network
+
+  # Analysis dashboard (simple web server for reports)
+  analysis-dashboard:
+    image: nginx:alpine
+    container_name: github-mcp-analysis-dashboard
+    ports:
+      - "8080:80"
+    volumes:
+      - ./analysis-output:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - code-analysis
+    restart: unless-stopped
+    networks:
+      - analysis-network
+
+  # Agent health monitor
+  health-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile.agents
+      target: production
+    container_name: github-mcp-health-monitor
+    volumes:
+      - ./src:/app/src:ro
+      - ./analysis-output:/app/output
+    environment:
+      - NODE_ENV=production
+    command: ["/app/scripts/health-check.sh"]
+    restart: "no"
+    networks:
+      - analysis-network
+
+networks:
+  analysis-network:
+    driver: bridge
+
+volumes:
+  analysis-output:
+    driver: local

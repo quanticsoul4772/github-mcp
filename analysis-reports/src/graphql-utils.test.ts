@@ -1,0 +1,557 @@
+/**
+ * Tests for GraphQL utility functions
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import {
+  cachedGraphQL,
+  smartGraphQL,
+  batchCachedGraphQL,
+  GraphQLTTL,
+  getQueryOperation,
+  createGraphQLWrapper,
+  GraphQLQueries,
+  safeAccess,
+  validateResponseFields,
+  formatGraphQLError,
+  createTypedHandler,
+  paginatedGraphQL,
+  typedGraphQL,
+  validatedGraphQL,
+} from './graphql-utils.js';
+import { OptimizedAPIClient } from './optimized-api-client.js';
+import { createMockOctokit } from './__tests__/mocks/octokit.js';
+
+describe('GraphQL Utils', () => {
+  let mockOctokit: any;
+  let mockOptimizedClient: OptimizedAPIClient;
+
+  beforeEach(() => {
+    mockOctokit = createMockOctokit();
+    mockOptimizedClient = new OptimizedAPIClient({
+      octokit: mockOctokit,
+      enableGraphQLCache: true,
+    });
+  });
+
+  describe('cachedGraphQL', () => {
+    it('should use OptimizedAPIClient.graphql when available', async () => {
+      const query = 'query GetRepo { repository { name } }';
+      const variables = { owner: 'test', repo: 'test' };
+      const mockResponse = { repository: { name: 'test' } };
+
+      const graphqlSpy = vi.spyOn(mockOptimizedClient, 'graphql').mockResolvedValue(mockResponse);
+
+      const result = await cachedGraphQL(mockOptimizedClient, query, variables, { ttl: 1000 });
+
+      expect(result).toEqual(mockResponse);
+      expect(graphqlSpy).toHaveBeenCalledWith(query, variables, { ttl: 1000 });
+    });
+
+    it('should fallback to octokit.graphql for regular Octokit instance', async () => {
+      const query = 'query GetRepo { repository { name } }';
+      const variables = { owner: 'test', repo: 'test' };
+      const mockResponse = { repository: { name: 'test' } };
+
+      mockOctokit.graphql.mockResolvedValue(mockResponse);
+
+      const result = await cachedGraphQL(mockOctokit, query, variables);
+
+      expect(result).toEqual(mockResponse);
+      expect(mockOctokit.graphql).toHaveBeenCalledWith(query, variables);
+    });
+  });
+
+  describe('smartGraphQL', () => {
+    it('should execute regular queries normally', async () => {
+      const query = 'query GetRepo { repository { name } }';
+      const mockResponse = { repository: { name: 'test' } };
+
+      const graphqlSpy = vi.spyOn(mockOptimizedClient, 'graphql').mockResolvedValue(mockResponse);
+
+      const result = await smartGraphQL(mockOptimizedClient, query, {}, { ttl: 1000 });
+
+      expect(result).toEqual(mockResponse);
+      expect(graphqlSpy).toHaveBeenCalledWith(query, {}, { ttl: 1000 });
+    });
+
+    it('should invalidate cache for mutations', async () => {
+      const mutation = 'mutation CreateDiscussion { createDiscussion { id } }';
+      const mockResponse = { createDiscussion: { id: '123' } };
+
+      const graphqlSpy = vi.spyOn(mockOptimizedClient, 'graphql').mockResolvedValue(mockResponse);
+      const invalidateSpy = vi
+        .spyOn(mockOptimizedClient, 'invalidateGraphQLCacheForMutation')
+        .mockReturnValue(2);
+
+      const result = await smartGraphQL(
+        mockOptimizedClient,
+        mutation,
+        { owner: 'test', repo: 'test' },
+        { isMutation: true }
+      );
+
+      expect(result).toEqual(mockResponse);
+      expect(graphqlSpy).toHaveBeenCalledWith(
+        mutation,
+        { owner: 'test', repo: 'test' },
+        { isMutation: true }
+      );
+      expect(invalidateSpy).toHaveBeenCalledWith(mutation, { owner: 'test', repo: 'test' });
+    });
+
+    it('should not invalidate cache for regular queries', async () => {
+      const query = 'query GetRepo { repository { name } }';
+      const mockResponse = { repository: { name: 'test' } };
+
+      vi.spyOn(mockOptimizedClient, 'graphql').mockResolvedValue(mockResponse);
+      const invalidateSpy = vi.spyOn(mockOptimizedClient, 'invalidateGraphQLCacheForMutation');
+
+      await smartGraphQL(mockOptimizedClient, query);
+
+      expect(invalidateSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('batchCachedGraphQL', () => {
+    it('should execute multiple GraphQL queries', async () => {
+      const queries = [
+        {
+          query: 'query GetRepo1 { repository(owner: "test1", name: "repo1") { name } }',
+          variables: { owner: 'test1', repo: 'repo1' },
+        },
+        {
+          query: 'query GetRepo2 { repository(owner: "test2", name: "repo2") { name } }',
+          variables: { owner: 'test2', repo: 'repo2' },
+        },
+      ];
+
+      const mockResponses = [{ repository: { name: 'repo1' } }, { repository: { name: 'repo2' } }];
+
+      vi.spyOn(mockOptimizedClient, 'graphql')
+        .mockResolvedValueOnce(mockResponses[0])
+        .mockResolvedValueOnce(mockResponses[1]);
+
+      const results = await batchCachedGraphQL(mockOptimizedClient, queries);
+
+      expect(results).toEqual(mockResponses);
+      expect(mockOptimizedClient.graphql).toHaveBeenCalledTimes(2);
+    });
+
+    it('should handle mixed success and failure', async () => {
+      const queries = [
+        { query: 'query Success { repository { name } }' },
+        { query: 'query Failure { repository { name } }' },
+      ];
+
+      vi.spyOn(mockOptimizedClient, 'graphql')
+        .mockResolvedValueOnce({ repository: { name: 'success' } })
+        .mockRejectedValueOnce(new Error('GraphQL Error'));
+
+      await expect(batchCachedGraphQL(mockOptimizedClient, queries)).rejects.toThrow(
+        'GraphQL Error'
+      );
+    });
+  });
+
+  describe('GraphQLTTL constants', () => {
+    it('should provide appropriate TTL values', () => {
+      expect(GraphQLTTL.REPOSITORY_INSIGHTS).toBe(60 * 60 * 1000); // 1 hour
+      expect(GraphQLTTL.CONTRIBUTORS).toBe(6 * 60 * 60 * 1000); // 6 hours
+      expect(GraphQLTTL.SEARCH_RESULTS).toBe(15 * 60 * 1000); // 15 minutes
+      expect(GraphQLTTL.DEFAULT).toBe(5 * 60 * 1000); // 5 minutes
+    });
+
+    it('should have reasonable relationships between TTL values', () => {
+      // Long-term data should have longer TTL
+      expect(GraphQLTTL.CONTRIBUTORS).toBeGreaterThan(GraphQLTTL.REPOSITORY_INSIGHTS);
+      expect(GraphQLTTL.REPOSITORY_INSIGHTS).toBeGreaterThan(GraphQLTTL.DISCUSSIONS_LIST);
+      expect(GraphQLTTL.DISCUSSIONS_LIST).toBeGreaterThan(GraphQLTTL.SEARCH_RESULTS);
+    });
+  });
+
+  describe('getQueryOperation', () => {
+    it('should extract operation names from GraphQL queries', () => {
+      const testCases = [
+        { query: 'query GetRepository { repository { name } }', expected: 'GetRepository' },
+        {
+          query: 'mutation CreateDiscussion { createDiscussion { id } }',
+          expected: 'CreateDiscussion',
+        },
+        {
+          query: 'query GetUser($login: String!) { user(login: $login) { name } }',
+          expected: 'GetUser',
+        },
+        { query: '{ repository(owner: "test", name: "repo") { name } }', expected: 'repository' },
+        { query: 'invalid query', expected: 'unknown_operation' },
+      ];
+
+      testCases.forEach(({ query, expected }) => {
+        expect(getQueryOperation(query)).toBe(expected);
+      });
+    });
+  });
+
+  describe('createGraphQLWrapper', () => {
+    it('should create a wrapper with proper methods', () => {
+      const wrapper = createGraphQLWrapper(mockOptimizedClient);
+
+      expect(wrapper).toHaveProperty('query');
+      expect(wrapper).toHaveProperty('mutate');
+      expect(wrapper).toHaveProperty('execute');
+      expect(wrapper).toHaveProperty('getClient');
+      expect(typeof wrapper.query).toBe('function');
+      expect(typeof wrapper.mutate).toBe('function');
+      expect(typeof wrapper.execute).toBe('function');
+      expect(wrapper.getClient()).toBe(mockOptimizedClient);
+    });
+
+    it('should execute queries with caching', async () => {
+      const wrapper = createGraphQLWrapper(mockOptimizedClient);
+      const mockResponse = { repository: { name: 'test' } };
+
+      vi.spyOn(mockOptimizedClient, 'graphql').mockResolvedValue(mockResponse);
+
+      const result = await wrapper.query(
+        'query GetRepo { repository { name } }',
+        { owner: 'test' },
+        1000
+      );
+
+      expect(result).toEqual(mockResponse);
+      expect(mockOptimizedClient.graphql).toHaveBeenCalledWith(
+        'query GetRepo { repository { name } }',
+        { owner: 'test' },
+        { ttl: 1000, operation: 'GetRepo' }
+      );
+    });
+
+    it('should execute mutations with cache invalidation', async () => {
+      const wrapper = createGraphQLWrapper(mockOptimizedClient);
+      const mockResponse = { createDiscussion: { id: '123' } };
+
+      vi.spyOn(mockOptimizedClient, 'graphql').mockResolvedValue(mockResponse);
+      const invalidateSpy = vi
+        .spyOn(mockOptimizedClient, 'invalidateGraphQLCacheForMutation')
+        .mockReturnValue(1);
+
+      const result = await wrapper.mutate('mutation CreateDiscussion { createDiscussion { id } }', {
+        title: 'Test',
+      });
+
+      expect(result).toEqual(mockResponse);
+      expect(invalidateSpy).toHaveBeenCalled();
+    });
+
+    it('should call mutate without variables (|| {} branch on line 213)', async () => {
+      const wrapper = createGraphQLWrapper(mockOptimizedClient);
+      vi.spyOn(mockOptimizedClient, 'graphql').mockResolvedValue({ done: true });
+      vi.spyOn(mockOptimizedClient, 'invalidateGraphQLCacheForMutation').mockReturnValue(0);
+      const result = await wrapper.mutate('mutation DoSomething { doSomething { ok } }');
+      expect(result).toEqual({ done: true });
+    });
+
+    it('should call execute without variables (|| {} branch on line 231)', async () => {
+      const wrapper = createGraphQLWrapper(mockOptimizedClient);
+      vi.spyOn(mockOptimizedClient, 'graphql').mockResolvedValue({ data: 'ok' });
+      const result = await wrapper.execute('query { viewer { login } }');
+      expect(result).toEqual({ data: 'ok' });
+    });
+  });
+
+  describe('GraphQLQueries helpers', () => {
+    it('should provide repository insights query configuration', () => {
+      const config = GraphQLQueries.repositoryInsights('test', 'repo');
+
+      expect(config).toHaveProperty('query');
+      expect(config).toHaveProperty('variables');
+      expect(config).toHaveProperty('operation');
+      expect(config).toHaveProperty('ttl');
+      expect(config.variables).toEqual({ owner: 'test', repo: 'repo' });
+      expect(config.operation).toBe('GetRepositoryInsights');
+      expect(config.ttl).toBe(GraphQLTTL.REPOSITORY_INSIGHTS);
+    });
+
+    it('should provide discussions list query configuration', () => {
+      const config = GraphQLQueries.discussionsList('test', 'repo', 50, 'cursor123', 'category456');
+
+      expect(config.variables).toEqual({
+        owner: 'test',
+        repo: 'repo',
+        first: 50,
+        after: 'cursor123',
+        categoryId: 'category456',
+      });
+      expect(config.operation).toBe('ListDiscussions');
+      expect(config.ttl).toBe(GraphQLTTL.DISCUSSIONS_LIST);
+    });
+
+    it('should provide contributor stats query configuration', () => {
+      const config = GraphQLQueries.contributorStats('test', 'repo', 10);
+
+      expect(config.variables).toEqual({ owner: 'test', repo: 'repo', first: 10 });
+      expect(config.operation).toBe('GetContributorStats');
+      expect(config.ttl).toBe(GraphQLTTL.CONTRIBUTORS);
+    });
+
+    it('should use default values when optional parameters are not provided', () => {
+      const config = GraphQLQueries.discussionsList('test', 'repo');
+
+      expect(config.variables.first).toBe(25);
+      expect(config.variables.after).toBeUndefined();
+      expect(config.variables.categoryId).toBeUndefined();
+    });
+  });
+
+  describe('Error handling in utils', () => {
+    it('should handle errors in batch operations gracefully', async () => {
+      const queries = [
+        { query: 'query Success { repository { name } }' },
+        { query: 'query Failure { repository { name } }' },
+      ];
+
+      vi.spyOn(mockOptimizedClient, 'graphql')
+        .mockResolvedValueOnce({ repository: { name: 'success' } })
+        .mockRejectedValueOnce(new Error('API Error'));
+
+      // Should propagate the error
+      await expect(batchCachedGraphQL(mockOptimizedClient, queries)).rejects.toThrow('API Error');
+    });
+
+    it('should handle wrapper method errors', async () => {
+      const wrapper = createGraphQLWrapper(mockOptimizedClient);
+
+      vi.spyOn(mockOptimizedClient, 'graphql').mockRejectedValue(new Error('GraphQL Error'));
+
+      await expect(wrapper.query('query { test }')).rejects.toThrow('GraphQL Error');
+    });
+  });
+
+  // ============================================================================
+  // safeAccess
+  // ============================================================================
+
+  describe('safeAccess', () => {
+    it('should access a nested field', () => {
+      const obj = { a: { b: { c: 42 } } };
+      expect(safeAccess(obj, ['a', 'b', 'c'], 0)).toBe(42);
+    });
+
+    it('should return defaultValue when path does not exist', () => {
+      expect(safeAccess({ a: {} }, ['a', 'b', 'c'], 'default')).toBe('default');
+    });
+
+    it('should return defaultValue for null object', () => {
+      expect(safeAccess(null, ['a'], 'fallback')).toBe('fallback');
+    });
+
+    it('should return defaultValue for null intermediate', () => {
+      expect(safeAccess({ x: null }, ['x', 'y'], -1)).toBe(-1);
+    });
+
+    it('should return defaultValue when final value is null', () => {
+      expect(safeAccess({ a: null }, ['a'], 'default')).toBe('default');
+    });
+
+    it('should handle non-object intermediary', () => {
+      expect(safeAccess({ a: 'string' }, ['a', 'b'], 'default')).toBe('default');
+    });
+  });
+
+  // ============================================================================
+  // validateResponseFields
+  // ============================================================================
+
+  describe('validateResponseFields', () => {
+    it('should return true when all required paths exist', () => {
+      const response = { data: { viewer: { login: 'octocat' } } };
+      expect(validateResponseFields(response, [['data', 'viewer', 'login']])).toBe(true);
+    });
+
+    it('should return false when a required path is missing', () => {
+      expect(validateResponseFields({ data: { viewer: {} } }, [['data', 'viewer', 'login']])).toBe(false);
+    });
+
+    it('should return true for empty required fields list', () => {
+      expect(validateResponseFields({}, [])).toBe(true);
+    });
+
+    it('should return false when response is null', () => {
+      expect(validateResponseFields(null, [['a']])).toBe(false);
+    });
+
+    it('should return false when one of multiple paths is missing', () => {
+      expect(validateResponseFields({ data: { a: 1 } }, [['data', 'a'], ['data', 'b']])).toBe(false);
+    });
+  });
+
+  // ============================================================================
+  // formatGraphQLError
+  // ============================================================================
+
+  describe('formatGraphQLError', () => {
+    it('should format error from response.data.errors array', () => {
+      const error = {
+        response: { data: { errors: [{ message: 'Field not found' }, { message: 'Access denied' }] } },
+      };
+      expect(formatGraphQLError(error)).toBe('Field not found; Access denied');
+    });
+
+    it('should return error.message when no response errors', () => {
+      expect(formatGraphQLError({ message: 'GraphQL error' })).toBe('GraphQL error');
+    });
+
+    it('should return default message for unknown errors', () => {
+      expect(formatGraphQLError({})).toBe('An unknown error occurred while executing GraphQL query');
+    });
+
+    it('should return default message for null', () => {
+      expect(formatGraphQLError(null)).toBe('An unknown error occurred while executing GraphQL query');
+    });
+
+    it('should handle errors array item with missing message', () => {
+      const error = { response: { data: { errors: [{}] } } };
+      expect(formatGraphQLError(error)).toBe('Unknown GraphQL error');
+    });
+
+    it('should fall through to message when errors array is empty', () => {
+      const error = { response: { data: { errors: [] } }, message: 'fallback' };
+      expect(formatGraphQLError(error)).toBe('fallback');
+    });
+  });
+
+  // ============================================================================
+  // createTypedHandler
+  // ============================================================================
+
+  describe('createTypedHandler', () => {
+    it('should wrap a handler to accept unknown args', async () => {
+      const handler = vi.fn().mockResolvedValue({ result: 'ok' });
+      const typed = createTypedHandler(handler);
+      const result = await typed({ param: 'value' });
+      expect(result).toEqual({ result: 'ok' });
+      expect(handler).toHaveBeenCalledWith({ param: 'value' });
+    });
+  });
+
+  describe('paginatedGraphQL', () => {
+    it('should fetch all pages when hasNextPage is true then false', async () => {
+      const page1 = { data: [1], pageInfo: { hasNextPage: true, endCursor: 'cursor1' } };
+      const page2 = { data: [2], pageInfo: { hasNextPage: false, endCursor: null } };
+      mockOctokit.graphql = vi.fn()
+        .mockResolvedValueOnce(page1)
+        .mockResolvedValueOnce(page2);
+
+      const results = await paginatedGraphQL(
+        mockOctokit,
+        '{ items(first: $first, after: $after) { pageInfo { hasNextPage endCursor } } }',
+        {},
+        25,
+        10
+      );
+      expect(results).toHaveLength(2);
+      expect(mockOctokit.graphql).toHaveBeenCalledTimes(2);
+    });
+
+    it('should stop after maxPages', async () => {
+      const page = { data: [1], pageInfo: { hasNextPage: true, endCursor: 'c' } };
+      mockOctokit.graphql = vi.fn().mockResolvedValue(page);
+
+      const results = await paginatedGraphQL(mockOctokit, '{ query }', {}, 25, 3);
+      expect(results).toHaveLength(3);
+      expect(mockOctokit.graphql).toHaveBeenCalledTimes(3);
+    });
+
+    it('should return single page when hasNextPage is false', async () => {
+      const page = { data: [1, 2], pageInfo: { hasNextPage: false, endCursor: null } };
+      mockOctokit.graphql = vi.fn().mockResolvedValue(page);
+      const results = await paginatedGraphQL(mockOctokit, '{ query }');
+      expect(results).toHaveLength(1);
+    });
+  });
+
+  // ============================================================================
+  // typedGraphQL
+  // ============================================================================
+
+  describe('typedGraphQL', () => {
+    it('should return response on success', async () => {
+      const mockResponse = { repository: { name: 'test' } };
+      mockOctokit.graphql = vi.fn().mockResolvedValue(mockResponse);
+      const result = await typedGraphQL(mockOctokit, '{ repository { name } }');
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should re-throw non-GraphQL errors', async () => {
+      mockOctokit.graphql = vi.fn().mockRejectedValue(new Error('network error'));
+      await expect(typedGraphQL(mockOctokit, '{ repo }')).rejects.toThrow('network error');
+    });
+
+    it('should format GraphQL response errors', async () => {
+      const graphqlError = {
+        response: { data: { errors: [{ message: 'Field not found' }, { message: 'Syntax error' }] } },
+      };
+      mockOctokit.graphql = vi.fn().mockRejectedValue(graphqlError);
+      await expect(typedGraphQL(mockOctokit, '{ repo }')).rejects.toThrow(
+        'GraphQL errors: Field not found, Syntax error'
+      );
+    });
+
+    it('should re-throw error objects without response field', async () => {
+      const err = { code: 'SOME_ERROR', message: 'some error' };
+      mockOctokit.graphql = vi.fn().mockRejectedValue(err);
+      await expect(typedGraphQL(mockOctokit, '{ repo }')).rejects.toEqual(err);
+    });
+  });
+
+  // ============================================================================
+  // validatedGraphQL
+  // ============================================================================
+
+  describe('validatedGraphQL', () => {
+    it('should return result when validator passes', async () => {
+      const mockResponse = { data: { name: 'hello' } };
+      mockOctokit.graphql = vi.fn().mockResolvedValue(mockResponse);
+      const result = await validatedGraphQL(
+        mockOctokit,
+        '{ data { name } }',
+        {},
+        (d): d is typeof mockResponse => d !== null
+      );
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should throw when validator fails', async () => {
+      mockOctokit.graphql = vi.fn().mockResolvedValue({ data: null });
+      await expect(
+        validatedGraphQL(mockOctokit, '{ data }', {}, (d): d is never => false)
+      ).rejects.toThrow('GraphQL response failed validation');
+    });
+
+    it('should return result when no validator provided', async () => {
+      const mockResponse = { name: 'test' };
+      mockOctokit.graphql = vi.fn().mockResolvedValue(mockResponse);
+      const result = await validatedGraphQL(mockOctokit, '{ name }');
+      expect(result).toEqual(mockResponse);
+    });
+  });
+
+  // ============================================================================
+  // createGraphQLWrapper getClient
+  // ============================================================================
+
+  describe('createGraphQLWrapper getClient', () => {
+    it('should return the underlying client', () => {
+      const wrapper = createGraphQLWrapper(mockOptimizedClient);
+      expect(wrapper.getClient()).toBe(mockOptimizedClient);
+    });
+
+    it('execute should call smartGraphQL with options', async () => {
+      const mockResponse = { data: 'result' };
+      vi.spyOn(mockOptimizedClient, 'graphql').mockResolvedValue(mockResponse);
+      const wrapper = createGraphQLWrapper(mockOptimizedClient);
+      const result = await wrapper.execute('{ data }', { id: 1 }, { ttl: 500 });
+      expect(result).toEqual(mockResponse);
+    });
+  });
+});

@@ -1,0 +1,51 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: github-mcp-kustomization
+
+# Common labels applied to all resources
+commonLabels:
+  app: github-mcp
+  environment: production
+
+# Common annotations applied to all resources
+commonAnnotations:
+  deployed-by: kustomize
+  version: "1.0.0"
+
+# Resources to include in the kustomization
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  - hpa.yaml
+
+# Images to replace
+images:
+  - name: github-mcp
+    newName: github-mcp
+    newTag: latest
+
+# Namespace to deploy all resources to
+namespace: github-mcp
+
+# Patches for different environments
+patches:
+  # Production specific patches
+  - target:
+      kind: Deployment
+      name: github-mcp
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "256Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "512Mi"
