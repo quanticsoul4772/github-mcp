@@ -145,7 +145,7 @@ jobs:
 
       - name: Upload quick analysis results
         if: steps.quick_analysis.outputs.analysis_needed == 'true'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: quick-analysis-results
           path: quick-analysis-results.json
@@ -328,7 +328,7 @@ jobs:
 
       - name: Upload analysis reports
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: analysis-reports-${{ github.run_number }}
           path: |
@@ -538,7 +538,7 @@ jobs:
           delete-branch: true
 
       - name: Upload test generation results
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: generated-tests-${{ github.run_number }}
           path: |
@@ -664,7 +664,7 @@ jobs:
 
       - name: Upload security analysis results
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: security-analysis-${{ github.run_number }}
           path: |
@@ -824,7 +824,7 @@ jobs:
           node performance_analysis.mjs
 
       - name: Upload performance analysis results
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: performance-analysis-${{ github.run_number }}
           path: |
